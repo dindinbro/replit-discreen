@@ -1,4 +1,6 @@
-const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+function getWebhookUrl(): string | undefined {
+  return process.env.DISCORD_WEBHOOK_URL;
+}
 
 interface WebhookOptions {
   title: string;
@@ -40,7 +42,11 @@ function sep(): string {
 }
 
 export async function sendWebhook(options: WebhookOptions): Promise<void> {
-  if (!WEBHOOK_URL) return;
+  const url = getWebhookUrl();
+  if (!url) {
+    console.warn("[webhook] DISCORD_WEBHOOK_URL not set, skipping");
+    return;
+  }
 
   try {
     const embed: any = {
@@ -58,13 +64,16 @@ export async function sendWebhook(options: WebhookOptions): Promise<void> {
     };
     if (options.content) payload.content = options.content;
 
-    await fetch(WEBHOOK_URL, {
+    const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (!resp.ok) {
+      console.error(`[webhook] Discord returned ${resp.status}: ${await resp.text().catch(() => "")}`);
+    }
   } catch (err) {
-    console.error("Webhook send error:", err);
+    console.error("[webhook] Send error:", err);
   }
 }
 
