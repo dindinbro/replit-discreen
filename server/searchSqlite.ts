@@ -279,7 +279,11 @@ export async function initSearchDatabases(): Promise<void> {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  await syncDatabasesFromS3(dataDir);
+  if (process.env.SKIP_S3_SYNC === "true") {
+    console.log("[s3sync] SKIP_S3_SYNC=true — skipping remote sync");
+  } else {
+    await syncDatabasesFromS3(dataDir);
+  }
 
   const dbFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith(".db"));
   if (dbFiles.length > 0) {

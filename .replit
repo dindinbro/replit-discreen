@@ -50,3 +50,4 @@ expertMode = true
 [userenv.shared]
 S3_BUCKET = "discreen"
 S3_REGION = "auto"
+SKIP_S3_SYNC = "true"
