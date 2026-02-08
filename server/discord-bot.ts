@@ -776,7 +776,7 @@ export async function startDiscordBot() {
         let email = "Inconnu";
         let username = "Inconnu";
         let createdAt: Date | null = null;
-        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (supabaseUrl && supabaseKey) {
           const supaAdmin = createClient(supabaseUrl, supabaseKey);
@@ -862,7 +862,7 @@ export async function startDiscordBot() {
         await storage.upsertSubscription(sub.userId, plan as PlanTier);
 
         let email = "Inconnu";
-        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (supabaseUrl && supabaseKey) {
           const supaAdmin = createClient(supabaseUrl, supabaseKey);
@@ -975,7 +975,7 @@ export async function startDiscordBot() {
         type ServiceStatus = "operational" | "degraded" | "down";
         const services: { name: string; status: ServiceStatus }[] = [];
 
-        const siteOk = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const siteOk = !!(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
         let dbOk = false;
         try {
           await storage.getAllUsers();

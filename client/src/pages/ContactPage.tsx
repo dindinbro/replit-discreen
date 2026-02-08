@@ -61,32 +61,32 @@ export default function ContactPage() {
             </Card>
           </div>
 
-          <div className="max-w-lg mx-auto pt-2">
-            <Card className="p-8 text-center space-y-4">
-              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <ShieldBan className="w-7 h-7 text-primary" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto pt-4">
+            <Card className="p-6 text-center space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <ShieldBan className="w-6 h-6 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold" data-testid="text-blacklist-contact">Demande de Blacklist</h2>
-                <p className="text-sm text-muted-foreground">Vous souhaitez faire retirer vos donnees ? Soumettez une demande de suppression.</p>
+                <h2 className="font-semibold" data-testid="text-blacklist-contact">Demande de Blacklist</h2>
+                <p className="text-xs text-muted-foreground">Vous souhaitez faire retirer vos donnees ? Soumettez une demande.</p>
               </div>
               <Link href="/blacklist-request">
-                <Button variant="outline" className="gap-2" data-testid="button-blacklist-request">
+                <Button variant="outline" className="w-full gap-2" data-testid="button-blacklist-request">
                   Faire une demande
                 </Button>
               </Link>
             </Card>
 
-            <Card className="p-8 text-center space-y-4">
-              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <Search className="w-7 h-7 text-primary" />
+            <Card className="p-6 text-center space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <Search className="w-6 h-6 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold" data-testid="text-info-contact">Demande d'Information</h2>
-                <p className="text-sm text-muted-foreground">Vous souhaitez obtenir les informations d'une personne ? Soumettez une demande.</p>
+                <h2 className="font-semibold" data-testid="text-info-contact">Demande d'Information</h2>
+                <p className="text-xs text-muted-foreground">Vous souhaitez obtenir des informations ? Soumettez une demande.</p>
               </div>
               <Link href="/info-request">
-                <Button variant="outline" className="gap-2" data-testid="button-info-request">
+                <Button variant="outline" className="w-full gap-2" data-testid="button-info-request">
                   Faire une demande
                 </Button>
               </Link>
