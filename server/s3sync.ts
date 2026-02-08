@@ -1,4 +1,4 @@
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import path from "path";
 import { Readable } from "stream";
@@ -114,4 +114,159 @@ export async function syncDatabasesFromS3(dataDir: string): Promise<string[]> {
   }
 
   return downloaded;
+}
+
+export async function uploadFileToS3(localPath: string, remoteKey?: string): Promise<boolean> {
+  const config = getS3Config();
+  if (!config) {
+    console.error("[s3sync] S3 not configured — cannot upload");
+    return false;
+  }
+
+  const client = createS3Client(config);
+  const filename = path.basename(localPath);
+  const key = remoteKey || (config.prefix ? `${config.prefix}${filename}` : filename);
+
+  try {
+    const fileBuffer = fs.readFileSync(localPath);
+    const sizeInMB = (fileBuffer.length / 1024 / 1024).toFixed(1);
+    console.log(`[s3sync] Uploading ${filename} (${sizeInMB} MB) to ${key}...`);
+
+    await client.send(new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: fileBuffer,
+    }));
+
+    console.log(`[s3sync] ${filename} uploaded successfully`);
+    return true;
+  } catch (err) {
+    console.error(`[s3sync] Error uploading ${filename}:`, err);
+    return false;
+  }
+}
+
+export async function uploadDirectoryToS3(dirPath: string, remotePrefix?: string): Promise<string[]> {
+  const config = getS3Config();
+  if (!config) {
+    console.error("[s3sync] S3 not configured — cannot upload");
+    return [];
+  }
+
+  const prefix = remotePrefix ?? config.prefix;
+  const uploaded: string[] = [];
+
+  function getAllFiles(dir: string, baseDir: string): string[] {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const files: string[] = [];
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...getAllFiles(fullPath, baseDir));
+      } else {
+        files.push(fullPath);
+      }
+    }
+    return files;
+  }
+
+  const files = getAllFiles(dirPath, dirPath);
+  console.log(`[s3sync] Found ${files.length} files to upload from ${dirPath}`);
+
+  for (const filePath of files) {
+    const relativePath = path.relative(dirPath, filePath);
+    const key = prefix ? `${prefix}${relativePath}` : relativePath;
+    const success = await uploadFileToS3(filePath, key);
+    if (success) {
+      uploaded.push(relativePath);
+    }
+  }
+
+  console.log(`[s3sync] Upload complete: ${uploaded.length}/${files.length} files uploaded`);
+  return uploaded;
+}
+
+export async function downloadFileFromS3(remoteKey: string, localPath: string): Promise<boolean> {
+  const config = getS3Config();
+  if (!config) {
+    console.error("[s3sync] S3 not configured — cannot download");
+    return false;
+  }
+
+  const client = createS3Client(config);
+
+  try {
+    console.log(`[s3sync] Downloading ${remoteKey}...`);
+    const response = await client.send(new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: remoteKey,
+    }));
+
+    if (response.Body) {
+      const dir = path.dirname(localPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const tmpPath = localPath + ".tmp";
+      const writeStream = fs.createWriteStream(tmpPath);
+      await pipeline(response.Body as Readable, writeStream);
+      fs.renameSync(tmpPath, localPath);
+      const sizeInMB = (fs.statSync(localPath).size / 1024 / 1024).toFixed(1);
+      console.log(`[s3sync] Downloaded ${remoteKey} (${sizeInMB} MB)`);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error(`[s3sync] Error downloading ${remoteKey}:`, err);
+    return false;
+  }
+}
+
+export async function listS3Files(prefix?: string): Promise<{ key: string; size: number; lastModified?: Date }[]> {
+  const config = getS3Config();
+  if (!config) {
+    console.error("[s3sync] S3 not configured — cannot list");
+    return [];
+  }
+
+  const client = createS3Client(config);
+  const searchPrefix = prefix ?? config.prefix;
+
+  try {
+    const response = await client.send(new ListObjectsV2Command({
+      Bucket: config.bucket,
+      Prefix: searchPrefix,
+    }));
+
+    return (response.Contents || []).map(obj => ({
+      key: obj.Key || "",
+      size: obj.Size || 0,
+      lastModified: obj.LastModified,
+    }));
+  } catch (err) {
+    console.error("[s3sync] Error listing files:", err);
+    return [];
+  }
+}
+
+export async function deleteFileFromS3(remoteKey: string): Promise<boolean> {
+  const config = getS3Config();
+  if (!config) {
+    console.error("[s3sync] S3 not configured — cannot delete");
+    return false;
+  }
+
+  const client = createS3Client(config);
+
+  try {
+    await client.send(new DeleteObjectCommand({
+      Bucket: config.bucket,
+      Key: remoteKey,
+    }));
+    console.log(`[s3sync] Deleted ${remoteKey}`);
+    return true;
+  } catch (err) {
+    console.error(`[s3sync] Error deleting ${remoteKey}:`, err);
+    return false;
+  }
 }
