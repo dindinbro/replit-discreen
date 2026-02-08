@@ -310,6 +310,64 @@ export async function startDiscordBot() {
         }
       }
     }
+
+    // Auto-sync approved vouches from Discord channel
+    try {
+      const vouchCh = client?.channels.cache.get("1469798983168688219") ||
+        await client?.channels.fetch("1469798983168688219").catch(() => null);
+      if (vouchCh && vouchCh.isTextBased() && "messages" in vouchCh) {
+        let imported = 0;
+        let lastId: string | undefined;
+        let allMessages: any[] = [];
+
+        // Fetch all messages (100 at a time)
+        while (true) {
+          const fetched = await (vouchCh as any).messages.fetch({ limit: 100, ...(lastId ? { before: lastId } : {}) });
+          if (fetched.size === 0) break;
+          allMessages = allMessages.concat(Array.from(fetched.values()));
+          lastId = fetched.last()?.id;
+          if (fetched.size < 100) break;
+        }
+
+        for (const msg of allMessages) {
+          const embed = msg.embeds?.[0];
+          if (!embed || !embed.title?.includes("Approuve")) continue;
+
+          const discordIdField = embed.fields?.find((f: any) => f.name === "ID Discord");
+          const auteurField = embed.fields?.find((f: any) => f.name === "Auteur");
+          const noteField = embed.fields?.find((f: any) => f.name === "Note");
+
+          if (!discordIdField || !auteurField || !noteField) continue;
+
+          const discordUserId = discordIdField.value;
+          const existing = await storage.getVouchByDiscordUser(discordUserId);
+          if (existing) continue;
+
+          const discordUsername = auteurField.value;
+          const rating = (noteField.value.match(/★/g) || []).length;
+          const comment = embed.description || "";
+          const discordAvatar = embed.thumbnail?.url || "";
+
+          await storage.createVouch({
+            discordUserId,
+            discordUsername,
+            discordAvatar,
+            rating,
+            comment,
+          });
+          imported++;
+          log(`Re-imported vouch from ${discordUsername}`, "discord");
+        }
+
+        if (imported > 0) {
+          log(`Vouch sync complete: ${imported} vouches re-imported from Discord`, "discord");
+        } else {
+          log(`Vouch sync complete: all vouches already in database`, "discord");
+        }
+      }
+    } catch (err) {
+      log(`Error syncing vouches from Discord: ${err}`, "discord");
+    }
   });
 
   const soutienRoleId = "1469926673582653648";
