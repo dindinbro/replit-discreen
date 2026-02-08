@@ -1465,7 +1465,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Code langue invalide." });
       }
 
-      const leakosintToken = process.env.LEAKOSINT_API_KEY;
+      const leakosintToken = process.env.LEAK_OSINT_API_KEY || process.env.LEAKOSINT_API_KEY;
       if (!leakosintToken) {
         console.error("LEAKOSINT_API_KEY not configured");
         return res.status(500).json({ message: "Service LeakOSINT non configure." });

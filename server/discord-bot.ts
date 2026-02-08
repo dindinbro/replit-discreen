@@ -993,7 +993,7 @@ export async function startDiscordBot() {
         });
 
         const breachOk = !!process.env.BREACH_API_KEY;
-        const leakOk = !!process.env.LEAKOSINT_API_KEY;
+        const leakOk = !!process.env.LEAK_OSINT_API_KEY || !!process.env.LEAKOSINT_API_KEY;
         const plisioOk = !!process.env.PLISIO_API_KEY;
         services.push({
           name: "API",
