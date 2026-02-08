@@ -1,0 +1,135 @@
+Salut, j’ai un projet de site web appelé Skorpion.
+
+Le but : créer un moteur de recherche type IntelX (mais dans mon cas c’est du RP / données fictives), qui permet de chercher une info dans des dumps et d’afficher les résultats par source (nom du fichier).
+
+1) Données / stockage
+
+J’ai 2 bases SQLite énormes :
+
+index.db
+
+incoming.db (très grosse, ~86 Go)
+
+Les 2 DB ont une table FTS5 appelée records avec 2 colonnes :
+
+source (nom du fichier / dataset d’origine)
+
+content (la ligne brute)
+
+Schéma :
+
+CREATE VIRTUAL TABLE records USING fts5(source, content);
+
+2) Recherche
+
+Je veux que le site fasse la recherche dans les deux DB en même temps, sans les fusionner (car trop lourd).
+
+Le backend doit donc :
+
+chercher dans index.db
+
+chercher dans incoming.db
+
+fusionner les résultats côté serveur
+
+afficher les résultats groupés par source
+
+Avec des limites :
+
+max 1000 résultats total
+
+max 200 résultats par source
+
+3) UI / filtres (important)
+
+Je veux une interface comme les screens que je t’ai envoyés :
+
+Au début : aucun filtre
+
+L’utilisateur clique sur “Ajouter un critère”
+
+Un menu dropdown apparaît avec tous les filtres possibles
+
+Quand l’utilisateur clique un filtre, ça crée une ligne (tag + input + bouton X)
+Exemple :
+[Email] _________valeur________ [X]
+
+Filtres disponibles :
+
+Nom d'utilisateur
+
+Nom d'affichage
+
+Adresse MAC
+
+Adresse IP
+
+Adresse Email
+
+Adresse
+
+Nom
+
+Prenom
+
+Numéro de sécurité sociale
+
+Numéro de Téléphone
+
+Genre
+
+Date de naissance
+
+Année de naissance
+
+IBAN
+
+BIC
+
+Hashed Password
+
+Password
+
+VIN / Plaque
+
+Discord ID
+
+4) Style / Design
+
+Je veux une DA blanc + vert (propre, moderne), pas du vert néon agressif.
+
+Nom du site : Skorpion
+
+5) Objectif final : API
+
+Je veux aussi une API qui centralise la recherche.
+
+Objectif :
+
+le site web consomme l’API
+
+plus tard je pourrai faire d’autres outils (bot Discord, CLI, etc.) qui utilisent la même API
+
+Idéalement :
+
+endpoints type /search
+
+paramètres : query + filtres + opérateur AND/OR/NOT + exact match + case sensitive
+
+pagination plus tard
+
+6) Résultats attendus
+
+Les résultats doivent s’afficher par source, comme :
+
+source1.txt (20 lignes)
+  - ligne 1
+  - ligne 2
+  ...
+
+source2.json (5 lignes)
+  - ligne 1
+  ...
+
+
+Je veux une structure propre et stable, capable de gérer des bases énormes (dont une à 86 Go), sans tout charger en RAM.

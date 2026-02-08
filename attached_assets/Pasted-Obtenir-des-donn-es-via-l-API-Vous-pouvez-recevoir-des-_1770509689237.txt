@@ -1,0 +1,171 @@
+Obtenir des données via l'API
+Vous pouvez recevoir des données automatiquement à l'aide de l'API. Pour ce faire, vous devez écrire une commande / API dans le bot et obtenir votre jeton personnel. Initialement, il aura 100 demandes gratuites qui permettra de tester le système. À leur fin, l'argent commencera à dépenser de l'argent de votre solde.
+
+Le prix de la demande dépend du type de demande et de la limite de recherche spécifiée. Par défaut, la limite est de 100, avec une telle limite, la plupart des demandes coûteront 0,003 $.
+
+La formule de calcul des prix en dollars est la suivante:
+
+0.0002 * (5 + sqrt(Limit * Complexity))
+Limit est une limite de recherche que vous avez spécifiée (par exemple, 100).
+La complexité est un paramètre reflétant le nombre de recherches uniques qui doivent être effectuées pour votre demande.
+Si la demande se compose de plusieurs mots, ils recherchent dans tous les réarrangements possibles, et donc la complexité dépend du nombre de mots dans votre demande. Voici un exemple de calcul de la complexité:
+
+1 mot: Complexity = 1
+2 mots: Complexity = 5
+3 mots: Complexity = 16
+Plus de 3 mots: Complexity = 40
+De plus, les éléments suivants ne sont pas considérés comme les mots:
+
+Dates
+Les lignes sont plus courtes que 4 caractères
+Nombres moins courts que 6 caractères
+Si vous devez éviter de diviser votre requête en mots par espaces, utilisez des guillemets doubles. Les phrases entre guillemets doubles sont traitées comme un seul mot.
+
+Note: La limite de la fréquence des requêtes provenant d'une IP est de 3 requêtes par seconde. Si vous devez exécuter plus de requêtes, vous pouvez combiner plusieurs requêtes en une seule ou créer une clé distincte dans l'onglet /app.
+Demander des paramètres
+Paramètre	Description
+'token'	Le jeton que vous recevez après avoir exécuté la commande /api.
+'request'	Une ligne avec votre demande ou un tableau de lignes avec plusieurs demandes.
+'limit'	Limite de recherche (par défaut 100). Le nombre est de 100 à 10 000. Il détermine le nombre de résultats renvoyés et la plage de recherche dans la base de données.
+'lang'	Le code linguistique sur lequel il y aura les résultats de la demande (par défaut en ).
+'type'	Type de rapport: json, short, html (Par défaut json).
+'bot_name'	Le nom du bot au format @name (il est nécessaire d'indiquer si le bot ne s'applique pas au groupe principal de miroirs).
+Exemples de demandes
+Exemple 1:
+
+{"token":"987654321:b42vAQjW", "request":"google"}
+        
+Exemple 2:
+
+{"token":"987654321:b42vAQjW", "request":"Petya Ivanov ", "lang": "ru"}
+        
+Exemple 3:
+
+{"token":"987654321:b42vAQjW", "request":"example@gmail.com", "limit": 300}
+        
+Exemple 4:
+
+{"token":"987654321:b42vAQjW", "request":"Elon Reeve Musk", "limit": 100, "lang":"ru"}
+        
+Exemple 5:
+
+{"token":"987654321:b42vAQjW", "request":"example@gmail.com\nElon Reeve Musk"}
+        
+Exemple 6:
+
+{"token":"987654321:b42vAQjW", "request":["example@gmail.com","Elon Reeve Musk"]}
+        
+Пример кода (Python)
+Пример использования API на языке Python:
+
+import requests
+
+data = {"token":"987654321:Vg41g0qY", "request":"test request", "limit": 100, "lang":"ru"}
+url = 'https://leakosintapi.com/'
+response = requests.post(url, json=data)
+print(response.json())
+        
+Veuillez noter: Les données de requête sont envoyées au format JSON. Si vous envoyez le formulaire de paramètres de demande, vous obtiendrez une erreur 501.
+
+Un exemple de combat télégramme basé sur l'API:
+
+import requests
+from random import randint
+try:
+    import telebot
+    from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+except ModuleNotFoundError:
+    input("Il n'y a pas de bibliothèque nécessaire. Terminez la commande de ligne de commande: PIP Installer Pytelegrambotapi")
+
+url = "https://leakosintapi.com/"
+bot_token = "" #Insérer ici le jeton reçu de @botfather
+api_token = ""  #Insérer ici le jeton reçu de Leakosint
+lang = "ru"
+limit = 300
+
+#Dans cette fonction, vous pouvez vérifier si l'utilisateur a accès à
+def user_access_test(user_id):
+    return(True)
+
+#Fonction pour générer des rapports
+cash_reports = {}
+def generate_report(query, query_id):
+    global cash_reports, url, bot_token, api_token, limit, lang
+    data =  {"token":api_token, "request":query.split("\n")[0], "limit": limit, "lang":lang}
+    response = requests.post(url, json=data).json()
+    print(response)
+    if "Error code" in response:
+        print("Erreur:"+response["Error code"])
+        return(None)
+    cash_reports[str(query_id)] = []
+    for database_name in response["List"].keys():
+        text = [f"<b>{database_name}</b>",""]
+        text.append(response["List"][database_name]["InfoLeak"]+"\n")
+        if database_name!="No results found":
+            for report_data in response["List"][database_name]["Data"]:
+                for column_name in report_data.keys():
+                    text.append(f"<b>{column_name}</b>:  {report_data[column_name]}")
+                text.append("")
+        text = "\n".join(text)
+        if len(text)>3500:
+            text = text[:3500]+text[3500:].split("\n")[0]+"\n\nCertaines données n'ont pas adapté ce message"
+        cash_reports[str(query_id)].append(text)
+    return(cash_reports[str(query_id)])
+
+#Fonction pour créer un clavier en ligne
+def create_inline_keyboard(query_id, page_id, count_page):
+    markup = InlineKeyboardMarkup()
+    if page_id<0:
+        page_id=count_page
+    elif page_id>count_page-1:
+        page_id=page_id%count_page
+    if count_page==1:
+        return markup
+    markup.row_width = 3
+    markup.add(InlineKeyboardButton(text = "<<", callback_data=f"/page {query_id} {page_id-1}"),
+               InlineKeyboardButton(text = f"{page_id+1}/{count_page}", callback_data="page_list"),
+               InlineKeyboardButton(text = ">>", callback_data=f"/page {query_id} {page_id+1}"))
+    return markup
+
+bot = telebot.TeleBot(bot_token)
+@bot.message_handler(commands=["start"])
+def send_welcome(message):
+    bot.reply_to(message, "Bonjour! Je suis un télégramme-boot qui peut rechercher des bases de données.", parse_mode="Markdown")
+
+@bot.message_handler(func=lambda message: True)
+def echo_message(message):
+    user_id = message.from_user.id
+    if not(user_access_test(user_id)):
+        bot.send_message(message.chat.id, "Vous n'avez pas accès au bot")
+        return()
+    if message.content_type == "text":
+        query_id = randint(0,9999999)
+        report = generate_report(message.text,query_id)
+        markup = create_inline_keyboard(query_id,0,len(report))
+        if report==None:
+            bot.reply_to(message, "Le bot ne fonctionne pas pour le moment.", parse_mode="Markdown")
+        try:
+            bot.send_message(message.chat.id, report[0], parse_mode="html", reply_markup=markup) #, reply_markup=markup
+        except telebot.apihelper.ApiTelegramException:
+            bot.send_message(message.chat.id, text = report[0].replace("<b>","").replace("</b>",""), reply_markup=markup)
+        
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call: CallbackQuery):
+    global cash_reports
+    if call.data.startswith("/page "):
+        query_id, page_id = call.data.split(" ")[1:]
+        if not(query_id in cash_reports):
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Les résultats de la demande ont déjà été supprimés")
+        else:
+            report = cash_reports[query_id]
+            markup = create_inline_keyboard(query_id,int(page_id),len(report))
+            try:
+                bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=report[int(page_id)], parse_mode="html", reply_markup=markup)
+            except telebot.apihelper.ApiTelegramException:
+                bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=report[int(page_id)].replace("<b>","").replace("</b>",""), reply_markup=markup)
+while True:
+    try:
+        bot.polling()
+    except:
+        pass
+        
