@@ -2,6 +2,10 @@ function getWebhookUrl(): string | undefined {
   return process.env.DISCORD_WEBHOOK_URL;
 }
 
+function getSearchWebhookUrl(): string | undefined {
+  return process.env.DISCORD_SEARCH_WEBHOOK_URL;
+}
+
 interface WebhookOptions {
   title: string;
   description?: string;
@@ -41,13 +45,7 @@ function sep(): string {
   return "\n\u200B";
 }
 
-export async function sendWebhook(options: WebhookOptions): Promise<void> {
-  const url = getWebhookUrl();
-  if (!url) {
-    console.warn("[webhook] DISCORD_WEBHOOK_URL not set, skipping");
-    return;
-  }
-
+async function sendToWebhook(webhookUrl: string, options: WebhookOptions, label: string): Promise<void> {
   try {
     const embed: any = {
       title: options.title,
@@ -64,17 +62,35 @@ export async function sendWebhook(options: WebhookOptions): Promise<void> {
     };
     if (options.content) payload.content = options.content;
 
-    const resp = await fetch(url, {
+    const resp = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (!resp.ok) {
-      console.error(`[webhook] Discord returned ${resp.status}: ${await resp.text().catch(() => "")}`);
+      console.error(`[webhook:${label}] Discord returned ${resp.status}: ${await resp.text().catch(() => "")}`);
     }
   } catch (err) {
-    console.error("[webhook] Send error:", err);
+    console.error(`[webhook:${label}] Send error:`, err);
   }
+}
+
+export async function sendWebhook(options: WebhookOptions): Promise<void> {
+  const url = getWebhookUrl();
+  if (!url) {
+    console.warn("[webhook] DISCORD_WEBHOOK_URL not set, skipping");
+    return;
+  }
+  await sendToWebhook(url, options, "general");
+}
+
+async function sendSearchWebhook(options: WebhookOptions): Promise<void> {
+  const url = getSearchWebhookUrl();
+  if (!url) {
+    console.warn("[webhook] DISCORD_SEARCH_WEBHOOK_URL not set, skipping search log");
+    return;
+  }
+  await sendToWebhook(url, options, "search");
 }
 
 export function webhookSearch(user: UserInfo, type: string, criteria: string, resultCount: number) {
@@ -88,7 +104,7 @@ export function webhookSearch(user: UserInfo, type: string, criteria: string, re
     `**Resultat** : **${resultCount}** trouve(s)`,
   ].join("\n");
 
-  sendWebhook({
+  sendSearchWebhook({
     title: "\u{1F50D} Recherche Interne",
     description: desc,
     color: COLORS.search,
@@ -106,7 +122,7 @@ export function webhookBreachSearch(user: UserInfo, term: string, fields: string
     `**Resultat** : **${resultCount}** trouve(s)`,
   ].join("\n");
 
-  sendWebhook({
+  sendSearchWebhook({
     title: "\u{1F310} Recherche Externe (Breach)",
     description: desc,
     color: COLORS.search,
@@ -122,7 +138,7 @@ export function webhookLeakosintSearch(user: UserInfo, request: string, resultCo
     `**Resultat** : **${resultCount}** trouve(s)`,
   ].join("\n");
 
-  sendWebhook({
+  sendSearchWebhook({
     title: "\u{1F4E1} Recherche LeakOSINT",
     description: desc,
     color: COLORS.search,
@@ -139,7 +155,7 @@ export function webhookApiSearch(userId: string, criteria: string, resultCount: 
     `**Resultat** : **${resultCount}** trouve(s)`,
   ].join("\n");
 
-  sendWebhook({
+  sendSearchWebhook({
     title: "\u{1F527} Recherche API v1",
     description: desc,
     color: COLORS.search,
@@ -282,7 +298,7 @@ export function webhookPhoneLookup(user: UserInfo, phone: string) {
     `**Numero** : \`${phone}\``,
   ].join("\n");
 
-  sendWebhook({
+  sendSearchWebhook({
     title: "\u{1F4F1} Lookup Telephone",
     description: desc,
     color: COLORS.lookup,
@@ -296,7 +312,7 @@ export function webhookGeoIP(user: UserInfo, ip: string) {
     `**IP** : \`${ip}\``,
   ].join("\n");
 
-  sendWebhook({
+  sendSearchWebhook({
     title: "\u{1F30D} Lookup GeoIP",
     description: desc,
     color: COLORS.lookup,
