@@ -1,3 +1,26 @@
+import "dotenv/config";
+
+function checkRequiredEnv() {
+  const required: { key: string; alt?: string }[] = [
+    { key: "DATABASE_URL" },
+    { key: "VITE_SUPABASE_URL", alt: "SUPABASE_URL" },
+    { key: "VITE_SUPABASE_ANON_KEY" },
+    { key: "SUPABASE_SERVICE_ROLE_KEY" },
+  ];
+  const missing: string[] = [];
+  for (const { key, alt } of required) {
+    if (!process.env[key] && !(alt && process.env[alt])) {
+      missing.push(key);
+    }
+  }
+  if (missing.length > 0) {
+    console.error(`[env] Missing required environment variables: ${missing.join(", ")}`);
+    console.error(`[env] Copy .env.example to .env and fill in the values.`);
+    process.exit(1);
+  }
+}
+checkRequiredEnv();
+
 import express, { type Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";

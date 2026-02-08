@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import path from "path";
@@ -12,8 +13,16 @@ function getS3Config() {
   const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
   const prefix = process.env.S3_PREFIX || "";
 
-  if (!bucket || !accessKeyId || !secretAccessKey) {
-    console.error("Missing env vars: S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY");
+  const missing = [];
+  if (!bucket) missing.push("S3_BUCKET");
+  if (!accessKeyId) missing.push("S3_ACCESS_KEY_ID");
+  if (!secretAccessKey) missing.push("S3_SECRET_ACCESS_KEY");
+  if (!endpoint) missing.push("S3_ENDPOINT");
+
+  if (missing.length > 0) {
+    console.error(`\nMissing environment variables: ${missing.join(", ")}`);
+    console.error(`\nSet them in .env file or export them:`);
+    console.error(`  cp .env.example .env && nano .env\n`);
     process.exit(1);
   }
 
@@ -38,6 +47,17 @@ function createS3Client(config) {
 }
 
 async function uploadFile(localPath, remoteKey) {
+  if (!fs.existsSync(localPath)) {
+    console.error(`File not found: ${localPath}`);
+    return false;
+  }
+
+  const stat = fs.statSync(localPath);
+  if (!stat.isFile()) {
+    console.error(`Not a file: ${localPath} (use upload-dir for directories)`);
+    return false;
+  }
+
   const config = getS3Config();
   const client = createS3Client(config);
   const filename = path.basename(localPath);
@@ -45,7 +65,7 @@ async function uploadFile(localPath, remoteKey) {
 
   const fileBuffer = fs.readFileSync(localPath);
   const sizeMB = (fileBuffer.length / 1024 / 1024).toFixed(1);
-  console.log(`Uploading ${filename} (${sizeMB} MB) to ${key}...`);
+  console.log(`Uploading ${filename} (${sizeMB} MB) -> ${key}`);
 
   await client.send(new PutObjectCommand({
     Bucket: config.bucket,
@@ -53,7 +73,7 @@ async function uploadFile(localPath, remoteKey) {
     Body: fileBuffer,
   }));
 
-  console.log(`${filename} uploaded successfully`);
+  console.log(`OK: ${filename} uploaded`);
   return true;
 }
 
@@ -72,18 +92,30 @@ function getAllFiles(dir) {
 }
 
 async function uploadDir(dirPath, remotePrefix) {
-  const config = getS3Config();
-  const prefix = remotePrefix ?? config.prefix;
-
   if (!fs.existsSync(dirPath)) {
     console.error(`Directory not found: ${dirPath}`);
     process.exit(1);
   }
 
+  const stat = fs.statSync(dirPath);
+  if (!stat.isDirectory()) {
+    console.error(`Not a directory: ${dirPath} (use upload for single files)`);
+    process.exit(1);
+  }
+
+  const config = getS3Config();
+  const prefix = remotePrefix ?? config.prefix;
   const files = getAllFiles(dirPath);
-  console.log(`Found ${files.length} files to upload from ${dirPath}`);
+
+  if (files.length === 0) {
+    console.log("No files found in directory");
+    return;
+  }
+
+  console.log(`Found ${files.length} files to upload from ${dirPath}\n`);
 
   let uploaded = 0;
+  let failed = 0;
   for (const filePath of files) {
     const relativePath = path.relative(dirPath, filePath);
     const key = prefix ? `${prefix}${relativePath}` : relativePath;
@@ -91,11 +123,12 @@ async function uploadDir(dirPath, remotePrefix) {
       await uploadFile(filePath, key);
       uploaded++;
     } catch (err) {
-      console.error(`Failed to upload ${relativePath}:`, err.message);
+      console.error(`FAIL: ${relativePath} - ${err.message}`);
+      failed++;
     }
   }
 
-  console.log(`Upload complete: ${uploaded}/${files.length} files uploaded`);
+  console.log(`\nDone: ${uploaded} uploaded, ${failed} failed, ${files.length} total`);
 }
 
 async function downloadFile(remoteKey, localPath) {
@@ -103,22 +136,31 @@ async function downloadFile(remoteKey, localPath) {
   const client = createS3Client(config);
 
   console.log(`Downloading ${remoteKey}...`);
-  const response = await client.send(new GetObjectCommand({
-    Bucket: config.bucket,
-    Key: remoteKey,
-  }));
 
-  if (response.Body) {
-    const dir = path.dirname(localPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+  try {
+    const response = await client.send(new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: remoteKey,
+    }));
+
+    if (response.Body) {
+      const dir = path.dirname(localPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const tmpPath = localPath + ".tmp";
+      const writeStream = fs.createWriteStream(tmpPath);
+      await pipeline(response.Body, writeStream);
+      fs.renameSync(tmpPath, localPath);
+      const sizeMB = (fs.statSync(localPath).size / 1024 / 1024).toFixed(1);
+      console.log(`OK: ${remoteKey} (${sizeMB} MB) -> ${localPath}`);
     }
-    const tmpPath = localPath + ".tmp";
-    const writeStream = fs.createWriteStream(tmpPath);
-    await pipeline(response.Body, writeStream);
-    fs.renameSync(tmpPath, localPath);
-    const sizeMB = (fs.statSync(localPath).size / 1024 / 1024).toFixed(1);
-    console.log(`Downloaded ${remoteKey} (${sizeMB} MB)`);
+  } catch (err) {
+    if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404) {
+      console.error(`File not found in R2: ${remoteKey}`);
+    } else {
+      throw err;
+    }
   }
 }
 
@@ -146,6 +188,7 @@ async function syncDb(dataDir) {
   }
 
   let downloaded = 0;
+  let skipped = 0;
   for (const obj of dbFiles) {
     const key = obj.Key;
     const filename = path.basename(key);
@@ -156,7 +199,8 @@ async function syncDb(dataDir) {
     const remoteSize = obj.Size || 0;
 
     if (localExists && localSize === remoteSize) {
-      console.log(`${filename} already up to date (${remoteSize} bytes)`);
+      console.log(`SKIP: ${filename} already up to date (${(remoteSize / 1024 / 1024).toFixed(1)} MB)`);
+      skipped++;
       continue;
     }
 
@@ -164,7 +208,7 @@ async function syncDb(dataDir) {
     downloaded++;
   }
 
-  console.log(`Sync complete: ${downloaded} files downloaded`);
+  console.log(`\nSync complete: ${downloaded} downloaded, ${skipped} skipped, ${dbFiles.length} total`);
 }
 
 async function listFiles(prefix) {
@@ -183,12 +227,16 @@ async function listFiles(prefix) {
     return;
   }
 
+  let totalSize = 0;
   console.log(`Found ${files.length} files:\n`);
   for (const f of files) {
-    const sizeMB = ((f.Size || 0) / 1024 / 1024).toFixed(2);
+    const size = f.Size || 0;
+    totalSize += size;
+    const sizeMB = (size / 1024 / 1024).toFixed(2);
     const date = f.LastModified ? f.LastModified.toISOString().slice(0, 19) : "unknown";
     console.log(`  ${f.Key}  (${sizeMB} MB, ${date})`);
   }
+  console.log(`\nTotal: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
 }
 
 async function deleteFile(remoteKey) {
@@ -199,7 +247,7 @@ async function deleteFile(remoteKey) {
     Bucket: config.bucket,
     Key: remoteKey,
   }));
-  console.log(`Deleted ${remoteKey}`);
+  console.log(`Deleted: ${remoteKey}`);
 }
 
 const args = process.argv.slice(2);
@@ -207,7 +255,7 @@ const command = args[0];
 
 function printUsage() {
   console.log(`
-Discreen R2 CLI
+Discreen R2 CLI - Manage files in Cloudflare R2
 
 Usage:
   node server/r2-cli.mjs <command> [options]
@@ -216,9 +264,21 @@ Commands:
   upload <local-path> [remote-key]     Upload a single file
   upload-dir <local-dir> [prefix]      Upload an entire directory
   download <remote-key> <local-path>   Download a single file
-  sync-db <local-dir>                  Sync all .db files from R2
+  sync-db [local-dir]                  Sync all .db files (default: ./data)
   list [prefix]                        List files in the bucket
   delete <remote-key>                  Delete a file from R2
+
+Config:
+  Uses .env file automatically if present in project root.
+  Or export: S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
+
+Examples:
+  node server/r2-cli.mjs upload /srv/discreen-data/index.db
+  node server/r2-cli.mjs upload-dir /srv/discreen-data/
+  node server/r2-cli.mjs download index.db /srv/discreen-data/index.db
+  node server/r2-cli.mjs sync-db /srv/discreen-data
+  node server/r2-cli.mjs list
+  node server/r2-cli.mjs delete old-file.db
 `);
 }
 
@@ -230,17 +290,17 @@ async function main() {
 
   switch (command) {
     case "upload": {
-      if (!args[1]) { console.error("Error: local file path required"); process.exit(1); }
+      if (!args[1]) { console.error("Error: local file path required\n  Usage: node server/r2-cli.mjs upload <path> [remote-key]"); process.exit(1); }
       await uploadFile(args[1], args[2]);
       break;
     }
     case "upload-dir": {
-      if (!args[1]) { console.error("Error: directory path required"); process.exit(1); }
+      if (!args[1]) { console.error("Error: directory path required\n  Usage: node server/r2-cli.mjs upload-dir <dir> [prefix]"); process.exit(1); }
       await uploadDir(args[1], args[2]);
       break;
     }
     case "download": {
-      if (!args[1] || !args[2]) { console.error("Error: remote key and local path required"); process.exit(1); }
+      if (!args[1] || !args[2]) { console.error("Error: remote key and local path required\n  Usage: node server/r2-cli.mjs download <key> <path>"); process.exit(1); }
       await downloadFile(args[1], args[2]);
       break;
     }
@@ -253,7 +313,7 @@ async function main() {
       break;
     }
     case "delete": {
-      if (!args[1]) { console.error("Error: remote key required"); process.exit(1); }
+      if (!args[1]) { console.error("Error: remote key required\n  Usage: node server/r2-cli.mjs delete <key>"); process.exit(1); }
       await deleteFile(args[1]);
       break;
     }
@@ -265,6 +325,12 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("Error:", err.message);
+  if (err.name === "CredentialsProviderError" || err.message?.includes("credential")) {
+    console.error("\nAuthentication error: check S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY");
+  } else if (err.name === "NetworkingError" || err.code === "ENOTFOUND") {
+    console.error("\nNetwork error: check S3_ENDPOINT and your internet connection");
+  } else {
+    console.error(`\nError: ${err.message}`);
+  }
   process.exit(1);
 });
