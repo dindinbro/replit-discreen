@@ -49,6 +49,7 @@ The project is organized as a monorepo containing a React frontend (`client/`), 
 - **Supabase**: Primary service for user authentication, authorization, and profile management.
 - **PostgreSQL**: The main relational database for structured application data.
 - **SQLite**: Local, file-based databases providing the core full-text search capabilities.
+- **Cloudflare R2**: Private S3-compatible object storage for database files (`.db`, `.json`, `.txt`). Managed via `server/s3sync.ts` (upload/download/list/delete functions) and `server/r2-cli.ts` (CLI tool for VPS operations). On startup, the backend auto-syncs `.db` files from R2 to local `data/` directory. Secrets: `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
 - **Breach.vip**: External API integrated for additional search capabilities (proxied via `POST /api/breach-search`), with rate limiting based on user subscription tiers.
 - **LeakOSINT**: Another external API integrated for extended data searching (proxied via `POST /api/leakosint-search`), subject to tiered daily quotas and external rate limits.
 - **Discord Bot**: A custom bot (`discord.js`) integrated for a vouches/reviews system and a ticket support system, interacting with PostgreSQL for data storage and Discord for moderation and communication.
