@@ -23,6 +23,7 @@ checkRequiredEnv();
 
 import express, { type Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -32,6 +33,29 @@ import { webhookSubscriptionExpired } from "./webhook";
 
 const app = express();
 const httpServer = createServer(app);
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : undefined,
+  /\.replit\.dev$/,
+  /\.repl\.co$/,
+].filter(Boolean) as (string | RegExp)[];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === "string") return origin === allowed;
+      if (allowed instanceof RegExp) return allowed.test(origin);
+      return false;
+    });
+    if (isAllowed) return callback(null, true);
+    callback(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -51,11 +75,32 @@ const searchLimiter = rateLimit({
   validate: { xForwardedForHeader: false, trustProxy: false },
 });
 
+const heartbeatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Trop de requetes heartbeat." },
+  validate: { xForwardedForHeader: false, trustProxy: false },
+});
+
+const invoiceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Trop de demandes de paiement. Reessayez dans une minute." },
+  validate: { xForwardedForHeader: false, trustProxy: false },
+});
+
 app.use("/api/", globalLimiter);
+app.use("/api/heartbeat", heartbeatLimiter);
 app.use("/api/search", searchLimiter);
 app.use("/api/breach-search", searchLimiter);
 app.use("/api/leakosint-search", searchLimiter);
 app.use("/api/v1/search", searchLimiter);
+app.use("/api/create-invoice", invoiceLimiter);
+app.use("/api/create-service-invoice", invoiceLimiter);
 
 declare module "http" {
   interface IncomingMessage {

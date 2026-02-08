@@ -628,12 +628,12 @@ export async function registerRoutes(
 
   // POST /api/blacklist-request and /api/info-request are no longer directly accessible.
   // Requests are created exclusively by the Plisio callback after successful payment.
-  // These endpoints return 403 to prevent unpaid submissions.
-  app.post("/api/blacklist-request", (_req, res) => {
+  // These endpoints require auth and return 403 to prevent unpaid submissions.
+  app.post("/api/blacklist-request", requireAuth, (_req, res) => {
     res.status(403).json({ message: "Les demandes de blacklist necessitent un paiement. Utilisez le formulaire prevu a cet effet." });
   });
 
-  app.post("/api/info-request", (_req, res) => {
+  app.post("/api/info-request", requireAuth, (_req, res) => {
     res.status(403).json({ message: "Les demandes d'information necessitent un paiement. Utilisez le formulaire prevu a cet effet." });
   });
 
@@ -952,8 +952,8 @@ export async function registerRoutes(
     }
   });
 
-  // Plisio payment - create invoice (server-side price enforcement)
-  app.post("/api/create-invoice", async (req: Request, res: Response) => {
+  // Plisio payment - create invoice (server-side price enforcement, auth required)
+  app.post("/api/create-invoice", requireAuth, async (req: Request, res: Response) => {
     try {
       const { plan } = req.body;
       const planInfo = PLAN_LIMITS[plan as PlanTier];
@@ -1021,12 +1021,25 @@ export async function registerRoutes(
       console.log("Plisio callback:", { status, order_number, source_amount, currency });
 
       const plisioKey = process.env.PLISIO_API_KEY;
-      if (verify_hash && plisioKey) {
-        const crypto = await import("crypto");
+      if (!plisioKey) {
+        console.error("Plisio callback: PLISIO_API_KEY not configured");
+        return res.status(500).json({ status: "server misconfigured" });
+      }
+
+      if (!verify_hash) {
+        if (req.method === "GET") {
+          console.warn("Plisio callback (GET): missing verify_hash — allowing for browser redirect compatibility");
+        } else {
+          console.error("Plisio callback (POST): missing verify_hash — rejecting unsigned request");
+          return res.status(403).json({ status: "signature required" });
+        }
+      }
+
+      if (verify_hash) {
         const sortedKeys = Object.keys(params).filter(k => k !== "verify_hash").sort();
         const message = sortedKeys.map(k => `${k}=${params[k]}`).join("&");
         const expected = crypto.createHmac("sha1", plisioKey).update(message).digest("hex");
-        if (expected !== verify_hash) {
+        if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(String(verify_hash)))) {
           console.error("Plisio callback: invalid verify_hash");
           return res.status(403).json({ status: "invalid signature" });
         }
