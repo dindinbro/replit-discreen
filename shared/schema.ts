@@ -118,7 +118,7 @@ export const PLAN_LIMITS: Record<PlanTier, { dailySearches: number; dailyLeakosi
   free: { dailySearches: 5, dailyLeakosintSearches: 0, price: 0, label: "Free" },
   vip: { dailySearches: 50, dailyLeakosintSearches: 10, price: 6.99, label: "VIP" },
   pro: { dailySearches: 200, dailyLeakosintSearches: 50, price: 14.99, label: "PRO" },
-  business: { dailySearches: 500, dailyLeakosintSearches: 100, price: 24.99, label: "Business" },
+  business: { dailySearches: 500, dailyLeakosintSearches: 150, price: 24.99, label: "Business" },
   api: { dailySearches: -1, dailyLeakosintSearches: 200, price: 49.99, label: "API" },
 };
 
