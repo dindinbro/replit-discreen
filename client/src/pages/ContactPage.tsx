@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, ExternalLink, ShieldBan } from "lucide-react";
+import { MessageSquare, ExternalLink, ShieldBan, Search } from "lucide-react";
 import { SiDiscord, SiTelegram } from "react-icons/si";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -72,6 +72,21 @@ export default function ContactPage() {
               </div>
               <Link href="/blacklist-request">
                 <Button variant="outline" className="gap-2" data-testid="button-blacklist-request">
+                  Faire une demande
+                </Button>
+              </Link>
+            </Card>
+
+            <Card className="p-8 text-center space-y-4">
+              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <Search className="w-7 h-7 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold" data-testid="text-info-contact">Demande d'Information</h2>
+                <p className="text-sm text-muted-foreground">Vous souhaitez obtenir les informations d'une personne ? Soumettez une demande.</p>
+              </div>
+              <Link href="/info-request">
+                <Button variant="outline" className="gap-2" data-testid="button-info-request">
                   Faire une demande
                 </Button>
               </Link>

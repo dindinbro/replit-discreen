@@ -14,7 +14,7 @@ import {
   webhookKeyRedeemed, webhookKeyGenerated, webhookApiKeyCreated, webhookApiKeyRevoked,
   webhookPhoneLookup, webhookGeoIP, webhookVouchDeleted,
   webhookCategoryCreated, webhookCategoryUpdated, webhookCategoryDeleted,
-  webhookBlacklistRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
+  webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
 } from "./webhook";
 import { sendFreezeAlert } from "./discord-bot";
 
@@ -513,39 +513,80 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/blacklist-request - submit a blacklist request (any authenticated user)
-  app.post("/api/blacklist-request", requireAuth, async (req, res) => {
+  // POST /api/create-service-invoice - create a Plisio invoice for blacklist or info request (50€)
+  app.post("/api/create-service-invoice", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user.id;
-      const schema = z.object({
-        firstName: z.string().optional().nullable(),
-        lastName: z.string().optional().nullable(),
-        pseudo: z.string().optional().nullable(),
-        email: z.string().optional().nullable(),
-        phone: z.string().optional().nullable(),
-        address: z.string().optional().nullable(),
-        reason: z.string().optional().nullable(),
+      const bodySchema = z.object({
+        type: z.enum(["blacklist", "info"]),
+        formData: z.record(z.any()),
       });
-      const parsed = schema.parse(req.body);
-      const request = await storage.createBlacklistRequest({
-        userId,
-        firstName: parsed.firstName || null,
-        lastName: parsed.lastName || null,
-        pseudo: parsed.pseudo || null,
-        email: parsed.email || null,
-        phone: parsed.phone || null,
-        address: parsed.address || null,
-        reason: parsed.reason || null,
+      const parsed = bodySchema.parse(req.body);
+
+      const plisioKey = process.env.PLISIO_API_KEY;
+      if (!plisioKey) {
+        return res.status(500).json({ message: "Plisio not configured" });
+      }
+
+      const orderId = `service_${parsed.type}_${Date.now()}`;
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const callbackUrl = `${baseUrl}/api/plisio-callback?json=true`;
+      const orderToken = signOrderId(orderId);
+      const successUrl = `${baseUrl}/payment-success?order=${orderId}&token=${orderToken}&service=${parsed.type}`;
+
+      await storage.createPendingServiceRequest(orderId, parsed.type, userId, JSON.stringify(parsed.formData));
+
+      const label = parsed.type === "blacklist" ? "Demande de Blacklist" : "Demande d'Information";
+
+      const params = new URLSearchParams({
+        api_key: plisioKey,
+        order_name: label,
+        order_number: orderId,
+        source_amount: "50",
+        source_currency: "EUR",
+        currency: "BTC",
+        callback_url: callbackUrl,
+        success_callback_url: successUrl,
       });
 
-      const wUser = await buildUserInfo(req);
-      webhookBlacklistRequest(wUser, parsed);
+      const response = await fetch(
+        `https://api.plisio.net/api/v1/invoices/new?${params.toString()}`,
+        { method: "GET" }
+      );
 
-      res.status(201).json(request);
+      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Plisio non-JSON response:", text.slice(0, 300));
+        return res.status(502).json({ message: "Payment service unavailable" });
+      }
+
+      const data = await response.json();
+
+      if (!data.data?.invoice_url) {
+        console.error("Plisio error:", data);
+        return res.status(502).json({ message: "Failed to create invoice" });
+      }
+
+      res.json({ invoice_url: data.data.invoice_url, orderId });
     } catch (err) {
-      console.error("POST /api/blacklist-request error:", err);
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Donnees invalides", errors: err.errors });
+      }
+      console.error("POST /api/create-service-invoice error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  // POST /api/blacklist-request and /api/info-request are no longer directly accessible.
+  // Requests are created exclusively by the Plisio callback after successful payment.
+  // These endpoints return 403 to prevent unpaid submissions.
+  app.post("/api/blacklist-request", (_req, res) => {
+    res.status(403).json({ message: "Les demandes de blacklist necessitent un paiement. Utilisez le formulaire prevu a cet effet." });
+  });
+
+  app.post("/api/info-request", (_req, res) => {
+    res.status(403).json({ message: "Les demandes d'information necessitent un paiement. Utilisez le formulaire prevu a cet effet." });
   });
 
   // GET /api/admin/blacklist-requests - list all blacklist requests (admin only)
@@ -641,6 +682,36 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       console.error("DELETE /api/admin/blacklist/:id error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // GET /api/admin/info-requests - list all info requests (admin only)
+  app.get("/api/admin/info-requests", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const requests = await storage.getInfoRequests();
+      res.json(requests);
+    } catch (err) {
+      console.error("GET /api/admin/info-requests error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // PATCH /api/admin/info-requests/:id - update info request status (admin only)
+  app.patch("/api/admin/info-requests/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const schema = z.object({
+        status: z.enum(["pending", "approved", "rejected", "completed"]),
+        adminNotes: z.string().optional(),
+      });
+      const parsed = schema.parse(req.body);
+      const updated = await storage.updateInfoRequestStatus(id, parsed.status, parsed.adminNotes);
+      if (!updated) return res.status(404).json({ message: "Demande non trouvee" });
+      res.json(updated);
+    } catch (err) {
+      console.error("PATCH /api/admin/info-requests/:id error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -915,13 +986,51 @@ export async function registerRoutes(
 
       if (status === "completed" || status === "mismatch") {
         const orderStr = String(order_number || "");
-        const tierMatch = orderStr.match(/^order_(vip|pro|business|api)_/);
-        const tier = tierMatch ? tierMatch[1] as PlanTier : null;
 
-        if (tier) {
-          const license = await storage.createLicenseKey(tier, orderStr);
-          console.log(`License key for order ${orderStr}: ${license.key}`);
-          webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"));
+        const serviceMatch = orderStr.match(/^service_(blacklist|info)_/);
+        if (serviceMatch) {
+          const serviceType = serviceMatch[1];
+          const pending = await storage.getPendingServiceRequest(orderStr);
+          if (pending && !pending.paid) {
+            await storage.markPendingServiceRequestPaid(orderStr);
+            const formData = JSON.parse(pending.formData);
+
+            if (serviceType === "blacklist") {
+              await storage.createBlacklistRequest({
+                userId: pending.userId,
+                firstName: formData.firstName || null,
+                lastName: formData.lastName || null,
+                pseudo: formData.pseudo || null,
+                email: formData.email || null,
+                phone: formData.phone || null,
+                address: formData.address || null,
+                reason: formData.reason || null,
+              });
+              console.log(`Blacklist request created for paid order ${orderStr}`);
+            } else if (serviceType === "info") {
+              await storage.createInfoRequest({
+                userId: pending.userId,
+                discordId: formData.discordId || null,
+                email: formData.email || null,
+                pseudo: formData.pseudo || null,
+                ipAddress: formData.ipAddress || null,
+                additionalInfo: formData.additionalInfo || null,
+                orderId: orderStr,
+              });
+              console.log(`Info request created for paid order ${orderStr}`);
+            }
+
+            webhookPaymentCompleted(orderStr, serviceType as any, String(source_amount || "50"), String(currency || "BTC"));
+          }
+        } else {
+          const tierMatch = orderStr.match(/^order_(vip|pro|business|api)_/);
+          const tier = tierMatch ? tierMatch[1] as PlanTier : null;
+
+          if (tier) {
+            const license = await storage.createLicenseKey(tier, orderStr);
+            console.log(`License key for order ${orderStr}: ${license.key}`);
+            webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"));
+          }
         }
       }
 

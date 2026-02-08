@@ -18,6 +18,7 @@ import VouchesPage from "@/pages/VouchesPage";
 import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
 import ProfilePage from "@/pages/ProfilePage";
 import BlacklistRequestPage from "@/pages/BlacklistRequestPage";
+import InfoRequestPage from "@/pages/InfoRequestPage";
 import UsersPage from "@/pages/UsersPage";
 import Layout from "@/components/Layout";
 import { Loader2 } from "lucide-react";
@@ -94,6 +95,9 @@ function Router() {
       </Route>
       <Route path="/blacklist-request">
         <ProtectedRoute component={BlacklistRequestPage} />
+      </Route>
+      <Route path="/info-request">
+        <ProtectedRoute component={InfoRequestPage} />
       </Route>
       <Route path="/users">
         <PublicRoute component={UsersPage} />

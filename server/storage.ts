@@ -1,10 +1,11 @@
 import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
-  blacklistRequests, blacklistEntries,
+  blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
   type BlacklistEntry, type InsertBlacklistEntry,
+  type InfoRequest, type InsertInfoRequest, type PendingServiceRequest,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -50,6 +51,13 @@ export interface IStorage {
   createBlacklistEntry(data: InsertBlacklistEntry): Promise<BlacklistEntry>;
   getBlacklistEntries(): Promise<BlacklistEntry[]>;
   deleteBlacklistEntry(id: number): Promise<boolean>;
+  createInfoRequest(data: InsertInfoRequest): Promise<InfoRequest>;
+  getInfoRequests(): Promise<InfoRequest[]>;
+  updateInfoRequestStatus(id: number, status: string, adminNotes?: string): Promise<InfoRequest | undefined>;
+  markInfoRequestPaid(orderId: string): Promise<InfoRequest | undefined>;
+  createPendingServiceRequest(orderId: string, type: string, userId: string | null, formData: string): Promise<PendingServiceRequest>;
+  getPendingServiceRequest(orderId: string): Promise<PendingServiceRequest | undefined>;
+  markPendingServiceRequestPaid(orderId: string): Promise<PendingServiceRequest | undefined>;
 }
 
 function hashKey(key: string): string {
@@ -444,6 +452,42 @@ export class DatabaseStorage implements IStorage {
   async deleteBlacklistEntry(id: number): Promise<boolean> {
     const result = await db.delete(blacklistEntries).where(eq(blacklistEntries.id, id)).returning();
     return result.length > 0;
+  }
+
+  async createInfoRequest(data: InsertInfoRequest): Promise<InfoRequest> {
+    const [created] = await db.insert(infoRequests).values(data).returning();
+    return created;
+  }
+
+  async getInfoRequests(): Promise<InfoRequest[]> {
+    return db.select().from(infoRequests).orderBy(desc(infoRequests.createdAt));
+  }
+
+  async updateInfoRequestStatus(id: number, status: string, adminNotes?: string): Promise<InfoRequest | undefined> {
+    const setData: any = { status };
+    if (adminNotes !== undefined) setData.adminNotes = adminNotes;
+    const [updated] = await db.update(infoRequests).set(setData).where(eq(infoRequests.id, id)).returning();
+    return updated;
+  }
+
+  async markInfoRequestPaid(orderId: string): Promise<InfoRequest | undefined> {
+    const [updated] = await db.update(infoRequests).set({ paid: true }).where(eq(infoRequests.orderId, orderId)).returning();
+    return updated;
+  }
+
+  async createPendingServiceRequest(orderId: string, type: string, userId: string | null, formData: string): Promise<PendingServiceRequest> {
+    const [created] = await db.insert(pendingServiceRequests).values({ orderId, type, userId, formData }).returning();
+    return created;
+  }
+
+  async getPendingServiceRequest(orderId: string): Promise<PendingServiceRequest | undefined> {
+    const [found] = await db.select().from(pendingServiceRequests).where(eq(pendingServiceRequests.orderId, orderId));
+    return found;
+  }
+
+  async markPendingServiceRequestPaid(orderId: string): Promise<PendingServiceRequest | undefined> {
+    const [updated] = await db.update(pendingServiceRequests).set({ paid: true }).where(eq(pendingServiceRequests.orderId, orderId)).returning();
+    return updated;
   }
 }
 

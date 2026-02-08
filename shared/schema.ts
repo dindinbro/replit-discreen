@@ -225,4 +225,35 @@ export const insertBlacklistEntrySchema = createInsertSchema(blacklistEntries).o
 export type InsertBlacklistEntry = z.infer<typeof insertBlacklistEntrySchema>;
 export type BlacklistEntry = typeof blacklistEntries.$inferSelect;
 
+export const infoRequests = pgTable("info_requests", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"),
+  discordId: text("discord_id"),
+  email: text("email"),
+  pseudo: text("pseudo"),
+  ipAddress: text("ip_address"),
+  additionalInfo: text("additional_info"),
+  orderId: text("order_id"),
+  paid: boolean("paid").notNull().default(false),
+  status: text("status").notNull().default("pending"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertInfoRequestSchema = createInsertSchema(infoRequests).omit({ id: true, createdAt: true, status: true, adminNotes: true, paid: true });
+export type InsertInfoRequest = z.infer<typeof insertInfoRequestSchema>;
+export type InfoRequest = typeof infoRequests.$inferSelect;
+
+export const pendingServiceRequests = pgTable("pending_service_requests", {
+  id: serial("id").primaryKey(),
+  orderId: text("order_id").notNull().unique(),
+  type: text("type").notNull(),
+  userId: text("user_id"),
+  formData: text("form_data").notNull(),
+  paid: boolean("paid").notNull().default(false),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type PendingServiceRequest = typeof pendingServiceRequests.$inferSelect;
+
 export * from "./models/chat";

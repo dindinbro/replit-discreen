@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Category, BlacklistRequest, BlacklistEntry } from "@shared/schema";
+import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -412,6 +412,10 @@ export default function AdminPage() {
   const [loadingBlacklist, setLoadingBlacklist] = useState(true);
   const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
 
+  const [infoRequests, setInfoRequests] = useState<InfoRequest[]>([]);
+  const [loadingInfoRequests, setLoadingInfoRequests] = useState(true);
+  const [processingInfoRequestId, setProcessingInfoRequestId] = useState<number | null>(null);
+
   useEffect(() => {
     if (authLoading || !user || role !== "admin") return;
     async function fetchBlacklistRequests() {
@@ -427,7 +431,21 @@ export default function AdminPage() {
       } catch {}
       setLoadingBlacklist(false);
     }
+    async function fetchInfoRequests() {
+      const token = getAccessToken();
+      if (!token) return;
+      try {
+        const res = await fetch("/api/admin/info-requests", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          setInfoRequests(await res.json());
+        }
+      } catch {}
+      setLoadingInfoRequests(false);
+    }
     fetchBlacklistRequests();
+    fetchInfoRequests();
   }, [authLoading, user, role, getAccessToken]);
 
   const updateRequestStatus = async (requestId: number, status: "approved" | "rejected") => {
@@ -454,6 +472,33 @@ export default function AdminPage() {
       toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
     }
     setProcessingRequestId(null);
+  };
+
+  const updateInfoRequestStatus = async (requestId: number, status: "approved" | "rejected" | "completed") => {
+    const token = getAccessToken();
+    if (!token) return;
+    setProcessingInfoRequestId(requestId);
+    try {
+      const res = await fetch(`/api/admin/info-requests/${requestId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        setInfoRequests(prev => prev.map(r => r.id === requestId ? { ...r, status } : r));
+        const labels: Record<string, string> = { approved: "Approuvee", rejected: "Rejetee", completed: "Terminee" };
+        toast({ title: `Demande ${labels[status] || status}` });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Erreur", description: err.message || "Impossible de modifier", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    }
+    setProcessingInfoRequestId(null);
   };
 
   if (authLoading) {
@@ -698,6 +743,81 @@ export default function AdminPage() {
                             data-testid={`button-reject-${req.id}`}
                           >
                             {processingRequestId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" />Rejeter</>}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Search className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-display font-bold">Demandes d'information</h2>
+          </div>
+
+          {loadingInfoRequests ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : infoRequests.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">Aucune demande d'information.</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {infoRequests.map(req => {
+                const isPending = req.status === "pending";
+                const statusBadge = req.status === "approved"
+                  ? <Badge variant="default" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Check className="w-3 h-3" />Approuvee</Badge>
+                  : req.status === "rejected"
+                  ? <Badge variant="destructive" className="gap-1" data-testid={`badge-info-status-${req.id}`}><X className="w-3 h-3" />Rejetee</Badge>
+                  : req.status === "completed"
+                  ? <Badge variant="default" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Check className="w-3 h-3" />Terminee</Badge>
+                  : <Badge variant="secondary" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Clock className="w-3 h-3" />En attente</Badge>;
+
+                return (
+                  <Card key={req.id} className="p-4" data-testid={`card-info-${req.id}`}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs text-muted-foreground">#{req.id}</span>
+                          {statusBadge}
+                          {req.paid && <Badge variant="outline" className="gap-1">Payee</Badge>}
+                          <span className="text-xs text-muted-foreground">
+                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString("fr-FR") : ""}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                          {req.discordId && <div><span className="text-muted-foreground">Discord ID:</span> {req.discordId}</div>}
+                          {req.email && <div><span className="text-muted-foreground">Email:</span> {req.email}</div>}
+                          {req.pseudo && <div><span className="text-muted-foreground">Pseudo:</span> {req.pseudo}</div>}
+                          {req.ipAddress && <div><span className="text-muted-foreground">IP:</span> {req.ipAddress}</div>}
+                          {req.additionalInfo && <div className="col-span-2"><span className="text-muted-foreground">Info:</span> {req.additionalInfo}</div>}
+                        </div>
+                      </div>
+                      {isPending && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            onClick={() => updateInfoRequestStatus(req.id, "approved")}
+                            disabled={processingInfoRequestId === req.id}
+                            data-testid={`button-approve-info-${req.id}`}
+                          >
+                            {processingInfoRequestId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" />Approuver</>}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => updateInfoRequestStatus(req.id, "rejected")}
+                            disabled={processingInfoRequestId === req.id}
+                            data-testid={`button-reject-info-${req.id}`}
+                          >
+                            {processingInfoRequestId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" />Rejeter</>}
                           </Button>
                         </div>
                       )}

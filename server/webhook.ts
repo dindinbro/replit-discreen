@@ -377,6 +377,28 @@ export function webhookBlacklistRequest(user: UserInfo, fields: Record<string, s
   });
 }
 
+export function webhookInfoRequest(user: UserInfo, fields: Record<string, string | null | undefined>) {
+  const details: string[] = [];
+  if (fields.discordId) details.push(`**Discord ID** : \`${fields.discordId}\``);
+  if (fields.email) details.push(`**Email** : \`${fields.email}\``);
+  if (fields.pseudo) details.push(`**Pseudo** : \`${fields.pseudo}\``);
+  if (fields.ipAddress) details.push(`**IP** : \`${fields.ipAddress}\``);
+  if (fields.additionalInfo) details.push(`**Infos** : ${fields.additionalInfo}`);
+
+  const desc = [
+    userBlock(user),
+    sep(),
+    `**Details de la demande d'information**`,
+    ...(details.length > 0 ? details : ["Aucun champ renseigne"]),
+  ].join("\n");
+
+  sendWebhook({
+    title: "\uD83D\uDD0D Demande d'Information",
+    description: desc,
+    color: COLORS.info,
+  });
+}
+
 export function webhookSubscriptionExpired(count: number) {
   if (count === 0) return;
   sendWebhook({
