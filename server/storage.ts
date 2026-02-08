@@ -58,6 +58,9 @@ export interface IStorage {
   createPendingServiceRequest(orderId: string, type: string, userId: string | null, formData: string): Promise<PendingServiceRequest>;
   getPendingServiceRequest(orderId: string): Promise<PendingServiceRequest | undefined>;
   markPendingServiceRequestPaid(orderId: string): Promise<PendingServiceRequest | undefined>;
+  setDiscordId(userId: string, discordId: string): Promise<Subscription | undefined>;
+  clearDiscordId(userId: string): Promise<void>;
+  getDiscordId(userId: string): Promise<string | null>;
 }
 
 function hashKey(key: string): string {
@@ -488,6 +491,28 @@ export class DatabaseStorage implements IStorage {
   async markPendingServiceRequestPaid(orderId: string): Promise<PendingServiceRequest | undefined> {
     const [updated] = await db.update(pendingServiceRequests).set({ paid: true }).where(eq(pendingServiceRequests.orderId, orderId)).returning();
     return updated;
+  }
+
+  async setDiscordId(userId: string, discordId: string): Promise<Subscription | undefined> {
+    await this.getOrCreateSubscription(userId);
+    const [updated] = await db
+      .update(subscriptions)
+      .set({ discordId })
+      .where(eq(subscriptions.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  async clearDiscordId(userId: string): Promise<void> {
+    await db
+      .update(subscriptions)
+      .set({ discordId: null })
+      .where(eq(subscriptions.userId, userId));
+  }
+
+  async getDiscordId(userId: string): Promise<string | null> {
+    const sub = await this.getSubscription(userId);
+    return sub?.discordId || null;
   }
 }
 

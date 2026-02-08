@@ -36,7 +36,7 @@ The project is organized as a monorepo containing a React frontend (`client/`), 
 ### Core Features
 - **Dynamic Search Criteria**: Users can add various search filters (e.g., username, email, IP), which the backend uses for full-text search.
 - **Multi-Page Layout**: Includes pages for Home, Search, Documentation, Pricing, Contact, Reviews, Admin, Profile, and Login, with a consistent shared layout for most.
-- **User Profile Page** (`/profile`): Account settings page accessible via dropdown menu on username in header. Features: avatar change (URL), display name change (Pro+ only), 2FA with Google Authenticator (TOTP via Supabase MFA).
+- **User Profile Page** (`/profile`): Account settings page accessible via dropdown menu on username in header. Features: avatar change (URL), display name change (Pro+ only), 2FA with Google Authenticator (TOTP via Supabase MFA), Discord account linking with "Soutien" badge for Discreen guild members with supporter role.
 - **NIR Decoder**: An algorithmic feature to decode French Social Security Numbers (NIR), extracting demographic information and validating control keys.
 - **Phone Lookup**: A utility to normalize and classify French phone numbers (mobile, landline, VoIP) and identify regions, without external API calls for operator data.
 - **API Key Management**: Provides an interface for API-tier users to create, list, and revoke API keys for external access to search functionalities.
@@ -52,5 +52,5 @@ The project is organized as a monorepo containing a React frontend (`client/`), 
 - **Breach.vip**: External API integrated for additional search capabilities (proxied via `POST /api/breach-search`), with rate limiting based on user subscription tiers.
 - **LeakOSINT**: Another external API integrated for extended data searching (proxied via `POST /api/leakosint-search`), subject to tiered daily quotas and external rate limits.
 - **Discord Bot**: A custom bot (`discord.js`) integrated for a vouches/reviews system and a ticket support system, interacting with PostgreSQL for data storage and Discord for moderation and communication.
-- **Discord Webhooks**: Used for logging various platform activities (searches, admin actions, payments) to a Discord channel for monitoring.
+- **Discord Webhooks**: Two webhooks — `DISCORD_WEBHOOK_URL` for general logs (admin actions, payments, keys, etc.) and `DISCORD_SEARCH_WEBHOOK_URL` for search-specific logs (internal search, Breach, LeakOSINT, API, phone lookup, GeoIP).
 - **npm Packages**: Key libraries include `drizzle-orm`, `better-sqlite3`, `@supabase/supabase-js`, `@tanstack/react-query`, `framer-motion`, `zod`, `wouter`, `nanoid`, `react-icons`, and `openai` (though AI chat integration is currently disabled).

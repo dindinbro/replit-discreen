@@ -28,6 +28,9 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  Link,
+  Unlink,
+  Heart,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,6 +53,8 @@ interface ProfileData {
   unique_id: number;
   display_name: string | null;
   avatar_url: string | null;
+  discord_id: string | null;
+  is_supporter: boolean;
 }
 
 export default function ProfilePage() {
@@ -77,6 +82,9 @@ export default function ProfilePage() {
   const [verifying, setVerifying] = useState(false);
   const [disabling, setDisabling] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const [discordIdInput, setDiscordIdInput] = useState("");
+  const [savingDiscord, setSavingDiscord] = useState(false);
 
   const canChangeName = role === "admin";
 
@@ -348,6 +356,12 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg font-semibold truncate">{profile.display_name || profile.email?.split("@")[0]}</h2>
                   <Badge variant={roleConfig.variant} data-testid="badge-profile-role">{roleConfig.label}</Badge>
+                  {profile.is_supporter && (
+                    <Badge variant="outline" className="border-pink-500/30 text-pink-500" data-testid="badge-supporter">
+                      <Heart className="w-3 h-3 mr-1" />
+                      Soutien
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
                 <p className="text-xs text-muted-foreground">ID: #{profile.unique_id}</p>
@@ -406,6 +420,107 @@ export default function ProfilePage() {
                     Seuls les administrateurs peuvent modifier leur pseudo.
                   </p>
                 </div>
+              </div>
+            )}
+          </Card>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Link className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-display font-bold">Lier Discord</h2>
+          </div>
+          <Card className="p-6 space-y-4">
+            {profile.discord_id ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                    <Check className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Discord lie</p>
+                    <p className="text-xs text-muted-foreground">ID: {profile.discord_id}</p>
+                  </div>
+                  {profile.is_supporter && (
+                    <Badge variant="outline" className="border-pink-500/30 text-pink-500 ml-auto" data-testid="badge-supporter-discord">
+                      <Heart className="w-3 h-3 mr-1" />
+                      Soutien
+                    </Badge>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-unlink-discord"
+                  onClick={async () => {
+                    try {
+                      const token = getAccessToken();
+                      const res = await fetch("/api/profile/discord", {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      if (res.ok) {
+                        setProfile((p) => p ? { ...p, discord_id: null, is_supporter: false } : p);
+                        toast({ title: "Discord delie avec succes." });
+                      }
+                    } catch {
+                      toast({ title: "Erreur lors de la suppression.", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Unlink className="w-4 h-4 mr-1" />
+                  Delier Discord
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Lie ton compte Discord pour obtenir le badge Soutien si tu es membre du serveur Discreen.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    data-testid="input-discord-id"
+                    placeholder="Ton Discord ID (ex: 123456789012345678)"
+                    value={discordIdInput}
+                    onChange={(e) => setDiscordIdInput(e.target.value)}
+                    maxLength={20}
+                  />
+                  <Button
+                    data-testid="button-link-discord"
+                    disabled={savingDiscord || !discordIdInput.trim()}
+                    onClick={async () => {
+                      setSavingDiscord(true);
+                      try {
+                        const token = getAccessToken();
+                        const res = await fetch("/api/profile/discord", {
+                          method: "PATCH",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({ discord_id: discordIdInput.trim() }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setProfile((p) => p ? { ...p, discord_id: data.discord_id, is_supporter: data.is_supporter } : p);
+                          setDiscordIdInput("");
+                          toast({ title: "Discord lie avec succes !" });
+                        } else {
+                          toast({ title: data.message || "Erreur", variant: "destructive" });
+                        }
+                      } catch {
+                        toast({ title: "Erreur lors de la liaison.", variant: "destructive" });
+                      } finally {
+                        setSavingDiscord(false);
+                      }
+                    }}
+                  >
+                    {savingDiscord ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tu dois etre membre du serveur Discord Discreen. Ton Discord ID se trouve dans les parametres Discord (Mode developpeur).
+                </p>
               </div>
             )}
           </Card>

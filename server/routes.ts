@@ -16,7 +16,7 @@ import {
   webhookCategoryCreated, webhookCategoryUpdated, webhookCategoryDeleted,
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
 } from "./webhook";
-import { sendFreezeAlert } from "./discord-bot";
+import { sendFreezeAlert, checkDiscordMemberStatus } from "./discord-bot";
 
 const ORDER_TOKEN_SECRET = process.env.PLISIO_API_KEY || crypto.randomBytes(32).toString("hex");
 
@@ -226,6 +226,12 @@ export async function registerRoutes(
       const displayName = meta.display_name || meta.full_name || null;
       const avatarUrl = meta.avatar_url || null;
 
+      let isSupporter = false;
+      if (sub?.discordId) {
+        const discordStatus = await checkDiscordMemberStatus(sub.discordId);
+        isSupporter = discordStatus.inGuild && discordStatus.isSupporter;
+      }
+
       if (profileRole === "admin") {
         return res.json({
           id: user.id,
@@ -237,6 +243,8 @@ export async function registerRoutes(
           display_name: displayName,
           avatar_url: avatarUrl,
           expires_at: sub?.expiresAt || null,
+          discord_id: sub?.discordId || null,
+          is_supporter: isSupporter,
         });
       }
 
@@ -255,6 +263,8 @@ export async function registerRoutes(
         display_name: displayName,
         avatar_url: avatarUrl,
         expires_at: sub?.expiresAt || null,
+        discord_id: sub?.discordId || null,
+        is_supporter: isSupporter,
       });
     } catch (err) {
       console.error("GET /api/me error:", err);
@@ -325,6 +335,44 @@ export async function registerRoutes(
       res.json({ success: true, avatar_url: avatar_url || null });
     } catch (err) {
       console.error("PATCH /api/profile/avatar error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/profile/discord", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { discord_id } = req.body;
+
+      if (!discord_id || typeof discord_id !== "string") {
+        return res.status(400).json({ message: "Discord ID requis." });
+      }
+
+      const cleaned = discord_id.trim();
+      if (!/^\d{17,20}$/.test(cleaned)) {
+        return res.status(400).json({ message: "Discord ID invalide. Il doit contenir entre 17 et 20 chiffres." });
+      }
+
+      const status = await checkDiscordMemberStatus(cleaned);
+      if (!status.inGuild) {
+        return res.status(400).json({ message: "Cet utilisateur n'est pas membre du serveur Discord Discreen." });
+      }
+
+      await storage.setDiscordId(user.id, cleaned);
+      res.json({ success: true, discord_id: cleaned, is_supporter: status.isSupporter });
+    } catch (err) {
+      console.error("PATCH /api/profile/discord error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/profile/discord", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      await storage.clearDiscordId(user.id);
+      res.json({ success: true, discord_id: null });
+    } catch (err) {
+      console.error("DELETE /api/profile/discord error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

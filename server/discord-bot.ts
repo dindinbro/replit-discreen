@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { PlanTier } from "@shared/schema";
 
 let client: Client | null = null;
+const SOUTIEN_ROLE_ID = "1469926673582653648";
 
 export async function startDiscordBot() {
   const token = process.env.DISCORD_BOT_TOKEN;
@@ -370,23 +371,21 @@ export async function startDiscordBot() {
     }
   });
 
-  const soutienRoleId = "1469926673582653648";
-
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
     try {
       const wasBoosting = !!oldMember.premiumSince;
       const isBoosting = !!newMember.premiumSince;
 
       if (!wasBoosting && isBoosting) {
-        if (!newMember.roles.cache.has(soutienRoleId)) {
-          await newMember.roles.add(soutienRoleId);
+        if (!newMember.roles.cache.has(SOUTIEN_ROLE_ID)) {
+          await newMember.roles.add(SOUTIEN_ROLE_ID);
           log(`Role Soutien ajoute a ${newMember.user.tag} (boost)`, "discord");
         }
       }
 
       if (wasBoosting && !isBoosting) {
-        if (newMember.roles.cache.has(soutienRoleId)) {
-          await newMember.roles.remove(soutienRoleId);
+        if (newMember.roles.cache.has(SOUTIEN_ROLE_ID)) {
+          await newMember.roles.remove(SOUTIEN_ROLE_ID);
           log(`Role Soutien retire de ${newMember.user.tag} (fin boost)`, "discord");
         }
       }
@@ -1861,5 +1860,25 @@ export async function sendFreezeAlert(userId: string, username: string, uniqueId
     });
   } catch (err) {
     log(`Error sending freeze alert: ${err}`, "discord");
+  }
+}
+
+const DISCREEN_GUILD_ID = "1130682847749996564";
+
+export async function checkDiscordMemberStatus(discordId: string): Promise<{ inGuild: boolean; isSupporter: boolean }> {
+  if (!client) return { inGuild: false, isSupporter: false };
+
+  try {
+    const guild = client.guilds.cache.get(DISCREEN_GUILD_ID);
+    if (!guild) return { inGuild: false, isSupporter: false };
+
+    const member = await guild.members.fetch(discordId).catch(() => null);
+    if (!member) return { inGuild: false, isSupporter: false };
+
+    const isSupporter = member.roles.cache.has(SOUTIEN_ROLE_ID);
+    return { inGuild: true, isSupporter };
+  } catch (err) {
+    log(`Error checking discord member status for ${discordId}: ${err}`, "discord");
+    return { inGuild: false, isSupporter: false };
   }
 }

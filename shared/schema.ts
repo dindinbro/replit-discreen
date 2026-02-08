@@ -129,6 +129,7 @@ export const subscriptions = pgTable("subscriptions", {
   frozen: boolean("frozen").notNull().default(false),
   frozenAt: timestamp("frozen_at"),
   expiresAt: timestamp("expires_at"),
+  discordId: text("discord_id"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
