@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest } from "@shared/schema";
+import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest, WantedProfile, InsertWantedProfile } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,8 @@ import {
   X,
   Clock,
   Search,
+  UserPlus,
+  UserMinus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel";
@@ -72,6 +75,161 @@ interface CategoryFormData {
   icon: string;
   color: string;
   sortOrder: number;
+}
+
+function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState<Partial<InsertWantedProfile>>({
+    nom: "",
+    prenom: "",
+    email: "",
+    telephone: "",
+    adresse: "",
+    ville: "",
+    codePostal: "",
+    civilite: "M.",
+    dateNaissance: "",
+    ip: "",
+    pseudo: "",
+    discord: "",
+    password: "",
+    iban: "",
+    notes: ""
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = getAccessToken();
+    if (!token) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/wanted-profiles", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(form),
+      });
+
+      if (res.ok) {
+        toast({ title: "Profil créé", description: "Le profil Wanted a été ajouté avec succès." });
+        setForm({
+          nom: "", prenom: "", email: "", telephone: "", adresse: "",
+          ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
+          ip: "", pseudo: "", discord: "", password: "", iban: "", notes: ""
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
+      } else {
+        const err = await res.json();
+        toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur réseau", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="p-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Civilité</label>
+            <Select value={form.civilite} onValueChange={(v) => setForm(p => ({ ...p, civilite: v }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Civilité" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="M.">Monsieur (M.)</SelectItem>
+                <SelectItem value="Mme">Madame (Mme)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Prénom</label>
+            <Input value={form.prenom} onChange={e => setForm(p => ({ ...p, prenom: e.target.value }))} placeholder="Jean" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nom</label>
+            <Input value={form.nom} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} placeholder="Dupont" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email</label>
+            <Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="jean.dupont@example.com" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Téléphone</label>
+            <Input value={form.telephone} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} placeholder="06 12 34 56 78" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Adresse</label>
+          <Input value={form.adresse} onChange={e => setForm(p => ({ ...p, adresse: e.target.value }))} placeholder="123 Rue de la République" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Code Postal</label>
+            <Input value={form.codePostal} onChange={e => setForm(p => ({ ...p, codePostal: e.target.value }))} placeholder="75001" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Ville</label>
+            <Input value={form.ville} onChange={e => setForm(p => ({ ...p, ville: e.target.value }))} placeholder="Paris" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date de naissance</label>
+            <Input value={form.dateNaissance} onChange={e => setForm(p => ({ ...p, dateNaissance: e.target.value }))} placeholder="DD/MM/YYYY" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">IP</label>
+            <Input value={form.ip} onChange={e => setForm(p => ({ ...p, ip: e.target.value }))} placeholder="192.168.1.1" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Pseudo</label>
+            <Input value={form.pseudo} onChange={e => setForm(p => ({ ...p, pseudo: e.target.value }))} placeholder="JDupont" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Discord</label>
+            <Input value={form.discord} onChange={e => setForm(p => ({ ...p, discord: e.target.value }))} placeholder="jdupont#1234" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Mot de passe (fuite)</label>
+            <Input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">IBAN</label>
+          <Input value={form.iban} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Notes / Signalement</label>
+          <Textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Informations complémentaires..." className="min-h-[100px]" />
+        </div>
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+          Entrer les informations
+        </Button>
+      </form>
+    </Card>
+  );
 }
 
 function CategoryFormDialog({
@@ -548,6 +706,14 @@ export default function AdminPage() {
       </header>
 
       <main className="container max-w-4xl mx-auto px-4 py-8 space-y-10">
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <UserPlus className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-display font-bold">Ajouter un profil Wanted</h2>
+          </div>
+          <WantedProfileForm getAccessToken={getAccessToken} />
+        </section>
+
         <section className="space-y-6">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">

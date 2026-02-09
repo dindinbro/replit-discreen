@@ -385,7 +385,9 @@ export default function SearchPage() {
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir">("internal");
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted">("internal");
+  const [wantedResults, setWantedResults] = useState<any[]>([]);
+  const [loadingWanted, setLoadingWanted] = useState(false);
 
   const [criteria, setCriteria] = useState<CriterionRow[]>([
     { id: String(nextCriterionId++), type: "username", value: "" },
@@ -522,6 +524,60 @@ export default function SearchPage() {
   };
 
   const filterTypes = Object.keys(FilterLabels) as SearchFilterType[];
+
+  const handleWantedSearch = async () => {
+    const query = criteria.map(c => c.value).filter(Boolean).join(" ");
+    if (!query) return;
+
+    const token = getAccessToken();
+    if (!token) return;
+
+    setLoadingWanted(true);
+    try {
+      const res = await fetch(`/api/wanted/search?q=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setWantedResults(await res.json());
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de rechercher les profils Wanted", variant: "destructive" });
+    } finally {
+      setLoadingWanted(false);
+    }
+  };
+
+  const handleInternalSearch = (newPage: number) => {
+    const filledCriteria = criteria.filter((c) => c.value.trim() !== "");
+    if (filledCriteria.length === 0) {
+      toast({
+        title: "Criteres manquants",
+        description: "Veuillez entrer au moins un critere de recherche.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLimitReached(false);
+    setPage(newPage);
+    searchMutation.mutate(
+      {
+        criteria: filledCriteria.map((c) => ({ type: c.type, value: c.value.trim() })),
+        limit: pageSize,
+        offset: newPage * pageSize,
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
+        },
+        onError: (err) => {
+          if (err instanceof SearchLimitError) {
+            setLimitReached(true);
+          }
+        },
+      }
+    );
+  };
 
   const internalQuota = quotaQuery.data;
   const internalQuotaFromResponse = searchMutation.data?.quota;
@@ -758,6 +814,15 @@ export default function SearchPage() {
           >
             <Hash className="w-4 h-4" />
             Decodeur NIR
+          </Button>
+          <Button
+            variant={searchMode === "wanted" ? "default" : "outline"}
+            onClick={() => setSearchMode("wanted")}
+            className="min-w-[180px] gap-2"
+            data-testid="button-mode-wanted"
+          >
+            <ShieldAlert className="w-4 h-4" />
+            Wanted
           </Button>
         </div>
 
@@ -1312,7 +1377,45 @@ export default function SearchPage() {
                 />
               ))}
 
-                    {searchMode === "internal" && searchMutation.data && (searchMutation.data.total ?? 0) > pageSize && (
+                    {searchMode === "wanted" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Résultats Wanted ({wantedResults.length})</h3>
+              </div>
+              {loadingWanted ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : wantedResults.length === 0 ? (
+                <Card className="p-8 text-center text-muted-foreground">
+                  Aucun profil wanted correspondant trouvé.
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {wantedResults.map((profile, i) => (
+                    <ResultCard
+                      key={profile.id}
+                      index={i}
+                      globalIndex={i}
+                      row={{
+                        nom: profile.nom,
+                        prenom: profile.prenom,
+                        email: profile.email,
+                        telephone: profile.telephone,
+                        adresse: `${profile.adresse || ""} ${profile.codePostal || ""} ${profile.ville || ""}`.trim(),
+                        pseudo: profile.pseudo,
+                        discord: profile.discord,
+                        notes: profile.notes,
+                        source: "Base Wanted Admin"
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {searchMode === "internal" && searchMutation.data && (searchMutation.data.total ?? 0) > pageSize && (
                       <div className="flex items-center justify-center gap-2 pt-8">
                         <Button
                           variant="outline"

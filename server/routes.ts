@@ -1804,6 +1804,28 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/wanted/search", requireAuth, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) return res.json([]);
+      const results = await storage.searchWantedProfiles(query);
+      res.json(results);
+    } catch (err) {
+      console.error("GET /api/wanted/search error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/wanted-profiles", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const profile = await storage.createWantedProfile(req.body);
+      res.json(profile);
+    } catch (err) {
+      console.error("POST /api/admin/wanted-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.get("/api/_deploy-file", (req: Request, res: Response) => {
     const secret = req.query.s;
     if (secret !== "xK9mBridge2026") {

@@ -70,7 +70,15 @@ export const FilterLabels: Record<SearchFilterType, string> = {
   password: "Password",
   vin: "VIN / Plaque",
   discordId: "Discord ID",
-  fivemLicense: "License FiveM"
+  fivemLicense: "License FiveM",
+  nom: "Nom (Wanted)",
+  prenom: "Prénom (Wanted)",
+  ville: "Ville",
+  codePostal: "Code Postal",
+  civilite: "Civilité",
+  dateNaissance: "Date de Naissance",
+  iban_wanted: "IBAN (Wanted)",
+  notes: "Notes / Signalement"
 };
 
 export const SearchCriterionSchema = z.object({
