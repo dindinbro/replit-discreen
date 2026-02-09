@@ -831,7 +831,10 @@ export async function registerRoutes(
       }
 
       const request = api.search.perform.input.parse(req.body);
+      console.log(`[search] Incoming criteria: ${JSON.stringify(request.criteria)}, limit: ${request.limit}, offset: ${request.offset}`);
+      const searchStart = Date.now();
       const { results, total } = await searchAllIndexes(request.criteria, request.limit, request.offset);
+      console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}`);
 
       const wUser = await buildUserInfo(req);
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
