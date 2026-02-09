@@ -1317,6 +1317,7 @@ export async function registerRoutes(
             case_sensitive: false,
             categories: null,
           }),
+          signal: AbortSignal.timeout(15000),
         });
       } catch (fetchErr) {
         console.error("Breach.vip API fetch error:", fetchErr);
@@ -1449,7 +1450,9 @@ export async function registerRoutes(
         return res.json({ ok: false, message: "Format d'adresse IP invalide" });
       }
 
-      const response = await fetch(`http://ip-api.com/json/${encodeURIComponent(trimmed)}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query`);
+      const response = await fetch(`http://ip-api.com/json/${encodeURIComponent(trimmed)}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query`, {
+        signal: AbortSignal.timeout(8000),
+      });
       const data = await response.json();
 
       if (data.status === "fail") {
@@ -1658,6 +1661,7 @@ export async function registerRoutes(
             lang: lang || "en",
             type: "json",
           }),
+          signal: AbortSignal.timeout(15000),
         });
       } catch (fetchErr) {
         console.error("LeakOSINT API fetch error:", fetchErr);
