@@ -56,8 +56,11 @@ function detectMainTable(db: Database.Database): { tableName: string; columns: s
   throw new Error("No usable table found in database");
 }
 
+const failedDbs = new Set<string>();
+
 function openDb(sourceKey: string): DbInfo | null {
   if (dbCache[sourceKey]) return dbCache[sourceKey];
+  if (failedDbs.has(sourceKey)) return null;
 
   const filename = SOURCE_MAP[sourceKey];
   if (!filename) return null;
@@ -65,12 +68,18 @@ function openDb(sourceKey: string): DbInfo | null {
   const filePath = path.join(getDataDir(), filename);
   if (!fs.existsSync(filePath)) return null;
 
-  const db = new Database(filePath, { readonly: true });
-  const { tableName, columns, isFts } = detectMainTable(db);
+  try {
+    const db = new Database(filePath, { readonly: true });
+    const { tableName, columns, isFts } = detectMainTable(db);
 
-  const info: DbInfo = { db, tableName, columns, isFts, sourceKey };
-  dbCache[sourceKey] = info;
-  return info;
+    const info: DbInfo = { db, tableName, columns, isFts, sourceKey };
+    dbCache[sourceKey] = info;
+    return info;
+  } catch (err) {
+    console.warn(`[searchSqlite] ${sourceKey} (${filename}) failed to open, skipping:`, (err as Error).message);
+    failedDbs.add(sourceKey);
+    return null;
+  }
 }
 
 function getAvailableDbs(): DbInfo[] {
