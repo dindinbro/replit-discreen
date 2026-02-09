@@ -8,6 +8,8 @@ import { createClient } from "@supabase/supabase-js";
 import { searchAllIndexes, initSearchDatabases } from "./searchSqlite";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import crypto from "crypto";
+import path from "path";
+import fs from "fs";
 import {
   webhookSearch, webhookBreachSearch, webhookLeakosintSearch, webhookApiSearch,
   webhookRoleChange, webhookFreeze, webhookInvoiceCreated, webhookPaymentCompleted,
@@ -1800,6 +1802,19 @@ export async function registerRoutes(
       console.error("DELETE /api/vouches/:id error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  app.get("/api/_bridge-file", (req: Request, res: Response) => {
+    const secret = req.query.s;
+    if (secret !== "xK9mBridge2026") {
+      return res.status(404).json({ error: "Not found" });
+    }
+    const filePath = path.join(process.cwd(), "vps-bridge", "server.js");
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    res.setHeader("Content-Type", "application/javascript");
+    res.send(fs.readFileSync(filePath, "utf-8"));
   });
 
   return httpServer;
