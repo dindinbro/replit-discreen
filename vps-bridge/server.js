@@ -35,11 +35,12 @@ function loadDatabases() {
 
     try {
       const db = new Database(filePath, { readonly: true });
+      db.pragma("busy_timeout = 10000");
       const info = detectMainTable(db);
       dbCache[key] = { db, ...info, sourceKey: key, filename: file };
 
-      const countRow = db.prepare(`SELECT count(*) as c FROM "${info.tableName}"`).get();
-      console.log(`[bridge] ${file} -> table "${info.tableName}" (${info.isFts ? "FTS5" : "regular"}, ${countRow.c} rows)`);
+      db.prepare(`SELECT 1 FROM "${info.tableName}" LIMIT 1`).get();
+      console.log(`[bridge] ${file} -> table "${info.tableName}" (${info.isFts ? "FTS5" : "regular"}) OK`);
     } catch (err) {
       console.error(`[bridge] Failed to load ${file}:`, err.message);
     }
@@ -272,33 +273,25 @@ function searchOneDb(info, criteria, limit, offset) {
   const { db, tableName, columns, isFts, sourceKey } = info;
 
   const values = criteria.map((c) => (c.value || "").trim()).filter(Boolean);
-  if (values.length === 0) return { results: [], total: 0 };
+  if (values.length === 0) return { results: [], total: null };
 
   if (isFts) {
     const ftsTerms = values.map((v) => `"${v.replace(/"/g, '""')}"`);
     const ftsQuery = ftsTerms.join(" ");
 
-    const countRow = db
-      .prepare(`SELECT count(*) as total FROM "${tableName}" WHERE "${tableName}" MATCH ?`)
-      .get(ftsQuery);
-
-    if (limit === 0) {
-      return { results: [], total: countRow.total };
-    }
-
-    const fetchLimit = limit * 5;
+    const fetchLimit = Math.max(limit * 5, 100);
     const rows = db
       .prepare(
-        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ?`
+        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ? OFFSET ?`
       )
-      .all(ftsQuery, fetchLimit);
+      .all(ftsQuery, fetchLimit, offset);
 
     const processed = processResults(rows, sourceKey);
     const filtered = filterResultsByCriteria(processed, criteria);
 
     return {
       results: filtered.slice(0, limit),
-      total: countRow.total,
+      total: null,
     };
   } else {
     const conditions = [];
@@ -314,27 +307,19 @@ function searchOneDb(info, criteria, limit, offset) {
 
     const whereSQL = conditions.join(" AND ");
 
-    const countRow = db
-      .prepare(`SELECT count(*) as total FROM "${tableName}" WHERE ${whereSQL}`)
-      .get(...params);
-
-    if (limit === 0) {
-      return { results: [], total: countRow.total };
-    }
-
-    const fetchLimit = limit * 5;
+    const fetchLimit = Math.max(limit * 5, 100);
     const rows = db
       .prepare(
-        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE ${whereSQL} LIMIT ?`
+        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE ${whereSQL} LIMIT ? OFFSET ?`
       )
-      .all(...params, fetchLimit);
+      .all(...params, fetchLimit, offset);
 
     const processed = processResults(rows, sourceKey);
     const filtered = filterResultsByCriteria(processed, criteria);
 
     return {
       results: filtered.slice(0, limit),
-      total: countRow.total,
+      total: null,
     };
   }
 }
@@ -365,42 +350,21 @@ app.post("/search", authMiddleware, (req, res) => {
       return res.json({ results: [], total: 0 });
     }
 
-    let totalCount = 0;
-    const dbTotals = [];
-
-    for (const dbInfo of dbs) {
-      try {
-        const countResult = searchOneDb(dbInfo, criteria, 0, 0);
-        const t = countResult.total || 0;
-        totalCount += t;
-        dbTotals.push({ info: dbInfo, total: t });
-      } catch (err) {
-        console.warn(`[bridge] Error counting ${dbInfo.sourceKey}:`, err.message);
-      }
-    }
-
-    let remaining = safeOffset;
     const allResults = [];
     let needed = safeLimit;
 
-    for (const { info, total } of dbTotals) {
+    for (const dbInfo of dbs) {
       if (needed <= 0) break;
-      if (remaining >= total) {
-        remaining -= total;
-        continue;
-      }
-
       try {
-        const result = searchOneDb(info, criteria, needed, remaining);
+        const result = searchOneDb(dbInfo, criteria, needed, safeOffset);
         allResults.push(...result.results);
         needed -= result.results.length;
-        remaining = 0;
       } catch (err) {
-        console.warn(`[bridge] Error searching ${info.sourceKey}:`, err.message);
+        console.warn(`[bridge] Error searching ${dbInfo.sourceKey}:`, err.message);
       }
     }
 
-    res.json({ results: allResults, total: totalCount });
+    res.json({ results: allResults, total: allResults.length > 0 ? allResults.length : 0 });
   } catch (err) {
     console.error("[bridge] Search error:", err);
     res.status(500).json({ error: "Internal search error" });
