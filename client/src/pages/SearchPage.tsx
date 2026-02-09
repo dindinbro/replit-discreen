@@ -66,26 +66,69 @@ const FILTER_ICONS: Partial<Record<SearchFilterType, typeof User>> = {
 };
 
 const FILTER_PLACEHOLDERS: Partial<Record<SearchFilterType, string>> = {
-  username: "Entrez nom d'utilisateur...",
-  displayName: "Entrez nom d'affichage...",
-  lastName: "Entrez nom...",
-  firstName: "Entrez prenom...",
-  email: "Entrez adresse email...",
-  address: "Entrez adresse...",
-  ipAddress: "Entrez adresse IP...",
-  macAddress: "Entrez adresse MAC...",
-  phone: "Entrez numero de telephone...",
-  ssn: "Entrez numero de securite sociale...",
-  dob: "Entrez date de naissance...",
-  yob: "Entrez annee de naissance...",
-  iban: "Entrez IBAN...",
-  bic: "Entrez BIC...",
-  discordId: "Entrez Discord ID...",
-  fivemLicense: "Entrez license FiveM...",
-  gender: "Entrez genre...",
-  hashedPassword: "Entrez hashed password...",
-  password: "Entrez password...",
-  vin: "Entrez VIN / plaque...",
+  username: "ex: jean_dupont",
+  displayName: "ex: Jean Dupont",
+  lastName: "ex: Dupont",
+  firstName: "ex: Jean",
+  email: "ex: nom@domaine.com",
+  address: "ex: 12 rue de la Paix, Paris",
+  ipAddress: "ex: 192.168.1.1",
+  macAddress: "ex: AA:BB:CC:DD:EE:FF",
+  phone: "ex: 0612345678 ou +33612345678",
+  ssn: "ex: 1 85 05 78 006 084 36",
+  dob: "ex: 05/10/1964",
+  yob: "ex: 1964",
+  iban: "ex: FR76 1234 5678 9012 3456 7890 123",
+  bic: "ex: BNPAFRPP",
+  discordId: "ex: 123456789012345678",
+  fivemLicense: "ex: license:abc123def456",
+  gender: "ex: M ou F",
+  hashedPassword: "ex: 5f4dcc3b5aa765d61d8327deb882cf99",
+  password: "ex: motdepasse123",
+  vin: "ex: AA-123-BB ou WF0XXXGCDX1234567",
+};
+
+const FILTER_VALIDATORS: Partial<Record<SearchFilterType, { test: (v: string) => boolean; message: string }>> = {
+  email: {
+    test: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    message: "L'email doit contenir un @ et un nom de domaine (ex: nom@domaine.com)",
+  },
+  ipAddress: {
+    test: (v) => /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v),
+    message: "L'adresse IP doit etre au format X.X.X.X (ex: 192.168.1.1)",
+  },
+  macAddress: {
+    test: (v) => /^([0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}$/.test(v),
+    message: "L'adresse MAC doit etre au format AA:BB:CC:DD:EE:FF",
+  },
+  phone: {
+    test: (v) => /^(\+?\d[\d\s\-().]{6,})$/.test(v.replace(/\s/g, "")),
+    message: "Le numero doit contenir au moins 7 chiffres (ex: 0612345678)",
+  },
+  vin: {
+    test: (v) => /^[A-Z]{2}[\s-]?\d{3}[\s-]?[A-Z]{2}$/i.test(v) || /^[A-HJ-NPR-Z0-9]{17}$/i.test(v) || v.length >= 3,
+    message: "Entrez une plaque (AA-123-BB) ou un VIN (17 caracteres)",
+  },
+  discordId: {
+    test: (v) => /^\d{15,20}$/.test(v),
+    message: "L'ID Discord doit contenir 15 a 20 chiffres",
+  },
+  ssn: {
+    test: (v) => /^\d[\s]?\d{2}[\s]?\d{2}[\s]?\d{2}[\s]?\d{3}[\s]?\d{3}[\s]?\d{2}$/.test(v.replace(/\s/g, "")) || v.replace(/\s/g, "").length >= 5,
+    message: "Le NIR doit contenir 13 chiffres + 2 cles",
+  },
+  yob: {
+    test: (v) => /^\d{4}$/.test(v) && parseInt(v) >= 1900 && parseInt(v) <= new Date().getFullYear(),
+    message: "L'annee doit etre entre 1900 et aujourd'hui (ex: 1964)",
+  },
+  iban: {
+    test: (v) => v.replace(/\s/g, "").length >= 15,
+    message: "L'IBAN doit contenir au moins 15 caracteres",
+  },
+  bic: {
+    test: (v) => /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/i.test(v),
+    message: "Le BIC doit etre au format BNPAFRPP (8 ou 11 caracteres)",
+  },
 };
 
 const FIELD_ICON_MAP: Record<string, typeof User> = {
@@ -587,6 +630,18 @@ export default function SearchPage() {
         variant: "destructive",
       });
       return;
+    }
+
+    for (const c of filledCriteria) {
+      const validator = FILTER_VALIDATORS[c.type];
+      if (validator && !validator.test(c.value.trim())) {
+        toast({
+          title: `Format invalide — ${FilterLabels[c.type]}`,
+          description: validator.message,
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setLimitReached(false);
