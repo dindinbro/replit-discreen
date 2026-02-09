@@ -140,22 +140,27 @@ const JSON_FIELD_MAP: Record<string, string> = {
   "dob": "date_naissance",
   "birth_date": "date_naissance",
   "birthday": "date_naissance",
+  "anniversaryday": "date_naissance",
   "genre": "civilite",
   "sexe": "civilite",
   "gender": "civilite",
   "civilite": "civilite",
+  "civility": "civilite",
   "telephone": "telephone",
   "phone": "telephone",
   "tel": "telephone",
   "mobile": "telephone",
+  "msisdn": "telephone",
   "adresse": "adresse",
   "address": "adresse",
   "voie": "adresse",
   "rue": "adresse",
   "street": "adresse",
+  "streetname": "adresse",
   "cplt_adresse": "cplt_adresse",
   "code_postal": "code_postal",
   "postal_code": "code_postal",
+  "postalcode": "code_postal",
   "zip": "code_postal",
   "ville": "ville",
   "city": "ville",
@@ -169,7 +174,8 @@ const JSON_FIELD_MAP: Record<string, string> = {
   "hash": "hash",
   "ip": "ip",
   "ip_address": "ip",
-  "id": "identifiant_interne",
+  "login": "identifiant",
+  "username": "identifiant",
   "id_psp": "id_psp",
   "matricule": "matricule",
   "organisme": "organisme",
@@ -177,7 +183,43 @@ const JSON_FIELD_MAP: Record<string, string> = {
   "allocataire": "allocataire",
   "qualite": "qualite",
   "boursier": "boursier",
+  "offername": "offre",
+  "offerdescription": "offre_detail",
+  "offerprice": "prix_offre",
+  "freeboxid": "freebox_id",
+  "status": "statut",
+  "internalstatus": "statut_interne",
+  "activationdat": "date_activation",
+  "firstactivationline": "date_activation_ligne",
+  "createdat": "date_creation",
+  "modifiedat": "date_modification",
 };
+
+function flattenObject(obj: Record<string, unknown>, prefix: string = ""): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === null || val === undefined) continue;
+    if (typeof val === "object" && !Array.isArray(val)) {
+      const nested = flattenObject(val as Record<string, unknown>, "");
+      for (const [nk, nv] of Object.entries(nested)) {
+        result[nk] = nv;
+      }
+    } else {
+      const strVal = String(val).trim();
+      if (strVal && strVal !== "null") {
+        result[key.toLowerCase()] = strVal;
+      }
+    }
+  }
+  return result;
+}
+
+const SKIP_JSON_FIELDS = new Set([
+  "id", "overconsumption", "canterminate", "posterioriporta",
+  "havebarring", "a_valider", "exercice_id", "uuid_doc",
+  "refuser", "supplement", "account", "parent", "prepaidid",
+  "offer", "metaofferid", "accountid",
+]);
 
 function parseJsonLine(line: string, source: string): Record<string, string> | null {
   const trimmed = line.trim();
@@ -187,19 +229,18 @@ function parseJsonLine(line: string, source: string): Record<string, string> | n
     const obj = JSON.parse(trimmed);
     if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return null;
 
+    const flat = flattenObject(obj);
     const parsed: Record<string, string> = {};
 
-    for (const [key, val] of Object.entries(obj)) {
-      if (val === null || val === undefined || val === "") continue;
-      const strVal = String(val).trim();
-      if (!strVal || strVal === "null" || strVal === "false" || strVal === "0") continue;
+    for (const [key, val] of Object.entries(flat)) {
+      if (!val || val === "false" || val === "0") continue;
+      if (SKIP_JSON_FIELDS.has(key)) continue;
 
-      const normalizedKey = key.toLowerCase().trim();
-      const mappedField = JSON_FIELD_MAP[normalizedKey];
+      const mappedField = JSON_FIELD_MAP[key];
 
       if (mappedField) {
-        if (mappedField === "date_naissance" && strVal.includes("T")) {
-          const datePart = strVal.split("T")[0];
+        if ((mappedField === "date_naissance" || mappedField === "date_creation" || mappedField === "date_modification" || mappedField === "date_activation" || mappedField === "date_activation_ligne") && val.includes("-") && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+          const datePart = val.split("T")[0].split("t")[0];
           if (datePart) {
             const parts = datePart.split("-");
             if (parts.length === 3) {
@@ -209,17 +250,16 @@ function parseJsonLine(line: string, source: string): Record<string, string> | n
           }
         }
         if (!parsed[mappedField]) {
-          parsed[mappedField] = strVal;
+          parsed[mappedField] = val;
         }
       }
     }
 
-    if (parsed["voie"] || parsed["cplt_adresse"]) {
-      const parts = [parsed["voie"], parsed["cplt_adresse"]].filter(Boolean);
-      if (parts.length > 0 && !parsed["adresse"]) {
-        parsed["adresse"] = parts.join(", ");
-      }
-      delete parsed["voie"];
+    if (parsed["cplt_adresse"] && parsed["adresse"]) {
+      parsed["adresse"] = parsed["adresse"] + ", " + parsed["cplt_adresse"];
+      delete parsed["cplt_adresse"];
+    } else if (parsed["cplt_adresse"] && !parsed["adresse"]) {
+      parsed["adresse"] = parsed["cplt_adresse"];
       delete parsed["cplt_adresse"];
     }
 
@@ -227,6 +267,11 @@ function parseJsonLine(line: string, source: string): Record<string, string> | n
       parsed["adresse"] = parsed["nom_adresse_postale"];
       delete parsed["nom_adresse_postale"];
     }
+    if (parsed["nom_adresse_postale"] && parsed["adresse"]) {
+      delete parsed["nom_adresse_postale"];
+    }
+
+    if (Object.keys(parsed).length === 0) return null;
 
     if (source) parsed["source"] = source;
     return parsed;

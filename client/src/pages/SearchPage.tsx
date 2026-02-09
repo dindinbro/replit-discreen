@@ -155,6 +155,10 @@ const FIELD_ICON_MAP: Record<string, typeof User> = {
   boursier: FileText, code_insee: Hash, id_psp: Hash,
   identifiant_interne: Hash, cplt_adresse: MapPin,
   nom_adresse_postale: MapPin,
+  offre: FileText, offre_detail: FileText, prix_offre: CreditCard,
+  freebox_id: Hash, statut: FileText, statut_interne: FileText,
+  date_activation: Calendar, date_activation_ligne: Calendar,
+  date_creation: Calendar, date_modification: Calendar,
 };
 
 function getFieldIcon(fieldName: string) {
@@ -174,9 +178,9 @@ function getFieldColorVar(fieldName: string): string {
     return "--field-phone";
   if (["code_postal", "zip", "zipcode", "postal", "id", "discord", "mac", "hash", "_source", "code_insee", "matricule", "id_psp", "identifiant_interne"].includes(key))
     return "--field-id";
-  if (["date_naissance", "birthday", "dob", "birth", "date", "bday", "regdate", "lastactive"].includes(key))
+  if (["date_naissance", "birthday", "dob", "birth", "date", "bday", "regdate", "lastactive", "date_activation", "date_activation_ligne", "date_creation", "date_modification"].includes(key))
     return "--field-date";
-  if (["iban", "credit_card", "card", "ssn"].includes(key))
+  if (["iban", "credit_card", "card", "ssn", "prix_offre"].includes(key))
     return "--field-finance";
   if (["password"].includes(key))
     return "--field-person";
@@ -208,6 +212,10 @@ function getFieldLabel(fieldName: string): string {
     boursier: "Boursier", code_insee: "Code INSEE", id_psp: "ID PSP",
     identifiant_interne: "ID interne", cplt_adresse: "Complement adresse",
     nom_adresse_postale: "Adresse postale",
+    offre: "Offre", offre_detail: "Detail offre", prix_offre: "Prix offre",
+    freebox_id: "Freebox ID", statut: "Statut", statut_interne: "Statut interne",
+    date_activation: "Date activation", date_activation_ligne: "Activation ligne",
+    date_creation: "Date creation", date_modification: "Date modification",
   };
   return labels[key] || fieldName.replace(/_/g, " ");
 }
