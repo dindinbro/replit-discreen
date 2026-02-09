@@ -833,7 +833,23 @@ export async function registerRoutes(
       const request = api.search.perform.input.parse(req.body);
       console.log(`[search] Incoming criteria: ${JSON.stringify(request.criteria)}, limit: ${request.limit}, offset: ${request.offset}`);
       const searchStart = Date.now();
-      const { results, total } = await searchAllIndexes(request.criteria, request.limit, request.offset);
+      const searchPromise = Promise.resolve(searchAllIndexes(request.criteria, request.limit, request.offset));
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("SEARCH_TIMEOUT")), 90000)
+      );
+      let results: Record<string, unknown>[];
+      let total: number | null;
+      try {
+        const searchResult = await Promise.race([searchPromise, timeoutPromise]);
+        results = searchResult.results;
+        total = searchResult.total;
+      } catch (timeoutErr: any) {
+        if (timeoutErr.message === "SEARCH_TIMEOUT") {
+          console.warn(`[search] Timeout after ${Date.now() - searchStart}ms`);
+          return res.status(504).json({ message: "La recherche a pris trop de temps. Essayez un terme plus precis." });
+        }
+        throw timeoutErr;
+      }
       console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}`);
 
       const wUser = await buildUserInfo(req);
