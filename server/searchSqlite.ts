@@ -298,15 +298,7 @@ function searchOneDb(
     const ftsTerms = values.map((v) => `"${v.replace(/"/g, '""')}"`);
     const ftsQuery = ftsTerms.join(" ");
 
-    if (limit === 0) {
-      const countStmt = db.prepare(
-        `SELECT count(*) as total FROM "${tableName}" WHERE "${tableName}" MATCH ?`
-      );
-      const countRow = countStmt.get(ftsQuery) as { total: number };
-      return { results: [], total: countRow.total };
-    }
-
-    const fetchLimit = limit * 5;
+    const fetchLimit = Math.max(limit * 5, 100);
     const selectStmt = db.prepare(
       `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ? OFFSET ?`
     );
@@ -315,14 +307,9 @@ function searchOneDb(
     const processed = processResults(rows, sourceKey);
     const filtered = filterResultsByCriteria(processed, criteria);
 
-    const countStmt = db.prepare(
-      `SELECT count(*) as total FROM "${tableName}" WHERE "${tableName}" MATCH ?`
-    );
-    const countRow = countStmt.get(ftsQuery) as { total: number };
-
     return {
       results: filtered.slice(0, limit),
-      total: countRow.total,
+      total: null,
     };
   } else {
     const conditions: string[] = [];
@@ -338,21 +325,17 @@ function searchOneDb(
 
     const whereSQL = conditions.join(" AND ");
 
-    const countStmt = db.prepare(
-      `SELECT count(*) as total FROM "${tableName}" WHERE ${whereSQL}`
-    );
-    const countRow = countStmt.get(...params) as { total: number };
-
+    const fetchLimit = Math.max(limit * 5, 100);
     const selectStmt = db.prepare(
       `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE ${whereSQL} LIMIT ? OFFSET ?`
     );
-    const rows = selectStmt.all(...params, limit, offset) as Record<string, string>[];
+    const rows = selectStmt.all(...params, fetchLimit, offset) as Record<string, string>[];
 
     const processed = processResults(rows, sourceKey);
     const filtered = filterResultsByCriteria(processed, criteria);
     return {
-      results: filtered,
-      total: countRow.total,
+      results: filtered.slice(0, limit),
+      total: null,
     };
   }
 }
@@ -439,17 +422,17 @@ function searchLocal(
     return { results: [], total: 0 };
   }
 
-  let totalCount = 0;
-  const dbTotals: { info: DbInfo; total: number }[] = [];
+  const allResults: Record<string, unknown>[] = [];
+  let needed = limit;
 
   for (const dbInfo of dbs) {
+    if (needed <= 0) break;
     try {
-      const countResult = searchOneDb(dbInfo, criteria, 0, 0);
-      const t = countResult.total ?? 0;
-      totalCount += t;
-      dbTotals.push({ info: dbInfo, total: t });
+      const result = searchOneDb(dbInfo, criteria, needed, offset);
+      allResults.push(...result.results);
+      needed -= result.results.length;
     } catch (err: any) {
-      console.warn(`[searchSqlite] Error counting ${dbInfo.sourceKey}:`, err?.message);
+      console.warn(`[searchSqlite] Error searching ${dbInfo.sourceKey}:`, err?.message);
       if (err?.code === "SQLITE_CORRUPT") {
         failedDbs.add(dbInfo.sourceKey);
         delete dbCache[dbInfo.sourceKey];
@@ -457,35 +440,9 @@ function searchLocal(
     }
   }
 
-  let remaining = offset;
-  const allResults: Record<string, unknown>[] = [];
-  let needed = limit;
-
-  for (const { info, total } of dbTotals) {
-    if (needed <= 0) break;
-
-    if (remaining >= total) {
-      remaining -= total;
-      continue;
-    }
-
-    try {
-      const result = searchOneDb(info, criteria, needed, remaining);
-      allResults.push(...result.results);
-      needed -= result.results.length;
-      remaining = 0;
-    } catch (err: any) {
-      console.warn(`[searchSqlite] Error searching ${info.sourceKey}:`, err?.message);
-      if (err?.code === "SQLITE_CORRUPT") {
-        failedDbs.add(info.sourceKey);
-        delete dbCache[info.sourceKey];
-      }
-    }
-  }
-
   return {
     results: allResults,
-    total: totalCount,
+    total: allResults.length,
   };
 }
 
