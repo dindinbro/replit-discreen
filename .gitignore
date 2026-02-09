@@ -9,3 +9,8 @@ build
 server/public
 vite.config.ts.*
 *.tar.gz
+server/data/*.db
+server/data/*.db.tmp
+server/data/*.db-journal
+data/*.db
+data/*.db.tmp
