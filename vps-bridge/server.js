@@ -4,33 +4,16 @@
  * 
  * Ce script tourne sur ton VPS et expose tes fichiers SQLite
  * via une API HTTP securisee que le site Replit interroge.
- *
- * INSTALLATION SUR LE VPS:
- *   1. Copie ce fichier sur ton VPS
- *   2. npm init -y && npm install better-sqlite3 express
- *   3. Modifie DATA_DIR ci-dessous pour pointer vers tes fichiers .db
- *   4. Change le BRIDGE_SECRET pour un mot de passe securise
- *   5. Lance: node server.js
- *   6. (Optionnel) Utilise pm2 pour garder le processus actif:
- *      npm install -g pm2 && pm2 start server.js --name discreen-bridge
- *
- * CONFIGURATION:
- *   - DATA_DIR: Dossier contenant tes fichiers .db (index.db, index2.db, etc.)
- *   - PORT: Port d'ecoute (defaut: 4800)
- *   - BRIDGE_SECRET: Cle secrete partagee avec le site Replit
  */
 
 const express = require("express");
 const Database = require("better-sqlite3");
 const path = require("path");
 const fs = require("fs");
-const crypto = require("crypto");
 
-// ============ CONFIGURATION ============
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const PORT = parseInt(process.env.PORT || "4800", 10);
 const BRIDGE_SECRET = process.env.BRIDGE_SECRET || "CHANGE_ME_TO_A_SECURE_SECRET";
-// =======================================
 
 const app = express();
 app.use(express.json());
@@ -90,6 +73,193 @@ function detectMainTable(db) {
   throw new Error("No usable table found");
 }
 
+function getFieldCI(r, ...keys) {
+  for (const k of keys) {
+    if (r[k] !== undefined) return r[k];
+    const lower = k.toLowerCase();
+    const upper = k.charAt(0).toUpperCase() + k.slice(1);
+    if (r[lower] !== undefined) return r[lower];
+    if (r[upper] !== undefined) return r[upper];
+  }
+  for (const k of keys) {
+    const found = Object.keys(r).find((rk) => rk.toLowerCase() === k.toLowerCase());
+    if (found && r[found] !== undefined) return r[found];
+  }
+  return "";
+}
+
+function parseLineField(line, source) {
+  const parsed = {};
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+  const phoneRegex = /^(\+?\d[\d\s\-().]{6,})$/;
+  const hashRegex = /^[a-f0-9]{32,128}$/i;
+  const urlRegex = /^https?:\/\//i;
+
+  let sep = ":";
+  if (urlRegex.test(line)) {
+    const withoutUrls = line.replace(/https?:\/\/[^\s;|,]+/g, "");
+    if (withoutUrls.includes(";")) sep = ";";
+    else if (withoutUrls.includes("|")) sep = "|";
+    else sep = ":";
+  } else {
+    const semicolons = (line.match(/;/g) || []).length;
+    const colons = (line.match(/:/g) || []).length;
+    const pipes = (line.match(/\|/g) || []).length;
+    if (semicolons > 0 && semicolons >= colons) sep = ";";
+    else if (pipes > 0 && pipes >= colons && pipes >= semicolons) sep = "|";
+    else sep = ":";
+  }
+
+  let parts;
+  if (sep === ":" && urlRegex.test(line)) {
+    parts = [];
+    let remaining = line;
+    while (remaining.length > 0) {
+      const urlMatch = remaining.match(/^(https?:\/\/[^\s:]+)/i);
+      if (urlMatch) {
+        parts.push(urlMatch[1]);
+        remaining = remaining.slice(urlMatch[1].length);
+        if (remaining.startsWith(":")) remaining = remaining.slice(1);
+      } else {
+        const idx = remaining.indexOf(":");
+        if (idx === -1) {
+          parts.push(remaining);
+          break;
+        } else {
+          parts.push(remaining.slice(0, idx));
+          remaining = remaining.slice(idx + 1);
+        }
+      }
+    }
+  } else {
+    parts = line.split(sep);
+  }
+
+  parts = parts.map((p) => p.trim()).filter(Boolean);
+
+  if (parts.length === 1) {
+    parsed["donnee"] = parts[0];
+    if (source) parsed["source"] = source;
+    return parsed;
+  }
+
+  const assigned = new Set();
+
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (!p) continue;
+    if (emailRegex.test(p) && !parsed["email"]) {
+      parsed["email"] = p;
+      assigned.add(i);
+    } else if (ipRegex.test(p) && !parsed["ip"]) {
+      parsed["ip"] = p;
+      assigned.add(i);
+    } else if (phoneRegex.test(p) && !parsed["telephone"]) {
+      parsed["telephone"] = p;
+      assigned.add(i);
+    } else if (hashRegex.test(p) && p.length >= 32 && !parsed["hash"]) {
+      parsed["hash"] = p;
+      assigned.add(i);
+    }
+  }
+
+  const unassigned = parts.filter((_, i) => !assigned.has(i)).filter(Boolean);
+
+  if (unassigned.length > 0) {
+    if (!parsed["email"]) {
+      parsed["identifiant"] = unassigned.shift();
+    }
+  }
+  if (unassigned.length > 0) {
+    const next = unassigned[0];
+    if (next && hashRegex.test(next) && next.length >= 32 && !parsed["hash"]) {
+      parsed["hash"] = unassigned.shift();
+    } else if (next && !parsed["password"]) {
+      parsed["password"] = unassigned.shift();
+    }
+  }
+  for (let i = 0; i < unassigned.length; i++) {
+    parsed[`champ_${i + 1}`] = unassigned[i];
+  }
+
+  if (source) parsed["source"] = source;
+  return parsed;
+}
+
+function processResults(rows, sourceKey) {
+  return rows.map((r) => {
+    const line = getFieldCI(r, "line", "data", "content");
+    const source = getFieldCI(r, "source");
+
+    if (line && typeof line === "string" && line.length > 0) {
+      const parsed = parseLineField(line, source);
+      return { _source: sourceKey, _raw: line, ...parsed };
+    }
+
+    const cleaned = {};
+    for (const [k, v] of Object.entries(r)) {
+      if (k.toLowerCase() !== "rownum") {
+        cleaned[k] = v;
+      }
+    }
+    return { _source: sourceKey, ...cleaned };
+  });
+}
+
+const CRITERION_TO_PARSED_FIELDS = {
+  email: ["email", "mail"],
+  username: ["identifiant", "username", "pseudo"],
+  displayName: ["identifiant", "username", "pseudo", "nom", "name"],
+  lastName: ["nom", "name", "last_name", "lastname", "surname", "identifiant"],
+  firstName: ["prenom", "first_name", "firstname", "identifiant"],
+  phone: ["telephone", "phone", "tel", "mobile"],
+  ipAddress: ["ip"],
+  address: ["adresse", "address", "rue", "street", "ville", "city"],
+  ssn: ["ssn"],
+  dob: ["date_naissance", "birthday", "dob", "birth", "date", "bday"],
+  yob: ["date_naissance", "birthday", "dob", "birth", "date", "bday"],
+  iban: ["iban"],
+  bic: ["bic"],
+  password: ["password", "hash"],
+  hashedPassword: ["hash", "password"],
+  discordId: ["discord"],
+  macAddress: ["mac"],
+  gender: ["gender"],
+  vin: ["vin"],
+  fivemLicense: ["fivem"],
+};
+
+function filterResultsByCriteria(results, criteria) {
+  if (!criteria || criteria.length === 0) return results;
+
+  return results.filter((row) => {
+    for (const criterion of criteria) {
+      const allowedFields = CRITERION_TO_PARSED_FIELDS[criterion.type];
+      if (!allowedFields) continue;
+      const searchVal = (criterion.value || "").trim().toLowerCase();
+      if (!searchVal) continue;
+
+      let foundInAllowedField = false;
+      for (const [key, val] of Object.entries(row)) {
+        if (key.startsWith("_")) continue;
+        const keyLower = key.toLowerCase();
+        if (allowedFields.includes(keyLower)) {
+          const strVal = String(val || "").toLowerCase();
+          if (strVal.includes(searchVal)) {
+            foundInAllowedField = true;
+            break;
+          }
+        }
+      }
+
+      if (!foundInAllowedField) return false;
+    }
+    return true;
+  });
+}
+
 function authMiddleware(req, res, next) {
   const token = req.headers["x-bridge-secret"];
   if (!token || token !== BRIDGE_SECRET) {
@@ -98,9 +268,10 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-function searchOneDb(info, values, limit, offset) {
+function searchOneDb(info, criteria, limit, offset) {
   const { db, tableName, columns, isFts, sourceKey } = info;
 
+  const values = criteria.map((c) => (c.value || "").trim()).filter(Boolean);
   if (values.length === 0) return { results: [], total: 0 };
 
   if (isFts) {
@@ -111,14 +282,22 @@ function searchOneDb(info, values, limit, offset) {
       .prepare(`SELECT count(*) as total FROM "${tableName}" WHERE "${tableName}" MATCH ?`)
       .get(ftsQuery);
 
+    if (limit === 0) {
+      return { results: [], total: countRow.total };
+    }
+
+    const fetchLimit = limit * 5;
     const rows = db
       .prepare(
-        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ? OFFSET ?`
+        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ?`
       )
-      .all(ftsQuery, limit, offset);
+      .all(ftsQuery, fetchLimit);
+
+    const processed = processResults(rows, sourceKey);
+    const filtered = filterResultsByCriteria(processed, criteria);
 
     return {
-      results: rows.map((r) => ({ _source: sourceKey, ...r })),
+      results: filtered.slice(0, limit),
       total: countRow.total,
     };
   } else {
@@ -139,26 +318,32 @@ function searchOneDb(info, values, limit, offset) {
       .prepare(`SELECT count(*) as total FROM "${tableName}" WHERE ${whereSQL}`)
       .get(...params);
 
+    if (limit === 0) {
+      return { results: [], total: countRow.total };
+    }
+
+    const fetchLimit = limit * 5;
     const rows = db
       .prepare(
-        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE ${whereSQL} LIMIT ? OFFSET ?`
+        `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE ${whereSQL} LIMIT ?`
       )
-      .all(...params, limit, offset);
+      .all(...params, fetchLimit);
+
+    const processed = processResults(rows, sourceKey);
+    const filtered = filterResultsByCriteria(processed, criteria);
 
     return {
-      results: rows.map((r) => ({ _source: sourceKey, ...r })),
+      results: filtered.slice(0, limit),
       total: countRow.total,
     };
   }
 }
 
-// Health check (no auth needed)
 app.get("/health", (_req, res) => {
   const dbs = Object.keys(dbCache);
   res.json({ status: "ok", databases: dbs.length, names: dbs });
 });
 
-// Search endpoint
 app.post("/search", authMiddleware, (req, res) => {
   try {
     const { criteria, limit = 20, offset = 0 } = req.body;
@@ -185,7 +370,7 @@ app.post("/search", authMiddleware, (req, res) => {
 
     for (const dbInfo of dbs) {
       try {
-        const countResult = searchOneDb(dbInfo, values, 0, 0);
+        const countResult = searchOneDb(dbInfo, criteria, 0, 0);
         const t = countResult.total || 0;
         totalCount += t;
         dbTotals.push({ info: dbInfo, total: t });
@@ -206,7 +391,7 @@ app.post("/search", authMiddleware, (req, res) => {
       }
 
       try {
-        const result = searchOneDb(info, values, needed, remaining);
+        const result = searchOneDb(info, criteria, needed, remaining);
         allResults.push(...result.results);
         needed -= result.results.length;
         remaining = 0;
@@ -222,7 +407,6 @@ app.post("/search", authMiddleware, (req, res) => {
   }
 });
 
-// Info about loaded databases
 app.get("/info", authMiddleware, (_req, res) => {
   const info = Object.entries(dbCache).map(([key, db]) => ({
     key,
@@ -234,7 +418,6 @@ app.get("/info", authMiddleware, (_req, res) => {
   res.json({ databases: info });
 });
 
-// Start
 loadDatabases();
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`[bridge] Discreen VPS Bridge running on port ${PORT}`);
