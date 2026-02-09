@@ -10,6 +10,13 @@ let remoteBridgeSecret = "";
 
 let SOURCE_MAP: Record<string, string> = {};
 
+const BLACKLISTED_SOURCES = new Set([
+  "Pass'Sport.csv",
+  "Pass'Sport",
+  "PassSport.csv",
+  "PassSport",
+]);
+
 interface DbInfo {
   db: Database.Database;
   tableName: string;
@@ -246,23 +253,29 @@ function getFieldCI(r: Record<string, string>, ...keys: string[]): string {
 }
 
 function processResults(rows: Record<string, string>[], sourceKey: string): Record<string, unknown>[] {
-  return rows.map((r) => {
-    const line = getFieldCI(r, "line", "data", "content");
-    const source = getFieldCI(r, "source");
+  return rows
+    .map((r) => {
+      const line = getFieldCI(r, "line", "data", "content");
+      const source = getFieldCI(r, "source");
 
-    if (line && typeof line === "string" && line.length > 0) {
-      const parsed = parseLineField(line, source);
-      return { _source: sourceKey, _raw: line, ...parsed };
-    }
-
-    const cleaned: Record<string, string> = {};
-    for (const [k, v] of Object.entries(r)) {
-      if (k.toLowerCase() !== "rownum") {
-        cleaned[k] = v;
+      if (source && BLACKLISTED_SOURCES.has(source)) {
+        return null;
       }
-    }
-    return { _source: sourceKey, ...cleaned };
-  });
+
+      if (line && typeof line === "string" && line.length > 0) {
+        const parsed = parseLineField(line, source);
+        return { _source: sourceKey, _raw: line, ...parsed };
+      }
+
+      const cleaned: Record<string, string> = {};
+      for (const [k, v] of Object.entries(r)) {
+        if (k.toLowerCase() !== "rownum") {
+          cleaned[k] = v;
+        }
+      }
+      return { _source: sourceKey, ...cleaned };
+    })
+    .filter((r) => r !== null) as Record<string, unknown>[];
 }
 
 const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
