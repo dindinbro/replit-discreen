@@ -224,8 +224,12 @@ function searchLocal(
       const t = countResult.total ?? 0;
       totalCount += t;
       dbTotals.push({ info: dbInfo, total: t });
-    } catch (err) {
-      console.warn(`[searchSqlite] Error counting ${dbInfo.sourceKey}:`, err);
+    } catch (err: any) {
+      console.warn(`[searchSqlite] Error counting ${dbInfo.sourceKey}:`, err?.message);
+      if (err?.code === "SQLITE_CORRUPT") {
+        failedDbs.add(dbInfo.sourceKey);
+        delete dbCache[dbInfo.sourceKey];
+      }
     }
   }
 
@@ -246,8 +250,12 @@ function searchLocal(
       allResults.push(...result.results);
       needed -= result.results.length;
       remaining = 0;
-    } catch (err) {
-      console.warn(`[searchSqlite] Error searching ${info.sourceKey}:`, err);
+    } catch (err: any) {
+      console.warn(`[searchSqlite] Error searching ${info.sourceKey}:`, err?.message);
+      if (err?.code === "SQLITE_CORRUPT") {
+        failedDbs.add(info.sourceKey);
+        delete dbCache[info.sourceKey];
+      }
     }
   }
 
