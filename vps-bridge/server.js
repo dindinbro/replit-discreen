@@ -300,14 +300,18 @@ function searchOneDb(info, criteria, limit, offset) {
     const ftsQuery = ftsTerms.join(" ");
 
     const fetchLimit = Math.max(limit * 5, 100);
+    console.log(`[bridge:searchOneDb] FTS on "${sourceKey}": MATCH '${ftsQuery}' LIMIT ${fetchLimit}`);
     const rows = db
       .prepare(
         `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ? OFFSET ?`
       )
       .all(ftsQuery, fetchLimit, offset);
+    console.log(`[bridge:searchOneDb] FTS returned ${rows.length} raw rows`);
+    if (rows.length > 0) console.log(`[bridge:searchOneDb] Sample row keys: ${Object.keys(rows[0]).join(", ")}`);
 
     const processed = processResults(rows, sourceKey);
     const filtered = filterResultsByCriteria(processed, criteria);
+    console.log(`[bridge:searchOneDb] After filter: ${filtered.length}/${processed.length}`);
 
     return {
       results: filtered.slice(0, limit),

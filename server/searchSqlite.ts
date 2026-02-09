@@ -319,13 +319,16 @@ function searchOneDb(
     const ftsQuery = ftsTerms.join(" ");
 
     const fetchLimit = Math.max(limit * 5, 100);
+    console.log(`[searchOneDb] FTS query on "${sourceKey}": MATCH '${ftsQuery}' LIMIT ${fetchLimit} OFFSET ${offset}`);
     const selectStmt = db.prepare(
       `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ? OFFSET ?`
     );
     const rows = selectStmt.all(ftsQuery, fetchLimit, offset) as Record<string, string>[];
+    console.log(`[searchOneDb] FTS returned ${rows.length} raw rows from "${sourceKey}"`);
 
     const processed = processResults(rows, sourceKey);
     const filtered = filterResultsByCriteria(processed, criteria);
+    console.log(`[searchOneDb] After filter: ${filtered.length} results (from ${processed.length} processed)`);
 
     return {
       results: filtered.slice(0, limit),
@@ -382,6 +385,7 @@ async function searchRemoteBridge(
     }
 
     const data = await res.json() as SearchResult;
+    console.log(`[searchRemoteBridge] Bridge returned ${data.results?.length ?? 0} results`);
 
     if (data.results && data.results.length > 0) {
       const firstRow = data.results[0];
@@ -426,9 +430,11 @@ export function searchAllIndexes(
   const safeOffset = Math.max(0, offset);
 
   if (useRemoteBridge) {
+    console.log(`[searchAllIndexes] Using REMOTE BRIDGE for ${filled.length} criteria`);
     return searchRemoteBridge(filled, safeLimit, safeOffset);
   }
 
+  console.log(`[searchAllIndexes] Using LOCAL search for ${filled.length} criteria`);
   return searchLocal(filled, safeLimit, safeOffset);
 }
 
