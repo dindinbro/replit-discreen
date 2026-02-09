@@ -228,6 +228,61 @@ function processResults(rows: Record<string, string>[], sourceKey: string): Reco
   });
 }
 
+const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
+  email: ["email", "mail"],
+  username: ["identifiant", "username", "pseudo"],
+  displayName: ["identifiant", "username", "pseudo", "nom", "name"],
+  lastName: ["nom", "name", "last_name", "lastname", "surname", "identifiant"],
+  firstName: ["prenom", "first_name", "firstname", "identifiant"],
+  phone: ["telephone", "phone", "tel", "mobile"],
+  ipAddress: ["ip"],
+  address: ["adresse", "address", "rue", "street", "ville", "city"],
+  ssn: ["ssn"],
+  dob: ["date_naissance", "birthday", "dob", "birth", "date", "bday"],
+  yob: ["date_naissance", "birthday", "dob", "birth", "date", "bday"],
+  iban: ["iban"],
+  bic: ["bic"],
+  password: ["password", "hash"],
+  hashedPassword: ["hash", "password"],
+  discordId: ["discord"],
+  macAddress: ["mac"],
+  gender: ["gender"],
+  vin: ["vin"],
+  fivemLicense: ["fivem"],
+};
+
+function filterResultsByCriteria(
+  results: Record<string, unknown>[],
+  criteria: SearchCriterion[]
+): Record<string, unknown>[] {
+  if (criteria.length === 0) return results;
+
+  return results.filter((row) => {
+    for (const criterion of criteria) {
+      const allowedFields = CRITERION_TO_PARSED_FIELDS[criterion.type];
+      if (!allowedFields) continue;
+      const searchVal = criterion.value.trim().toLowerCase();
+      if (!searchVal) continue;
+
+      let foundInAllowedField = false;
+      for (const [key, val] of Object.entries(row)) {
+        if (key.startsWith("_")) continue;
+        const keyLower = key.toLowerCase();
+        if (allowedFields.includes(keyLower)) {
+          const strVal = String(val ?? "").toLowerCase();
+          if (strVal.includes(searchVal)) {
+            foundInAllowedField = true;
+            break;
+          }
+        }
+      }
+
+      if (!foundInAllowedField) return false;
+    }
+    return true;
+  });
+}
+
 function searchOneDb(
   info: DbInfo,
   criteria: SearchCriterion[],
@@ -243,18 +298,30 @@ function searchOneDb(
     const ftsTerms = values.map((v) => `"${v.replace(/"/g, '""')}"`);
     const ftsQuery = ftsTerms.join(" ");
 
+    if (limit === 0) {
+      const countStmt = db.prepare(
+        `SELECT count(*) as total FROM "${tableName}" WHERE "${tableName}" MATCH ?`
+      );
+      const countRow = countStmt.get(ftsQuery) as { total: number };
+      return { results: [], total: countRow.total };
+    }
+
+    const fetchLimit = limit * 5;
+    const selectStmt = db.prepare(
+      `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ? OFFSET ?`
+    );
+    const rows = selectStmt.all(ftsQuery, fetchLimit, offset) as Record<string, string>[];
+
+    const processed = processResults(rows, sourceKey);
+    const filtered = filterResultsByCriteria(processed, criteria);
+
     const countStmt = db.prepare(
       `SELECT count(*) as total FROM "${tableName}" WHERE "${tableName}" MATCH ?`
     );
     const countRow = countStmt.get(ftsQuery) as { total: number };
 
-    const selectStmt = db.prepare(
-      `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${tableName}" WHERE "${tableName}" MATCH ? ORDER BY rank LIMIT ? OFFSET ?`
-    );
-    const rows = selectStmt.all(ftsQuery, limit, offset) as Record<string, string>[];
-
     return {
-      results: processResults(rows, sourceKey),
+      results: filtered.slice(0, limit),
       total: countRow.total,
     };
   } else {
@@ -281,8 +348,10 @@ function searchOneDb(
     );
     const rows = selectStmt.all(...params, limit, offset) as Record<string, string>[];
 
+    const processed = processResults(rows, sourceKey);
+    const filtered = filterResultsByCriteria(processed, criteria);
     return {
-      results: processResults(rows, sourceKey),
+      results: filtered,
       total: countRow.total,
     };
   }

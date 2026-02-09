@@ -88,26 +88,72 @@ const FILTER_PLACEHOLDERS: Partial<Record<SearchFilterType, string>> = {
   vin: "Entrez VIN / plaque...",
 };
 
-const FIELD_LABELS: Record<string, string> = {
-  nom: "Nom", name: "Nom", last_name: "Nom", lastname: "Nom", surname: "Nom",
-  prenom: "Prenom", first_name: "Prenom", firstname: "Prenom",
-  email: "Email", mail: "Email",
-  adresse: "Adresse", address: "Adresse", rue: "Rue", street: "Rue",
-  ville: "Ville", city: "Ville", pays: "Pays", country: "Pays",
-  code_postal: "Code postal", zip: "Code postal", zipcode: "Code postal", postal: "Code postal",
-  telephone: "Telephone", phone: "Telephone", tel: "Telephone", mobile: "Mobile",
-  date_naissance: "Date de naissance", birthday: "Date de naissance", dob: "Date de naissance", birth: "Naissance", date: "Date",
-  iban: "IBAN", credit_card: "Carte", card: "Carte",
-  ssn: "N securite sociale", id: "ID", username: "Pseudo", pseudo: "Pseudo",
-  discord: "Discord", ip: "IP", mac: "MAC",
-  identifiant: "Identifiant", password: "Mot de passe", hash: "Hash",
-  donnee: "Donnee", champ_1: "Champ 1", champ_2: "Champ 2", champ_3: "Champ 3",
-  champ_4: "Champ 4", champ_5: "Champ 5", champ_6: "Champ 6",
+const FIELD_ICON_MAP: Record<string, typeof User> = {
+  nom: User, name: User, last_name: User, lastname: User, surname: User,
+  prenom: User, first_name: User, firstname: User, displayname: User,
+  email: Mail, mail: Mail,
+  adresse: MapPin, address: MapPin, rue: MapPin, street: MapPin,
+  ville: Globe, city: Globe, pays: Globe, country: Globe,
+  code_postal: Hash, zip: Hash, zipcode: Hash, postal: Hash, postcode: Hash,
+  telephone: Phone, phone: Phone, tel: Phone, mobile: Phone,
+  date_naissance: Calendar, birthday: Calendar, dob: Calendar, birth: Calendar, date: Calendar,
+  bday: Calendar, regdate: Calendar, lastactive: Calendar,
+  iban: CreditCard, credit_card: CreditCard, card: CreditCard,
+  ssn: FileText, id: Hash, username: User, pseudo: User,
+  discord: Hash, ip: Globe, mac: Hash,
+  source: Database, _source: Database,
+  identifiant: User, password: ShieldAlert, hash: Hash,
+  product: FileText, description: FileText, status: FileText,
+  donnee: FileText, champ_1: FileText, champ_2: FileText, champ_3: FileText,
 };
+
+function getFieldIcon(fieldName: string) {
+  const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
+  return FIELD_ICON_MAP[key] || FileText;
+}
+
+function getFieldColorVar(fieldName: string): string {
+  const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
+  if (["nom", "name", "last_name", "lastname", "surname", "prenom", "first_name", "firstname", "username", "pseudo", "identifiant", "displayname"].includes(key))
+    return "--field-person";
+  if (["email", "mail"].includes(key))
+    return "--field-email";
+  if (["adresse", "address", "rue", "street", "ville", "city", "pays", "country", "ip", "postcode"].includes(key))
+    return "--field-location";
+  if (["telephone", "phone", "tel", "mobile"].includes(key))
+    return "--field-phone";
+  if (["code_postal", "zip", "zipcode", "postal", "id", "discord", "mac", "hash", "_source"].includes(key))
+    return "--field-id";
+  if (["date_naissance", "birthday", "dob", "birth", "date", "bday", "regdate", "lastactive"].includes(key))
+    return "--field-date";
+  if (["iban", "credit_card", "card", "ssn"].includes(key))
+    return "--field-finance";
+  if (["password"].includes(key))
+    return "--field-person";
+  return "--primary";
+}
 
 function getFieldLabel(fieldName: string): string {
   const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
-  return FIELD_LABELS[key] || fieldName.replace(/_/g, " ");
+  const labels: Record<string, string> = {
+    nom: "Nom", name: "Nom", last_name: "Nom", lastname: "Nom", surname: "Nom",
+    prenom: "Prenom", first_name: "Prenom", firstname: "Prenom", displayname: "Nom d'affichage",
+    email: "Email", mail: "Email",
+    adresse: "Adresse", address: "Adresse", rue: "Rue", street: "Rue",
+    ville: "Ville", city: "Ville", pays: "Pays", country: "Pays",
+    code_postal: "Code postal", zip: "Code postal", zipcode: "Code postal", postal: "Code postal", postcode: "Code postal",
+    telephone: "Telephone", phone: "Telephone", tel: "Telephone", mobile: "Mobile",
+    date_naissance: "Date naissance", birthday: "Date naissance", dob: "Date naissance", birth: "Naissance",
+    bday: "Date naissance", date: "Date", regdate: "Inscription", lastactive: "Derniere activite",
+    iban: "IBAN", credit_card: "Carte", card: "Carte",
+    ssn: "N Secu", id: "ID", username: "Pseudo", pseudo: "Pseudo",
+    discord: "Discord", ip: "IP", mac: "MAC",
+    identifiant: "Identifiant", password: "Mot de passe", hash: "Hash",
+    product: "Produit", description: "Description", status: "Statut",
+    donnee: "Donnee", champ_1: "Champ 1", champ_2: "Champ 2", champ_3: "Champ 3",
+    champ_4: "Champ 4", champ_5: "Champ 5", champ_6: "Champ 6",
+  };
+  return labels[key] || fieldName.replace(/_/g, " ");
 }
 
 const BREACH_FIELDS = [
@@ -189,51 +235,75 @@ function ResultCard({
     dataFields = [["donnee", rawLine]];
   }
 
+  const titleField = visibleFields.find(([k]) => {
+    const key = k.toLowerCase();
+    return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
+  });
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.02, duration: 0.2 }}
+      transition={{ delay: index * 0.03 }}
     >
       <Card className="overflow-visible" data-testid={`card-result-${globalIndex}`}>
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-2 min-w-0 text-xs text-muted-foreground">
-              <span className="font-mono font-medium text-foreground/60">#{globalIndex + 1}</span>
+        <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b border-border/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground">
+              {globalIndex + 1}
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
+                {titleField ? String(titleField[1]) : `Resultat ${globalIndex + 1}`}
+              </p>
               {sourceText && (
-                <>
-                  <span className="text-border">|</span>
-                  <span className="truncate">{sourceText}</span>
-                </>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{sourceText}</p>
               )}
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCopy}
-                data-testid={`button-copy-${globalIndex}`}
-              >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCopyJSON}
-                data-testid={`button-json-${globalIndex}`}
-              >
-                <Braces className="w-3.5 h-3.5" />
-              </Button>
-            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5">
-            {dataFields.map(([col, val]) => (
-              <div key={col} className="flex items-baseline gap-2 min-w-0" data-testid={`field-${col}-${globalIndex}`}>
-                <span className="text-xs text-muted-foreground shrink-0 w-24 text-right">{getFieldLabel(col)}</span>
-                <span className="text-sm text-foreground break-all font-mono leading-snug">{String(val ?? "")}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              data-testid={`button-copy-${globalIndex}`}
+            >
+              {copied ? <Check className="w-3.5 h-3.5 mr-1" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
+              Copier
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyJSON}
+              data-testid={`button-json-${globalIndex}`}
+            >
+              <Braces className="w-3.5 h-3.5 mr-1" />
+              JSON
+            </Button>
+          </div>
+        </div>
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+          {dataFields.map(([col, val]) => {
+            const Icon = getFieldIcon(col);
+            const cssVar = getFieldColorVar(col);
+            return (
+              <div key={col} className="flex items-start gap-3" data-testid={`field-${col}-${globalIndex}`}>
+                <div
+                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{
+                    color: `hsl(var(${cssVar}))`,
+                    backgroundColor: `hsl(var(${cssVar}) / 0.12)`,
+                  }}
+                >
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">{getFieldLabel(col)}</p>
+                  <p className="text-sm font-medium text-foreground break-all leading-tight">{String(val ?? "")}</p>
+                </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </Card>
     </motion.div>
@@ -1156,7 +1226,7 @@ export default function SearchPage() {
                     <p className="text-muted-foreground animate-pulse">Recherche en cours...</p>
                   </div>
                 ) : activeResults && activeResults.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-4">
                     {activeResults.map((row, idx) => (
                 <ResultCard
                   key={idx}
