@@ -124,7 +124,121 @@ function classifyPart(p: string): string | null {
   return null;
 }
 
+const JSON_FIELD_MAP: Record<string, string> = {
+  "email": "email",
+  "mail": "email",
+  "courriel": "email",
+  "nom": "nom",
+  "last_name": "nom",
+  "lastname": "nom",
+  "prenom": "prenom",
+  "first_name": "prenom",
+  "firstname": "prenom",
+  "nom_complet": "nom_complet",
+  "full_name": "nom_complet",
+  "date_naissance": "date_naissance",
+  "dob": "date_naissance",
+  "birth_date": "date_naissance",
+  "birthday": "date_naissance",
+  "genre": "civilite",
+  "sexe": "civilite",
+  "gender": "civilite",
+  "civilite": "civilite",
+  "telephone": "telephone",
+  "phone": "telephone",
+  "tel": "telephone",
+  "mobile": "telephone",
+  "adresse": "adresse",
+  "address": "adresse",
+  "voie": "adresse",
+  "rue": "adresse",
+  "street": "adresse",
+  "cplt_adresse": "cplt_adresse",
+  "code_postal": "code_postal",
+  "postal_code": "code_postal",
+  "zip": "code_postal",
+  "ville": "ville",
+  "city": "ville",
+  "commune": "ville",
+  "code_insee": "code_insee",
+  "nom_adresse_postale": "nom_adresse_postale",
+  "iban": "iban",
+  "bic": "bic",
+  "password": "password",
+  "mot_de_passe": "password",
+  "hash": "hash",
+  "ip": "ip",
+  "ip_address": "ip",
+  "id": "identifiant_interne",
+  "id_psp": "id_psp",
+  "matricule": "matricule",
+  "organisme": "organisme",
+  "situation": "situation",
+  "allocataire": "allocataire",
+  "qualite": "qualite",
+  "boursier": "boursier",
+};
+
+function parseJsonLine(line: string, source: string): Record<string, string> | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("{")) return null;
+
+  try {
+    const obj = JSON.parse(trimmed);
+    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return null;
+
+    const parsed: Record<string, string> = {};
+
+    for (const [key, val] of Object.entries(obj)) {
+      if (val === null || val === undefined || val === "") continue;
+      const strVal = String(val).trim();
+      if (!strVal || strVal === "null" || strVal === "false" || strVal === "0") continue;
+
+      const normalizedKey = key.toLowerCase().trim();
+      const mappedField = JSON_FIELD_MAP[normalizedKey];
+
+      if (mappedField) {
+        if (mappedField === "date_naissance" && strVal.includes("T")) {
+          const datePart = strVal.split("T")[0];
+          if (datePart) {
+            const parts = datePart.split("-");
+            if (parts.length === 3) {
+              parsed[mappedField] = `${parts[2]}/${parts[1]}/${parts[0]}`;
+              continue;
+            }
+          }
+        }
+        if (!parsed[mappedField]) {
+          parsed[mappedField] = strVal;
+        }
+      }
+    }
+
+    if (parsed["voie"] || parsed["cplt_adresse"]) {
+      const parts = [parsed["voie"], parsed["cplt_adresse"]].filter(Boolean);
+      if (parts.length > 0 && !parsed["adresse"]) {
+        parsed["adresse"] = parts.join(", ");
+      }
+      delete parsed["voie"];
+      delete parsed["cplt_adresse"];
+    }
+
+    if (parsed["nom_adresse_postale"] && !parsed["adresse"]) {
+      parsed["adresse"] = parsed["nom_adresse_postale"];
+      delete parsed["nom_adresse_postale"];
+    }
+
+    if (source) parsed["source"] = source;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function parseLineField(line: string, source: string): Record<string, string> {
+  const jsonResult = parseJsonLine(line, source);
+  if (jsonResult) return jsonResult;
+
   const parsed: Record<string, string> = {};
 
   const urlRegex = /^https?:\/\//i;

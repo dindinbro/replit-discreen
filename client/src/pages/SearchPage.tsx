@@ -150,6 +150,11 @@ const FIELD_ICON_MAP: Record<string, typeof User> = {
   civilite: User, bic: CreditCard, url: Globe, vin: Hash,
   product: FileText, description: FileText, status: FileText,
   donnee: FileText, champ_1: FileText, champ_2: FileText, champ_3: FileText,
+  nom_complet: User, matricule: Hash, organisme: FileText,
+  situation: FileText, allocataire: User, qualite: FileText,
+  boursier: FileText, code_insee: Hash, id_psp: Hash,
+  identifiant_interne: Hash, cplt_adresse: MapPin,
+  nom_adresse_postale: MapPin,
 };
 
 function getFieldIcon(fieldName: string) {
@@ -159,15 +164,15 @@ function getFieldIcon(fieldName: string) {
 
 function getFieldColorVar(fieldName: string): string {
   const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
-  if (["nom", "name", "last_name", "lastname", "surname", "prenom", "first_name", "firstname", "username", "pseudo", "identifiant", "displayname", "civilite"].includes(key))
+  if (["nom", "name", "last_name", "lastname", "surname", "prenom", "first_name", "firstname", "username", "pseudo", "identifiant", "displayname", "civilite", "nom_complet", "allocataire"].includes(key))
     return "--field-person";
   if (["email", "mail"].includes(key))
     return "--field-email";
-  if (["adresse", "address", "rue", "street", "ville", "city", "pays", "country", "ip", "postcode"].includes(key))
+  if (["adresse", "address", "rue", "street", "ville", "city", "pays", "country", "ip", "postcode", "cplt_adresse", "nom_adresse_postale"].includes(key))
     return "--field-location";
   if (["telephone", "phone", "tel", "mobile"].includes(key))
     return "--field-phone";
-  if (["code_postal", "zip", "zipcode", "postal", "id", "discord", "mac", "hash", "_source"].includes(key))
+  if (["code_postal", "zip", "zipcode", "postal", "id", "discord", "mac", "hash", "_source", "code_insee", "matricule", "id_psp", "identifiant_interne"].includes(key))
     return "--field-id";
   if (["date_naissance", "birthday", "dob", "birth", "date", "bday", "regdate", "lastactive"].includes(key))
     return "--field-date";
@@ -198,6 +203,11 @@ function getFieldLabel(fieldName: string): string {
     product: "Produit", description: "Description", status: "Statut",
     donnee: "Donnee", champ_1: "Champ 1", champ_2: "Champ 2", champ_3: "Champ 3",
     champ_4: "Champ 4", champ_5: "Champ 5", champ_6: "Champ 6",
+    nom_complet: "Nom complet", matricule: "Matricule", organisme: "Organisme",
+    situation: "Situation", allocataire: "Allocataire", qualite: "Qualite",
+    boursier: "Boursier", code_insee: "Code INSEE", id_psp: "ID PSP",
+    identifiant_interne: "ID interne", cplt_adresse: "Complement adresse",
+    nom_adresse_postale: "Adresse postale",
   };
   return labels[key] || fieldName.replace(/_/g, " ");
 }
