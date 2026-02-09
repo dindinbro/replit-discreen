@@ -8,10 +8,7 @@ let useRemoteBridge = false;
 let remoteBridgeUrl = "";
 let remoteBridgeSecret = "";
 
-let SOURCE_MAP: Record<string, string> = {
-  index1: "index.db",
-  index2: "index2.db",
-};
+let SOURCE_MAP: Record<string, string> = {};
 
 interface DbInfo {
   db: Database.Database;
@@ -311,17 +308,31 @@ export async function initSearchDatabases(): Promise<void> {
     });
   }
 
+  const keysToRemove: string[] = [];
   for (const [key, filename] of Object.entries(SOURCE_MAP)) {
     const filePath = path.join(dataDir, filename);
     if (fs.existsSync(filePath)) {
       try {
-        openDb(key);
-        console.log(`[searchSqlite] ${key} (${filename}) loaded successfully`);
-      } catch (err) {
-        console.warn(`[searchSqlite] ${key} (${filename}) could not be loaded:`, err);
+        const info = openDb(key);
+        if (info) {
+          info.db.prepare(`SELECT count(*) FROM "${info.tableName}" LIMIT 1`).get();
+          console.log(`[searchSqlite] ${key} (${filename}) loaded and verified`);
+        } else {
+          keysToRemove.push(key);
+        }
+      } catch (err: any) {
+        console.warn(`[searchSqlite] ${key} (${filename}) failed verification, removing:`, err?.message);
+        failedDbs.add(key);
+        delete dbCache[key];
+        keysToRemove.push(key);
       }
     } else {
-      console.log(`[searchSqlite] ${key} (${filename}) not found — will be available when the file is added`);
+      console.log(`[searchSqlite] ${key} (${filename}) not found — skipping`);
+      keysToRemove.push(key);
     }
   }
+  for (const k of keysToRemove) {
+    delete SOURCE_MAP[k];
+  }
+  console.log(`[searchSqlite] Active databases: ${Object.keys(SOURCE_MAP).join(", ") || "none"}`);
 }
