@@ -1,0 +1,33 @@
+root@k9qny3dF8DL4Y2:/srv/discreen# cd /srv/discreen && node -e "
+const Database = require('better-sqlite3');
+const db = new Database('/srv/discreen/r2data/Discreen.db', {readonly:true});
+const rows = db.prepare(\"SELECT line, source FROM data WHERE data MATCH 'cedricmelin' LIMIT 10\").all();
+rows.forEach(r => console.log('SOURCE:', JSON.stringify(r.source), '\nLINE:', r.line.substring(0, 400), '\n---'));
+"
+SOURCE: "caf.csv" 
+LINE: {"id":6580875 | id_psp:"s9je-7b7x" | nom:"melin" | prenom:"carl" | date_naissance:"2004-11-02t00:00:00.000+01:00" | genre:"m" | organisme:"cnous" | situation:"boursier" | allocataire:{"qualite":"m" | prenom:"carl" | nom:"melin" | date_naissance:"02/11/2004" | courriel:"cedricmelin@live.fr" | matricule:"071818591bf"} | adresse:{"nom_adresse_postale":"m carl melin" | voie:"600 avenue de calais" | cp 
+---
+SOURCE: "caf.csv" 
+LINE: {"id":7160618 | id_psp:"vkl-qph-uwt" | nom:"melin" | prenom:"carl" | date_naissance:"2004-11-02t00:00:00.000+01:00" | genre:"m" | organisme:"cnous" | situation:"boursier" | allocataire:{"matricule":"071818591bf" | qualite:"m" | courriel:"cedricmelin@live.fr" | nom:"melin" | prenom:"carl"} | adresse:{"voie":"600 avenue de calais" | commune:"ardres" | code_insee:"62531" | code_postal:"62610"} | crea 
+---
+SOURCE: "etat_civil.csv" 
+LINE: melin | cyprien |  | 600 avenue de calais |  | 62610.0 | ardres | monsieur | masculin | melin | cyprien | 07/10/2008 | calais |  |  | 321172986 |  |  |  | 651957294 |  | cedricmelin@live.fr |  
+---
+SOURCE: "etat_civil.csv" 
+LINE: meteyer | yanis |  | 236 rue de la mine a cailloux |  | 62610 | ardres | monsieur | masculin | meteyer | yanis | 13/09/2003 | calais |  |  | 03 21 00 17 95 |  |  |  |  |  | cedricmelin@live.fr |  
+---
+SOURCE: "free.csv" 
+LINE: [{"id":"rd9zlgkqepg4nk2pmbqn" | login:"92188209" | identity:{"civility":"m" | email:"cedricmelin@live.fr" | status:"actif" | createdat:"2018-09-24t13:13:09+02:00" | modifiedat:"2018-09-24t13:13:09+02:00" | firstname:"cedric" | lastname:"melin"} | address:{"postalcode":"62610" | streetname:"600 avenue calais" | streettype:"avenue" | number:"600" | city:"ardres" | supplement:"" | addressid:25609464  
+---
+SOURCE: "free.csv" 
+LINE: [{"id":"o0ewnp31mbolz3mb76w9" | login:"96036071" | identity:{"civility":"m" | email:"cedricmelin@live.fr" | status:"actif" | createdat:"2019-07-17t10:30:47+02:00" | modifiedat:"2019-07-17t10:30:47+02:00" | firstname:"cyprien" | lastname:"melin"} | address:{"postalcode":"62610" | streetname:"600 avenue de calais" | city:"ardres" | supplement:"600 av calais" | freeboxid:5464357} | offer:{"id":"vzawl 
+---
+SOURCE: "free.csv" 
+LINE: [{"id":"mnw9j1pxqa7laxwvvp08" | login:"12312709" | adslid:5464357 | fbxattachdate:"2024-08-06t14:12:22+02:00" | identity:{"civility":"mme" | email:"cedricmelin@live.fr" | status:"actif" | createdat:"2023-12-06t16:30:08+01:00" | modifiedat:"2023-12-06t16:30:08+01:00" | firstname:"cindy" | lastname:"lejeune"} | address:{"postalcode":"62610" | streetname:"600 avenue de calais" | city:"ardres" | suppl 
+---
+SOURCE: "Pass'Sport.csv" 
+LINE: {"id":6580875 | id_psp:"s9je-7b7x" | nom:"melin" | prenom:"carl" | date_naissance:"2004-11-02t00:00:00.000+01:00" | genre:"m" | organisme:"cnous" | situation:"boursier" | allocataire:{"qualite":"m" | prenom:"carl" | nom:"melin" | date_naissance:"02/11/2004" | courriel:"cedricmelin@live.fr" | matricule:"071818591bf"} | adresse:{"nom_adresse_postale":"m carl melin" | voie:"600 avenue de calais" | cp 
+---
+SOURCE: "Pass'Sport.csv" 
+LINE: {"id":7160618 | id_psp:"vkl-qph-uwt" | nom:"melin" | prenom:"carl" | date_naissance:"2004-11-02t00:00:00.000+01:00" | genre:"m" | organisme:"cnous" | situation:"boursier" | allocataire:{"matricule":"071818591bf" | qualite:"m" | courriel:"cedricmelin@live.fr" | nom:"melin" | prenom:"carl"} | adresse:{"voie":"600 avenue de calais" | commune:"ardres" | code_insee:"62531" | code_postal:"62610"} | crea 
+---

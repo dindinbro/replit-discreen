@@ -109,13 +109,14 @@ function classifyPart(p: string): string | null {
   if (/^(\+?\d[\d\s\-().]{6,})$/.test(trimmed) && /\d{7,}/.test(trimmed.replace(/\D/g, ""))) return "telephone";
   if (/^[a-f0-9]{32,128}$/i.test(trimmed)) return "hash";
   if (/^https?:\/\//i.test(trimmed)) return "url";
+  if (/^(mr|mrs|mme|mlle|m\.|monsieur|madame|mademoiselle|homme|femme|male|female|man|woman|his|her|him|h|f|m|masculin|feminin)$/i.test(trimmed)) return "civilite";
   if (/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/i.test(trimmed)) return "iban";
-  if (/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/i.test(trimmed) && trimmed.length >= 8 && trimmed.length <= 11) return "bic";
+  if (/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/i.test(trimmed) && trimmed.length >= 8 && trimmed.length <= 11 && /\d/.test(trimmed)) return "bic";
   if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(trimmed)) return "date_naissance";
   if (/^\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}$/.test(trimmed)) return "date_naissance";
   if (/^\d{5}$/.test(trimmed) && parseInt(trimmed) >= 1000 && parseInt(trimmed) <= 99999) return "code_postal";
+  if (/^\d{5}\.\d+$/.test(trimmed)) return "code_postal";
   if (/^\d+[\s,]+/.test(trimmed) && /[a-zA-ZÀ-ÿ]/.test(trimmed) && trimmed.length > 5) return "adresse";
-  if (/^(mr|mrs|mme|mlle|m\.|monsieur|madame|mademoiselle|homme|femme|male|female|man|woman|his|her|him|h|f|m)$/i.test(trimmed)) return "civilite";
   if (/^[A-Z0-9]{11,17}$/i.test(trimmed) && /\d/.test(trimmed) && /[A-Z]/i.test(trimmed)) {
     if (trimmed.length === 17) return "vin";
   }
@@ -195,94 +196,67 @@ const JSON_FIELD_MAP: Record<string, string> = {
   "modifiedat": "date_modification",
 };
 
-function flattenObject(obj: Record<string, unknown>, prefix: string = ""): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const [key, val] of Object.entries(obj)) {
-    if (val === null || val === undefined) continue;
-    if (typeof val === "object" && !Array.isArray(val)) {
-      const nested = flattenObject(val as Record<string, unknown>, "");
-      for (const [nk, nv] of Object.entries(nested)) {
-        result[nk] = nv;
-      }
-    } else {
-      const strVal = String(val).trim();
-      if (strVal && strVal !== "null") {
-        result[key.toLowerCase()] = strVal;
-      }
-    }
-  }
-  return result;
-}
-
-const SKIP_JSON_FIELDS = new Set([
-  "id", "overconsumption", "canterminate", "posterioriporta",
-  "havebarring", "a_valider", "exercice_id", "uuid_doc",
-  "refuser", "supplement", "account", "parent", "prepaidid",
-  "offer", "metaofferid", "accountid",
-]);
-
-function parseJsonLine(line: string, source: string): Record<string, string> | null {
+function parsePipeJson(line: string, source: string): Record<string, string> | null {
   const trimmed = line.trim();
-  if (!trimmed.startsWith("{")) return null;
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[{")) return null;
 
-  try {
-    const obj = JSON.parse(trimmed);
-    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return null;
+  const parsed: Record<string, string> = {};
 
-    const flat = flattenObject(obj);
-    const parsed: Record<string, string> = {};
+  const quotedRegex = /([a-zA-Z_]\w*)\s*:\s*"([^"]*)"/g;
+  let match;
+  while ((match = quotedRegex.exec(trimmed)) !== null) {
+    const key = match[1].toLowerCase();
+    const value = match[2];
+    if (!value || value === "null" || value === "false") continue;
 
-    for (const [key, val] of Object.entries(flat)) {
-      if (!val || val === "false" || val === "0") continue;
-      if (SKIP_JSON_FIELDS.has(key)) continue;
-
-      const mappedField = JSON_FIELD_MAP[key];
-
-      if (mappedField) {
-        if ((mappedField === "date_naissance" || mappedField === "date_creation" || mappedField === "date_modification" || mappedField === "date_activation" || mappedField === "date_activation_ligne") && val.includes("-") && /^\d{4}-\d{2}-\d{2}/.test(val)) {
-          const datePart = val.split("T")[0].split("t")[0];
-          if (datePart) {
-            const parts = datePart.split("-");
-            if (parts.length === 3) {
-              parsed[mappedField] = `${parts[2]}/${parts[1]}/${parts[0]}`;
-              continue;
-            }
-          }
-        }
-        if (!parsed[mappedField]) {
-          parsed[mappedField] = val;
+    const mapped = JSON_FIELD_MAP[key];
+    if (mapped && !parsed[mapped]) {
+      if (mapped.startsWith("date") && value.includes("-") && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        const datePart = value.split("t")[0].split("T")[0];
+        const parts = datePart.split("-");
+        if (parts.length === 3) {
+          parsed[mapped] = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          continue;
         }
       }
+      parsed[mapped] = value;
     }
-
-    if (parsed["cplt_adresse"] && parsed["adresse"]) {
-      parsed["adresse"] = parsed["adresse"] + ", " + parsed["cplt_adresse"];
-      delete parsed["cplt_adresse"];
-    } else if (parsed["cplt_adresse"] && !parsed["adresse"]) {
-      parsed["adresse"] = parsed["cplt_adresse"];
-      delete parsed["cplt_adresse"];
-    }
-
-    if (parsed["nom_adresse_postale"] && !parsed["adresse"]) {
-      parsed["adresse"] = parsed["nom_adresse_postale"];
-      delete parsed["nom_adresse_postale"];
-    }
-    if (parsed["nom_adresse_postale"] && parsed["adresse"]) {
-      delete parsed["nom_adresse_postale"];
-    }
-
-    if (Object.keys(parsed).length === 0) return null;
-
-    if (source) parsed["source"] = source;
-    return parsed;
-  } catch {
-    return null;
   }
+
+  const numRegex = /([a-zA-Z_]\w*)\s*:\s*(\d+(?:\.\d+)?)\b/g;
+  while ((match = numRegex.exec(trimmed)) !== null) {
+    const key = match[1].toLowerCase();
+    const value = match[2];
+    const mapped = JSON_FIELD_MAP[key];
+    if (mapped && !parsed[mapped]) {
+      parsed[mapped] = value;
+    }
+  }
+
+  if (parsed["cplt_adresse"] && parsed["adresse"]) {
+    parsed["adresse"] = parsed["adresse"] + ", " + parsed["cplt_adresse"];
+    delete parsed["cplt_adresse"];
+  } else if (parsed["cplt_adresse"]) {
+    parsed["adresse"] = parsed["cplt_adresse"];
+    delete parsed["cplt_adresse"];
+  }
+
+  if (parsed["nom_adresse_postale"]) {
+    if (!parsed["adresse"]) {
+      parsed["adresse"] = parsed["nom_adresse_postale"];
+    }
+    delete parsed["nom_adresse_postale"];
+  }
+
+  if (Object.keys(parsed).length === 0) return null;
+
+  if (source) parsed["source"] = source;
+  return parsed;
 }
 
 function parseLineField(line: string, source: string): Record<string, string> {
-  const jsonResult = parseJsonLine(line, source);
-  if (jsonResult) return jsonResult;
+  const pipeJsonResult = parsePipeJson(line, source);
+  if (pipeJsonResult) return pipeJsonResult;
 
   const parsed: Record<string, string> = {};
 
