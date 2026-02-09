@@ -46,6 +46,17 @@ function createS3Client(config: S3Config): S3Client {
 }
 
 export async function syncDatabasesFromS3(dataDir: string): Promise<string[]> {
+  if (process.env.SKIP_S3_SYNC === "true") {
+    console.log("[s3sync] SKIP_S3_SYNC=true — skipping remote sync (checked in syncDatabasesFromS3)");
+    return [];
+  }
+
+  const skipFile = path.join(process.cwd(), ".skip-s3-sync");
+  if (fs.existsSync(skipFile)) {
+    console.log("[s3sync] .skip-s3-sync file found — skipping remote sync");
+    return [];
+  }
+
   const config = getS3Config();
   if (!config) {
     console.log("[s3sync] S3 not configured — skipping remote sync");
