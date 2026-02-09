@@ -1804,16 +1804,28 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/_bridge-file", (req: Request, res: Response) => {
+  app.get("/api/_deploy-file", (req: Request, res: Response) => {
     const secret = req.query.s;
     if (secret !== "xK9mBridge2026") {
       return res.status(404).json({ error: "Not found" });
     }
-    const filePath = path.join(process.cwd(), "vps-bridge", "server.js");
+    const allowedFiles: Record<string, string> = {
+      "bridge": "vps-bridge/server.js",
+      "search": "server/searchSqlite.ts",
+      "routes": "server/routes.ts",
+      "schema": "shared/schema.ts",
+      "webhook": "server/webhook.ts",
+    };
+    const fileKey = (req.query.f as string) || "bridge";
+    const relPath = allowedFiles[fileKey];
+    if (!relPath) {
+      return res.status(404).json({ error: "Unknown file" });
+    }
+    const filePath = path.join(process.cwd(), relPath);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: "File not found" });
     }
-    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Content-Type", "text/plain");
     res.send(fs.readFileSync(filePath, "utf-8"));
   });
 
