@@ -299,7 +299,8 @@ export async function initSearchDatabases(): Promise<void> {
     await syncDatabasesFromS3(dataDir);
   }
 
-  const dbFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith(".db"));
+  const BLACKLISTED_FILES = new Set(["index2.db"]);
+  const dbFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith(".db") && !BLACKLISTED_FILES.has(f));
   if (dbFiles.length > 0) {
     SOURCE_MAP = {};
     dbFiles.forEach((filename, i) => {
