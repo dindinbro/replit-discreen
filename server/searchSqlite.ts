@@ -175,6 +175,8 @@ function parseLineField(line: string, source: string): Record<string, string> {
   if (unassigned.length > 0) {
     if (!parsed["email"]) {
       parsed["identifiant"] = unassigned.shift()!;
+    } else if (unassigned.length >= 2) {
+      parsed["identifiant"] = unassigned.shift()!;
     }
   }
   if (unassigned.length > 0) {
@@ -277,7 +279,25 @@ function filterResultsByCriteria(
         }
       }
 
-      if (!foundInAllowedField) return false;
+      if (!foundInAllowedField) {
+        const raw = String(row["_raw"] ?? "").toLowerCase();
+        if (raw.includes(searchVal)) {
+          foundInAllowedField = true;
+        }
+      }
+
+      if (!foundInAllowedField) {
+        let foundAnywhere = false;
+        for (const [key, val] of Object.entries(row)) {
+          if (key.startsWith("_")) continue;
+          const strVal = String(val ?? "").toLowerCase();
+          if (strVal.includes(searchVal)) {
+            foundAnywhere = true;
+            break;
+          }
+        }
+        if (!foundAnywhere) return false;
+      }
     }
     return true;
   });
