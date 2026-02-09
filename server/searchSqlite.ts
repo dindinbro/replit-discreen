@@ -369,7 +369,7 @@ async function searchRemoteBridge(
         "Content-Type": "application/json",
         "X-Bridge-Secret": remoteBridgeSecret,
       },
-      body: JSON.stringify({ criteria, limit, offset }),
+      body: JSON.stringify({ criteria, limit: limit * 5, offset }),
       signal: AbortSignal.timeout(30000),
     });
 
@@ -379,6 +379,29 @@ async function searchRemoteBridge(
     }
 
     const data = await res.json() as SearchResult;
+
+    if (data.results && data.results.length > 0) {
+      const firstRow = data.results[0];
+      const hasRawFields = Object.keys(firstRow).some(k => 
+        ["Line", "line", "Content", "content", "Rownum", "rownum", "Source", "source"].includes(k)
+      );
+      const hasParsedFields = Object.keys(firstRow).some(k => 
+        ["_source", "_raw", "email", "identifiant", "password", "telephone"].includes(k)
+      );
+
+      if (hasRawFields && !hasParsedFields) {
+        const processed = processResults(
+          data.results as unknown as Record<string, string>[],
+          "discreen"
+        );
+        const filtered = filterResultsByCriteria(processed, criteria);
+        return {
+          results: filtered.slice(0, limit) as SearchResult["results"],
+          total: data.total,
+        };
+      }
+    }
+
     return data;
   } catch (err) {
     console.error("[searchSqlite] Remote bridge request failed:", err);
