@@ -543,7 +543,7 @@ export async function initSearchDatabases(): Promise<void> {
       try {
         const info = openDb(key);
         if (info) {
-          info.db.prepare(`SELECT count(*) FROM "${info.tableName}" LIMIT 1`).get();
+          info.db.prepare(`SELECT 1 FROM "${info.tableName}" LIMIT 1`).get();
           console.log(`[searchSqlite] ${key} (${filename}) loaded and verified`);
         } else {
           keysToRemove.push(key);
