@@ -129,7 +129,7 @@ interface CriterionRow {
   value: string;
 }
 
-const HIDDEN_FIELDS = new Set(["_source", "_raw", "rownum", "line"]);
+const HIDDEN_FIELDS = new Set(["_source", "_raw", "rownum", "Rownum", "line", "Line", "content", "Content"]);
 const FIELD_PRIORITY: Record<string, number> = {
   email: 1, mail: 1,
   identifiant: 2, username: 2, pseudo: 2,

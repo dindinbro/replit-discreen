@@ -193,18 +193,38 @@ function parseLineField(line: string, source: string): Record<string, string> {
   return parsed;
 }
 
+function getFieldCI(r: Record<string, string>, ...keys: string[]): string {
+  for (const k of keys) {
+    if (r[k] !== undefined) return r[k];
+    const lower = k.toLowerCase();
+    const upper = k.charAt(0).toUpperCase() + k.slice(1);
+    if (r[lower] !== undefined) return r[lower];
+    if (r[upper] !== undefined) return r[upper];
+  }
+  for (const k of keys) {
+    const found = Object.keys(r).find((rk) => rk.toLowerCase() === k.toLowerCase());
+    if (found && r[found] !== undefined) return r[found];
+  }
+  return "";
+}
+
 function processResults(rows: Record<string, string>[], sourceKey: string): Record<string, unknown>[] {
   return rows.map((r) => {
-    const line = r["line"] || r["data"] || r["content"] || "";
-    const source = r["source"] || "";
+    const line = getFieldCI(r, "line", "data", "content");
+    const source = getFieldCI(r, "source");
 
     if (line && typeof line === "string" && line.length > 0) {
       const parsed = parseLineField(line, source);
       return { _source: sourceKey, _raw: line, ...parsed };
     }
 
-    const { rownum, ...rest } = r;
-    return { _source: sourceKey, ...rest };
+    const cleaned: Record<string, string> = {};
+    for (const [k, v] of Object.entries(r)) {
+      if (k.toLowerCase() !== "rownum") {
+        cleaned[k] = v;
+      }
+    }
+    return { _source: sourceKey, ...cleaned };
   });
 }
 
