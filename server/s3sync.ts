@@ -51,10 +51,17 @@ export async function syncDatabasesFromS3(dataDir: string): Promise<string[]> {
     return [];
   }
 
-  const skipFile = path.join(process.cwd(), ".skip-s3-sync");
-  if (fs.existsSync(skipFile)) {
-    console.log("[s3sync] .skip-s3-sync file found — skipping remote sync");
-    return [];
+  const skipLocations = [
+    path.join(process.cwd(), ".skip-s3-sync"),
+    path.resolve(__dirname, "..", ".skip-s3-sync"),
+    path.resolve(__dirname, ".skip-s3-sync"),
+    "/srv/discreen/.skip-s3-sync",
+  ];
+  for (const skipFile of skipLocations) {
+    if (fs.existsSync(skipFile)) {
+      console.log(`[s3sync] .skip-s3-sync file found at ${skipFile} — skipping remote sync`);
+      return [];
+    }
   }
 
   const config = getS3Config();
