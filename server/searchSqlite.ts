@@ -93,13 +93,33 @@ export interface SearchResult {
   total: number | null;
 }
 
+function classifyPart(p: string): string | null {
+  const trimmed = p.trim();
+  if (!trimmed) return null;
+
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "email";
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(trimmed)) return "ip";
+  if (/^(\+?\d[\d\s\-().]{6,})$/.test(trimmed) && /\d{7,}/.test(trimmed.replace(/\D/g, ""))) return "telephone";
+  if (/^[a-f0-9]{32,128}$/i.test(trimmed)) return "hash";
+  if (/^https?:\/\//i.test(trimmed)) return "url";
+  if (/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/i.test(trimmed)) return "iban";
+  if (/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/i.test(trimmed) && trimmed.length >= 8 && trimmed.length <= 11) return "bic";
+  if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(trimmed)) return "date_naissance";
+  if (/^\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}$/.test(trimmed)) return "date_naissance";
+  if (/^\d{5}$/.test(trimmed) && parseInt(trimmed) >= 1000 && parseInt(trimmed) <= 99999) return "code_postal";
+  if (/^\d+[\s,]+/.test(trimmed) && /[a-zA-ZÀ-ÿ]/.test(trimmed) && trimmed.length > 5) return "adresse";
+  if (/^(mr|mrs|mme|mlle|m\.|monsieur|madame|mademoiselle|homme|femme|male|female|man|woman|his|her|him|h|f|m)$/i.test(trimmed)) return "civilite";
+  if (/^[A-Z0-9]{11,17}$/i.test(trimmed) && /\d/.test(trimmed) && /[A-Z]/i.test(trimmed)) {
+    if (trimmed.length === 17) return "vin";
+  }
+  if (/^[a-f0-9]{40}:[a-f0-9]+$/i.test(trimmed)) return "hash";
+
+  return null;
+}
+
 function parseLineField(line: string, source: string): Record<string, string> {
   const parsed: Record<string, string> = {};
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-  const phoneRegex = /^(\+?\d[\d\s\-().]{6,})$/;
-  const hashRegex = /^[a-f0-9]{32,128}$/i;
   const urlRegex = /^https?:\/\//i;
 
   let sep = ":";
@@ -155,40 +175,55 @@ function parseLineField(line: string, source: string): Record<string, string> {
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i];
     if (!p) continue;
-    if (emailRegex.test(p) && !parsed["email"]) {
-      parsed["email"] = p;
-      assigned.add(i);
-    } else if (ipRegex.test(p) && !parsed["ip"]) {
-      parsed["ip"] = p;
-      assigned.add(i);
-    } else if (phoneRegex.test(p) && !parsed["telephone"]) {
-      parsed["telephone"] = p;
-      assigned.add(i);
-    } else if (hashRegex.test(p) && p.length >= 32 && !parsed["hash"]) {
-      parsed["hash"] = p;
+    const cls = classifyPart(p);
+    if (cls && !parsed[cls]) {
+      parsed[cls] = p;
       assigned.add(i);
     }
   }
 
   const unassigned = parts.filter((_, i) => !assigned.has(i)).filter(Boolean);
 
-  if (unassigned.length > 0) {
-    if (!parsed["email"]) {
-      parsed["identifiant"] = unassigned.shift()!;
-    } else if (unassigned.length >= 2) {
-      parsed["identifiant"] = unassigned.shift()!;
-    }
+  if (unassigned.length > 0 && !parsed["identifiant"] && !parsed["email"]) {
+    parsed["identifiant"] = unassigned.shift()!;
+  } else if (unassigned.length >= 2 && !parsed["identifiant"]) {
+    parsed["identifiant"] = unassigned.shift()!;
   }
-  if (unassigned.length > 0) {
+
+  if (unassigned.length > 0 && !parsed["password"] && !parsed["hash"]) {
     const next = unassigned[0];
-    if (next && hashRegex.test(next) && next.length >= 32 && !parsed["hash"]) {
+    if (next && /^[a-f0-9]{32,128}$/i.test(next)) {
       parsed["hash"] = unassigned.shift()!;
-    } else if (next && !parsed["password"]) {
+    } else {
       parsed["password"] = unassigned.shift()!;
     }
   }
-  for (let i = 0; i < unassigned.length; i++) {
-    parsed[`champ_${i + 1}`] = unassigned[i];
+
+  if (unassigned.length > 0) {
+    let foundPostalCode = !!parsed["code_postal"];
+    for (let i = 0; i < unassigned.length; i++) {
+      const u = unassigned[i];
+      const cls = classifyPart(u);
+      if (cls && !parsed[cls]) {
+        parsed[cls] = u;
+        if (cls === "code_postal") foundPostalCode = true;
+        continue;
+      }
+      if (foundPostalCode && !parsed["ville"] && /^[a-zA-ZÀ-ÿ\s\-']+$/.test(u) && u.length >= 2) {
+        parsed["ville"] = u;
+        foundPostalCode = false;
+        continue;
+      }
+      if (!parsed["nom"] && /^[a-zA-ZÀ-ÿ\s\-']+$/.test(u) && u.length >= 2 && u.length <= 30) {
+        parsed["nom"] = u;
+        continue;
+      }
+      if (!parsed["prenom"] && /^[a-zA-ZÀ-ÿ\s\-']+$/.test(u) && u.length >= 2 && u.length <= 30 && parsed["nom"]) {
+        parsed["prenom"] = u;
+        continue;
+      }
+      parsed[`champ_${i + 1}`] = u;
+    }
   }
 
   if (source) parsed["source"] = source;
@@ -232,13 +267,13 @@ function processResults(rows: Record<string, string>[], sourceKey: string): Reco
 
 const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   email: ["email", "mail"],
-  username: ["identifiant", "username", "pseudo"],
-  displayName: ["identifiant", "username", "pseudo", "nom", "name"],
+  username: ["identifiant", "username", "pseudo", "nom"],
+  displayName: ["identifiant", "username", "pseudo", "nom", "name", "prenom"],
   lastName: ["nom", "name", "last_name", "lastname", "surname", "identifiant"],
-  firstName: ["prenom", "first_name", "firstname", "identifiant"],
+  firstName: ["prenom", "first_name", "firstname", "identifiant", "nom"],
   phone: ["telephone", "phone", "tel", "mobile"],
   ipAddress: ["ip"],
-  address: ["adresse", "address", "rue", "street", "ville", "city"],
+  address: ["adresse", "address", "rue", "street", "ville", "city", "code_postal"],
   ssn: ["ssn"],
   dob: ["date_naissance", "birthday", "dob", "birth", "date", "bday"],
   yob: ["date_naissance", "birthday", "dob", "birth", "date", "bday"],
@@ -248,7 +283,7 @@ const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   hashedPassword: ["hash", "password"],
   discordId: ["discord"],
   macAddress: ["mac"],
-  gender: ["gender"],
+  gender: ["gender", "civilite"],
   vin: ["vin"],
   fivemLicense: ["fivem"],
 };

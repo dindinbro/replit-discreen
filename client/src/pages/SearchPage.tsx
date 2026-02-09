@@ -147,6 +147,7 @@ const FIELD_ICON_MAP: Record<string, typeof User> = {
   discord: Hash, ip: Globe, mac: Hash,
   source: Database, _source: Database,
   identifiant: User, password: ShieldAlert, hash: Hash,
+  civilite: User, bic: CreditCard, url: Globe, vin: Hash,
   product: FileText, description: FileText, status: FileText,
   donnee: FileText, champ_1: FileText, champ_2: FileText, champ_3: FileText,
 };
@@ -158,7 +159,7 @@ function getFieldIcon(fieldName: string) {
 
 function getFieldColorVar(fieldName: string): string {
   const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
-  if (["nom", "name", "last_name", "lastname", "surname", "prenom", "first_name", "firstname", "username", "pseudo", "identifiant", "displayname"].includes(key))
+  if (["nom", "name", "last_name", "lastname", "surname", "prenom", "first_name", "firstname", "username", "pseudo", "identifiant", "displayname", "civilite"].includes(key))
     return "--field-person";
   if (["email", "mail"].includes(key))
     return "--field-email";
@@ -193,6 +194,7 @@ function getFieldLabel(fieldName: string): string {
     ssn: "N Secu", id: "ID", username: "Pseudo", pseudo: "Pseudo",
     discord: "Discord", ip: "IP", mac: "MAC",
     identifiant: "Identifiant", password: "Mot de passe", hash: "Hash",
+    civilite: "Civilite", bic: "BIC", url: "URL", vin: "VIN",
     product: "Produit", description: "Description", status: "Statut",
     donnee: "Donnee", champ_1: "Champ 1", champ_2: "Champ 2", champ_3: "Champ 3",
     champ_4: "Champ 4", champ_5: "Champ 5", champ_6: "Champ 6",
