@@ -245,6 +245,31 @@ export const insertInfoRequestSchema = createInsertSchema(infoRequests).omit({ i
 export type InsertInfoRequest = z.infer<typeof insertInfoRequestSchema>;
 export type InfoRequest = typeof infoRequests.$inferSelect;
 
+export const wantedProfiles = pgTable("wanted_profiles", {
+  id: serial("id").primaryKey(),
+  nom: text("nom"),
+  prenom: text("prenom"),
+  email: text("email"),
+  telephone: text("telephone"),
+  adresse: text("adresse"),
+  ville: text("ville"),
+  codePostal: text("code_postal"),
+  civilite: text("civilite"),
+  dateNaissance: text("date_naissance"),
+  ip: text("ip"),
+  pseudo: text("pseudo"),
+  discord: text("discord"),
+  password: text("password"),
+  iban: text("iban"),
+  notes: text("notes"),
+  addedBy: text("added_by"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertWantedProfileSchema = createInsertSchema(wantedProfiles).omit({ id: true, createdAt: true });
+export type InsertWantedProfile = z.infer<typeof insertWantedProfileSchema>;
+export type WantedProfile = typeof wantedProfiles.$inferSelect;
+
 export const pendingServiceRequests = pgTable("pending_service_requests", {
   id: serial("id").primaryKey(),
   orderId: text("order_id").notNull().unique(),

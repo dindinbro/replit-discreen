@@ -1,11 +1,13 @@
 import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
+  wantedProfiles,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
   type BlacklistEntry, type InsertBlacklistEntry,
   type InfoRequest, type InsertInfoRequest, type PendingServiceRequest,
+  type WantedProfile, type InsertWantedProfile,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -61,6 +63,12 @@ export interface IStorage {
   setDiscordId(userId: string, discordId: string): Promise<Subscription | undefined>;
   clearDiscordId(userId: string): Promise<void>;
   getDiscordId(userId: string): Promise<string | null>;
+  createWantedProfile(data: InsertWantedProfile): Promise<WantedProfile>;
+  getWantedProfiles(): Promise<WantedProfile[]>;
+  getWantedProfileById(id: number): Promise<WantedProfile | undefined>;
+  updateWantedProfile(id: number, data: Partial<InsertWantedProfile>): Promise<WantedProfile | undefined>;
+  deleteWantedProfile(id: number): Promise<boolean>;
+  searchWantedProfiles(query: string): Promise<WantedProfile[]>;
 }
 
 function hashKey(key: string): string {
