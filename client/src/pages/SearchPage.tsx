@@ -1400,11 +1400,13 @@ export default function SearchPage() {
                       row={{
                         nom: profile.nom,
                         prenom: profile.prenom,
-                        email: profile.email,
-                        telephone: profile.telephone,
+                        emails: profile.emails?.length > 0 ? profile.emails.join(", ") : profile.email,
+                        telephones: profile.phones?.length > 0 ? profile.phones.join(", ") : profile.telephone,
                         adresse: `${profile.adresse || ""} ${profile.codePostal || ""} ${profile.ville || ""}`.trim(),
                         pseudo: profile.pseudo,
-                        discord: profile.discord,
+                        discord_tag: profile.discord,
+                        discord_ids: profile.discordIds?.length > 0 ? profile.discordIds.join(", ") : profile.discordId,
+                        ips: profile.ips?.length > 0 ? profile.ips.join(", ") : profile.ip,
                         notes: profile.notes,
                         source: "Base Wanted Admin"
                       }}

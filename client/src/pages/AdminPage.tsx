@@ -81,23 +81,31 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  
+  const [emails, setEmails] = useState<string[]>([""]);
+  const [phones, setPhones] = useState<string[]>([""]);
+  const [ips, setIps] = useState<string[]>([""]);
+  const [discordIds, setDiscordIds] = useState<string[]>([""]);
+
   const [form, setForm] = useState<Partial<InsertWantedProfile>>({
     nom: "",
     prenom: "",
-    email: "",
-    telephone: "",
     adresse: "",
     ville: "",
     codePostal: "",
     civilite: "M.",
     dateNaissance: "",
-    ip: "",
     pseudo: "",
     discord: "",
+    discordId: "",
     password: "",
     iban: "",
     notes: ""
   });
+
+  const addField = (setter: React.Dispatch<React.SetStateAction<string[]>>) => setter(prev => [...prev, ""]);
+  const removeField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number) => setter(prev => prev.filter((_, i) => i !== index));
+  const updateField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number, value: string) => setter(prev => prev.map((v, i) => i === index ? value : v));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,22 +114,39 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
 
     setLoading(true);
     try {
+      const payload = {
+        ...form,
+        emails: emails.filter(Boolean),
+        phones: phones.filter(Boolean),
+        ips: ips.filter(Boolean),
+        discordIds: discordIds.filter(Boolean),
+        // Fallbacks for older fields
+        email: emails[0] || "",
+        telephone: phones[0] || "",
+        ip: ips[0] || "",
+        discordId: discordIds[0] || form.discordId || "",
+      };
+
       const res = await fetch("/api/admin/wanted-profiles", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         toast({ title: "Profil créé", description: "Le profil Wanted a été ajouté avec succès." });
         setForm({
-          nom: "", prenom: "", email: "", telephone: "", adresse: "",
+          nom: "", prenom: "", adresse: "",
           ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
-          ip: "", pseudo: "", discord: "", password: "", iban: "", notes: ""
+          pseudo: "", discord: "", discordId: "", password: "", iban: "", notes: ""
         });
+        setEmails([""]);
+        setPhones([""]);
+        setIps([""]);
+        setDiscordIds([""]);
         queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
       } else {
         const err = await res.json();
@@ -133,6 +158,33 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
       setLoading(false);
     }
   };
+
+  const DynamicFields = ({ label, values, setter, placeholder }: any) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">{label}</label>
+        <Button type="button" variant="ghost" size="sm" className="h-6 px-2" onClick={() => addField(setter)}>
+          <Plus className="w-3 h-3 mr-1" /> Ajouter
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {values.map((val: string, i: number) => (
+          <div key={i} className="flex gap-2">
+            <Input 
+              value={val} 
+              onChange={e => updateField(setter, i, e.target.value)} 
+              placeholder={placeholder} 
+            />
+            {values.length > 1 && (
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeField(setter, i)}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <Card className="p-6">
@@ -161,14 +213,8 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
-            <Input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="jean.dupont@example.com" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Téléphone</label>
-            <Input value={form.telephone} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} placeholder="06 12 34 56 78" />
-          </div>
+          <DynamicFields label="Emails" values={emails} setter={setEmails} placeholder="jean.dupont@example.com" />
+          <DynamicFields label="Téléphones" values={phones} setter={setPhones} placeholder="06 12 34 56 78" />
         </div>
 
         <div className="space-y-2">
@@ -192,10 +238,7 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">IP</label>
-            <Input value={form.ip} onChange={e => setForm(p => ({ ...p, ip: e.target.value }))} placeholder="192.168.1.1" />
-          </div>
+          <DynamicFields label="IPs" values={ips} setter={setIps} placeholder="192.168.1.1" />
           <div className="space-y-2">
             <label className="text-sm font-medium">Pseudo</label>
             <Input value={form.pseudo} onChange={e => setForm(p => ({ ...p, pseudo: e.target.value }))} placeholder="JDupont" />
@@ -204,13 +247,15 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Discord</label>
+            <label className="text-sm font-medium">Discord Tag</label>
             <Input value={form.discord} onChange={e => setForm(p => ({ ...p, discord: e.target.value }))} placeholder="jdupont#1234" />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Mot de passe (fuite)</label>
-            <Input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" />
-          </div>
+          <DynamicFields label="Discord IDs" values={discordIds} setter={setDiscordIds} placeholder="123456789012345678" />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Mot de passe (fuite)</label>
+          <Input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" />
         </div>
 
         <div className="space-y-2">

@@ -257,19 +257,24 @@ export const wantedProfiles = pgTable("wanted_profiles", {
   id: serial("id").primaryKey(),
   nom: text("nom"),
   prenom: text("prenom"),
-  email: text("email"),
-  telephone: text("telephone"),
+  email: text("email"), // Keeping for compatibility, but we'll use a JSON/Text for multiples
+  telephone: text("telephone"), // Keeping for compatibility
   adresse: text("adresse"),
   ville: text("ville"),
   codePostal: text("code_postal"),
   civilite: text("civilite"),
   dateNaissance: text("date_naissance"),
-  ip: text("ip"),
+  ip: text("ip"), // Keeping for compatibility
   pseudo: text("pseudo"),
   discord: text("discord"),
+  discordId: text("discord_id"), // Added Discord ID field
   password: text("password"),
   iban: text("iban"),
   notes: text("notes"),
+  emails: text("emails").array(), // Added multiple emails
+  phones: text("phones").array(), // Added multiple phones
+  ips: text("ips").array(), // Added multiple IPs
+  discordIds: text("discord_ids").array(), // Added multiple Discord IDs
   addedBy: text("added_by"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
