@@ -838,22 +838,23 @@ export default function SearchPage() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
-                  <h2 className="text-xl font-semibold">Recherche par Critères</h2>
+                  <h2 className="text-xl font-bold tracking-tight">Recherche par Critères</h2>
                 </div>
                 <Button
                   data-testid="button-add-criterion"
                   variant="outline"
                   size="sm"
                   onClick={addCriterion}
+                  className="gap-2"
                 >
-                  <Plus className="w-4 h-4 mr-1" />
+                  <Plus className="w-4 h-4" />
                   Ajouter un filtre
                 </Button>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <AnimatePresence mode="popLayout">
-                  {criteria.map((criterion) => {
+                  {criteria.map((criterion, idx) => {
                     const IconComp = FILTER_ICONS[criterion.type] || FileText;
                     return (
                       <motion.div
@@ -861,97 +862,88 @@ export default function SearchPage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="flex items-center gap-3"
+                        className="group relative"
                       >
-                        <Card className="flex-1 flex items-center gap-3 p-3 overflow-visible" data-testid={`criterion-row-${criterion.id}`}>
-                          <div
-                            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
-                            style={{
-                              color: `hsl(var(--primary))`,
-                              backgroundColor: `hsl(var(--primary) / 0.1)`,
-                            }}
-                          >
-                            <IconComp className="w-4 h-4" />
+                        <Card className="p-3 bg-secondary/30 border-border/50">
+                          <div className="flex flex-col sm:flex-row items-center gap-3">
+                            <div
+                              className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-primary"
+                            >
+                              <IconComp className="w-4 h-4" />
+                            </div>
+                            
+                            <div className="w-full sm:w-[220px]">
+                              <Select
+                                value={criterion.type}
+                                onValueChange={(val) => updateCriterion(criterion.id, "type", val)}
+                              >
+                                <SelectTrigger className="bg-background">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {filterTypes.map((ft) => (
+                                    <SelectItem key={ft} value={ft}>
+                                      {FilterLabels[ft]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex-1 w-full relative">
+                              <Input
+                                data-testid={`input-criterion-value-${criterion.id}`}
+                                placeholder={FILTER_PLACEHOLDERS[criterion.type] || "Entrez une valeur..."}
+                                value={criterion.value}
+                                onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSearch(0);
+                                }}
+                                className="bg-background pr-10"
+                              />
+                            </div>
+
+                            {criteria.length > 1 && (
+                              <Button
+                                data-testid={`button-remove-criterion-${criterion.id}`}
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => removeCriterion(criterion.id)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
-                          <Select
-                            value={criterion.type}
-                            onValueChange={(val) => updateCriterion(criterion.id, "type", val)}
-                          >
-                            <SelectTrigger className="w-[200px] shrink-0" data-testid={`select-criterion-type-${criterion.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {filterTypes.map((ft) => (
-                                <SelectItem key={ft} value={ft}>
-                                  {FilterLabels[ft]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            data-testid={`input-criterion-value-${criterion.id}`}
-                            placeholder={FILTER_PLACEHOLDERS[criterion.type] || "Entrez une valeur..."}
-                            value={criterion.value}
-                            onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSearch(0);
-                            }}
-                            className="flex-1"
-                          />
                         </Card>
-                        {criteria.length > 1 && (
-                          <Button
-                            data-testid={`button-remove-criterion-${criterion.id}`}
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeCriterion(criterion.id)}
-                            title="Supprimer ce critere"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
                       </motion.div>
                     );
                   })}
                 </AnimatePresence>
               </div>
 
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="text-quota-info">
-                  {isUnlimited ? (
-                    <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
-                      <Search className="w-3 h-3" />
-                      Illimite ({displayTier.toUpperCase()})
-                    </Badge>
-                  ) : (
-                    <>
-                      <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
-                        {displayTier.toUpperCase()}
-                      </Badge>
-                      <span>{displayUsed} / {displayLimit} {isExternalMode ? "recherches externes" : "recherches"} aujourd'hui</span>
-                      {!isUnlimited && displayUsed >= displayLimit && (
-                        <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">
-                          Limite atteinte
-                        </Badge>
-                      )}
-                    </>
-                  )}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="h-7 bg-primary/5 text-primary border-primary/20 gap-1.5 font-medium">
+                    <Search className="w-3.5 h-3.5" />
+                    {isUnlimited ? `Illimité (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
+                  </Badge>
                 </div>
-              </div>
 
-              <Button
-                data-testid="button-search"
-                onClick={() => handleSearch(0)}
-                disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
-                className="w-full gap-2 shadow-lg shadow-primary/25"
-              >
-                {searchMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Search className="w-4 h-4" />
-                )}
-                Rechercher
-              </Button>
+                <Button
+                  data-testid="button-search"
+                  onClick={() => handleSearch(0)}
+                  disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
+                  className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
+                >
+                  {searchMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  Rechercher
+                </Button>
+              </div>
             </motion.div>
           )}
 
