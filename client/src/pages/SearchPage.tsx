@@ -101,6 +101,8 @@ const FIELD_ICON_MAP: Record<string, typeof User> = {
   ssn: FileText, id: Hash, username: User, pseudo: User,
   discord: Hash, ip: Globe, mac: Hash,
   source: Database, content: FileText, _source: Database,
+  identifiant: User, password: ShieldAlert, hash: Hash,
+  donnee: FileText, champ_1: FileText, champ_2: FileText, champ_3: FileText,
 };
 
 function getFieldIcon(fieldName: string) {
@@ -124,6 +126,10 @@ function getFieldColorVar(fieldName: string): string {
     return "--field-date";
   if (["iban", "credit_card", "card", "ssn"].includes(key))
     return "--field-finance";
+  if (["password", "identifiant", "pseudo", "username"].includes(key))
+    return "--field-person";
+  if (["donnee", "champ_1", "champ_2", "champ_3"].includes(key))
+    return "--field-id";
   return "--primary";
 }
 
@@ -146,6 +152,18 @@ interface CriterionRow {
   value: string;
 }
 
+const HIDDEN_FIELDS = new Set(["_source", "_raw", "rownum", "line"]);
+const FIELD_PRIORITY: Record<string, number> = {
+  email: 1, mail: 1,
+  identifiant: 2, username: 2, pseudo: 2,
+  nom: 3, name: 3, last_name: 3, lastname: 3,
+  prenom: 4, first_name: 4, firstname: 4,
+  password: 5, hash: 6,
+  telephone: 7, phone: 7, tel: 7,
+  ip: 8,
+  source: 99,
+};
+
 function ResultCard({
   row,
   index,
@@ -159,18 +177,26 @@ function ResultCard({
   const [copied, setCopied] = useState(false);
 
   const entries = Object.entries(row);
+  const rawLine = row["_raw"] as string | undefined;
 
-  const titleField = entries.find(([k]) => {
+  const visibleFields = entries
+    .filter(([k]) => !HIDDEN_FIELDS.has(k))
+    .sort(([a], [b]) => {
+      const pa = FIELD_PRIORITY[a.toLowerCase()] ?? 50;
+      const pb = FIELD_PRIORITY[b.toLowerCase()] ?? 50;
+      return pa - pb;
+    });
+
+  const titleField = visibleFields.find(([k]) => {
     const key = k.toLowerCase();
-    return ["nom", "name", "last_name", "lastname", "surname", "username"].includes(key);
+    return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
   });
-  const subtitleParts: string[] = [];
-  const sourceField = entries.find(([k]) => k.toLowerCase() === "source" || k === "_source");
-  if (sourceField) subtitleParts.push(String(sourceField[1]));
+  const sourceField = entries.find(([k]) => k.toLowerCase() === "source");
+  const dbSource = row["_source"] as string | undefined;
+  const sourceText = sourceField ? String(sourceField[1]) : (dbSource || "");
 
   const handleCopy = () => {
-    const text = entries
-      .filter(([k]) => k !== "_source")
+    const text = rawLine || visibleFields
       .map(([k, v]) => `${k}: ${v}`)
       .join("\n");
     navigator.clipboard.writeText(text);
@@ -180,12 +206,15 @@ function ResultCard({
   };
 
   const handleCopyJSON = () => {
-    const clean = Object.fromEntries(entries.filter(([k]) => k !== "_source"));
+    const clean = Object.fromEntries(visibleFields);
     navigator.clipboard.writeText(JSON.stringify(clean, null, 2));
     toast({ title: "JSON copie !" });
   };
 
-  const detailFields = entries.filter(([k]) => k !== "_source");
+  let dataFields = visibleFields.filter(([k]) => k.toLowerCase() !== "source");
+  if (dataFields.length === 0 && rawLine) {
+    dataFields = [["donnee", rawLine]];
+  }
 
   return (
     <motion.div
@@ -203,10 +232,11 @@ function ResultCard({
               <p className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
                 {titleField ? String(titleField[1]) : `Resultat ${globalIndex + 1}`}
               </p>
-              {subtitleParts.length > 0 && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {subtitleParts.join(" - ")}
-                </p>
+              {sourceText && (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Database className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <p className="text-xs text-muted-foreground truncate">{sourceText}</p>
+                </div>
               )}
             </div>
           </div>
@@ -233,7 +263,7 @@ function ResultCard({
         </div>
 
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
-          {detailFields.map(([col, val]) => {
+          {dataFields.map(([col, val]) => {
             const Icon = getFieldIcon(col);
             const cssVar = getFieldColorVar(col);
             return (

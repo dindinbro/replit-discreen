@@ -93,6 +93,121 @@ export interface SearchResult {
   total: number | null;
 }
 
+function parseLineField(line: string, source: string): Record<string, string> {
+  const parsed: Record<string, string> = {};
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+  const phoneRegex = /^(\+?\d[\d\s\-().]{6,})$/;
+  const hashRegex = /^[a-f0-9]{32,128}$/i;
+  const urlRegex = /^https?:\/\//i;
+
+  let sep = ":";
+  if (urlRegex.test(line)) {
+    const withoutUrls = line.replace(/https?:\/\/[^\s;|,]+/g, "");
+    if (withoutUrls.includes(";")) sep = ";";
+    else if (withoutUrls.includes("|")) sep = "|";
+    else sep = ":";
+  } else {
+    const semicolons = (line.match(/;/g) || []).length;
+    const colons = (line.match(/:/g) || []).length;
+    const pipes = (line.match(/\|/g) || []).length;
+    if (semicolons > 0 && semicolons >= colons) sep = ";";
+    else if (pipes > 0 && pipes >= colons && pipes >= semicolons) sep = "|";
+    else sep = ":";
+  }
+
+  let parts: string[];
+  if (sep === ":" && urlRegex.test(line)) {
+    parts = [];
+    let remaining = line;
+    while (remaining.length > 0) {
+      const urlMatch = remaining.match(/^(https?:\/\/[^\s:]+)/i);
+      if (urlMatch) {
+        parts.push(urlMatch[1]);
+        remaining = remaining.slice(urlMatch[1].length);
+        if (remaining.startsWith(":")) remaining = remaining.slice(1);
+      } else {
+        const idx = remaining.indexOf(":");
+        if (idx === -1) {
+          parts.push(remaining);
+          break;
+        } else {
+          parts.push(remaining.slice(0, idx));
+          remaining = remaining.slice(idx + 1);
+        }
+      }
+    }
+  } else {
+    parts = line.split(sep);
+  }
+
+  parts = parts.map((p) => p.trim()).filter(Boolean);
+
+  if (parts.length === 1) {
+    parsed["donnee"] = parts[0];
+    if (source) parsed["source"] = source;
+    return parsed;
+  }
+
+  const assigned = new Set<number>();
+
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (!p) continue;
+    if (emailRegex.test(p) && !parsed["email"]) {
+      parsed["email"] = p;
+      assigned.add(i);
+    } else if (ipRegex.test(p) && !parsed["ip"]) {
+      parsed["ip"] = p;
+      assigned.add(i);
+    } else if (phoneRegex.test(p) && !parsed["telephone"]) {
+      parsed["telephone"] = p;
+      assigned.add(i);
+    } else if (hashRegex.test(p) && p.length >= 32 && !parsed["hash"]) {
+      parsed["hash"] = p;
+      assigned.add(i);
+    }
+  }
+
+  const unassigned = parts.filter((_, i) => !assigned.has(i)).filter(Boolean);
+
+  if (unassigned.length > 0) {
+    if (!parsed["email"]) {
+      parsed["identifiant"] = unassigned.shift()!;
+    }
+  }
+  if (unassigned.length > 0) {
+    const next = unassigned[0];
+    if (next && hashRegex.test(next) && next.length >= 32 && !parsed["hash"]) {
+      parsed["hash"] = unassigned.shift()!;
+    } else if (next && !parsed["password"]) {
+      parsed["password"] = unassigned.shift()!;
+    }
+  }
+  for (let i = 0; i < unassigned.length; i++) {
+    parsed[`champ_${i + 1}`] = unassigned[i];
+  }
+
+  if (source) parsed["source"] = source;
+  return parsed;
+}
+
+function processResults(rows: Record<string, string>[], sourceKey: string): Record<string, unknown>[] {
+  return rows.map((r) => {
+    const line = r["line"] || r["data"] || r["content"] || "";
+    const source = r["source"] || "";
+
+    if (line && typeof line === "string" && line.length > 0) {
+      const parsed = parseLineField(line, source);
+      return { _source: sourceKey, _raw: line, ...parsed };
+    }
+
+    const { rownum, ...rest } = r;
+    return { _source: sourceKey, ...rest };
+  });
+}
+
 function searchOneDb(
   info: DbInfo,
   criteria: SearchCriterion[],
@@ -119,7 +234,7 @@ function searchOneDb(
     const rows = selectStmt.all(ftsQuery, limit, offset) as Record<string, string>[];
 
     return {
-      results: rows.map((r) => ({ _source: sourceKey, ...r })),
+      results: processResults(rows, sourceKey),
       total: countRow.total,
     };
   } else {
@@ -147,7 +262,7 @@ function searchOneDb(
     const rows = selectStmt.all(...params, limit, offset) as Record<string, string>[];
 
     return {
-      results: rows.map((r) => ({ _source: sourceKey, ...r })),
+      results: processResults(rows, sourceKey),
       total: countRow.total,
     };
   }
