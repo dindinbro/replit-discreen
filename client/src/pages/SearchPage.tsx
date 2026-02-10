@@ -44,7 +44,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
-const FILTER_ICONS: Partial<Record<SearchFilterType, typeof User>> = {
+const FILTER_ICONS: Record<string, typeof User> = {
   username: User,
   displayName: User,
   lastName: User,
@@ -67,7 +67,7 @@ const FILTER_ICONS: Partial<Record<SearchFilterType, typeof User>> = {
   vin: Hash,
 };
 
-const FILTER_PLACEHOLDERS: Partial<Record<SearchFilterType, string>> = {
+const FILTER_PLACEHOLDERS: Record<string, string> = {
   username: "ex: jean_dupont",
   displayName: "ex: Jean Dupont",
   lastName: "ex: Dupont",
@@ -90,7 +90,7 @@ const FILTER_PLACEHOLDERS: Partial<Record<SearchFilterType, string>> = {
   vin: "ex: AA-123-BB ou WF0XXXGCDX1234567",
 };
 
-const FILTER_VALIDATORS: Partial<Record<SearchFilterType, { test: (v: string) => boolean; message: string }>> = {
+const FILTER_VALIDATORS: Record<string, { test: (v: string) => boolean; message: string }> = {
   email: {
     test: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
     message: "L'email doit contenir un @ et un nom de domaine (ex: nom@domaine.com)",
@@ -236,7 +236,7 @@ const BREACH_FIELDS = [
 
 interface CriterionRow {
   id: string;
-  type: SearchFilterType;
+  type: string;
   value: string;
 }
 
@@ -582,7 +582,7 @@ export default function SearchPage() {
     setPage(newPage);
     searchMutation.mutate(
       {
-        criteria: filledCriteria.map((c) => ({ type: c.type, value: c.value.trim() })),
+        criteria: filledCriteria.map((c) => ({ type: c.type as SearchFilterType, value: c.value.trim() })),
         limit: pageSize,
         offset: newPage * pageSize,
       },
@@ -766,7 +766,7 @@ export default function SearchPage() {
       const validator = FILTER_VALIDATORS[c.type];
       if (validator && !validator.test(c.value.trim())) {
         toast({
-          title: `Format invalide — ${FilterLabels[c.type]}`,
+          title: `Format invalide — ${(FilterLabels as Record<string, string>)[c.type] || c.type}`,
           description: validator.message,
           variant: "destructive",
         });
@@ -793,7 +793,7 @@ export default function SearchPage() {
 
     searchMutation.mutate(
       {
-        criteria: filledCriteria.map((c) => ({ type: c.type, value: c.value.trim() })),
+        criteria: filledCriteria.map((c) => ({ type: c.type as SearchFilterType, value: c.value.trim() })),
         limit: pageSize,
         offset: newPage * pageSize,
       },
@@ -1534,7 +1534,61 @@ export default function SearchPage() {
           )}
         </AnimatePresence>
 
-        {searchMode !== "other" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && (
+        {searchMode === "wanted" && (
+          <div className="space-y-6 min-h-[400px]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Database className="w-5 h-5 text-primary" />
+                Résultats Wanted
+                {wantedResults.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {wantedResults.length}
+                  </Badge>
+                )}
+              </h3>
+            </div>
+
+            {loadingWanted ? (
+              <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
+                  <Loader2 className="w-12 h-12 animate-spin text-primary relative" />
+                </div>
+                <p className="text-muted-foreground animate-pulse">Recherche en cours...</p>
+              </div>
+            ) : wantedResults.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4">
+                {wantedResults.map((profile, i) => (
+                  <ResultCard
+                    key={profile.id}
+                    index={i}
+                    globalIndex={i}
+                    row={{
+                      nom: profile.nom,
+                      prenom: profile.prenom,
+                      emails: profile.emails?.length > 0 ? profile.emails.join(", ") : profile.email,
+                      telephones: profile.phones?.length > 0 ? profile.phones.join(", ") : profile.telephone,
+                      adresse: `${profile.adresse || ""} ${profile.codePostal || ""} ${profile.ville || ""}`.trim(),
+                      pseudo: profile.pseudo,
+                      discord_tag: profile.discord,
+                      discord_ids: profile.discordIds?.length > 0 ? profile.discordIds.join(", ") : profile.discordId,
+                      ips: profile.ips?.length > 0 ? profile.ips.join(", ") : profile.ip,
+                      notes: profile.notes,
+                      source: "Base Wanted Admin"
+                    }}
+                  />
+                ))}
+              </div>
+            ) : wantedResults.length === 0 && !loadingWanted ? (
+              <Card className="p-12 text-center space-y-4 border-dashed">
+                <Search className="w-12 h-12 text-muted-foreground/50 mx-auto" />
+                <p className="text-muted-foreground">Aucun profil wanted correspondant trouvé. Lancez une recherche pour voir les résultats.</p>
+              </Card>
+            ) : null}
+          </div>
+        )}
+
+        {searchMode !== "other" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
             const activeResults = searchMode === "external"
@@ -1592,46 +1646,6 @@ export default function SearchPage() {
                   globalIndex={(searchMode === "internal" ? page * pageSize : 0) + idx}
                 />
               ))}
-
-                    {searchMode === "wanted" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Résultats Wanted ({wantedResults.length})</h3>
-              </div>
-              {loadingWanted ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-              ) : wantedResults.length === 0 ? (
-                <Card className="p-8 text-center text-muted-foreground">
-                  Aucun profil wanted correspondant trouvé.
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {wantedResults.map((profile, i) => (
-                    <ResultCard
-                      key={profile.id}
-                      index={i}
-                      globalIndex={i}
-                      row={{
-                        nom: profile.nom,
-                        prenom: profile.prenom,
-                        emails: profile.emails?.length > 0 ? profile.emails.join(", ") : profile.email,
-                        telephones: profile.phones?.length > 0 ? profile.phones.join(", ") : profile.telephone,
-                        adresse: `${profile.adresse || ""} ${profile.codePostal || ""} ${profile.ville || ""}`.trim(),
-                        pseudo: profile.pseudo,
-                        discord_tag: profile.discord,
-                        discord_ids: profile.discordIds?.length > 0 ? profile.discordIds.join(", ") : profile.discordId,
-                        ips: profile.ips?.length > 0 ? profile.ips.join(", ") : profile.ip,
-                        notes: profile.notes,
-                        source: "Base Wanted Admin"
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {searchMode === "internal" && searchMutation.data && (searchMutation.data.total ?? 0) > pageSize && (
                       <div className="flex items-center justify-center gap-2 pt-8">
