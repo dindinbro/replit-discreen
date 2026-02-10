@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { FilterLabels, type SearchFilterType } from "@shared/schema";
+import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType } from "@shared/schema";
 import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, SearchLimitError } from "@/hooks/use-search";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
@@ -545,7 +545,8 @@ export default function SearchPage() {
     try {
       const params = new URLSearchParams();
       filledCriteria.forEach((c) => {
-        params.append(c.type, c.value.trim());
+        const apiParam = WantedFilterToApiParam[c.type as WantedFilterType] || c.type;
+        params.append(apiParam, c.value.trim());
       });
 
       const res = await fetch(`/api/wanted/search?${params.toString()}`, {
@@ -623,8 +624,13 @@ export default function SearchPage() {
 
   const addCriterion = () => {
     const usedTypes = new Set(criteria.map((c) => c.type));
-    const available = filterTypes.find((t) => !usedTypes.has(t)) || filterTypes[0];
-    setCriteria((prev) => [...prev, { id: String(nextCriterionId++), type: available, value: "" }]);
+    if (searchMode === "wanted") {
+      const available = WantedFilterTypes.find((t) => !usedTypes.has(t)) || WantedFilterTypes[0];
+      setCriteria((prev) => [...prev, { id: String(nextCriterionId++), type: available, value: "" }]);
+    } else {
+      const available = filterTypes.find((t) => !usedTypes.has(t)) || filterTypes[0];
+      setCriteria((prev) => [...prev, { id: String(nextCriterionId++), type: available, value: "" }]);
+    }
   };
 
   const removeCriterion = (id: string) => {
@@ -797,7 +803,10 @@ export default function SearchPage() {
         <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
           <Button
             variant={searchMode === "internal" ? "default" : "outline"}
-            onClick={() => setSearchMode("internal")}
+            onClick={() => {
+              setSearchMode("internal");
+              if (searchMode === "wanted") setCriteria([{ id: String(nextCriterionId++), type: "username", value: "" }]);
+            }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-internal"
           >
@@ -851,7 +860,10 @@ export default function SearchPage() {
           </Button>
           <Button
             variant={searchMode === "wanted" ? "default" : "outline"}
-            onClick={() => setSearchMode("wanted")}
+            onClick={() => {
+              setSearchMode("wanted");
+              setCriteria([{ id: String(nextCriterionId++), type: "nom", value: "" }]);
+            }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-wanted"
           >
@@ -1317,9 +1329,9 @@ export default function SearchPage() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {filterTypes.map((ft) => (
+                                    {WantedFilterTypes.map((ft) => (
                                       <SelectItem key={ft} value={ft}>
-                                        {FilterLabels[ft]}
+                                        {WantedFilterLabels[ft]}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -1329,11 +1341,11 @@ export default function SearchPage() {
                               <div className="flex-1 w-full relative">
                                 <Input
                                   data-testid={`input-criterion-value-${criterion.id}`}
-                                  placeholder={FILTER_PLACEHOLDERS[criterion.type] || "Entrez une valeur..."}
+                                  placeholder={WantedFilterLabels[criterion.type as WantedFilterType] ? `Rechercher par ${WantedFilterLabels[criterion.type as WantedFilterType]?.toLowerCase()}...` : "Entrez une valeur..."}
                                   value={criterion.value}
                                   onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
                                   onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleSearch(0);
+                                    if (e.key === "Enter") handleWantedSearch();
                                   }}
                                   className="bg-background pr-10"
                                 />

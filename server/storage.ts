@@ -471,11 +471,11 @@ export class DatabaseStorage implements IStorage {
     const conditions = values.map(v => {
       const val = `%${v.trim().toLowerCase()}%`;
       return or(
-        sql`LOWER(${blacklistEntries.firstName}) LIKE ${val}`,
-        sql`LOWER(${blacklistEntries.lastName}) LIKE ${val}`,
-        sql`LOWER(${blacklistEntries.email}) LIKE ${val}`,
-        sql`LOWER(${blacklistEntries.phone}) LIKE ${val}`,
-        sql`LOWER(${blacklistEntries.address}) LIKE ${val}`
+        sql`LOWER(COALESCE(${blacklistEntries.firstName}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.lastName}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.email}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.phone}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.address}, '')) LIKE ${val}`
       );
     });
     return db.select().from(blacklistEntries).where(or(...conditions));
@@ -616,6 +616,10 @@ export class DatabaseStorage implements IStorage {
         );
       } else if (key === "notes") {
         conditions.push(ilike(wantedProfiles.notes, `%${val}%`));
+      } else if (key === "password") {
+        conditions.push(ilike(wantedProfiles.password, `%${val}%`));
+      } else if (key === "iban") {
+        conditions.push(ilike(wantedProfiles.iban, `%${val}%`));
       }
     }
 

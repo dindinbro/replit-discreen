@@ -71,14 +71,53 @@ export const FilterLabels: Record<SearchFilterType, string> = {
   vin: "VIN / Plaque",
   discordId: "Discord ID",
   fivemLicense: "License FiveM",
-  nom: "Nom (Wanted)",
-  prenom: "Prénom (Wanted)",
-  ville: "Ville",
-  codePostal: "Code Postal",
-  civilite: "Civilité",
-  dateNaissance: "Date de Naissance",
-  iban_wanted: "IBAN (Wanted)",
-  notes: "Notes / Signalement"
+};
+
+export const WantedFilterTypes = [
+  "nom",
+  "prenom",
+  "pseudo",
+  "email",
+  "phone",
+  "ipAddress",
+  "discordId",
+  "discord",
+  "address",
+  "password",
+  "iban",
+  "notes",
+] as const;
+
+export type WantedFilterType = typeof WantedFilterTypes[number];
+
+export const WantedFilterLabels: Record<WantedFilterType, string> = {
+  nom: "Nom",
+  prenom: "Prénom",
+  pseudo: "Pseudo",
+  email: "Email",
+  phone: "Téléphone",
+  ipAddress: "Adresse IP",
+  discordId: "Discord ID",
+  discord: "Discord",
+  address: "Adresse",
+  password: "Password",
+  iban: "IBAN",
+  notes: "Notes / Signalement",
+};
+
+export const WantedFilterToApiParam: Record<WantedFilterType, string> = {
+  nom: "nom",
+  prenom: "prenom",
+  pseudo: "pseudo",
+  email: "email",
+  phone: "phone",
+  ipAddress: "ip",
+  discordId: "discordId",
+  discord: "discord",
+  address: "adresse",
+  password: "password",
+  iban: "iban",
+  notes: "notes",
 };
 
 export const SearchCriterionSchema = z.object({
