@@ -2,7 +2,13 @@
 
 ## Overview
 
-Discreen is a web application designed for searching through large data dumps, inspired by IntelX. It allows users to apply multiple search criteria (e.g., username, email, IP address) and aggregates results from two internal SQLite FTS5 databases, grouping them by source file. The platform incorporates Supabase for authentication and role-based access control, alongside a modern UI with an emerald green branding theme. The project aims to provide a robust and efficient search solution for data analysis, with future ambitions to expand its integration capabilities and user base.
+Discreen is a web application designed for searching through large data dumps, inspired by IntelX. It allows users to apply multiple search criteria (e.g., username, email, IP address) and aggregates results from multiple sources, grouping them by source file. The platform incorporates Supabase for authentication and role-based access control, alongside a modern UI with an emerald green branding theme. The project aims to provide a robust and efficient search solution for data analysis, with future ambitions to expand its integration capabilities and user base.
+
+### Search Modes
+The search system supports three modes (checked in this order):
+1. **Remote Bridge** (`VPS_SEARCH_URL`): Forwards searches to a VPS running SQLite databases locally
+2. **R2 Streaming** (`USE_R2_SEARCH=true`): Streams and searches raw text files directly from Cloudflare R2 (no local storage needed). Files are stored under the `R2_DATA_PREFIX` (default: `data-files/`). Searches 10 files in parallel with 60s timeout.
+3. **Local SQLite**: Uses local FTS5 databases in the `data/` directory
 
 ## User Preferences
 

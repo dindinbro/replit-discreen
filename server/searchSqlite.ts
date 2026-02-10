@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import type { SearchCriterion } from "@shared/schema";
 import { syncDatabasesFromS3 } from "./s3sync";
+import { searchR2, isR2SearchEnabled } from "./r2-search";
 
 let useRemoteBridge = false;
 let remoteBridgeUrl = "";
@@ -100,7 +101,7 @@ export interface SearchResult {
   total: number | null;
 }
 
-function classifyPart(p: string): string | null {
+export function classifyPart(p: string): string | null {
   const trimmed = p.trim();
   if (!trimmed) return null;
 
@@ -254,7 +255,7 @@ function parsePipeJson(line: string, source: string): Record<string, string> | n
   return parsed;
 }
 
-function parseLineField(line: string, source: string): Record<string, string> {
+export function parseLineField(line: string, source: string): Record<string, string> {
   const pipeJsonResult = parsePipeJson(line, source);
   if (pipeJsonResult) return pipeJsonResult;
 
@@ -434,7 +435,7 @@ const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   fivemLicense: ["fivem"],
 };
 
-function filterResultsByCriteria(
+export function filterResultsByCriteria(
   results: Record<string, unknown>[],
   criteria: SearchCriterion[]
 ): Record<string, unknown>[] {
@@ -613,6 +614,11 @@ export function searchAllIndexes(
   if (useRemoteBridge) {
     console.log(`[searchAllIndexes] Using REMOTE BRIDGE for ${filled.length} criteria`);
     return searchRemoteBridge(filled, safeLimit, safeOffset);
+  }
+
+  if (isR2SearchEnabled()) {
+    console.log(`[searchAllIndexes] Using R2 STREAMING search for ${filled.length} criteria`);
+    return searchR2(filled, safeLimit, safeOffset);
   }
 
   console.log(`[searchAllIndexes] Using LOCAL search for ${filled.length} criteria`);
