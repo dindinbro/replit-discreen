@@ -137,6 +137,7 @@ const cardVariants = {
 
 export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemKey, setRedeemKey] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -287,12 +288,25 @@ export default function PricingPage() {
           {PLANS.map((plan) => {
             const Icon = plan.icon;
             const isLoading = loading === plan.id;
+            const isHovered = hoveredPlan === plan.id;
+            const isSiblingHovered = hoveredPlan !== null && hoveredPlan !== plan.id;
             return (
-              <motion.div key={plan.id} variants={cardVariants}>
+              <motion.div
+                key={plan.id}
+                variants={cardVariants}
+                onMouseEnter={() => setHoveredPlan(plan.id)}
+                onMouseLeave={() => setHoveredPlan(null)}
+                style={{
+                  transition: "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), filter 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+                  transform: isHovered ? "scale(1.05)" : isSiblingHovered ? "scale(0.97)" : "scale(1)",
+                  filter: isSiblingHovered ? "blur(2px) opacity(0.6)" : "blur(0px) opacity(1)",
+                  zIndex: isHovered ? 10 : 1,
+                }}
+              >
                 <Card
                   className={`relative flex flex-col p-5 h-full overflow-visible ${
                     plan.popular ? "border-primary/50 shadow-[0_0_24px_-6px] shadow-primary/15" : ""
-                  }`}
+                  } ${isHovered ? "shadow-lg shadow-primary/20 border-primary/40" : ""}`}
                   data-testid={`card-plan-${plan.id}`}
                 >
                   {plan.popular && (
