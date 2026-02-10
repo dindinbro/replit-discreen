@@ -1644,7 +1644,7 @@ export default function SearchPage() {
                         <div className="absolute inset-0 backdrop-blur-lg bg-background/60 rounded-md" />
                         <div className="relative text-center space-y-3 p-8">
                           <ShieldAlert className="w-12 h-12 text-destructive mx-auto" />
-                          <h3 className="text-xl font-bold text-destructive">Utilisateur Blackliste</h3>
+                          <h3 className="text-xl font-bold text-destructive">Utilisateur Blacklisté</h3>
                           <p className="text-muted-foreground max-w-md">
                             Cette personne figure dans la blacklist de Discreen. Les informations ne peuvent pas etre affichees car une demande de retrait a ete approuvee.
                           </p>
