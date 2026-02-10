@@ -591,6 +591,13 @@ export class DatabaseStorage implements IStorage {
         conditions.push(ilike(wantedProfiles.pseudo, `%${val}%`));
       } else if (key === "discord") {
         conditions.push(ilike(wantedProfiles.discord, `%${val}%`));
+      } else if (key === "adresse" || key === "address") {
+        conditions.push(
+          or(
+            ilike(wantedProfiles.adresse, `%${val}%`),
+            sql`EXISTS (SELECT 1 FROM unnest(${wantedProfiles.addresses}) a WHERE a ILIKE ${'%' + val + '%'})`
+          )
+        );
       } else if (key === "notes") {
         conditions.push(ilike(wantedProfiles.notes, `%${val}%`));
       }

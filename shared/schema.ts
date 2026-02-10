@@ -275,6 +275,7 @@ export const wantedProfiles = pgTable("wanted_profiles", {
   phones: text("phones").array(), // Added multiple phones
   ips: text("ips").array(), // Added multiple IPs
   discordIds: text("discord_ids").array(), // Added multiple Discord IDs
+  addresses: text("addresses").array(), // Added multiple addresses
   addedBy: text("added_by"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });

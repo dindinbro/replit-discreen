@@ -98,6 +98,7 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
   const [phones, setPhones] = useState<string[]>([""]);
   const [ips, setIps] = useState<string[]>([""]);
   const [discordIds, setDiscordIds] = useState<string[]>([""]);
+  const [addresses, setAddresses] = useState<string[]>([""]);
 
   const [form, setForm] = useState<Partial<InsertWantedProfile>>({
     nom: "",
@@ -132,10 +133,12 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         phones: phones.filter(Boolean),
         ips: ips.filter(Boolean),
         discordIds: discordIds.filter(Boolean),
+        addresses: addresses.filter(Boolean),
         email: emails[0] || "",
         telephone: phones[0] || "",
         ip: ips[0] || "",
         discordId: discordIds[0] || form.discordId || "",
+        adresse: addresses[0] || form.adresse || "",
       };
 
       const res = await fetch("/api/admin/wanted-profiles", {
@@ -158,6 +161,7 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         setPhones([""]);
         setIps([""]);
         setDiscordIds([""]);
+        setAddresses([""]);
         queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
       } else {
         const err = await res.json();
@@ -229,10 +233,7 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
           <DynamicFields label="Telephones" values={phones} setter={setPhones} placeholder="06 12 34 56 78" />
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Adresse</label>
-          <Input value={form.adresse || ""} onChange={e => setForm(p => ({ ...p, adresse: e.target.value }))} placeholder="123 Rue de la Republique" data-testid="input-adresse" />
-        </div>
+        <DynamicFields label="Adresses" values={addresses} setter={setAddresses} placeholder="123 Rue de la Republique" />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
@@ -297,6 +298,15 @@ function WantedHistorySection({ getAccessToken }: { getAccessToken: () => string
 
   const { data: profiles, isLoading } = useQuery<WantedProfile[]>({
     queryKey: ["/api/admin/wanted-profiles"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token) return [];
+      const res = await fetch("/api/admin/wanted-profiles", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch wanted profiles");
+      return res.json();
+    },
   });
 
   const deleteProfile = async (id: number) => {
@@ -335,7 +345,9 @@ function WantedHistorySection({ getAccessToken }: { getAccessToken: () => string
       (p.emails || []).some(e => e.toLowerCase().includes(q)) ||
       (p.phones || []).some(ph => ph.toLowerCase().includes(q)) ||
       (p.ips || []).some(ip => ip.toLowerCase().includes(q)) ||
-      (p.discordIds || []).some(d => d.toLowerCase().includes(q))
+      (p.discordIds || []).some(d => d.toLowerCase().includes(q)) ||
+      (p.adresse || "").toLowerCase().includes(q) ||
+      ((p as any).addresses || []).some((a: string) => a.toLowerCase().includes(q))
     );
   });
 
@@ -393,7 +405,9 @@ function WantedHistorySection({ getAccessToken }: { getAccessToken: () => string
                     {(profile.discordIds?.length ? profile.discordIds : profile.discordId ? [profile.discordId] : []).map((d, i) => (
                       <div key={`did-${i}`}><span className="text-muted-foreground">Discord ID:</span> {d}</div>
                     ))}
-                    {profile.adresse && <div className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {profile.adresse}</div>}
+                    {((profile as any).addresses?.length ? (profile as any).addresses : profile.adresse ? [profile.adresse] : []).map((a: string, i: number) => (
+                      <div key={`addr-${i}`} className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {a}</div>
+                    ))}
                     {(profile.codePostal || profile.ville) && (
                       <div><span className="text-muted-foreground">Ville:</span> {profile.codePostal} {profile.ville}</div>
                     )}
