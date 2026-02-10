@@ -14,6 +14,15 @@ let client: Client | null = null;
 const SOUTIEN_ROLE_ID = "1469926673582653648";
 
 export async function startDiscordBot() {
+  if (client) {
+    log("Discord bot already running, destroying old client...", "discord");
+    try {
+      client.removeAllListeners();
+      await client.destroy();
+    } catch {}
+    client = null;
+  }
+
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token) {
     log("DISCORD_BOT_TOKEN not set, Discord bot disabled", "discord");
