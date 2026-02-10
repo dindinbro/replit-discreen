@@ -113,6 +113,25 @@ async function indexFile(db, filePath) {
   return lineCount;
 }
 
+const SUPPORTED_EXT = [".txt", ".csv", ".log", ".json", ".tsv", ".sql", ".dat"];
+
+function findAllFiles(dir) {
+  let results = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results = results.concat(findAllFiles(fullPath));
+    } else if (entry.isFile()) {
+      const ext = path.extname(entry.name).toLowerCase();
+      if (SUPPORTED_EXT.includes(ext)) {
+        results.push(fullPath);
+      }
+    }
+  }
+  return results;
+}
+
 async function indexPath(db, targetPath) {
   const stat = fs.statSync(targetPath);
 
@@ -121,26 +140,22 @@ async function indexPath(db, targetPath) {
   }
 
   if (stat.isDirectory()) {
-    const files = fs
-      .readdirSync(targetPath)
-      .filter((f) => {
-        const ext = path.extname(f).toLowerCase();
-        return [".txt", ".csv", ".log", ".json", ".tsv", ".sql", ".dat"].includes(ext);
-      })
-      .sort();
+    const files = findAllFiles(targetPath).sort();
 
     if (files.length === 0) {
-      console.log("Aucun fichier compatible trouve dans le dossier.");
-      console.log("Extensions supportees: .txt, .csv, .log, .json, .tsv, .sql, .dat");
+      console.log("Aucun fichier compatible trouve dans le dossier et sous-dossiers.");
+      console.log("Extensions supportees: " + SUPPORTED_EXT.join(", "));
       return 0;
     }
 
-    console.log(`${files.length} fichier(s) a indexer dans ${targetPath}`);
+    console.log(`${files.length} fichier(s) trouves dans ${targetPath} (sous-dossiers inclus)\n`);
     let total = 0;
+    let filesDone = 0;
 
     for (const file of files) {
-      const fullPath = path.join(targetPath, file);
-      total += await indexFile(db, fullPath);
+      filesDone++;
+      console.log(`[${filesDone}/${files.length}]`);
+      total += await indexFile(db, file);
     }
 
     console.log(`\nTotal: ${total.toLocaleString("fr-FR")} lignes indexees depuis ${files.length} fichier(s)`);
