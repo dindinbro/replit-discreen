@@ -89,9 +89,14 @@ export default function ProfilePage() {
   const canChangeName = role === "admin";
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoadingProfile(false);
+      return;
+    }
     fetchProfile();
     fetchTwoFaStatus();
-  }, []);
+  }, [authLoading, user]);
 
   async function fetchProfile() {
     try {
