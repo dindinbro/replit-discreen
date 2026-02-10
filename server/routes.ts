@@ -901,28 +901,46 @@ export async function registerRoutes(
     const proxySecret = process.env.EXTERNAL_PROXY_SECRET;
     if (!proxySecret) return [];
 
-    const term = criteria.map((c) => c.value).join(" ");
-    const firstType = criteria[0]?.type || "all";
-    const searchType =
-      firstType === "email" ? "email" :
-      firstType === "phone" ? "telephone" :
-      firstType === "username" ? "username" :
-      firstType === "ip" ? "ip" :
-      firstType === "lastName" ? "nom" :
-      firstType === "firstName" ? "prenom" :
-      "all";
+    const params = new URLSearchParams();
+
+    const unmappedValues: string[] = [];
+    const mappedFields = new Map<string, string[]>();
+
+    for (const c of criteria) {
+      const externalField = CRITERIA_TO_EXTERNAL_FIELD[c.type];
+      if (externalField) {
+        const existing = mappedFields.get(externalField) || [];
+        existing.push(c.value);
+        mappedFields.set(externalField, existing);
+      } else {
+        unmappedValues.push(c.value);
+      }
+    }
+
+    Array.from(mappedFields.entries()).forEach(([field, values]) => {
+      params.set(field, values.join(" "));
+    });
+
+    const qParts = [...unmappedValues];
+    if (qParts.length === 0 && mappedFields.size > 0) {
+      const firstValues = Array.from(mappedFields.values())[0];
+      if (firstValues) qParts.push(firstValues[0]);
+    }
+    if (qParts.length > 0) {
+      params.set("q", qParts.join(" "));
+    } else if (criteria.length > 0) {
+      params.set("q", criteria[0].value);
+    }
+
+    params.set("operator", criteria.length > 1 ? "AND" : "AUTO");
 
     let response: globalThis.Response;
     try {
-      const url = "http://81.17.101.243:8000/api/search";
-      console.log(`[external-search] POST ${url} — term="${term}", type="${searchType}"`);
+      const url = `http://81.17.101.243:8000/api/search?${params.toString()}`;
+      console.log(`[external-search] GET ${url}`);
       response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Proxy-Secret": proxySecret,
-        },
-        body: JSON.stringify({ term, type: searchType }),
+        method: "GET",
+        headers: { "X-Proxy-Secret": proxySecret },
         signal: AbortSignal.timeout(30000),
       });
     } catch (fetchErr) {
