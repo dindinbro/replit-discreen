@@ -563,6 +563,39 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/admin/users/:userId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const targetUserId = req.params.userId as string;
+      if (!targetUserId) return res.status(400).json({ message: "ID utilisateur requis" });
+
+      const adminId = (req as any).user.id;
+      if (targetUserId === adminId) {
+        return res.status(400).json({ message: "Vous ne pouvez pas supprimer votre propre compte" });
+      }
+
+      if (!supabaseAdmin) {
+        return res.status(500).json({ message: "Supabase admin non configure" });
+      }
+
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
+      if (authError) {
+        console.error("Supabase deleteUser error:", authError);
+        return res.status(500).json({ message: "Erreur lors de la suppression du compte Supabase" });
+      }
+
+      try {
+        await storage.deleteUserData(targetUserId);
+      } catch (cleanupErr) {
+        console.error("Cleanup error after user deletion:", cleanupErr);
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("DELETE /api/admin/users/:userId error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // POST /api/create-service-invoice - create a Plisio invoice for blacklist or info request (50€)
   app.post("/api/create-service-invoice", requireAuth, async (req, res) => {
     try {

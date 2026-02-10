@@ -693,6 +693,8 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   const [pendingChanges, setPendingChanges] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [freezingId, setFreezingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
 
   useEffect(() => {
@@ -769,6 +771,30 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
       toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
     } finally {
       setFreezingId(null);
+    }
+  };
+
+  const deleteUser = async (uid: string) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setDeletingId(uid);
+    try {
+      const res = await fetch(`/api/admin/users/${uid}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== uid));
+        toast({ title: "Compte supprime", description: "L'utilisateur a ete supprime definitivement." });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Erreur", description: err.message || "Impossible de supprimer", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -854,6 +880,22 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
                       <Button variant={u.frozen ? "default" : "outline"} size="sm" onClick={() => toggleFreeze(u.id, !u.frozen)} disabled={freezingId === u.id} title={u.frozen ? "Degeler le compte" : "Geler le compte"} data-testid={`button-freeze-${u.id}`}>
                         {freezingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Snowflake className="w-4 h-4 mr-1" /> {u.frozen ? "Degeler" : "Geler"}</>}
                       </Button>
+                    )}
+                    {u.id !== userId && (
+                      confirmDeleteId === u.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button variant="destructive" size="sm" onClick={() => deleteUser(u.id)} disabled={deletingId === u.id} data-testid={`button-confirm-delete-${u.id}`}>
+                            {deletingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4 mr-1" /> Confirmer</>}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)} data-testid={`button-cancel-delete-${u.id}`}>
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button variant="ghost" size="icon" onClick={() => setConfirmDeleteId(u.id)} title="Supprimer le compte" data-testid={`button-delete-${u.id}`}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>

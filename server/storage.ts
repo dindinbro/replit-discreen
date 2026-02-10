@@ -71,6 +71,7 @@ export interface IStorage {
   updateWantedProfile(id: number, data: Partial<InsertWantedProfile>): Promise<WantedProfile | undefined>;
   deleteWantedProfile(id: number): Promise<boolean>;
   searchWantedProfiles(criteria: Record<string, string>): Promise<WantedProfile[]>;
+  deleteUserData(userId: string): Promise<void>;
 }
 
 function hashKey(key: string): string {
@@ -584,6 +585,12 @@ export class DatabaseStorage implements IStorage {
   async deleteWantedProfile(id: number): Promise<boolean> {
     const result = await db.delete(wantedProfiles).where(eq(wantedProfiles.id, id)).returning();
     return result.length > 0;
+  }
+
+  async deleteUserData(userId: string): Promise<void> {
+    await db.delete(subscriptions).where(eq(subscriptions.userId, userId));
+    await db.delete(dailyUsage).where(eq(dailyUsage.userId, userId));
+    await db.delete(apiKeys).where(eq(apiKeys.userId, userId));
   }
 
   async searchWantedProfiles(criteria: Record<string, string>): Promise<WantedProfile[]> {
