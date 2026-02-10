@@ -11,7 +11,7 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import {
-  webhookSearch, webhookBreachSearch, webhookLeakosintSearch, webhookApiSearch,
+  webhookSearch, webhookBreachSearch, webhookExternalProxySearch, webhookLeakosintSearch, webhookApiSearch,
   webhookRoleChange, webhookFreeze, webhookInvoiceCreated, webhookPaymentCompleted,
   webhookKeyRedeemed, webhookKeyGenerated, webhookApiKeyCreated, webhookApiKeyRevoked,
   webhookPhoneLookup, webhookGeoIP, webhookVouchDeleted,
@@ -1448,6 +1448,104 @@ export async function registerRoutes(
       });
     } catch (err) {
       console.error("POST /api/breach-search error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/external-search - proxy to external API (81.17.101.243:8000)
+  app.post("/api/external-search", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+
+      if (await storage.isFrozen(userId)) {
+        return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+
+      const effectiveRole = await getEffectiveRole(userId);
+      const isAdmin = effectiveRole === "admin";
+
+      const sub = await storage.getSubscription(userId);
+      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
+      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
+      const isUnlimited = isAdmin || planInfo.dailySearches === -1;
+
+      const newCount = await storage.incrementDailyUsage(userId, today);
+
+      if (!isUnlimited && newCount > planInfo.dailySearches) {
+        return res.status(429).json({
+          message: "Nombre de recherches limite atteint.",
+          used: newCount,
+          limit: planInfo.dailySearches,
+          tier,
+        });
+      }
+
+      const { term, type } = req.body;
+      if (!term || typeof term !== "string" || term.length < 1 || term.length > 200) {
+        return res.status(400).json({ message: "Le terme de recherche est requis (1-200 caracteres)." });
+      }
+
+      const searchType = type && typeof type === "string" ? type : "all";
+
+      const proxySecret = process.env.EXTERNAL_PROXY_SECRET;
+      if (!proxySecret) {
+        console.error("EXTERNAL_PROXY_SECRET not configured");
+        return res.status(503).json({ message: "Service de recherche externe non configure." });
+      }
+
+      let response: globalThis.Response;
+      try {
+        response = await fetch("http://81.17.101.243:8000/api/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Proxy-Secret": proxySecret,
+          },
+          body: JSON.stringify({
+            term,
+            type: searchType,
+          }),
+          signal: AbortSignal.timeout(30000),
+        });
+      } catch (fetchErr) {
+        console.error("External proxy API fetch error:", fetchErr);
+        return res.status(502).json({ message: "Impossible de joindre le service de recherche externe." });
+      }
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("External proxy API error:", response.status, errText.slice(0, 300));
+        if (response.status === 429) {
+          return res.status(429).json({ message: "Limite de requetes de l'API externe atteinte. Reessayez dans une minute." });
+        }
+        return res.status(502).json({ message: "Erreur du service de recherche externe." });
+      }
+
+      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("application/json")) {
+        console.error("External proxy API non-JSON response");
+        return res.status(503).json({ message: "Le service externe est temporairement inaccessible." });
+      }
+
+      const data = await response.json();
+
+      const wUser = await buildUserInfo(req);
+      const resultCount = Array.isArray(data.results) ? data.results.length : (data.total || 0);
+      webhookExternalProxySearch(wUser, term, resultCount);
+
+      res.json({
+        results: data.results || [],
+        total: data.total || 0,
+        quota: {
+          used: newCount,
+          limit: planInfo.dailySearches,
+          tier,
+        },
+      });
+    } catch (err) {
+      console.error("POST /api/external-search error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

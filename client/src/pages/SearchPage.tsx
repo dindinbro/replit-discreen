@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType } from "@shared/schema";
-import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, SearchLimitError } from "@/hooks/use-search";
+import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, useExternalProxySearch, SearchLimitError } from "@/hooks/use-search";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -383,6 +383,7 @@ export default function SearchPage() {
   const searchMutation = usePerformSearch(getAccessToken);
   const breachMutation = useBreachSearch(getAccessToken);
   const leakosintMutation = useLeakosintSearch(getAccessToken);
+  const externalProxyMutation = useExternalProxySearch(getAccessToken);
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
@@ -401,6 +402,8 @@ export default function SearchPage() {
   const [breachSelectedFields, setBreachSelectedFields] = useState<string[]>(["email"]);
 
   const [leakosintTerm, setLeakosintTerm] = useState("");
+
+  const [externalProxyTerm, setExternalProxyTerm] = useState("");
 
   const [phoneLookupTerm, setPhoneLookupTerm] = useState("");
   const [phoneLookupLoading, setPhoneLookupLoading] = useState(false);
@@ -735,6 +738,54 @@ export default function SearchPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["/api/leakosint-quota"] });
+        },
+        onError: (err) => {
+          if (err instanceof SearchLimitError) {
+            setLimitReached(true);
+          } else {
+            toast({
+              title: "Erreur de recherche",
+              description: err.message || "Le service est temporairement indisponible. Reessayez plus tard.",
+              variant: "destructive",
+            });
+          }
+        },
+      }
+    );
+  };
+
+  const handleExternalProxySearch = () => {
+    if (!externalProxyTerm.trim()) {
+      toast({
+        title: "Terme manquant",
+        description: "Veuillez entrer un terme de recherche.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLimitReached(false);
+    setBlacklistMatch(null);
+
+    const token = getAccessToken();
+    if (token && externalProxyTerm.trim().length >= 3) {
+      fetch("/api/blacklist/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ values: [externalProxyTerm.trim()] }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setBlacklistMatch(data); })
+        .catch(() => {});
+    }
+
+    externalProxyMutation.mutate(
+      {
+        term: externalProxyTerm.trim(),
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
         },
         onError: (err) => {
           if (err instanceof SearchLimitError) {
@@ -1125,23 +1176,28 @@ export default function SearchPage() {
                 <Database className="w-5 h-5 text-primary" />
                 <h2 className="text-xl font-semibold">Autres Sources</h2>
               </div>
-              <div className="flex justify-center py-12">
-                <Card className="p-8 text-center space-y-4 bg-secondary/30 border-dashed border-2 max-w-xs w-full">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                    <Database className="w-7 h-7 text-primary" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-bold text-lg">Autres Sources</h3>
-                    <Badge variant="outline" className="text-xs uppercase tracking-wider bg-background/50">
-                      Soon
-                    </Badge>
-                  </div>
-                </Card>
-              </div>
-              <div className="text-center">
-                <p className="text-muted-foreground max-w-sm mx-auto text-sm">
-                  Cette source de donnees sera bientot integree pour elargir vos capacites de recherche.
-                </p>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <Input
+                  data-testid="input-external-proxy-term"
+                  placeholder="Rechercher (email, username, IP...)"
+                  value={externalProxyTerm}
+                  onChange={(e) => setExternalProxyTerm(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleExternalProxySearch(); }}
+                  className="max-w-sm"
+                />
+                <Button
+                  data-testid="button-external-proxy-search"
+                  onClick={handleExternalProxySearch}
+                  disabled={externalProxyMutation.isPending || !externalProxyTerm.trim()}
+                >
+                  {externalProxyMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  <span className="ml-1.5">Rechercher</span>
+                </Button>
               </div>
             </motion.div>
           )}
@@ -1602,17 +1658,23 @@ export default function SearchPage() {
           </div>
         )}
 
-        {searchMode !== "other" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && (
+        {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
             const activeResults = searchMode === "external"
               ? leakosintMutation.data?.results
+              : searchMode === "other"
+              ? externalProxyMutation.data?.results
               : searchMutation.data?.results;
             const activeTotal = searchMode === "external"
               ? leakosintMutation.data?.results?.length
+              : searchMode === "other"
+              ? externalProxyMutation.data?.total ?? externalProxyMutation.data?.results?.length
               : searchMutation.data?.total;
             const isLoading = searchMode === "external"
               ? leakosintMutation.isPending
+              : searchMode === "other"
+              ? externalProxyMutation.isPending
               : searchMutation.isPending;
 
             return (

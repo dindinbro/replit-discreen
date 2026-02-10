@@ -129,6 +129,22 @@ export function webhookBreachSearch(user: UserInfo, term: string, fields: string
   });
 }
 
+export function webhookExternalProxySearch(user: UserInfo, term: string, resultCount: number) {
+  const desc = [
+    userBlock(user),
+    sep(),
+    `**Requete** : \`${String(term).slice(0, 200)}\``,
+    sep(),
+    `**Resultat** : **${resultCount}** trouve(s)`,
+  ].join("\n");
+
+  sendSearchWebhook({
+    title: "\u{1F50D} Recherche Externe (Proxy)",
+    description: desc,
+    color: COLORS.search,
+  });
+}
+
 export function webhookLeakosintSearch(user: UserInfo, request: string, resultCount: number) {
   const desc = [
     userBlock(user),
