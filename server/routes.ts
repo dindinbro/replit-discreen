@@ -1877,6 +1877,19 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/admin/wanted-profiles/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const updated = await storage.updateWantedProfile(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Profil introuvable" });
+      res.json(updated);
+    } catch (err) {
+      console.error("PATCH /api/admin/wanted-profiles/:id error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.delete("/api/admin/wanted-profiles/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id as string);

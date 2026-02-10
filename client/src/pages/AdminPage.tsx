@@ -89,7 +89,7 @@ interface CategoryFormData {
   sortOrder: number;
 }
 
-function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | null }) {
+function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAccessToken: () => string | null; editProfile?: WantedProfile | null; onEditDone?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
@@ -116,9 +116,49 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
     notes: ""
   });
 
+  const isEdit = !!editProfile;
+
+  useEffect(() => {
+    if (editProfile) {
+      setForm({
+        nom: editProfile.nom || "",
+        prenom: editProfile.prenom || "",
+        adresse: editProfile.adresse || "",
+        ville: editProfile.ville || "",
+        codePostal: editProfile.codePostal || "",
+        civilite: editProfile.civilite || "M.",
+        dateNaissance: editProfile.dateNaissance || "",
+        pseudo: editProfile.pseudo || "",
+        discord: editProfile.discord || "",
+        discordId: editProfile.discordId || "",
+        password: editProfile.password || "",
+        iban: editProfile.iban || "",
+        notes: editProfile.notes || "",
+      });
+      setEmails(editProfile.emails?.length ? editProfile.emails : [editProfile.email || ""]);
+      setPhones(editProfile.phones?.length ? editProfile.phones : [editProfile.telephone || ""]);
+      setIps(editProfile.ips?.length ? editProfile.ips : [editProfile.ip || ""]);
+      setDiscordIds(editProfile.discordIds?.length ? editProfile.discordIds : [editProfile.discordId || ""]);
+      setAddresses((editProfile as any).addresses?.length ? (editProfile as any).addresses : [editProfile.adresse || ""]);
+    }
+  }, [editProfile]);
+
   const addField = (setter: React.Dispatch<React.SetStateAction<string[]>>) => setter(prev => [...prev, ""]);
   const removeField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number) => setter(prev => prev.filter((_, i) => i !== index));
   const updateField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number, value: string) => setter(prev => prev.map((v, i) => i === index ? value : v));
+
+  const resetForm = () => {
+    setForm({
+      nom: "", prenom: "", adresse: "",
+      ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
+      pseudo: "", discord: "", discordId: "", password: "", iban: "", notes: ""
+    });
+    setEmails([""]);
+    setPhones([""]);
+    setIps([""]);
+    setDiscordIds([""]);
+    setAddresses([""]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,8 +181,11 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         adresse: addresses[0] || form.adresse || "",
       };
 
-      const res = await fetch("/api/admin/wanted-profiles", {
-        method: "POST",
+      const url = isEdit ? `/api/admin/wanted-profiles/${editProfile.id}` : "/api/admin/wanted-profiles";
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -151,18 +194,10 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
       });
 
       if (res.ok) {
-        toast({ title: "Profil cree", description: "Le profil Wanted a ete ajoute avec succes." });
-        setForm({
-          nom: "", prenom: "", adresse: "",
-          ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
-          pseudo: "", discord: "", discordId: "", password: "", iban: "", notes: ""
-        });
-        setEmails([""]);
-        setPhones([""]);
-        setIps([""]);
-        setDiscordIds([""]);
-        setAddresses([""]);
+        toast({ title: isEdit ? "Profil modifie" : "Profil cree", description: isEdit ? "Le profil Wanted a ete mis a jour." : "Le profil Wanted a ete ajoute avec succes." });
+        resetForm();
         queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
+        if (onEditDone) onEditDone();
       } else {
         const err = await res.json();
         toast({ title: "Erreur", description: err.message, variant: "destructive" });
@@ -204,6 +239,14 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
 
   return (
     <Card className="p-6">
+      {isEdit && (
+        <div className="flex items-center justify-between gap-2 mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/20">
+          <span className="font-medium text-sm">Modification du profil #{editProfile.id}</span>
+          <Button variant="ghost" size="sm" onClick={() => { resetForm(); onEditDone?.(); }} data-testid="button-cancel-wanted-edit">
+            <X className="w-4 h-4 mr-1" /> Annuler
+          </Button>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
@@ -282,15 +325,15 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         </div>
 
         <Button type="submit" className="w-full" disabled={loading} data-testid="button-submit-wanted">
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-          Entrer les informations
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isEdit ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+          {isEdit ? "Sauvegarder les modifications" : "Entrer les informations"}
         </Button>
       </form>
     </Card>
   );
 }
 
-function WantedHistorySection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () => string | null; onEdit: (profile: WantedProfile) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -420,16 +463,27 @@ function WantedHistorySection({ getAccessToken }: { getAccessToken: () => string
                     {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => deleteProfile(profile.id)}
-                  disabled={deletingId === profile.id}
-                  title="Supprimer"
-                  data-testid={`button-delete-wanted-${profile.id}`}
-                >
-                  {deletingId === profile.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onEdit(profile)}
+                    title="Modifier"
+                    data-testid={`button-edit-wanted-${profile.id}`}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteProfile(profile.id)}
+                    disabled={deletingId === profile.id}
+                    title="Supprimer"
+                    data-testid={`button-delete-wanted-${profile.id}`}
+                  >
+                    {deletingId === profile.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
@@ -1496,22 +1550,32 @@ function InfoRequestsSection({ getAccessToken }: { getAccessToken: () => string 
 
 function WantedSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const [wantedSubTab, setWantedSubTab] = useState<"form" | "history">("form");
+  const [editProfile, setEditProfile] = useState<WantedProfile | null>(null);
+
+  const handleEdit = (profile: WantedProfile) => {
+    setEditProfile(profile);
+    setWantedSubTab("form");
+  };
+
+  const handleEditDone = () => {
+    setEditProfile(null);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex gap-2">
         <Button
           variant={wantedSubTab === "form" ? "default" : "outline"}
-          onClick={() => setWantedSubTab("form")}
+          onClick={() => { setWantedSubTab("form"); setEditProfile(null); }}
           className="toggle-elevate"
           data-testid="button-wanted-form-tab"
         >
           <UserPlus className="w-4 h-4 mr-2" />
-          Ajouter un profil
+          {editProfile ? "Modifier" : "Ajouter un profil"}
         </Button>
         <Button
           variant={wantedSubTab === "history" ? "default" : "outline"}
-          onClick={() => setWantedSubTab("history")}
+          onClick={() => { setWantedSubTab("history"); setEditProfile(null); }}
           className="toggle-elevate"
           data-testid="button-wanted-history-tab"
         >
@@ -1521,9 +1585,9 @@ function WantedSection({ getAccessToken }: { getAccessToken: () => string | null
       </div>
 
       {wantedSubTab === "form" ? (
-        <WantedProfileForm getAccessToken={getAccessToken} />
+        <WantedProfileForm getAccessToken={getAccessToken} editProfile={editProfile} onEditDone={handleEditDone} />
       ) : (
-        <WantedHistorySection getAccessToken={getAccessToken} />
+        <WantedHistorySection getAccessToken={getAccessToken} onEdit={handleEdit} />
       )}
     </div>
   );
