@@ -669,6 +669,20 @@ export default function SearchPage() {
     }
 
     setLimitReached(false);
+    setBlacklistMatch(null);
+
+    const token = getAccessToken();
+    if (token && breachTerm.trim().length >= 3) {
+      fetch("/api/blacklist/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ values: [breachTerm.trim()] }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setBlacklistMatch(data); })
+        .catch(() => {});
+    }
+
     breachMutation.mutate(
       {
         term: breachTerm.trim(),
@@ -698,6 +712,20 @@ export default function SearchPage() {
     }
 
     setLimitReached(false);
+    setBlacklistMatch(null);
+
+    const token = getAccessToken();
+    if (token && leakosintTerm.trim().length >= 3) {
+      fetch("/api/blacklist/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ values: [leakosintTerm.trim()] }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setBlacklistMatch(data); })
+        .catch(() => {});
+    }
+
     leakosintMutation.mutate(
       {
         request: leakosintTerm.trim(),
