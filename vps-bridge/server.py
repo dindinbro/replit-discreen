@@ -1,123 +1,141 @@
 #!/usr/bin/env python3
 """
-Discreen VPS Bridge — Flask API
-Searches local SQLite FTS5 databases and enforces origin whitelist.
+Discreen VPS Bridge — Flask API (R2 Streaming)
+Searches raw text files directly on Cloudflare R2 (no local storage needed).
 
 Usage:
-  pip install flask boto3
+  pip install flask boto3 gunicorn
   export BRIDGE_SECRET="your-secret-here"
   export ALLOWED_ORIGIN="https://your-discreen-site.com"
-  export DATA_DIR="./data"        # folder containing .db files
+  export S3_ENDPOINT="https://xxx.r2.cloudflarestorage.com"
+  export S3_BUCKET="your-bucket"
+  export S3_ACCESS_KEY_ID="your-key"
+  export S3_SECRET_ACCESS_KEY="your-secret"
+  export R2_DATA_PREFIX="data-files/"
   export PORT=5050
   python server.py
-
-Endpoints:
-  GET  /health          Health check + list of loaded databases
-  POST /search          Full-text search across all databases
 """
 
 import os
 import re
-import glob
-import sqlite3
-import hashlib
-import hmac
+import io
 import time
+import hmac
+import threading
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, request, jsonify, abort
+
+import boto3
+from botocore.config import Config as BotoConfig
 
 app = Flask(__name__)
 
 BRIDGE_SECRET = os.environ.get("BRIDGE_SECRET", "")
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "")
-DATA_DIR = os.environ.get("DATA_DIR", "./data")
 PORT = int(os.environ.get("PORT", 5050))
 
-loaded_dbs = {}
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "")
+S3_BUCKET = os.environ.get("S3_BUCKET", "")
+S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID", "")
+S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY", "")
+R2_DATA_PREFIX = os.environ.get("R2_DATA_PREFIX", "data-files/")
+
+SUPPORTED_EXT = [".txt", ".csv", ".log", ".json", ".tsv", ".sql", ".dat"]
+PARALLEL_STREAMS = 10
+SEARCH_TIMEOUT_S = 60
+FILE_LIST_CACHE_TTL = 300
+
+BLACKLISTED_SOURCES = {"Pass'Sport.csv", "Pass'Sport", "PassSport.csv", "PassSport"}
+
+cached_file_list = []
+file_list_cache_time = 0
+file_list_lock = threading.Lock()
+
+s3_client = None
 
 
-def discover_databases():
-    """Scan DATA_DIR for .db files and verify they have an FTS5 'records' table."""
-    global loaded_dbs
-    loaded_dbs = {}
+def get_s3_client():
+    global s3_client
+    if s3_client:
+        return s3_client
 
-    if not os.path.isdir(DATA_DIR):
-        print(f"[bridge] DATA_DIR not found: {DATA_DIR}")
-        return
-
-    for db_path in sorted(glob.glob(os.path.join(DATA_DIR, "*.db"))):
-        filename = os.path.basename(db_path)
-        key = filename.replace(".db", "")
-
-        try:
-            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-            conn.execute("PRAGMA query_only = ON")
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='records'"
-            )
-            if cursor.fetchone():
-                conn.execute("SELECT 1 FROM records LIMIT 1")
-                loaded_dbs[key] = db_path
-                print(f"[bridge] Loaded: {filename}")
-            else:
-                print(f"[bridge] Skipped (no 'records' table): {filename}")
-                conn.close()
-        except Exception as e:
-            print(f"[bridge] Failed to load {filename}: {e}")
-
-
-def get_connection(key):
-    """Open a read-only connection to a database."""
-    db_path = loaded_dbs.get(key)
-    if not db_path:
+    if not S3_BUCKET or not S3_ACCESS_KEY_ID or not S3_SECRET_ACCESS_KEY:
+        print("[bridge] R2 credentials missing!")
         return None
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA query_only = ON")
-    return conn
+
+    kwargs = {
+        "region_name": "auto",
+        "aws_access_key_id": S3_ACCESS_KEY_ID,
+        "aws_secret_access_key": S3_SECRET_ACCESS_KEY,
+        "config": BotoConfig(
+            retries={"max_attempts": 2, "mode": "standard"},
+            connect_timeout=10,
+            read_timeout=30,
+        ),
+    }
+    if S3_ENDPOINT:
+        kwargs["endpoint_url"] = S3_ENDPOINT
+
+    s3_client = boto3.client("s3", **kwargs)
+    return s3_client
 
 
-def check_origin(f):
-    """Middleware: reject requests not from the allowed origin."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        origin = request.headers.get("Origin", "")
-        referer = request.headers.get("Referer", "")
+def list_data_files():
+    global cached_file_list, file_list_cache_time
 
-        if ALLOWED_ORIGIN:
-            origin_ok = origin and origin.rstrip("/") == ALLOWED_ORIGIN.rstrip("/")
-            referer_ok = referer and referer.startswith(ALLOWED_ORIGIN.rstrip("/"))
+    with file_list_lock:
+        if cached_file_list and (time.time() - file_list_cache_time) < FILE_LIST_CACHE_TTL:
+            return cached_file_list
 
-            if not origin_ok and not referer_ok:
-                is_server = request.headers.get("X-Bridge-Secret") == BRIDGE_SECRET and BRIDGE_SECRET
-                if not is_server:
-                    abort(403, description="Origin not allowed")
+    client = get_s3_client()
+    if not client:
+        return []
 
-        return f(*args, **kwargs)
-    return decorated
+    files = []
+    continuation_token = None
+
+    try:
+        while True:
+            params = {"Bucket": S3_BUCKET, "Prefix": R2_DATA_PREFIX}
+            if continuation_token:
+                params["ContinuationToken"] = continuation_token
+
+            response = client.list_objects_v2(**params)
+
+            for obj in response.get("Contents", []):
+                key = obj.get("Key", "")
+                size = obj.get("Size", 0)
+                if not key or not size:
+                    continue
+
+                ext_idx = key.rfind(".")
+                if ext_idx >= 0:
+                    ext = key[ext_idx:].lower()
+                    if ext in SUPPORTED_EXT:
+                        files.append({"key": key, "size": size})
+
+            if response.get("IsTruncated"):
+                continuation_token = response.get("NextContinuationToken")
+            else:
+                break
+
+        with file_list_lock:
+            cached_file_list = files
+            file_list_cache_time = time.time()
+
+        print(f"[bridge] Cached {len(files)} data files from R2")
+    except Exception as e:
+        print(f"[bridge] Error listing R2 files: {e}")
+
+    return files
 
 
-def check_secret(f):
-    """Middleware: validate X-Bridge-Secret header."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if BRIDGE_SECRET:
-            provided = request.headers.get("X-Bridge-Secret", "")
-            if not hmac.compare_digest(provided, BRIDGE_SECRET):
-                abort(401, description="Invalid bridge secret")
-        return f(*args, **kwargs)
-    return decorated
-
-
-def sanitize_fts_query(value):
-    """Escape a user query for FTS5 MATCH."""
-    cleaned = value.strip()
-    cleaned = cleaned.replace('"', '""')
-    return f'"{cleaned}"'
+def get_filename(key):
+    return key.split("/")[-1]
 
 
 def parse_line(content, source=""):
-    """Parse a raw database line into structured fields."""
     result = {"_source": source, "_raw": content}
 
     separators = [":", ";", "|", "\t", ","]
@@ -142,13 +160,17 @@ def parse_line(content, source=""):
             continue
 
         if re.search(r'^[\w.+-]+@[\w.-]+\.\w{2,}$', part):
-            result["email"] = part
+            if "email" not in result:
+                result["email"] = part
         elif re.search(r'^\+?\d[\d\s\-.()]{6,}$', part):
-            result["telephone"] = part
+            if "telephone" not in result:
+                result["telephone"] = part
         elif re.search(r'^\d{1,3}(\.\d{1,3}){3}$', part):
-            result["ip"] = part
+            if "ip" not in result:
+                result["ip"] = part
         elif re.search(r'^https?://', part):
-            result["url"] = part
+            if "url" not in result:
+                result["url"] = part
         elif "identifiant" not in result and not re.search(r'\s', part) and len(part) < 60:
             result["identifiant"] = part
         elif "password" not in result and "identifiant" in result:
@@ -157,49 +179,109 @@ def parse_line(content, source=""):
     return result
 
 
-def search_one_db(key, criteria, limit):
-    """Search a single database for matching records."""
-    conn = get_connection(key)
-    if not conn:
-        return []
+def filter_results(parsed_list, criteria):
+    filtered = []
+    for item in parsed_list:
+        match = True
+        for c in criteria:
+            val = c["value"].lower()
+            field = c.get("field", "")
+            raw = str(item.get("_raw", "")).lower()
 
-    try:
-        primary = criteria[0]
-        fts_query = sanitize_fts_query(primary["value"])
-        query = "SELECT source, content FROM records WHERE records MATCH ? ORDER BY rank LIMIT ?"
-        rows = conn.execute(query, (fts_query, limit * 3)).fetchall()
-
-        results = []
-        for row in rows:
-            parsed = parse_line(row["content"], row["source"])
-            match = True
-            for c in criteria:
-                val = c["value"].lower()
-                field = c.get("field", "")
-                if field and field in parsed:
-                    if val not in str(parsed[field]).lower():
-                        match = False
-                        break
-                elif val not in row["content"].lower():
+            if field and field in item:
+                if val not in str(item[field]).lower():
                     match = False
                     break
+            elif val not in raw:
+                match = False
+                break
 
-            if match:
-                results.append(parsed)
-                if len(results) >= limit:
+        if match:
+            filtered.append(item)
+    return filtered
+
+
+def search_one_file(file_info, search_values, criteria, max_results, cancel_event):
+    """Stream and search a single file from R2."""
+    results = []
+    filename = get_filename(file_info["key"])
+
+    if filename in BLACKLISTED_SOURCES or filename.rsplit(".", 1)[0] in BLACKLISTED_SOURCES:
+        return results
+
+    client = get_s3_client()
+    if not client:
+        return results
+
+    try:
+        response = client.get_object(Bucket=S3_BUCKET, Key=file_info["key"])
+        body = response["Body"]
+
+        raw_matches = []
+
+        for raw_line in body.iter_lines():
+            if cancel_event.is_set():
+                break
+
+            try:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+            except Exception:
+                continue
+
+            if not line or len(line) < 3:
+                continue
+
+            line_lower = line.lower()
+            if any(val in line_lower for val in search_values):
+                raw_matches.append({"content": line, "source": filename})
+                if len(raw_matches) >= max_results * 5:
                     break
 
-        return results
+        if raw_matches:
+            parsed = [parse_line(r["content"], r["source"]) for r in raw_matches]
+            filtered = filter_results(parsed, criteria)
+            results.extend(filtered[:max_results])
+
+        body.close()
     except Exception as e:
-        print(f"[bridge] Error searching {key}: {e}")
-        return []
-    finally:
-        conn.close()
+        if not cancel_event.is_set():
+            print(f"[bridge] Error reading {file_info['key']}: {e}")
+
+    return results
+
+
+def check_origin(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        origin = request.headers.get("Origin", "")
+        referer = request.headers.get("Referer", "")
+
+        if ALLOWED_ORIGIN:
+            origin_ok = origin and origin.rstrip("/") == ALLOWED_ORIGIN.rstrip("/")
+            referer_ok = referer and referer.startswith(ALLOWED_ORIGIN.rstrip("/"))
+
+            if not origin_ok and not referer_ok:
+                is_server = BRIDGE_SECRET and request.headers.get("X-Bridge-Secret") == BRIDGE_SECRET
+                if not is_server:
+                    abort(403, description="Origin not allowed")
+
+        return f(*args, **kwargs)
+    return decorated
+
+
+def check_secret(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if BRIDGE_SECRET:
+            provided = request.headers.get("X-Bridge-Secret", "")
+            if not hmac.compare_digest(provided, BRIDGE_SECRET):
+                abort(401, description="Invalid bridge secret")
+        return f(*args, **kwargs)
+    return decorated
 
 
 @app.after_request
 def add_cors_headers(response):
-    """Add CORS headers to every response."""
     if ALLOWED_ORIGIN:
         response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGIN
     else:
@@ -211,10 +293,13 @@ def add_cors_headers(response):
 
 @app.route("/health", methods=["GET"])
 def health():
+    files = list_data_files()
     return jsonify({
         "status": "ok",
-        "databases": len(loaded_dbs),
-        "names": list(loaded_dbs.keys()),
+        "mode": "r2-streaming",
+        "files": len(files),
+        "bucket": S3_BUCKET,
+        "prefix": R2_DATA_PREFIX,
     })
 
 
@@ -240,47 +325,96 @@ def search():
     if not filled:
         return jsonify({"results": [], "total": 0})
 
+    search_values = [c["value"].strip().lower() for c in filled]
+
+    files = list_data_files()
+    if not files:
+        return jsonify({"results": [], "total": 0, "error": "No data files found in R2"})
+
+    print(f"[bridge] Searching {len(files)} R2 files for {len(filled)} criteria")
+    start_time = time.time()
+
     all_results = []
-    for key in loaded_dbs:
-        if len(all_results) >= limit:
-            break
-        remaining = limit - len(all_results)
-        results = search_one_db(key, filled, remaining)
-        all_results.extend(results)
+    needed = limit + offset
+    cancel_event = threading.Event()
+    partial = False
+
+    def timeout_watchdog():
+        nonlocal partial
+        time.sleep(SEARCH_TIMEOUT_S)
+        if not cancel_event.is_set():
+            cancel_event.set()
+            partial = True
+            print(f"[bridge] Search timeout after {SEARCH_TIMEOUT_S}s")
+
+    timer_thread = threading.Thread(target=timeout_watchdog, daemon=True)
+    timer_thread.start()
+
+    try:
+        with ThreadPoolExecutor(max_workers=PARALLEL_STREAMS) as executor:
+            for i in range(0, len(files), PARALLEL_STREAMS):
+                if len(all_results) >= needed or cancel_event.is_set():
+                    break
+
+                batch = files[i:i + PARALLEL_STREAMS]
+                remaining = needed - len(all_results)
+                per_file = max(remaining // len(batch), 10)
+
+                futures = {
+                    executor.submit(
+                        search_one_file, f, search_values, filled, per_file, cancel_event
+                    ): f for f in batch
+                }
+
+                for future in as_completed(futures):
+                    try:
+                        file_results = future.result(timeout=SEARCH_TIMEOUT_S)
+                        all_results.extend(file_results)
+                        if len(all_results) >= needed:
+                            cancel_event.set()
+                            break
+                    except Exception as e:
+                        print(f"[bridge] File search error: {e}")
+
+                progress = min(i + PARALLEL_STREAMS, len(files))
+                if progress % 50 == 0 or progress >= len(files):
+                    print(f"[bridge] Progress: {progress}/{len(files)} files, {len(all_results)} results")
+    finally:
+        cancel_event.set()
+
+    elapsed = time.time() - start_time
+    print(f"[bridge] Done in {elapsed:.1f}s — {len(all_results)} results, partial: {partial}")
+
+    sliced = all_results[offset:offset + limit]
 
     return jsonify({
-        "results": all_results[:limit],
+        "results": sliced,
         "total": len(all_results),
+        "partial": partial,
     })
 
 
-@app.route("/sources", methods=["GET"])
+@app.route("/files", methods=["GET"])
 @check_secret
-def sources():
-    all_sources = {}
-    for key in loaded_dbs:
-        conn = get_connection(key)
-        if not conn:
-            continue
-        try:
-            rows = conn.execute(
-                "SELECT source, COUNT(*) as c FROM records GROUP BY source ORDER BY c DESC LIMIT 50"
-            ).fetchall()
-            all_sources[key] = [{"source": r["source"], "count": r["c"]} for r in rows]
-        except Exception as e:
-            all_sources[key] = {"error": str(e)}
-        finally:
-            conn.close()
-
-    return jsonify(all_sources)
+def list_files():
+    files = list_data_files()
+    return jsonify({
+        "count": len(files),
+        "files": [{"name": get_filename(f["key"]), "size_mb": round(f["size"] / 1024 / 1024, 2)} for f in files],
+    })
 
 
 if __name__ == "__main__":
-    print(f"[bridge] Data directory: {DATA_DIR}")
+    print(f"[bridge] Mode: R2 Streaming (no local storage)")
+    print(f"[bridge] Bucket: {S3_BUCKET}")
+    print(f"[bridge] Prefix: {R2_DATA_PREFIX}")
     print(f"[bridge] Allowed origin: {ALLOWED_ORIGIN or '* (all)'}")
     print(f"[bridge] Secret configured: {'yes' if BRIDGE_SECRET else 'no'}")
+    print(f"[bridge] Parallel streams: {PARALLEL_STREAMS}")
+    print(f"[bridge] Timeout: {SEARCH_TIMEOUT_S}s")
 
-    discover_databases()
+    files = list_data_files()
+    print(f"[bridge] Found {len(files)} searchable files on R2")
 
     print(f"\n[bridge] Starting on port {PORT}...")
     app.run(host="0.0.0.0", port=PORT, debug=False)
