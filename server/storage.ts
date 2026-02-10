@@ -68,7 +68,7 @@ export interface IStorage {
   getWantedProfileById(id: number): Promise<WantedProfile | undefined>;
   updateWantedProfile(id: number, data: Partial<InsertWantedProfile>): Promise<WantedProfile | undefined>;
   deleteWantedProfile(id: number): Promise<boolean>;
-  searchWantedProfiles(query: string): Promise<WantedProfile[]>;
+  searchWantedProfiles(criteria: Record<string, string>): Promise<WantedProfile[]>;
 }
 
 function hashKey(key: string): string {

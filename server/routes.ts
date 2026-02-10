@@ -1806,13 +1806,12 @@ export async function registerRoutes(
 
   app.get("/api/wanted/search", requireAuth, async (req, res) => {
     try {
-      const query = req.query.q as string;
-      if (!query) return res.json([]);
-      const results = await storage.searchWantedProfiles(query);
+      const criteria = req.query as Record<string, string>;
+      const results = await storage.searchWantedProfiles(criteria);
       res.json(results);
     } catch (err) {
       console.error("GET /api/wanted/search error:", err);
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Erreur lors de la recherche" });
     }
   });
 

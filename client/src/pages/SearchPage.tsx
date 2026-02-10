@@ -526,22 +526,39 @@ export default function SearchPage() {
   const filterTypes = Object.keys(FilterLabels) as SearchFilterType[];
 
   const handleWantedSearch = async () => {
-    const query = criteria.map(c => c.value).filter(Boolean).join(" ");
-    if (!query) return;
+    const filledCriteria = criteria.filter((c) => c.value.trim() !== "");
+    if (filledCriteria.length === 0) {
+      toast({
+        title: "Critères manquants",
+        description: "Veuillez entrer au moins un critère de recherche.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const token = getAccessToken();
     if (!token) return;
 
     setLoadingWanted(true);
     try {
-      const res = await fetch(`/api/wanted/search?q=${encodeURIComponent(query)}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const params = new URLSearchParams();
+      filledCriteria.forEach((c) => {
+        params.append(c.type, c.value.trim());
+      });
+
+      const res = await fetch(`/api/wanted/search?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         setWantedResults(await res.json());
       }
-    } catch {
-      toast({ title: "Erreur", description: "Impossible de rechercher les profils Wanted", variant: "destructive" });
+    } catch (error) {
+      console.error("Wanted search error:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de rechercher les profils Wanted",
+        variant: "destructive",
+      });
     } finally {
       setLoadingWanted(false);
     }
