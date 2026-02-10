@@ -810,21 +810,35 @@ export default function SearchPage() {
     );
   };
 
+  const isWantedMode = searchMode === "wanted";
+
   return (
-    <main className="relative">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none" />
+    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""}`}>
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
 
       <div className="relative container max-w-5xl mx-auto px-4 py-12 space-y-12">
         <section className="text-center space-y-4 max-w-2xl mx-auto mb-8">
           <motion.h1
+            key={isWantedMode ? "wanted-title" : "normal-title"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-[1.1]"
           >
-            Recherche Intelligente de <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">
-              Donnees Sensibles
-            </span>
+            {isWantedMode ? (
+              <>
+                Profils <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">
+                  Wanted
+                </span>
+              </>
+            ) : (
+              <>
+                Recherche Intelligente de <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">
+                  Donnees Sensibles
+                </span>
+              </>
+            )}
           </motion.h1>
         </section>
 
@@ -892,7 +906,7 @@ export default function SearchPage() {
               setSearchMode("wanted");
               setCriteria([{ id: String(nextCriterionId++), type: "nom", value: "" }]);
             }}
-            className="min-w-[180px] gap-2"
+            className={`min-w-[180px] gap-2 ${searchMode === "wanted" ? "bg-red-600 hover:bg-red-700 text-white border-red-600" : ""}`}
             data-testid="button-mode-wanted"
           >
             <ShieldAlert className="w-4 h-4" />
@@ -1307,12 +1321,12 @@ export default function SearchPage() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6 relative"
+              className="glass-panel-wanted rounded-2xl p-6 md:p-8 space-y-6 relative"
             >
               <div className={canAccessWanted ? "" : "blur-sm select-none pointer-events-none"}>
                 <div className="flex items-center justify-between gap-2 flex-wrap mb-6">
                   <div className="flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-primary" />
+                    <ShieldAlert className="w-5 h-5 text-red-500" />
                     <h2 className="text-xl font-bold tracking-tight">Recherche par Critères (Wanted)</h2>
                   </div>
                   <Button
@@ -1340,10 +1354,10 @@ export default function SearchPage() {
                           exit={{ opacity: 0, height: 0 }}
                           className="group relative"
                         >
-                          <Card className="p-3 bg-secondary/30 border-border/50">
+                          <Card className="p-3 bg-red-500/5 dark:bg-red-950/20 border-red-500/10">
                             <div className="flex flex-col sm:flex-row items-center gap-3">
                               <div
-                                className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-primary"
+                                className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500"
                               >
                                 <IconComp className="w-4 h-4" />
                               </div>
@@ -1402,7 +1416,7 @@ export default function SearchPage() {
                   data-testid="button-search"
                   onClick={() => handleSearch(0)}
                   disabled={loadingWanted || !criteria.some((c) => c.value.trim())}
-                  className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25 mt-6"
+                  className="w-full h-11 bg-red-600 text-white hover:bg-red-700 font-semibold gap-2 shadow-lg shadow-red-500/25 mt-6 border-red-600"
                   tabIndex={canAccessWanted ? 0 : -1}
                 >
                   {loadingWanted ? (
@@ -1417,8 +1431,8 @@ export default function SearchPage() {
               {!canAccessWanted && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl bg-background/30" data-testid="wanted-upgrade-overlay">
                   <div className="text-center space-y-3 p-6">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Lock className="w-6 h-6 text-primary" />
+                    <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                      <Lock className="w-6 h-6 text-red-500" />
                     </div>
                     <h3 className="text-lg font-bold">Abonnement PRO requis</h3>
                     <p className="text-sm text-muted-foreground max-w-sm">
@@ -1538,10 +1552,10 @@ export default function SearchPage() {
           <div className="space-y-6 min-h-[400px]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Database className="w-5 h-5 text-primary" />
-                Résultats Wanted
+                <Database className="w-5 h-5 text-red-500" />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Résultats Wanted</span>
                 {wantedResults.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="ml-2 bg-red-500/10 text-red-500 border-red-500/20">
                     {wantedResults.length}
                   </Badge>
                 )}
@@ -1551,8 +1565,8 @@ export default function SearchPage() {
             {loadingWanted ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
-                  <Loader2 className="w-12 h-12 animate-spin text-primary relative" />
+                  <div className="absolute inset-0 bg-red-500/20 blur-xl rounded-full animate-pulse" />
+                  <Loader2 className="w-12 h-12 animate-spin text-red-500 relative" />
                 </div>
                 <p className="text-muted-foreground animate-pulse">Recherche en cours...</p>
               </div>
@@ -1580,8 +1594,8 @@ export default function SearchPage() {
                 ))}
               </div>
             ) : wantedResults.length === 0 && !loadingWanted ? (
-              <Card className="p-12 text-center space-y-4 border-dashed">
-                <Search className="w-12 h-12 text-muted-foreground/50 mx-auto" />
+              <Card className="p-12 text-center space-y-4 border-dashed border-red-500/20">
+                <ShieldAlert className="w-12 h-12 text-red-500/30 mx-auto" />
                 <p className="text-muted-foreground">Aucun profil wanted correspondant trouvé. Lancez une recherche pour voir les résultats.</p>
               </Card>
             ) : null}
