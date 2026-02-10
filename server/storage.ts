@@ -53,6 +53,7 @@ export interface IStorage {
   createBlacklistEntry(data: InsertBlacklistEntry): Promise<BlacklistEntry>;
   getBlacklistEntries(): Promise<BlacklistEntry[]>;
   deleteBlacklistEntry(id: number): Promise<boolean>;
+  checkBlacklist(values: string[]): Promise<BlacklistEntry[]>;
   createInfoRequest(data: InsertInfoRequest): Promise<InfoRequest>;
   getInfoRequests(): Promise<InfoRequest[]>;
   updateInfoRequestStatus(id: number, status: string, adminNotes?: string): Promise<InfoRequest | undefined>;
@@ -463,6 +464,21 @@ export class DatabaseStorage implements IStorage {
   async deleteBlacklistEntry(id: number): Promise<boolean> {
     const result = await db.delete(blacklistEntries).where(eq(blacklistEntries.id, id)).returning();
     return result.length > 0;
+  }
+
+  async checkBlacklist(values: string[]): Promise<BlacklistEntry[]> {
+    if (values.length === 0) return [];
+    const conditions = values.map(v => {
+      const val = `%${v.trim().toLowerCase()}%`;
+      return or(
+        sql`LOWER(${blacklistEntries.firstName}) LIKE ${val}`,
+        sql`LOWER(${blacklistEntries.lastName}) LIKE ${val}`,
+        sql`LOWER(${blacklistEntries.email}) LIKE ${val}`,
+        sql`LOWER(${blacklistEntries.phone}) LIKE ${val}`,
+        sql`LOWER(${blacklistEntries.address}) LIKE ${val}`
+      );
+    });
+    return db.select().from(blacklistEntries).where(or(...conditions));
   }
 
   async createInfoRequest(data: InsertInfoRequest): Promise<InfoRequest> {

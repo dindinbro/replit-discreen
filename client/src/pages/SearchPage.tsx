@@ -389,6 +389,7 @@ export default function SearchPage() {
   const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted">("internal");
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
+  const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
 
   const [criteria, setCriteria] = useState<CriterionRow[]>([
     { id: String(nextCriterionId++), type: "username", value: "" },
@@ -741,6 +742,21 @@ export default function SearchPage() {
 
     setLimitReached(false);
     setPage(newPage);
+    setBlacklistMatch(null);
+
+    const searchValues = filledCriteria.map((c) => c.value.trim()).filter(Boolean);
+    const token = getAccessToken();
+    if (token && searchValues.length > 0) {
+      fetch("/api/blacklist/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ values: searchValues }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setBlacklistMatch(data); })
+        .catch(() => {});
+    }
+
     searchMutation.mutate(
       {
         criteria: filledCriteria.map((c) => ({ type: c.type, value: c.value.trim() })),
@@ -1514,7 +1530,20 @@ export default function SearchPage() {
                     <p className="text-muted-foreground animate-pulse">Recherche en cours...</p>
                   </div>
                 ) : activeResults && activeResults.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="relative">
+                    {blacklistMatch?.blacklisted && (
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-md" data-testid="blacklist-overlay">
+                        <div className="absolute inset-0 backdrop-blur-lg bg-background/60 rounded-md" />
+                        <div className="relative text-center space-y-3 p-8">
+                          <ShieldAlert className="w-12 h-12 text-destructive mx-auto" />
+                          <h3 className="text-xl font-bold text-destructive">Utilisateur Blackliste</h3>
+                          <p className="text-muted-foreground max-w-md">
+                            Cette personne figure dans la blacklist de Discreen. Les informations ne peuvent pas etre affichees car une demande de retrait a ete approuvee.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className={`grid grid-cols-1 gap-4 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
                     {activeResults.map((row, idx) => (
                 <ResultCard
                   key={idx}
@@ -1589,6 +1618,7 @@ export default function SearchPage() {
                         </Button>
                       </div>
                     )}
+                    </div>
                   </div>
                 ) : limitReached ? (
                   <Card className="p-12 text-center space-y-6 border-destructive/20 bg-destructive/5">

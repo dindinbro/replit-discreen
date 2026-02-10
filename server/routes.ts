@@ -736,6 +736,21 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/blacklist/check - check if search values match any blacklist entry (auth required)
+  app.post("/api/blacklist/check", requireAuth, async (req, res) => {
+    try {
+      const schema = z.object({ values: z.array(z.string()) });
+      const { values } = schema.parse(req.body);
+      const filtered = values.filter(v => v && v.trim().length >= 3);
+      if (filtered.length === 0) return res.json({ blacklisted: false });
+      const matches = await storage.checkBlacklist(filtered);
+      res.json({ blacklisted: matches.length > 0 });
+    } catch (err) {
+      console.error("POST /api/blacklist/check error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // GET /api/admin/info-requests - list all info requests (admin only)
   app.get("/api/admin/info-requests", requireAuth, requireAdmin, async (_req, res) => {
     try {

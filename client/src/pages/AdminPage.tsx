@@ -812,7 +812,206 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   );
 }
 
-function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function BlacklistAddForm({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
+    reason: "",
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = getAccessToken();
+    if (!token) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/blacklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        toast({ title: "Entree ajoutee", description: "L'entree a ete ajoutee a la blacklist." });
+        setForm({ firstName: "", lastName: "", email: "", phone: "", address: "", reason: "" });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/blacklist"] });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Erreur", description: err.message || "Impossible d'ajouter", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="p-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Prenom</label>
+            <Input value={form.firstName} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} placeholder="Jean" data-testid="input-bl-firstname" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nom</label>
+            <Input value={form.lastName} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Dupont" data-testid="input-bl-lastname" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email</label>
+            <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="jean.dupont@example.com" data-testid="input-bl-email" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Telephone</label>
+            <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="06 12 34 56 78" data-testid="input-bl-phone" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Adresse</label>
+          <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="123 Rue de la Republique, 75001 Paris" data-testid="input-bl-address" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Raison</label>
+          <Textarea value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} placeholder="Raison de l'ajout a la blacklist..." className="min-h-[80px]" data-testid="input-bl-reason" />
+        </div>
+        <Button type="submit" className="w-full" disabled={loading} data-testid="button-submit-blacklist">
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+          Ajouter a la blacklist
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+function BlacklistHistorySection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const { data: entries, isLoading } = useQuery<BlacklistEntry[]>({
+    queryKey: ["/api/admin/blacklist"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      if (!token) return [];
+      const res = await fetch("/api/admin/blacklist", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch blacklist");
+      return res.json();
+    },
+  });
+
+  const deleteEntry = async (id: number) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/blacklist/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/blacklist"] });
+        toast({ title: "Entree supprimee" });
+      } else {
+        toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    }
+    setDeletingId(null);
+  };
+
+  const filtered = (entries || []).filter(e => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (e.firstName || "").toLowerCase().includes(q) ||
+      (e.lastName || "").toLowerCase().includes(q) ||
+      (e.email || "").toLowerCase().includes(q) ||
+      (e.phone || "").toLowerCase().includes(q) ||
+      (e.address || "").toLowerCase().includes(q) ||
+      (e.reason || "").toLowerCase().includes(q)
+    );
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher dans la blacklist..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+          data-testid="input-blacklist-history-search"
+        />
+      </div>
+      {filtered.length === 0 ? (
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">
+            {searchQuery.trim() ? "Aucune entree correspondante." : "Aucune entree dans la blacklist."}
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(entry => (
+            <Card key={entry.id} className="p-4" data-testid={`card-blacklist-entry-${entry.id}`}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">{entry.firstName} {entry.lastName}</span>
+                    <Badge variant="outline" className="font-mono text-xs">#{entry.id}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    {entry.email && <div><span className="text-muted-foreground">Email:</span> {entry.email}</div>}
+                    {entry.phone && <div><span className="text-muted-foreground">Tel:</span> {entry.phone}</div>}
+                    {entry.address && <div className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {entry.address}</div>}
+                    {entry.reason && <div className="col-span-2"><span className="text-muted-foreground">Raison:</span> {entry.reason}</div>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}
+                    {entry.addedBy && <span className="ml-2">par {entry.addedBy}</span>}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => deleteEntry(entry.id)}
+                  disabled={deletingId === entry.id}
+                  title="Supprimer"
+                  data-testid={`button-delete-blacklist-${entry.id}`}
+                >
+                  {deletingId === entry.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlacklistRequestsSubSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const { toast } = useToast();
   const [blacklistRequests, setBlacklistRequests] = useState<BlacklistRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -917,6 +1116,51 @@ function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | n
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const [subTab, setSubTab] = useState<"requests" | "history" | "add">("requests");
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          variant={subTab === "requests" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSubTab("requests")}
+          className="gap-2"
+          data-testid="button-bl-subtab-requests"
+        >
+          <Clock className="w-4 h-4" />
+          Demandes
+        </Button>
+        <Button
+          variant={subTab === "history" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSubTab("history")}
+          className="gap-2"
+          data-testid="button-bl-subtab-history"
+        >
+          <Search className="w-4 h-4" />
+          Historique
+        </Button>
+        <Button
+          variant={subTab === "add" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSubTab("add")}
+          className="gap-2"
+          data-testid="button-bl-subtab-add"
+        >
+          <Plus className="w-4 h-4" />
+          Ajout Blacklist
+        </Button>
+      </div>
+
+      {subTab === "requests" && <BlacklistRequestsSubSection getAccessToken={getAccessToken} />}
+      {subTab === "history" && <BlacklistHistorySection getAccessToken={getAccessToken} />}
+      {subTab === "add" && <BlacklistAddForm getAccessToken={getAccessToken} />}
     </div>
   );
 }
