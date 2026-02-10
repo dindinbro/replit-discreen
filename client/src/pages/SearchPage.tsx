@@ -145,10 +145,12 @@ const FIELD_ICON_MAP: Record<string, typeof User> = {
   bday: Calendar, regdate: Calendar, lastactive: Calendar,
   iban: CreditCard, credit_card: CreditCard, card: CreditCard,
   ssn: FileText, id: Hash, username: User, pseudo: User,
-  discord: Hash, ip: Globe, mac: Hash,
+  discord: Hash, discord_id: Hash, ip: Globe, mac: Hash,
   source: Database, _source: Database,
   identifiant: User, password: ShieldAlert, hash: Hash,
-  civilite: User, bic: CreditCard, url: Globe, vin: Hash,
+  civilite: User, sexe: User, bic: CreditCard, url: Globe, vin: Hash,
+  telephone2: Phone, nir: FileText, plaque: Hash,
+  complement_adresse: MapPin, complement_ville: MapPin,
   product: FileText, description: FileText, status: FileText,
   donnee: FileText, champ_1: FileText, champ_2: FileText, champ_3: FileText,
   nom_complet: User, matricule: Hash, organisme: FileText,
@@ -173,9 +175,9 @@ function getFieldColorVar(fieldName: string): string {
     return "--field-person";
   if (["email", "mail"].includes(key))
     return "--field-email";
-  if (["adresse", "address", "rue", "street", "ville", "city", "pays", "country", "ip", "postcode", "cplt_adresse", "nom_adresse_postale"].includes(key))
+  if (["adresse", "address", "rue", "street", "ville", "city", "pays", "country", "ip", "postcode", "cplt_adresse", "nom_adresse_postale", "complement_adresse", "complement_ville"].includes(key))
     return "--field-location";
-  if (["telephone", "phone", "tel", "mobile"].includes(key))
+  if (["telephone", "phone", "tel", "mobile", "telephone2"].includes(key))
     return "--field-phone";
   if (["code_postal", "zip", "zipcode", "postal", "id", "discord", "mac", "hash", "_source", "code_insee", "matricule", "id_psp", "identifiant_interne"].includes(key))
     return "--field-id";
@@ -204,7 +206,9 @@ function getFieldLabel(fieldName: string): string {
     ssn: "N Secu", id: "ID", username: "Pseudo", pseudo: "Pseudo",
     discord: "Discord", ip: "IP", mac: "MAC",
     identifiant: "Identifiant", password: "Mot de passe", hash: "Hash",
-    civilite: "Civilite", bic: "BIC", url: "URL", vin: "VIN",
+    civilite: "Civilite", sexe: "Sexe", bic: "BIC", url: "URL", vin: "VIN",
+    telephone2: "Telephone 2", nir: "N Secu (NIR)", plaque: "Plaque immat.",
+    discord_id: "Discord ID", complement_adresse: "Complement adresse", complement_ville: "Complement ville",
     product: "Produit", description: "Description", status: "Statut",
     donnee: "Donnee", champ_1: "Champ 1", champ_2: "Champ 2", champ_3: "Champ 3",
     champ_4: "Champ 4", champ_5: "Champ 5", champ_6: "Champ 6",

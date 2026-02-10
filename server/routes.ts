@@ -949,7 +949,7 @@ export async function registerRoutes(
     }
 
     if (response.status === 204) {
-      console.log("[external-search] 204 No Content — no results");
+      console.log("[external-search] 204 — access blocked or secret not recognized by Flask");
       return [];
     }
 
@@ -978,58 +978,116 @@ export async function registerRoutes(
     const flatResults: Record<string, unknown>[] = [];
     const results = data.results || data;
 
+    function normalizeRow(obj: Record<string, any>, label: string, sourceFiles: string): Record<string, unknown> | null {
+      const flat = flattenObject(obj);
+      const row: Record<string, unknown> = { _source: `External - ${label}` };
+      for (const [k, v] of Object.entries(flat)) {
+        if (k === "resume" || k === "statut") continue;
+        const normalizedKey = FIELD_ALIASES[k] || k;
+        const strVal = String(v ?? "").slice(0, 260);
+        if (strVal) row[normalizedKey] = strVal;
+      }
+      if (sourceFiles) row["source"] = sourceFiles;
+      return Object.keys(row).length > 1 ? row : null;
+    }
+
+    function flattenObject(obj: Record<string, any>, prefix = "", depth = 0): Record<string, string> {
+      const result: Record<string, string> = {};
+      if (depth > 3) return result;
+      for (const [k, v] of Object.entries(obj)) {
+        const key = prefix ? `${prefix}_${k}` : k;
+        if (v === null || v === undefined) continue;
+        if (typeof v === "object" && !Array.isArray(v)) {
+          Object.assign(result, flattenObject(v, key, depth + 1));
+        } else if (Array.isArray(v)) {
+          result[key] = v.map(String).join(", ");
+        } else {
+          let strVal = String(v);
+          try {
+            const parsed = JSON.parse(strVal);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              Object.assign(result, flattenObject(parsed, key, depth + 1));
+              continue;
+            }
+          } catch {}
+          result[key] = strVal;
+        }
+      }
+      return result;
+    }
+
+    function parseRawLine(line: string): Record<string, string> | null {
+      try {
+        const obj = JSON.parse(line);
+        if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+          return flattenObject(obj);
+        }
+      } catch {}
+
+      if (line.includes(":") || line.includes("=")) {
+        const pairs: Record<string, string> = {};
+        const parts = line.split(/[,;|·]/).map((s) => s.trim()).filter(Boolean);
+        for (const part of parts) {
+          const sepIdx = part.indexOf(":");
+          const eqIdx = part.indexOf("=");
+          const idx = sepIdx >= 0 && eqIdx >= 0 ? Math.min(sepIdx, eqIdx) : sepIdx >= 0 ? sepIdx : eqIdx;
+          if (idx > 0) {
+            const key = part.slice(0, idx).trim().toLowerCase().replace(/\s+/g, "_");
+            const val = part.slice(idx + 1).trim();
+            if (key && val) pairs[key] = val;
+          }
+        }
+        if (Object.keys(pairs).length >= 1) return pairs;
+      }
+
+      const extracted: Record<string, string> = {};
+      const emailMatch = line.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i);
+      if (emailMatch) extracted["email"] = emailMatch[0];
+      const phoneMatch = line.match(/(?:\+33|33|0)[1-9](?:[\s.\-]?\d{2}){4}/);
+      if (phoneMatch) {
+        let phone = phoneMatch[0].replace(/[\s.\-]/g, "");
+        if (phone.startsWith("+33")) phone = "0" + phone.slice(3);
+        else if (phone.startsWith("33")) phone = "0" + phone.slice(2);
+        extracted["telephone"] = phone;
+      }
+      if (Object.keys(extracted).length > 0) return extracted;
+
+      return null;
+    }
+
     if (results && typeof results === "object" && !Array.isArray(results)) {
       for (const [sourceKey, sourceVal] of Object.entries(results)) {
         const src = sourceVal as any;
         const label = src.label || sourceKey;
         const sourceFiles = Array.isArray(src.sources) ? src.sources.join(", ") : "";
 
-        if (src.data && typeof src.data === "object") {
-          const row: Record<string, unknown> = { _source: `External - ${label}` };
-          for (const [k, v] of Object.entries(src.data)) {
-            if (k === "resume" || k === "statut") continue;
-            const normalizedKey = FIELD_ALIASES[k] || k;
-            const val = String(v ?? "").slice(0, 260);
-            if (val) row[normalizedKey] = val;
-          }
-          if (sourceFiles) row["source"] = sourceFiles;
-          if (Object.keys(row).length > 1) {
-            flatResults.push(row);
-          }
+        if (src.data && typeof src.data === "object" && !Array.isArray(src.data)) {
+          const row = normalizeRow(src.data, label, sourceFiles);
+          if (row) flatResults.push(row);
         }
 
         if (Array.isArray(src.raw_lines)) {
           for (const line of src.raw_lines) {
-            if (!line || typeof line !== "string") continue;
-            let parsed = false;
-            try {
-              const obj = JSON.parse(line);
-              if (obj && typeof obj === "object") {
-                const row: Record<string, unknown> = { _source: `External - ${label}` };
-                for (const [k, v] of Object.entries(obj)) {
-                  if (k === "resume" || k === "statut") continue;
-                  const normalizedKey = FIELD_ALIASES[k] || k;
-                  row[normalizedKey] = String(v ?? "").slice(0, 260);
-                }
-                if (sourceFiles) row["source"] = sourceFiles;
-                if (Object.keys(row).length > 1) flatResults.push(row);
-                parsed = true;
-              }
-            } catch {}
-            if (!parsed && line.trim()) {
-              const row: Record<string, unknown> = {
+            if (!line || typeof line !== "string" || !line.trim()) continue;
+            const parsed = parseRawLine(line);
+            if (parsed) {
+              const row = normalizeRow(parsed, label, sourceFiles);
+              if (row) flatResults.push(row);
+            } else {
+              flatResults.push({
                 _source: `External - ${label}`,
                 _raw: line.slice(0, 260),
-              };
-              if (sourceFiles) row["source"] = sourceFiles;
-              flatResults.push(row);
+                ...(sourceFiles ? { source: sourceFiles } : {}),
+              });
             }
           }
         }
       }
     } else if (Array.isArray(results)) {
       for (const item of results) {
-        flatResults.push({ ...item, _source: "External" });
+        if (item && typeof item === "object") {
+          flatResults.push({ ...item, _source: "External" });
+        }
       }
     }
 
