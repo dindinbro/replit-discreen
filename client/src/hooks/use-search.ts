@@ -130,52 +130,6 @@ export function useLeakosintSearch(getAccessToken: () => string | null) {
   });
 }
 
-export interface ExternalProxySearchRequest {
-  term: string;
-  type?: string;
-}
-
-export interface ExternalProxySearchResponse {
-  results: Record<string, unknown>[];
-  total?: number;
-  quota?: SearchQuota;
-}
-
-export function useExternalProxySearch(getAccessToken: () => string | null) {
-  return useMutation({
-    mutationFn: async (request: ExternalProxySearchRequest): Promise<ExternalProxySearchResponse> => {
-      const token = getAccessToken();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const res = await fetch("/api/external-search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(request),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Erreur inconnue" }));
-        if (res.status === 429) {
-          throw new SearchLimitError(
-            err.message || "Limite atteinte",
-            err.used || 0,
-            err.limit || 0,
-            err.tier || "free"
-          );
-        }
-        throw new Error(err.message || "Erreur de recherche externe");
-      }
-
-      return (await res.json()) as ExternalProxySearchResponse;
-    },
-  });
-}
-
 export function useSearchQuota(getAccessToken: () => string | null) {
   return useQuery({
     queryKey: ["/api/search-quota"],

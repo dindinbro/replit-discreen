@@ -877,6 +877,153 @@ export async function registerRoutes(
     }
   });
 
+  const CRITERIA_TO_EXTERNAL_FIELD: Record<string, string> = {
+    email: "email",
+    lastName: "nom",
+    firstName: "prenom",
+    phone: "telephone",
+    address: "adresse",
+  };
+
+  const FIELD_ALIASES: Record<string, string> = {
+    qualite: "civilite",
+    courriel: "email",
+    voie: "adresse",
+    commune: "ville",
+    nom_adresse_postale: "nom_complet",
+    cplt_adresse: "complement_adresse",
+    cplt_commune: "complement_ville",
+  };
+
+  async function callExternalSearchApi(
+    criteria: Array<{ type: string; value: string }>
+  ): Promise<Record<string, unknown>[]> {
+    const proxySecret = process.env.EXTERNAL_PROXY_SECRET;
+    if (!proxySecret) return [];
+
+    const params = new URLSearchParams();
+
+    const unmappedValues: string[] = [];
+    const mappedFields = new Map<string, string[]>();
+
+    for (const c of criteria) {
+      const externalField = CRITERIA_TO_EXTERNAL_FIELD[c.type];
+      if (externalField) {
+        const existing = mappedFields.get(externalField) || [];
+        existing.push(c.value);
+        mappedFields.set(externalField, existing);
+      } else {
+        unmappedValues.push(c.value);
+      }
+    }
+
+    Array.from(mappedFields.entries()).forEach(([field, values]) => {
+      params.set(field, values.join(" "));
+    });
+
+    const qParts = [...unmappedValues];
+    if (qParts.length === 0 && mappedFields.size > 0) {
+      const firstMapped = mappedFields.values().next().value;
+      if (firstMapped) qParts.push(firstMapped[0]);
+    }
+    if (qParts.length > 0) {
+      params.set("q", qParts.join(" "));
+    } else if (criteria.length > 0) {
+      params.set("q", criteria[0].value);
+    }
+
+    params.set("operator", criteria.length > 1 ? "AND" : "AUTO");
+
+    let response: globalThis.Response;
+    try {
+      const url = `http://81.17.101.243:8000/api/search?${params.toString()}`;
+      console.log(`[external-search] Calling: ${url}`);
+      response = await fetch(url, {
+        method: "GET",
+        headers: { "X-Proxy-Secret": proxySecret },
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (fetchErr) {
+      console.error("[external-search] Fetch error:", fetchErr);
+      return [];
+    }
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      console.error(`[external-search] Error ${response.status}:`, errText.slice(0, 300));
+      return [];
+    }
+
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    if (!contentType.includes("application/json")) {
+      console.error("[external-search] Non-JSON response");
+      return [];
+    }
+
+    const data = await response.json();
+
+    const flatResults: Record<string, unknown>[] = [];
+    const results = data.results || data;
+
+    if (results && typeof results === "object" && !Array.isArray(results)) {
+      for (const [sourceKey, sourceVal] of Object.entries(results)) {
+        const src = sourceVal as any;
+        const label = src.label || sourceKey;
+        const sourceFiles = Array.isArray(src.sources) ? src.sources.join(", ") : "";
+
+        if (src.data && typeof src.data === "object") {
+          const row: Record<string, unknown> = { _source: `External - ${label}` };
+          for (const [k, v] of Object.entries(src.data)) {
+            if (k === "resume" || k === "statut") continue;
+            const normalizedKey = FIELD_ALIASES[k] || k;
+            const val = String(v ?? "").slice(0, 260);
+            if (val) row[normalizedKey] = val;
+          }
+          if (sourceFiles) row["source"] = sourceFiles;
+          if (Object.keys(row).length > 1) {
+            flatResults.push(row);
+          }
+        }
+
+        if (Array.isArray(src.raw_lines)) {
+          for (const line of src.raw_lines) {
+            if (!line || typeof line !== "string") continue;
+            let parsed = false;
+            try {
+              const obj = JSON.parse(line);
+              if (obj && typeof obj === "object") {
+                const row: Record<string, unknown> = { _source: `External - ${label}` };
+                for (const [k, v] of Object.entries(obj)) {
+                  if (k === "resume" || k === "statut") continue;
+                  const normalizedKey = FIELD_ALIASES[k] || k;
+                  row[normalizedKey] = String(v ?? "").slice(0, 260);
+                }
+                if (sourceFiles) row["source"] = sourceFiles;
+                if (Object.keys(row).length > 1) flatResults.push(row);
+                parsed = true;
+              }
+            } catch {}
+            if (!parsed && line.trim()) {
+              const row: Record<string, unknown> = {
+                _source: `External - ${label}`,
+                _raw: line.slice(0, 260),
+              };
+              if (sourceFiles) row["source"] = sourceFiles;
+              flatResults.push(row);
+            }
+          }
+        }
+      }
+    } else if (Array.isArray(results)) {
+      for (const item of results) {
+        flatResults.push({ ...item, _source: "External" });
+      }
+    }
+
+    console.log(`[external-search] Got ${flatResults.length} results`);
+    return flatResults;
+  }
+
   // POST /api/search (protected + rate-limited)
   app.post(api.search.perform.path, requireAuth, async (req, res) => {
     try {
@@ -911,15 +1058,24 @@ export async function registerRoutes(
       console.log(`[search] Incoming criteria: ${JSON.stringify(request.criteria)}, limit: ${request.limit}, offset: ${request.offset}`);
       const searchStart = Date.now();
       const searchPromise = Promise.resolve(searchAllIndexes(request.criteria, request.limit, request.offset));
+      const externalPromise = callExternalSearchApi(request.criteria).catch((err) => {
+        console.error("[external-search] Failed (non-blocking):", err);
+        return [] as Record<string, unknown>[];
+      });
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("SEARCH_TIMEOUT")), 90000)
       );
       let results: Record<string, unknown>[];
       let total: number | null;
+      let externalResults: Record<string, unknown>[] = [];
       try {
-        const searchResult = await Promise.race([searchPromise, timeoutPromise]);
+        const [searchResult, extResults] = await Promise.race([
+          Promise.all([searchPromise, externalPromise]),
+          timeoutPromise,
+        ]) as [{ results: Record<string, unknown>[]; total: number | null }, Record<string, unknown>[]];
         results = searchResult.results;
         total = searchResult.total;
+        externalResults = extResults;
       } catch (timeoutErr: any) {
         if (timeoutErr.message === "SEARCH_TIMEOUT") {
           console.warn(`[search] Timeout after ${Date.now() - searchStart}ms`);
@@ -927,11 +1083,21 @@ export async function registerRoutes(
         }
         throw timeoutErr;
       }
-      console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}`);
+
+      if (externalResults.length > 0) {
+        results = [...results, ...externalResults];
+        total = (total ?? 0) + externalResults.length;
+      }
+
+      console.log(`[search] Done in ${Date.now() - searchStart}ms — internal: ${results.length - externalResults.length}, external: ${externalResults.length}, total: ${total}`);
 
       const wUser = await buildUserInfo(req);
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
       webhookSearch(wUser, "interne", criteriaStr, total ?? 0);
+
+      if (externalResults.length > 0) {
+        webhookExternalProxySearch(wUser, criteriaStr, externalResults.length);
+      }
 
       const alertKey = `${userId}_${today}`;
       if (!abnormalAlertsSent.has(alertKey)) {
@@ -1448,104 +1614,6 @@ export async function registerRoutes(
       });
     } catch (err) {
       console.error("POST /api/breach-search error:", err);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // POST /api/external-search - proxy to external API (81.17.101.243:8000)
-  app.post("/api/external-search", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-
-      if (await storage.isFrozen(userId)) {
-        return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
-      }
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const effectiveRole = await getEffectiveRole(userId);
-      const isAdmin = effectiveRole === "admin";
-
-      const sub = await storage.getSubscription(userId);
-      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
-      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const isUnlimited = isAdmin || planInfo.dailySearches === -1;
-
-      const newCount = await storage.incrementDailyUsage(userId, today);
-
-      if (!isUnlimited && newCount > planInfo.dailySearches) {
-        return res.status(429).json({
-          message: "Nombre de recherches limite atteint.",
-          used: newCount,
-          limit: planInfo.dailySearches,
-          tier,
-        });
-      }
-
-      const { term, type } = req.body;
-      if (!term || typeof term !== "string" || term.length < 1 || term.length > 200) {
-        return res.status(400).json({ message: "Le terme de recherche est requis (1-200 caracteres)." });
-      }
-
-      const searchType = type && typeof type === "string" ? type : "all";
-
-      const proxySecret = process.env.EXTERNAL_PROXY_SECRET;
-      if (!proxySecret) {
-        console.error("EXTERNAL_PROXY_SECRET not configured");
-        return res.status(503).json({ message: "Service de recherche externe non configure." });
-      }
-
-      let response: globalThis.Response;
-      try {
-        response = await fetch("http://81.17.101.243:8000/api/search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Proxy-Secret": proxySecret,
-          },
-          body: JSON.stringify({
-            term,
-            type: searchType,
-          }),
-          signal: AbortSignal.timeout(30000),
-        });
-      } catch (fetchErr) {
-        console.error("External proxy API fetch error:", fetchErr);
-        return res.status(502).json({ message: "Impossible de joindre le service de recherche externe." });
-      }
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        console.error("External proxy API error:", response.status, errText.slice(0, 300));
-        if (response.status === 429) {
-          return res.status(429).json({ message: "Limite de requetes de l'API externe atteinte. Reessayez dans une minute." });
-        }
-        return res.status(502).json({ message: "Erreur du service de recherche externe." });
-      }
-
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("application/json")) {
-        console.error("External proxy API non-JSON response");
-        return res.status(503).json({ message: "Le service externe est temporairement inaccessible." });
-      }
-
-      const data = await response.json();
-
-      const wUser = await buildUserInfo(req);
-      const resultCount = Array.isArray(data.results) ? data.results.length : (data.total || 0);
-      webhookExternalProxySearch(wUser, term, resultCount);
-
-      res.json({
-        results: data.results || [],
-        total: data.total || 0,
-        quota: {
-          used: newCount,
-          limit: planInfo.dailySearches,
-          tier,
-        },
-      });
-    } catch (err) {
-      console.error("POST /api/external-search error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
