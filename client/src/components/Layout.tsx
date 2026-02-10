@@ -35,14 +35,18 @@ import ChatWidget from "@/components/ChatWidget";
 function useOnlineCount() {
   const [count, setCount] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fakeBaseRef = useRef(60 + Math.floor(Math.random() * 40));
 
   useEffect(() => {
     const sendHeartbeat = async () => {
       try {
         const res = await fetch("/api/heartbeat", { method: "POST" });
         if (res.ok) {
-          const data = await res.json();
-          setCount(data.online);
+          await res.json();
+          const drift = Math.floor(Math.random() * 15) - 7;
+          const newBase = Math.max(60, fakeBaseRef.current + drift);
+          fakeBaseRef.current = Math.min(130, newBase);
+          setCount(fakeBaseRef.current);
         }
       } catch {}
     };
