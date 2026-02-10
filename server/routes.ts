@@ -978,6 +978,11 @@ export async function registerRoutes(
     const flatResults: Record<string, unknown>[] = [];
     const results = data.results || data;
 
+    const META_KEYS = new Set(["_source", "source", "_raw"]);
+    function hasUsefulData(row: Record<string, unknown>): boolean {
+      return Object.keys(row).some(k => !META_KEYS.has(k) && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "");
+    }
+
     function normalizeRow(obj: Record<string, any>, label: string, sourceFiles: string): Record<string, unknown> | null {
       const flat = flattenObject(obj);
       const row: Record<string, unknown> = { _source: `External - ${label}` };
@@ -1061,24 +1066,18 @@ export async function registerRoutes(
         const label = src.label || sourceKey;
         const sourceFiles = Array.isArray(src.sources) ? src.sources.join(", ") : "";
 
-        if (src.data && typeof src.data === "object" && !Array.isArray(src.data)) {
+        if (src.data && typeof src.data === "object" && !Array.isArray(src.data) && Object.keys(src.data).length > 0) {
           const row = normalizeRow(src.data, label, sourceFiles);
-          if (row) flatResults.push(row);
+          if (row && hasUsefulData(row)) flatResults.push(row);
         }
 
         if (Array.isArray(src.raw_lines)) {
           for (const line of src.raw_lines) {
             if (!line || typeof line !== "string" || !line.trim()) continue;
             const parsed = parseRawLine(line);
-            if (parsed) {
+            if (parsed && Object.keys(parsed).length > 0) {
               const row = normalizeRow(parsed, label, sourceFiles);
-              if (row) flatResults.push(row);
-            } else {
-              flatResults.push({
-                _source: `External - ${label}`,
-                _raw: line.slice(0, 260),
-                ...(sourceFiles ? { source: sourceFiles } : {}),
-              });
+              if (row && hasUsefulData(row)) flatResults.push(row);
             }
           }
         }
