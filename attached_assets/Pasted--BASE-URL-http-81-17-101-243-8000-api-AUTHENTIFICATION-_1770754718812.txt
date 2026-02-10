@@ -1,0 +1,160 @@
+🔗 BASE URL : http://81.17.101.243:8000/api
+
+🔐 AUTHENTIFICATION :
+   Header requis sur TOUTES les requêtes :
+   X-Proxy-Secret: <VOTRE_SECRET>
+   (Sans ce header, l'API renvoie 204 No Content)
+
+
+============================================================
+1. ❤️ HEALTH CHECK
+============================================================
+   Vérifie que l'API est en ligne.
+
+   GET /api/health
+
+   Réponse (200) :
+   { "status": "ok" }
+
+
+============================================================
+2. 🔍 RECHERCHE
+============================================================
+   Recherche dans la base de données.
+
+   GET /api/search?q={terme}&operator={AND|OR|AUTO}
+
+   PARAMÈTRES :
+   ┌────────────┬──────────┬─────────────────────────────────┐
+   │ Paramètre  │ Type     │ Description                     │
+   ├────────────┼──────────┼─────────────────────────────────┤
+   │ q          │ string   │ Terme de recherche (obligatoire)│
+   │ operator   │ string   │ AND, OR ou AUTO (défaut: AUTO)  │
+   │ email      │ string   │ Filtre par email (optionnel)    │
+   │ nom        │ string   │ Filtre par nom (optionnel)      │
+   │ prenom     │ string   │ Filtre par prénom (optionnel)   │
+   │ telephone  │ string   │ Filtre par téléphone (optionnel)│
+   │ adresse    │ string   │ Filtre par adresse (optionnel)  │
+   └────────────┴──────────┴─────────────────────────────────┘
+
+   EXEMPLE :
+   GET /api/search?q=dupont&operator=AND&email=test@gmail.com
+
+   RÉPONSE (200) :
+   {
+     "results": {
+       "source_1": {
+         "label": "Base XYZ",
+         "data": {
+           "email": "test@gmail.com",
+           "nom": "Dupont"
+         },
+         "raw_lines": ["ligne1", "ligne2"],
+         "sources": ["fichier1.txt"]
+       }
+     }
+   }
+
+
+============================================================
+3. 📱 RECHERCHE TÉLÉPHONE
+============================================================
+   Lookup d'un numéro de téléphone.
+
+   GET /api/phone?number={numéro}
+
+   PARAMÈTRES :
+   ┌────────────┬──────────┬──────────────────────────────────┐
+   │ Paramètre  │ Type     │ Description                      │
+   ├────────────┼──────────┼──────────────────────────────────┤
+   │ number     │ string   │ Numéro (format international)    │
+   └────────────┴──────────┴──────────────────────────────────┘
+
+   EXEMPLE :
+   GET /api/phone?number=+33612345678
+
+   RÉPONSE (200) :
+   {
+     "formatted": "+33 6 12 34 56 78",
+     "national": "06 12 34 56 78",
+     "international": "+33612345678",
+     "country": "FR",
+     "carrier": "Orange",
+     "line_type": "mobile",
+     "valid": true
+   }
+
+
+============================================================
+4. 🔗 EXEMPLE D'INTÉGRATION (JavaScript)
+============================================================
+
+   const API_URL = "http://81.17.101.243:8000/api";
+   const SECRET = "votre_secret_ici";
+
+   // Recherche
+   async function search(query, filters = {}) {
+     const params = new URLSearchParams({ q: query, ...filters });
+     const res = await fetch(`${API_URL}/search?${params}`, {
+       headers: { "X-Proxy-Secret": SECRET }
+     });
+     return res.json();
+   }
+
+   // Phone Lookup
+   async function phoneLookup(number) {
+     const res = await fetch(
+       `${API_URL}/phone?number=${encodeURIComponent(number)}`,
+       { headers: { "X-Proxy-Secret": SECRET } }
+     );
+     return res.json();
+   }
+
+   // Health Check
+   async function healthCheck() {
+     const res = await fetch(`${API_URL}/health`);
+     return res.json();
+   }
+
+
+============================================================
+5. 🔗 EXEMPLE D'INTÉGRATION (Python)
+============================================================
+
+   import requests
+
+   API_URL = "http://81.17.101.243:8000/api"
+   SECRET = "votre_secret_ici"
+   HEADERS = {"X-Proxy-Secret": SECRET}
+
+   # Recherche
+   def search(query, **filters):
+       params = {"q": query, **filters}
+       r = requests.get(f"{API_URL}/search", params=params, headers=HEADERS)
+       return r.json()
+
+   # Phone Lookup
+   def phone_lookup(number):
+       r = requests.get(f"{API_URL}/phone", params={"number": number}, headers=HEADERS)
+       return r.json()
+
+   # Health Check
+   def health():
+       return requests.get(f"{API_URL}/health").json()
+
+
+============================================================
+6. ⚠️ CODES D'ERREUR
+============================================================
+   ┌──────┬──────────────────────────────────────┐
+   │ Code │ Description                          │
+   ├──────┼──────────────────────────────────────┤
+   │ 200  │ Succès                               │
+   │ 204  │ Accès bloqué (secret manquant)       │
+   │ 400  │ Paramètres invalides                 │
+   │ 401  │ Non authentifié                       │
+   │ 500  │ Erreur serveur                        │
+   │ 502  │ API non accessible                    │
+   └──────┴──────────────────────────────────────┘
+
+============================================================
