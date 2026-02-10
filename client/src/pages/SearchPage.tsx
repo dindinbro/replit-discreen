@@ -1225,6 +1225,117 @@ export default function SearchPage() {
             </motion.div>
           )}
 
+          {searchMode === "wanted" && (
+            <motion.div
+              key="wanted"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-bold tracking-tight">Recherche par Critères (Wanted)</h2>
+                </div>
+                <Button
+                  data-testid="button-add-criterion"
+                  variant="outline"
+                  size="sm"
+                  onClick={addCriterion}
+                  className="gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Ajouter un filtre
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <AnimatePresence mode="popLayout">
+                  {criteria.map((criterion, idx) => {
+                    const IconComp = FILTER_ICONS[criterion.type] || FileText;
+                    return (
+                      <motion.div
+                        key={criterion.id}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="group relative"
+                      >
+                        <Card className="p-3 bg-secondary/30 border-border/50">
+                          <div className="flex flex-col sm:flex-row items-center gap-3">
+                            <div
+                              className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-primary"
+                            >
+                              <IconComp className="w-4 h-4" />
+                            </div>
+                            
+                            <div className="w-full sm:w-[220px]">
+                              <Select
+                                value={criterion.type}
+                                onValueChange={(val) => updateCriterion(criterion.id, "type", val)}
+                              >
+                                <SelectTrigger className="bg-background">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {filterTypes.map((ft) => (
+                                    <SelectItem key={ft} value={ft}>
+                                      {FilterLabels[ft]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex-1 w-full relative">
+                              <Input
+                                data-testid={`input-criterion-value-${criterion.id}`}
+                                placeholder={FILTER_PLACEHOLDERS[criterion.type] || "Entrez une valeur..."}
+                                value={criterion.value}
+                                onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSearch(0);
+                                }}
+                                className="bg-background pr-10"
+                              />
+                            </div>
+
+                            {criteria.length > 1 && (
+                              <Button
+                                data-testid={`button-remove-criterion-${criterion.id}`}
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => removeCriterion(criterion.id)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+
+              <Button
+                data-testid="button-search"
+                onClick={() => handleSearch(0)}
+                disabled={loadingWanted || !criteria.some((c) => c.value.trim())}
+                className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
+              >
+                {loadingWanted ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                Rechercher
+              </Button>
+            </motion.div>
+          )}
+
           {searchMode === "nir" && (
             <motion.div
               key="nir"
