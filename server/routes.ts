@@ -694,30 +694,57 @@ export async function registerRoutes(
     }
   });
 
+  const blacklistEntrySchema = z.object({
+    civilite: z.string().optional().nullable(),
+    firstName: z.string().optional().nullable(),
+    lastName: z.string().optional().nullable(),
+    pseudo: z.string().optional().nullable(),
+    email: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+    ville: z.string().optional().nullable(),
+    codePostal: z.string().optional().nullable(),
+    dateNaissance: z.string().optional().nullable(),
+    discord: z.string().optional().nullable(),
+    discordId: z.string().optional().nullable(),
+    password: z.string().optional().nullable(),
+    iban: z.string().optional().nullable(),
+    ip: z.string().optional().nullable(),
+    emails: z.array(z.string()).optional().nullable(),
+    phones: z.array(z.string()).optional().nullable(),
+    ips: z.array(z.string()).optional().nullable(),
+    discordIds: z.array(z.string()).optional().nullable(),
+    addresses: z.array(z.string()).optional().nullable(),
+    reason: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  });
+
   // POST /api/admin/blacklist - create a blacklist entry directly (admin only)
   app.post("/api/admin/blacklist", requireAuth, requireAdmin, async (req, res) => {
     try {
-      const schema = z.object({
-        firstName: z.string().optional().nullable(),
-        lastName: z.string().optional().nullable(),
-        email: z.string().optional().nullable(),
-        phone: z.string().optional().nullable(),
-        address: z.string().optional().nullable(),
-        reason: z.string().optional().nullable(),
-      });
-      const parsed = schema.parse(req.body);
+      const parsed = blacklistEntrySchema.parse(req.body);
       const entry = await storage.createBlacklistEntry({
-        firstName: parsed.firstName || null,
-        lastName: parsed.lastName || null,
-        email: parsed.email || null,
-        phone: parsed.phone || null,
-        address: parsed.address || null,
-        reason: parsed.reason || null,
+        ...parsed,
         addedBy: (req as any).user?.email || "admin",
       });
       res.status(201).json(entry);
     } catch (err) {
       console.error("POST /api/admin/blacklist error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // PATCH /api/admin/blacklist/:id - update a blacklist entry (admin only)
+  app.patch("/api/admin/blacklist/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const parsed = blacklistEntrySchema.parse(req.body);
+      const updated = await storage.updateBlacklistEntry(id, parsed);
+      if (!updated) return res.status(404).json({ message: "Entree non trouvee" });
+      res.json(updated);
+    } catch (err) {
+      console.error("PATCH /api/admin/blacklist/:id error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

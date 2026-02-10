@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest, WantedProfile, InsertWantedProfile } from "@shared/schema";
+import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest, WantedProfile, InsertWantedProfile, InsertBlacklistEntry } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -812,18 +812,74 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   );
 }
 
-function BlacklistAddForm({ getAccessToken }: { getAccessToken: () => string | null }) {
+function BlacklistAddForm({ getAccessToken, editEntry, onEditDone }: { getAccessToken: () => string | null; editEntry?: BlacklistEntry | null; onEditDone?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
+
+  const [emails, setEmails] = useState<string[]>([""]);
+  const [phones, setPhones] = useState<string[]>([""]);
+  const [ips, setIps] = useState<string[]>([""]);
+  const [discordIds, setDiscordIds] = useState<string[]>([""]);
+  const [addresses, setAddresses] = useState<string[]>([""]);
+
+  const [form, setForm] = useState<Partial<InsertBlacklistEntry>>({
+    civilite: "",
     firstName: "",
     lastName: "",
-    email: "",
-    phone: "",
-    address: "",
+    pseudo: "",
+    discord: "",
+    discordId: "",
+    password: "",
+    iban: "",
+    ip: "",
+    ville: "",
+    codePostal: "",
+    dateNaissance: "",
     reason: "",
+    notes: "",
   });
+
+  const isEdit = !!editEntry;
+
+  useEffect(() => {
+    if (editEntry) {
+      setForm({
+        civilite: editEntry.civilite || "",
+        firstName: editEntry.firstName || "",
+        lastName: editEntry.lastName || "",
+        pseudo: editEntry.pseudo || "",
+        discord: editEntry.discord || "",
+        discordId: editEntry.discordId || "",
+        password: editEntry.password || "",
+        iban: editEntry.iban || "",
+        ip: editEntry.ip || "",
+        ville: editEntry.ville || "",
+        codePostal: editEntry.codePostal || "",
+        dateNaissance: editEntry.dateNaissance || "",
+        reason: editEntry.reason || "",
+        notes: editEntry.notes || "",
+      });
+      setEmails(editEntry.emails?.length ? editEntry.emails : [editEntry.email || ""]);
+      setPhones(editEntry.phones?.length ? editEntry.phones : [editEntry.phone || ""]);
+      setIps(editEntry.ips?.length ? editEntry.ips : [editEntry.ip || ""]);
+      setDiscordIds(editEntry.discordIds?.length ? editEntry.discordIds : [editEntry.discordId || ""]);
+      setAddresses(editEntry.addresses?.length ? editEntry.addresses : [editEntry.address || ""]);
+    }
+  }, [editEntry]);
+
+  const addField = (setter: React.Dispatch<React.SetStateAction<string[]>>) => setter(prev => [...prev, ""]);
+  const removeField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number) => setter(prev => prev.filter((_, i) => i !== index));
+  const updateField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number, value: string) => setter(prev => prev.map((v, i) => i === index ? value : v));
+
+  const resetForm = () => {
+    setForm({
+      civilite: "", firstName: "", lastName: "", pseudo: "",
+      discord: "", discordId: "", password: "", iban: "", ip: "",
+      ville: "", codePostal: "", dateNaissance: "", reason: "", notes: "",
+    });
+    setEmails([""]); setPhones([""]); setIps([""]); setDiscordIds([""]); setAddresses([""]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -832,18 +888,37 @@ function BlacklistAddForm({ getAccessToken }: { getAccessToken: () => string | n
 
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/blacklist", {
-        method: "POST",
+      const payload = {
+        ...form,
+        emails: emails.filter(Boolean),
+        phones: phones.filter(Boolean),
+        ips: ips.filter(Boolean),
+        discordIds: discordIds.filter(Boolean),
+        addresses: addresses.filter(Boolean),
+        email: emails[0] || "",
+        phone: phones[0] || "",
+        ip: ips[0] || form.ip || "",
+        discordId: discordIds[0] || form.discordId || "",
+        address: addresses[0] || "",
+      };
+
+      const url = isEdit ? `/api/admin/blacklist/${editEntry.id}` : "/api/admin/blacklist";
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
+
       if (res.ok) {
-        toast({ title: "Entree ajoutee", description: "L'entree a ete ajoutee a la blacklist." });
-        setForm({ firstName: "", lastName: "", email: "", phone: "", address: "", reason: "" });
+        toast({ title: isEdit ? "Entree modifiee" : "Entree ajoutee", description: isEdit ? "L'entree a ete mise a jour." : "L'entree a ete ajoutee a la blacklist." });
+        resetForm();
         queryClient.invalidateQueries({ queryKey: ["/api/admin/blacklist"] });
+        if (onEditDone) onEditDone();
       } else {
         const err = await res.json().catch(() => ({}));
-        toast({ title: "Erreur", description: err.message || "Impossible d'ajouter", variant: "destructive" });
+        toast({ title: "Erreur", description: err.message || "Impossible de sauvegarder", variant: "destructive" });
       }
     } catch {
       toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
@@ -852,47 +927,139 @@ function BlacklistAddForm({ getAccessToken }: { getAccessToken: () => string | n
     }
   };
 
+  const DynamicFields = ({ label, values, setter, placeholder }: any) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">{label}</label>
+        <Button type="button" variant="ghost" size="sm" onClick={() => addField(setter)} data-testid={`button-add-bl-${label.toLowerCase()}`}>
+          <Plus className="w-3 h-3 mr-1" /> Ajouter
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {values.map((val: string, i: number) => (
+          <div key={i} className="flex gap-2">
+            <Input
+              value={val}
+              onChange={e => updateField(setter, i, e.target.value)}
+              placeholder={placeholder}
+              data-testid={`input-bl-${label.toLowerCase()}-${i}`}
+            />
+            {values.length > 1 && (
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeField(setter, i)} data-testid={`button-remove-bl-${label.toLowerCase()}-${i}`}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <Card className="p-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {isEdit && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-primary" />
+            <span className="font-medium">Modification de l'entree #{editEntry.id}</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => { resetForm(); onEditDone?.(); }} data-testid="button-cancel-bl-edit">
+            <X className="w-4 h-4 mr-1" /> Annuler
+          </Button>
+        </div>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Civilite</label>
+            <Select value={form.civilite || "M."} onValueChange={(v) => setForm(p => ({ ...p, civilite: v }))}>
+              <SelectTrigger data-testid="select-bl-civilite">
+                <SelectValue placeholder="Civilite" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="M.">Monsieur (M.)</SelectItem>
+                <SelectItem value="Mme">Madame (Mme)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Prenom</label>
-            <Input value={form.firstName} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} placeholder="Jean" data-testid="input-bl-firstname" />
+            <Input value={form.firstName || ""} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} placeholder="Jean" data-testid="input-bl-firstname" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Nom</label>
-            <Input value={form.lastName} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Dupont" data-testid="input-bl-lastname" />
+            <Input value={form.lastName || ""} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Dupont" data-testid="input-bl-lastname" />
           </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <DynamicFields label="Emails" values={emails} setter={setEmails} placeholder="jean.dupont@example.com" />
+          <DynamicFields label="Telephones" values={phones} setter={setPhones} placeholder="06 12 34 56 78" />
+        </div>
+
+        <DynamicFields label="Adresses" values={addresses} setter={setAddresses} placeholder="123 Rue de la Republique" />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Code Postal</label>
+            <Input value={form.codePostal || ""} onChange={e => setForm(p => ({ ...p, codePostal: e.target.value }))} placeholder="75001" data-testid="input-bl-code-postal" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Ville</label>
+            <Input value={form.ville || ""} onChange={e => setForm(p => ({ ...p, ville: e.target.value }))} placeholder="Paris" data-testid="input-bl-ville" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date de naissance</label>
+            <Input value={form.dateNaissance || ""} onChange={e => setForm(p => ({ ...p, dateNaissance: e.target.value }))} placeholder="DD/MM/YYYY" data-testid="input-bl-date-naissance" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <DynamicFields label="IPs" values={ips} setter={setIps} placeholder="192.168.1.1" />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Pseudo</label>
+            <Input value={form.pseudo || ""} onChange={e => setForm(p => ({ ...p, pseudo: e.target.value }))} placeholder="JDupont" data-testid="input-bl-pseudo" />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
-            <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="jean.dupont@example.com" data-testid="input-bl-email" />
+            <label className="text-sm font-medium">Discord Tag</label>
+            <Input value={form.discord || ""} onChange={e => setForm(p => ({ ...p, discord: e.target.value }))} placeholder="jdupont#1234" data-testid="input-bl-discord-tag" />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Telephone</label>
-            <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="06 12 34 56 78" data-testid="input-bl-phone" />
-          </div>
+          <DynamicFields label="Discord IDs" values={discordIds} setter={setDiscordIds} placeholder="123456789012345678" />
         </div>
+
         <div className="space-y-2">
-          <label className="text-sm font-medium">Adresse</label>
-          <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="123 Rue de la Republique, 75001 Paris" data-testid="input-bl-address" />
+          <label className="text-sm font-medium">Mot de passe (fuite)</label>
+          <Input value={form.password || ""} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" data-testid="input-bl-password" />
         </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">IBAN</label>
+          <Input value={form.iban || ""} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." data-testid="input-bl-iban" />
+        </div>
+
         <div className="space-y-2">
           <label className="text-sm font-medium">Raison</label>
-          <Textarea value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} placeholder="Raison de l'ajout a la blacklist..." className="min-h-[80px]" data-testid="input-bl-reason" />
+          <Textarea value={form.reason || ""} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} placeholder="Raison de l'ajout a la blacklist..." className="min-h-[80px]" data-testid="input-bl-reason" />
         </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Notes / Signalement</label>
+          <Textarea value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Informations complementaires..." className="min-h-[100px]" data-testid="input-bl-notes" />
+        </div>
+
         <Button type="submit" className="w-full" disabled={loading} data-testid="button-submit-blacklist">
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-          Ajouter a la blacklist
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isEdit ? <Save className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+          {isEdit ? "Sauvegarder les modifications" : "Ajouter a la blacklist"}
         </Button>
       </form>
     </Card>
   );
 }
 
-function BlacklistHistorySection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function BlacklistHistorySection({ getAccessToken, onEdit }: { getAccessToken: () => string | null; onEdit: (entry: BlacklistEntry) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -941,7 +1108,17 @@ function BlacklistHistorySection({ getAccessToken }: { getAccessToken: () => str
       (e.email || "").toLowerCase().includes(q) ||
       (e.phone || "").toLowerCase().includes(q) ||
       (e.address || "").toLowerCase().includes(q) ||
-      (e.reason || "").toLowerCase().includes(q)
+      (e.reason || "").toLowerCase().includes(q) ||
+      (e.pseudo || "").toLowerCase().includes(q) ||
+      (e.discord || "").toLowerCase().includes(q) ||
+      (e.discordId || "").toLowerCase().includes(q) ||
+      (e.iban || "").toLowerCase().includes(q) ||
+      (e.ip || "").toLowerCase().includes(q) ||
+      (e.emails || []).some(v => v.toLowerCase().includes(q)) ||
+      (e.phones || []).some(v => v.toLowerCase().includes(q)) ||
+      (e.ips || []).some(v => v.toLowerCase().includes(q)) ||
+      (e.discordIds || []).some(v => v.toLowerCase().includes(q)) ||
+      (e.addresses || []).some(v => v.toLowerCase().includes(q))
     );
   });
 
@@ -973,38 +1150,68 @@ function BlacklistHistorySection({ getAccessToken }: { getAccessToken: () => str
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map(entry => (
-            <Card key={entry.id} className="p-4" data-testid={`card-blacklist-entry-${entry.id}`}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium">{entry.firstName} {entry.lastName}</span>
-                    <Badge variant="outline" className="font-mono text-xs">#{entry.id}</Badge>
+          {filtered.map(entry => {
+            const allEmails = entry.emails?.length ? entry.emails : entry.email ? [entry.email] : [];
+            const allPhones = entry.phones?.length ? entry.phones : entry.phone ? [entry.phone] : [];
+            const allIps = entry.ips?.length ? entry.ips : entry.ip ? [entry.ip] : [];
+            const allDiscordIds = entry.discordIds?.length ? entry.discordIds : entry.discordId ? [entry.discordId] : [];
+            const allAddresses = entry.addresses?.length ? entry.addresses : entry.address ? [entry.address] : [];
+
+            return (
+              <Card key={entry.id} className="p-4" data-testid={`card-blacklist-entry-${entry.id}`}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">
+                        {entry.civilite} {entry.firstName} {entry.lastName}
+                      </span>
+                      <Badge variant="outline" className="font-mono text-xs">#{entry.id}</Badge>
+                      {entry.pseudo && <Badge variant="secondary">{entry.pseudo}</Badge>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      {allEmails.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Emails:</span> {allEmails.join(", ")}</div>}
+                      {allPhones.length > 0 && <div><span className="text-muted-foreground">Tel:</span> {allPhones.join(", ")}</div>}
+                      {entry.discord && <div><span className="text-muted-foreground">Discord:</span> {entry.discord}</div>}
+                      {allDiscordIds.length > 0 && <div><span className="text-muted-foreground">Discord IDs:</span> {allDiscordIds.join(", ")}</div>}
+                      {allIps.length > 0 && <div><span className="text-muted-foreground">IPs:</span> {allIps.join(", ")}</div>}
+                      {allAddresses.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Adresses:</span> {allAddresses.join(", ")}</div>}
+                      {entry.ville && <div><span className="text-muted-foreground">Ville:</span> {entry.ville} {entry.codePostal}</div>}
+                      {entry.dateNaissance && <div><span className="text-muted-foreground">Naissance:</span> {entry.dateNaissance}</div>}
+                      {entry.password && <div><span className="text-muted-foreground">MDP:</span> {entry.password}</div>}
+                      {entry.iban && <div><span className="text-muted-foreground">IBAN:</span> {entry.iban}</div>}
+                      {entry.reason && <div className="col-span-2"><span className="text-muted-foreground">Raison:</span> {entry.reason}</div>}
+                      {entry.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {entry.notes}</div>}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}
+                      {entry.addedBy && <span className="ml-2">par {entry.addedBy}</span>}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    {entry.email && <div><span className="text-muted-foreground">Email:</span> {entry.email}</div>}
-                    {entry.phone && <div><span className="text-muted-foreground">Tel:</span> {entry.phone}</div>}
-                    {entry.address && <div className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {entry.address}</div>}
-                    {entry.reason && <div className="col-span-2"><span className="text-muted-foreground">Raison:</span> {entry.reason}</div>}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}
-                    {entry.addedBy && <span className="ml-2">par {entry.addedBy}</span>}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(entry)}
+                      title="Modifier"
+                      data-testid={`button-edit-blacklist-${entry.id}`}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteEntry(entry.id)}
+                      disabled={deletingId === entry.id}
+                      title="Supprimer"
+                      data-testid={`button-delete-blacklist-${entry.id}`}
+                    >
+                      {deletingId === entry.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                    </Button>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => deleteEntry(entry.id)}
-                  disabled={deletingId === entry.id}
-                  title="Supprimer"
-                  data-testid={`button-delete-blacklist-${entry.id}`}
-                >
-                  {deletingId === entry.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
-                </Button>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1122,6 +1329,17 @@ function BlacklistRequestsSubSection({ getAccessToken }: { getAccessToken: () =>
 
 function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const [subTab, setSubTab] = useState<"requests" | "history" | "add">("requests");
+  const [editEntry, setEditEntry] = useState<BlacklistEntry | null>(null);
+
+  const handleEdit = (entry: BlacklistEntry) => {
+    setEditEntry(entry);
+    setSubTab("add");
+  };
+
+  const handleEditDone = () => {
+    setEditEntry(null);
+    setSubTab("history");
+  };
 
   return (
     <div className="space-y-6">
@@ -1129,7 +1347,7 @@ function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | n
         <Button
           variant={subTab === "requests" ? "default" : "outline"}
           size="sm"
-          onClick={() => setSubTab("requests")}
+          onClick={() => { setSubTab("requests"); setEditEntry(null); }}
           className="gap-2"
           data-testid="button-bl-subtab-requests"
         >
@@ -1139,7 +1357,7 @@ function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | n
         <Button
           variant={subTab === "history" ? "default" : "outline"}
           size="sm"
-          onClick={() => setSubTab("history")}
+          onClick={() => { setSubTab("history"); setEditEntry(null); }}
           className="gap-2"
           data-testid="button-bl-subtab-history"
         >
@@ -1149,18 +1367,18 @@ function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | n
         <Button
           variant={subTab === "add" ? "default" : "outline"}
           size="sm"
-          onClick={() => setSubTab("add")}
+          onClick={() => { setSubTab("add"); setEditEntry(null); }}
           className="gap-2"
           data-testid="button-bl-subtab-add"
         >
           <Plus className="w-4 h-4" />
-          Ajout Blacklist
+          {editEntry ? "Modifier" : "Ajout Blacklist"}
         </Button>
       </div>
 
       {subTab === "requests" && <BlacklistRequestsSubSection getAccessToken={getAccessToken} />}
-      {subTab === "history" && <BlacklistHistorySection getAccessToken={getAccessToken} />}
-      {subTab === "add" && <BlacklistAddForm getAccessToken={getAccessToken} />}
+      {subTab === "history" && <BlacklistHistorySection getAccessToken={getAccessToken} onEdit={handleEdit} />}
+      {subTab === "add" && <BlacklistAddForm getAccessToken={getAccessToken} editEntry={editEntry} onEditDone={handleEditDone} />}
     </div>
   );
 }

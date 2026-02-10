@@ -52,6 +52,7 @@ export interface IStorage {
   updateBlacklistRequestStatus(id: number, status: string, adminNotes?: string): Promise<BlacklistRequest | undefined>;
   createBlacklistEntry(data: InsertBlacklistEntry): Promise<BlacklistEntry>;
   getBlacklistEntries(): Promise<BlacklistEntry[]>;
+  updateBlacklistEntry(id: number, data: Partial<InsertBlacklistEntry>): Promise<BlacklistEntry | undefined>;
   deleteBlacklistEntry(id: number): Promise<boolean>;
   checkBlacklist(values: string[]): Promise<BlacklistEntry[]>;
   createInfoRequest(data: InsertInfoRequest): Promise<InfoRequest>;
@@ -461,6 +462,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(blacklistEntries).orderBy(desc(blacklistEntries.createdAt));
   }
 
+  async updateBlacklistEntry(id: number, data: Partial<InsertBlacklistEntry>): Promise<BlacklistEntry | undefined> {
+    const [updated] = await db.update(blacklistEntries).set(data).where(eq(blacklistEntries.id, id)).returning();
+    return updated;
+  }
+
   async deleteBlacklistEntry(id: number): Promise<boolean> {
     const result = await db.delete(blacklistEntries).where(eq(blacklistEntries.id, id)).returning();
     return result.length > 0;
@@ -475,7 +481,24 @@ export class DatabaseStorage implements IStorage {
         sql`LOWER(COALESCE(${blacklistEntries.lastName}, '')) LIKE ${val}`,
         sql`LOWER(COALESCE(${blacklistEntries.email}, '')) LIKE ${val}`,
         sql`LOWER(COALESCE(${blacklistEntries.phone}, '')) LIKE ${val}`,
-        sql`LOWER(COALESCE(${blacklistEntries.address}, '')) LIKE ${val}`
+        sql`LOWER(COALESCE(${blacklistEntries.address}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.pseudo}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.discord}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.discordId}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.password}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.iban}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.ip}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.civilite}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.ville}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.codePostal}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.dateNaissance}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.reason}, '')) LIKE ${val}`,
+        sql`LOWER(COALESCE(${blacklistEntries.notes}, '')) LIKE ${val}`,
+        sql`EXISTS (SELECT 1 FROM unnest(${blacklistEntries.emails}) AS e WHERE LOWER(e) LIKE ${val})`,
+        sql`EXISTS (SELECT 1 FROM unnest(${blacklistEntries.phones}) AS p WHERE LOWER(p) LIKE ${val})`,
+        sql`EXISTS (SELECT 1 FROM unnest(${blacklistEntries.ips}) AS i WHERE LOWER(i) LIKE ${val})`,
+        sql`EXISTS (SELECT 1 FROM unnest(${blacklistEntries.discordIds}) AS d WHERE LOWER(d) LIKE ${val})`,
+        sql`EXISTS (SELECT 1 FROM unnest(${blacklistEntries.addresses}) AS a WHERE LOWER(a) LIKE ${val})`
       );
     });
     return db.select().from(blacklistEntries).where(or(...conditions));
