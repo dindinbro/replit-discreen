@@ -11,7 +11,7 @@ export default function ContactPage() {
     <main className="relative">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background pointer-events-none" />
 
-      <div className="relative container max-w-3xl mx-auto px-4 py-24">
+      <div className="relative container max-w-5xl mx-auto px-4 py-24">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -30,14 +30,14 @@ export default function ContactPage() {
             Pour toute question, suggestion ou demande de support, rejoignez notre serveur Discord ou notre Telegram.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto pt-4">
-            <Card className="p-6 text-center space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-[#5865F2]/10 flex items-center justify-center mx-auto">
-                <SiDiscord className="w-6 h-6 text-[#5865F2]" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-8">
+            <Card className="p-8 text-center space-y-5">
+              <div className="w-16 h-16 rounded-xl bg-[#5865F2]/10 flex items-center justify-center mx-auto">
+                <SiDiscord className="w-8 h-8 text-[#5865F2]" />
               </div>
               <div className="space-y-1">
-                <h2 className="font-semibold" data-testid="text-discord-contact">Discord</h2>
-                <p className="text-xs text-muted-foreground">Support rapide et communaute</p>
+                <h2 className="text-lg font-semibold" data-testid="text-discord-contact">Discord</h2>
+                <p className="text-sm text-muted-foreground">Support rapide et communaute</p>
               </div>
               <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer">
                 <Button className="w-full gap-2" data-testid="button-discord-join">
@@ -47,28 +47,26 @@ export default function ContactPage() {
               </a>
             </Card>
 
-            <Card className="p-6 text-center space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-[#0088cc]/10 flex items-center justify-center mx-auto">
-                <SiTelegram className="w-6 h-6 text-[#0088cc]" />
+            <Card className="p-8 text-center space-y-5">
+              <div className="w-16 h-16 rounded-xl bg-[#0088cc]/10 flex items-center justify-center mx-auto">
+                <SiTelegram className="w-8 h-8 text-[#0088cc]" />
               </div>
               <div className="space-y-1">
-                <h2 className="font-semibold" data-testid="text-telegram-contact">Telegram</h2>
-                <p className="text-xs text-muted-foreground">Bientot disponible</p>
+                <h2 className="text-lg font-semibold" data-testid="text-telegram-contact">Telegram</h2>
+                <p className="text-sm text-muted-foreground">Bientot disponible</p>
               </div>
               <Button variant="outline" className="w-full gap-2" disabled data-testid="button-telegram-soon">
                 Soon
               </Button>
             </Card>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto pt-4">
-            <Card className="p-6 text-center space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <ShieldBan className="w-6 h-6 text-primary" />
+            <Card className="p-8 text-center space-y-5">
+              <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <ShieldBan className="w-8 h-8 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="font-semibold" data-testid="text-blacklist-contact">Demande de Blacklist</h2>
-                <p className="text-xs text-muted-foreground">Vous souhaitez faire retirer vos donnees ? Soumettez une demande.</p>
+                <h2 className="text-lg font-semibold" data-testid="text-blacklist-contact">Demande de Blacklist</h2>
+                <p className="text-sm text-muted-foreground">Vous souhaitez faire retirer vos donnees ? Soumettez une demande.</p>
               </div>
               <Link href="/blacklist-request">
                 <Button variant="outline" className="w-full gap-2" data-testid="button-blacklist-request">
@@ -77,13 +75,13 @@ export default function ContactPage() {
               </Link>
             </Card>
 
-            <Card className="p-6 text-center space-y-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <Search className="w-6 h-6 text-primary" />
+            <Card className="p-8 text-center space-y-5">
+              <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+                <Search className="w-8 h-8 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="font-semibold" data-testid="text-info-contact">Demande d'Information</h2>
-                <p className="text-xs text-muted-foreground">Vous souhaitez obtenir des informations ? Soumettez une demande.</p>
+                <h2 className="text-lg font-semibold" data-testid="text-info-contact">Demande d'Information</h2>
+                <p className="text-sm text-muted-foreground">Vous souhaitez obtenir des informations ? Soumettez une demande.</p>
               </div>
               <Link href="/info-request">
                 <Button variant="outline" className="w-full gap-2" data-testid="button-info-request">
