@@ -1413,8 +1413,8 @@ export default function SearchPage() {
                 </div>
 
                 <Button
-                  data-testid="button-search"
-                  onClick={() => handleSearch(0)}
+                  data-testid="button-wanted-search"
+                  onClick={() => handleWantedSearch()}
                   disabled={loadingWanted || !criteria.some((c) => c.value.trim())}
                   className="w-full h-11 bg-red-600 text-white hover:bg-red-700 font-semibold gap-2 shadow-lg shadow-red-500/25 mt-6 border-red-600"
                   tabIndex={canAccessWanted ? 0 : -1}
