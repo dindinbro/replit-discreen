@@ -281,7 +281,8 @@ function ResultCard({
 
   const sourceField = entries.find(([k]) => k.toLowerCase() === "source");
   const dbSource = row["_source"] as string | undefined;
-  const sourceText = sourceField ? String(sourceField[1]) : (dbSource || "");
+  const rawSource = sourceField ? String(sourceField[1]) : (dbSource || "");
+  const sourceText = rawSource ? "Discreen" : "";
 
   const handleCopy = () => {
     const text = rawLine || visibleFields
