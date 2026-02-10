@@ -1815,12 +1815,38 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/wanted-profiles", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const profiles = await storage.getWantedProfiles();
+      res.json(profiles);
+    } catch (err) {
+      console.error("GET /api/admin/wanted-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.post("/api/admin/wanted-profiles", requireAuth, requireAdmin, async (req, res) => {
     try {
       const profile = await storage.createWantedProfile(req.body);
       res.json(profile);
     } catch (err) {
       console.error("POST /api/admin/wanted-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/admin/wanted-profiles/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const deleted = await storage.deleteWantedProfile(id);
+      if (deleted) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Profil introuvable" });
+      }
+    } catch (err) {
+      console.error("DELETE /api/admin/wanted-profiles error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

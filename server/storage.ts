@@ -523,6 +523,30 @@ export class DatabaseStorage implements IStorage {
     return sub?.discordId || null;
   }
 
+  async createWantedProfile(data: InsertWantedProfile): Promise<WantedProfile> {
+    const [created] = await db.insert(wantedProfiles).values(data).returning();
+    return created;
+  }
+
+  async getWantedProfiles(): Promise<WantedProfile[]> {
+    return db.select().from(wantedProfiles).orderBy(desc(wantedProfiles.createdAt));
+  }
+
+  async getWantedProfileById(id: number): Promise<WantedProfile | undefined> {
+    const [found] = await db.select().from(wantedProfiles).where(eq(wantedProfiles.id, id));
+    return found;
+  }
+
+  async updateWantedProfile(id: number, data: Partial<InsertWantedProfile>): Promise<WantedProfile | undefined> {
+    const [updated] = await db.update(wantedProfiles).set(data).where(eq(wantedProfiles.id, id)).returning();
+    return updated;
+  }
+
+  async deleteWantedProfile(id: number): Promise<boolean> {
+    const result = await db.delete(wantedProfiles).where(eq(wantedProfiles.id, id)).returning();
+    return result.length > 0;
+  }
+
   async searchWantedProfiles(criteria: Record<string, string>): Promise<WantedProfile[]> {
     const conditions: any[] = [];
 

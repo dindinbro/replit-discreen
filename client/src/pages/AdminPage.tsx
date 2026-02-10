@@ -41,6 +41,9 @@ import {
   Search,
   UserPlus,
   UserMinus,
+  Crosshair,
+  FileText,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel";
@@ -67,6 +70,15 @@ const PRESET_COLORS = [
   "#10b981", "#3b82f6", "#8b5cf6", "#ec4899",
   "#f59e0b", "#ef4444", "#06b6d4", "#84cc16",
   "#f97316", "#6366f1",
+];
+
+type AdminTab = "users" | "blacklist" | "info" | "wanted";
+
+const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
+  { key: "users", label: "Gestion des utilisateurs", icon: Users },
+  { key: "blacklist", label: "Demandes de blacklist", icon: ShieldBan },
+  { key: "info", label: "Demandes d'information", icon: FileText },
+  { key: "wanted", label: "Wanted", icon: Crosshair },
 ];
 
 interface CategoryFormData {
@@ -120,7 +132,6 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         phones: phones.filter(Boolean),
         ips: ips.filter(Boolean),
         discordIds: discordIds.filter(Boolean),
-        // Fallbacks for older fields
         email: emails[0] || "",
         telephone: phones[0] || "",
         ip: ips[0] || "",
@@ -137,7 +148,7 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
       });
 
       if (res.ok) {
-        toast({ title: "Profil créé", description: "Le profil Wanted a été ajouté avec succès." });
+        toast({ title: "Profil cree", description: "Le profil Wanted a ete ajoute avec succes." });
         setForm({
           nom: "", prenom: "", adresse: "",
           ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
@@ -153,7 +164,7 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
         toast({ title: "Erreur", description: err.message, variant: "destructive" });
       }
     } catch {
-      toast({ title: "Erreur", description: "Erreur réseau", variant: "destructive" });
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -163,7 +174,7 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium">{label}</label>
-        <Button type="button" variant="ghost" size="sm" className="h-6 px-2" onClick={() => addField(setter)}>
+        <Button type="button" variant="ghost" size="sm" onClick={() => addField(setter)} data-testid={`button-add-${label.toLowerCase()}`}>
           <Plus className="w-3 h-3 mr-1" /> Ajouter
         </Button>
       </div>
@@ -173,10 +184,11 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
             <Input 
               value={val} 
               onChange={e => updateField(setter, i, e.target.value)} 
-              placeholder={placeholder} 
+              placeholder={placeholder}
+              data-testid={`input-${label.toLowerCase()}-${i}`}
             />
             {values.length > 1 && (
-              <Button type="button" variant="ghost" size="icon" onClick={() => removeField(setter, i)}>
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeField(setter, i)} data-testid={`button-remove-${label.toLowerCase()}-${i}`}>
                 <X className="w-4 h-4" />
               </Button>
             )}
@@ -191,10 +203,10 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Civilité</label>
-            <Select value={form.civilite} onValueChange={(v) => setForm(p => ({ ...p, civilite: v }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Civilité" />
+            <label className="text-sm font-medium">Civilite</label>
+            <Select value={form.civilite || "M."} onValueChange={(v) => setForm(p => ({ ...p, civilite: v }))}>
+              <SelectTrigger data-testid="select-civilite">
+                <SelectValue placeholder="Civilite" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="M.">Monsieur (M.)</SelectItem>
@@ -203,37 +215,37 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Prénom</label>
-            <Input value={form.prenom} onChange={e => setForm(p => ({ ...p, prenom: e.target.value }))} placeholder="Jean" />
+            <label className="text-sm font-medium">Prenom</label>
+            <Input value={form.prenom || ""} onChange={e => setForm(p => ({ ...p, prenom: e.target.value }))} placeholder="Jean" data-testid="input-prenom" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Nom</label>
-            <Input value={form.nom} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} placeholder="Dupont" />
+            <Input value={form.nom || ""} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} placeholder="Dupont" data-testid="input-nom" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DynamicFields label="Emails" values={emails} setter={setEmails} placeholder="jean.dupont@example.com" />
-          <DynamicFields label="Téléphones" values={phones} setter={setPhones} placeholder="06 12 34 56 78" />
+          <DynamicFields label="Telephones" values={phones} setter={setPhones} placeholder="06 12 34 56 78" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Adresse</label>
-          <Input value={form.adresse} onChange={e => setForm(p => ({ ...p, adresse: e.target.value }))} placeholder="123 Rue de la République" />
+          <Input value={form.adresse || ""} onChange={e => setForm(p => ({ ...p, adresse: e.target.value }))} placeholder="123 Rue de la Republique" data-testid="input-adresse" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Code Postal</label>
-            <Input value={form.codePostal} onChange={e => setForm(p => ({ ...p, codePostal: e.target.value }))} placeholder="75001" />
+            <Input value={form.codePostal || ""} onChange={e => setForm(p => ({ ...p, codePostal: e.target.value }))} placeholder="75001" data-testid="input-code-postal" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Ville</label>
-            <Input value={form.ville} onChange={e => setForm(p => ({ ...p, ville: e.target.value }))} placeholder="Paris" />
+            <Input value={form.ville || ""} onChange={e => setForm(p => ({ ...p, ville: e.target.value }))} placeholder="Paris" data-testid="input-ville" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Date de naissance</label>
-            <Input value={form.dateNaissance} onChange={e => setForm(p => ({ ...p, dateNaissance: e.target.value }))} placeholder="DD/MM/YYYY" />
+            <Input value={form.dateNaissance || ""} onChange={e => setForm(p => ({ ...p, dateNaissance: e.target.value }))} placeholder="DD/MM/YYYY" data-testid="input-date-naissance" />
           </div>
         </div>
 
@@ -241,39 +253,175 @@ function WantedProfileForm({ getAccessToken }: { getAccessToken: () => string | 
           <DynamicFields label="IPs" values={ips} setter={setIps} placeholder="192.168.1.1" />
           <div className="space-y-2">
             <label className="text-sm font-medium">Pseudo</label>
-            <Input value={form.pseudo} onChange={e => setForm(p => ({ ...p, pseudo: e.target.value }))} placeholder="JDupont" />
+            <Input value={form.pseudo || ""} onChange={e => setForm(p => ({ ...p, pseudo: e.target.value }))} placeholder="JDupont" data-testid="input-pseudo" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Discord Tag</label>
-            <Input value={form.discord} onChange={e => setForm(p => ({ ...p, discord: e.target.value }))} placeholder="jdupont#1234" />
+            <Input value={form.discord || ""} onChange={e => setForm(p => ({ ...p, discord: e.target.value }))} placeholder="jdupont#1234" data-testid="input-discord-tag" />
           </div>
           <DynamicFields label="Discord IDs" values={discordIds} setter={setDiscordIds} placeholder="123456789012345678" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Mot de passe (fuite)</label>
-          <Input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" />
+          <Input value={form.password || ""} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" data-testid="input-password" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">IBAN</label>
-          <Input value={form.iban} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." />
+          <Input value={form.iban || ""} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." data-testid="input-iban" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Notes / Signalement</label>
-          <Textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Informations complémentaires..." className="min-h-[100px]" />
+          <Textarea value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Informations complementaires..." className="min-h-[100px]" data-testid="input-notes" />
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="w-full" disabled={loading} data-testid="button-submit-wanted">
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
           Entrer les informations
         </Button>
       </form>
     </Card>
+  );
+}
+
+function WantedHistorySection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const { data: profiles, isLoading } = useQuery<WantedProfile[]>({
+    queryKey: ["/api/admin/wanted-profiles"],
+  });
+
+  const deleteProfile = async (id: number) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/wanted-profiles/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
+        toast({ title: "Profil supprime" });
+      } else {
+        toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    }
+    setDeletingId(null);
+  };
+
+  const filteredProfiles = (profiles || []).filter(p => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (p.nom || "").toLowerCase().includes(q) ||
+      (p.prenom || "").toLowerCase().includes(q) ||
+      (p.email || "").toLowerCase().includes(q) ||
+      (p.pseudo || "").toLowerCase().includes(q) ||
+      (p.telephone || "").toLowerCase().includes(q) ||
+      (p.discord || "").toLowerCase().includes(q) ||
+      (p.ip || "").toLowerCase().includes(q) ||
+      (p.discordId || "").toLowerCase().includes(q) ||
+      (p.emails || []).some(e => e.toLowerCase().includes(q)) ||
+      (p.phones || []).some(ph => ph.toLowerCase().includes(q)) ||
+      (p.ips || []).some(ip => ip.toLowerCase().includes(q)) ||
+      (p.discordIds || []).some(d => d.toLowerCase().includes(q))
+    );
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher un profil Wanted..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+          data-testid="input-wanted-search"
+        />
+      </div>
+
+      {filteredProfiles.length === 0 ? (
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">
+            {searchQuery.trim() ? "Aucun profil correspondant." : "Aucun profil Wanted enregistre."}
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredProfiles.map(profile => (
+            <Card key={profile.id} className="p-4" data-testid={`card-wanted-${profile.id}`}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">
+                      {profile.civilite} {profile.prenom} {profile.nom}
+                    </span>
+                    <Badge variant="outline" className="font-mono text-xs">#{profile.id}</Badge>
+                    {profile.pseudo && <Badge variant="secondary">{profile.pseudo}</Badge>}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    {(profile.emails?.length ? profile.emails : profile.email ? [profile.email] : []).map((e, i) => (
+                      <div key={`email-${i}`}><span className="text-muted-foreground">Email:</span> {e}</div>
+                    ))}
+                    {(profile.phones?.length ? profile.phones : profile.telephone ? [profile.telephone] : []).map((p, i) => (
+                      <div key={`phone-${i}`}><span className="text-muted-foreground">Tel:</span> {p}</div>
+                    ))}
+                    {(profile.ips?.length ? profile.ips : profile.ip ? [profile.ip] : []).map((ip, i) => (
+                      <div key={`ip-${i}`}><span className="text-muted-foreground">IP:</span> {ip}</div>
+                    ))}
+                    {profile.discord && <div><span className="text-muted-foreground">Discord:</span> {profile.discord}</div>}
+                    {(profile.discordIds?.length ? profile.discordIds : profile.discordId ? [profile.discordId] : []).map((d, i) => (
+                      <div key={`did-${i}`}><span className="text-muted-foreground">Discord ID:</span> {d}</div>
+                    ))}
+                    {profile.adresse && <div className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {profile.adresse}</div>}
+                    {(profile.codePostal || profile.ville) && (
+                      <div><span className="text-muted-foreground">Ville:</span> {profile.codePostal} {profile.ville}</div>
+                    )}
+                    {profile.dateNaissance && <div><span className="text-muted-foreground">Naissance:</span> {profile.dateNaissance}</div>}
+                    {profile.iban && <div><span className="text-muted-foreground">IBAN:</span> {profile.iban}</div>}
+                    {profile.password && <div><span className="text-muted-foreground">MDP:</span> {profile.password}</div>}
+                    {profile.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {profile.notes}</div>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => deleteProfile(profile.id)}
+                  disabled={deletingId === profile.id}
+                  title="Supprimer"
+                  data-testid={`button-delete-wanted-${profile.id}`}
+                >
+                  {deletingId === profile.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -315,7 +463,7 @@ function CategoryFormDialog({
   const saveMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
       const token = getAccessToken();
-      if (!token) throw new Error("Non authentifié");
+      if (!token) throw new Error("Non authentifie");
 
       const url = editCategory
         ? `/api/admin/categories/${editCategory.id}`
@@ -339,7 +487,7 @@ function CategoryFormDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-      toast({ title: editCategory ? "Catégorie mise à jour" : "Catégorie créée" });
+      toast({ title: editCategory ? "Categorie mise a jour" : "Categorie creee" });
       onOpenChange(false);
     },
     onError: (err: Error) => {
@@ -358,10 +506,10 @@ function CategoryFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {editCategory ? "Modifier la catégorie" : "Nouvelle catégorie"}
+            {editCategory ? "Modifier la categorie" : "Nouvelle categorie"}
           </DialogTitle>
           <DialogDescription>
-            {editCategory ? "Modifiez les informations de la catégorie." : "Ajoutez une nouvelle catégorie pour organiser vos bases de données."}
+            {editCategory ? "Modifiez les informations de la categorie." : "Ajoutez une nouvelle categorie pour organiser vos bases de donnees."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -371,7 +519,7 @@ function CategoryFormDialog({
               data-testid="input-category-name"
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder="Ex: Réseaux sociaux"
+              placeholder="Ex: Reseaux sociaux"
             />
           </div>
           <div className="space-y-2">
@@ -380,11 +528,11 @@ function CategoryFormDialog({
               data-testid="input-category-description"
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              placeholder="Ex: Bases de données des réseaux sociaux"
+              placeholder="Ex: Bases de donnees des reseaux sociaux"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Icône</label>
+            <label className="text-sm font-medium text-foreground">Icone</label>
             <div className="flex flex-wrap gap-1">
               {AVAILABLE_ICONS.map((iconName) => {
                 const Icon = getIconComponent(iconName);
@@ -443,7 +591,7 @@ function CategoryFormDialog({
               })()}
             </div>
             <div>
-              <p className="font-medium text-sm">{form.name || "Aperçu"}</p>
+              <p className="font-medium text-sm">{form.name || "Apercu"}</p>
               <p className="text-xs text-muted-foreground">{form.description || "Description..."}</p>
             </div>
           </div>
@@ -461,7 +609,7 @@ function CategoryFormDialog({
               ) : (
                 <Save className="w-4 h-4 mr-1" />
               )}
-              {editCategory ? "Modifier" : "Créer"}
+              {editCategory ? "Modifier" : "Creer"}
             </Button>
           </div>
         </form>
@@ -470,12 +618,8 @@ function CategoryFormDialog({
   );
 }
 
-export default function AdminPage() {
-  const { user, role, loading: authLoading, getAccessToken } = useAuth();
-  const [, navigate] = useLocation();
+function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string | null; userId: string }) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [pendingChanges, setPendingChanges] = useState<Record<string, string>>({});
@@ -483,102 +627,71 @@ export default function AdminPage() {
   const [freezingId, setFreezingId] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
 
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-
-  const { data: categories, isLoading: loadingCategories } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
-  });
-
   useEffect(() => {
-    if (authLoading) return;
-    if (!user || role !== "admin") return;
-
     async function fetchUsers() {
       const token = getAccessToken();
       if (!token) return;
-
       try {
         const res = await fetch("/api/admin/users", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         if (res.ok) {
-          const data = await res.json();
-          setUsers(data);
+          setUsers(await res.json());
         } else {
           toast({ title: "Erreur", description: "Impossible de charger les utilisateurs", variant: "destructive" });
         }
       } catch {
-        toast({ title: "Erreur", description: "Erreur réseau", variant: "destructive" });
+        toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
       } finally {
         setLoadingUsers(false);
       }
     }
-
     fetchUsers();
-  }, [authLoading, user, role, getAccessToken, toast]);
+  }, [getAccessToken, toast]);
 
-  const handleRoleChange = (userId: string, newRole: string) => {
-    setPendingChanges(prev => ({ ...prev, [userId]: newRole }));
+  const handleRoleChange = (uid: string, newRole: string) => {
+    setPendingChanges(prev => ({ ...prev, [uid]: newRole }));
   };
 
-  const saveRole = async (userId: string) => {
-    const newRole = pendingChanges[userId];
+  const saveRole = async (uid: string) => {
+    const newRole = pendingChanges[uid];
     if (!newRole) return;
-
     const token = getAccessToken();
     if (!token) return;
-
-    setSavingId(userId);
-
+    setSavingId(uid);
     try {
       const res = await fetch("/api/admin/set-role", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ userId, role: newRole }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId: uid, role: newRole }),
       });
-
       if (res.ok) {
-        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-        setPendingChanges(prev => {
-          const next = { ...prev };
-          delete next[userId];
-          return next;
-        });
-        toast({ title: "Rôle mis à jour", description: `Rôle changé en "${newRole}"` });
+        setUsers(prev => prev.map(u => u.id === uid ? { ...u, role: newRole } : u));
+        setPendingChanges(prev => { const next = { ...prev }; delete next[uid]; return next; });
+        toast({ title: "Role mis a jour", description: `Role change en "${newRole}"` });
       } else {
         const err = await res.json().catch(() => ({}));
-        toast({ title: "Erreur", description: err.message || "Impossible de changer le rôle", variant: "destructive" });
+        toast({ title: "Erreur", description: err.message || "Impossible de changer le role", variant: "destructive" });
       }
     } catch {
-      toast({ title: "Erreur", description: "Erreur réseau", variant: "destructive" });
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
     } finally {
       setSavingId(null);
     }
   };
 
-  const toggleFreeze = async (userId: string, freeze: boolean) => {
+  const toggleFreeze = async (uid: string, freeze: boolean) => {
     const token = getAccessToken();
     if (!token) return;
-
-    setFreezingId(userId);
-
+    setFreezingId(uid);
     try {
       const res = await fetch("/api/admin/freeze", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ userId, frozen: freeze }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId: uid, frozen: freeze }),
       });
-
       if (res.ok) {
-        setUsers(prev => prev.map(u => u.id === userId ? { ...u, frozen: freeze } : u));
+        setUsers(prev => prev.map(u => u.id === uid ? { ...u, frozen: freeze } : u));
         toast({ title: freeze ? "Compte gele" : "Compte degele" });
       } else {
         const err = await res.json().catch(() => ({}));
@@ -591,77 +704,129 @@ export default function AdminPage() {
     }
   };
 
-  const deleteCategory = async (id: number) => {
-    const token = getAccessToken();
-    if (!token) return;
+  if (loadingUsers) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-    try {
-      const res = await fetch(`/api/admin/categories/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
-        toast({ title: "Catégorie supprimée" });
-      } else {
-        toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Erreur", description: "Erreur réseau", variant: "destructive" });
-    }
-  };
+  const filtered = users.filter(u => {
+    if (!userSearch.trim()) return true;
+    const q = userSearch.toLowerCase();
+    const username = u.email.split("@")[0].toLowerCase();
+    const uid = u.unique_id ? `${u.unique_id}` : u.id.slice(0, 8);
+    return username.includes(q) || u.email.toLowerCase().includes(q) || uid.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
+  });
 
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher un utilisateur..."
+          value={userSearch}
+          onChange={(e) => setUserSearch(e.target.value)}
+          className="pl-9"
+          data-testid="input-user-search"
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">Aucun utilisateur trouve.</p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(u => {
+            const currentRole = pendingChanges[u.id] || u.role;
+            const hasChange = pendingChanges[u.id] !== undefined && pendingChanges[u.id] !== u.role;
+            const username = u.email.split("@")[0];
+            const shortId = u.unique_id ? `${u.unique_id}` : u.id.slice(0, 8).toUpperCase();
+
+            return (
+              <Card key={u.id} className={`p-4 ${u.frozen ? "border-blue-500/50 bg-blue-500/5" : ""}`} data-testid={`card-user-${u.id}`}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium" data-testid={`text-username-${u.id}`}>{username}</p>
+                      <Badge variant="outline" className="font-mono text-xs" data-testid={`badge-id-${u.id}`}>#{shortId}</Badge>
+                      {u.frozen && (
+                        <Badge variant="secondary" className="gap-1 text-blue-500" data-testid={`badge-frozen-${u.id}`}>
+                          <Snowflake className="w-3 h-3" /> Gele
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate" data-testid={`text-email-${u.id}`}>{u.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Select value={currentRole} onValueChange={(val) => handleRoleChange(u.id, val)} disabled={u.id === userId}>
+                      <SelectTrigger className="w-[130px]" data-testid={`select-role-${u.id}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free">Free</SelectItem>
+                        <SelectItem value="vip">VIP</SelectItem>
+                        <SelectItem value="pro">PRO</SelectItem>
+                        <SelectItem value="business">Business</SelectItem>
+                        <SelectItem value="api">API</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Badge variant={(ROLE_CONFIG[u.role] || ROLE_CONFIG.free).variant} data-testid={`badge-role-${u.id}`}>
+                      {(ROLE_CONFIG[u.role] || ROLE_CONFIG.free).label}
+                    </Badge>
+                    {hasChange && (
+                      <Button size="sm" onClick={() => saveRole(u.id)} disabled={savingId === u.id} data-testid={`button-save-role-${u.id}`}>
+                        {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Sauvegarder</>}
+                      </Button>
+                    )}
+                    {u.id !== userId && (
+                      <Button variant={u.frozen ? "default" : "outline"} size="sm" onClick={() => toggleFreeze(u.id, !u.frozen)} disabled={freezingId === u.id} title={u.frozen ? "Degeler le compte" : "Geler le compte"} data-testid={`button-freeze-${u.id}`}>
+                        {freezingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Snowflake className="w-4 h-4 mr-1" /> {u.frozen ? "Degeler" : "Geler"}</>}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
   const [blacklistRequests, setBlacklistRequests] = useState<BlacklistRequest[]>([]);
-  const [loadingBlacklist, setLoadingBlacklist] = useState(true);
-  const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
-
-  const [infoRequests, setInfoRequests] = useState<InfoRequest[]>([]);
-  const [loadingInfoRequests, setLoadingInfoRequests] = useState(true);
-  const [processingInfoRequestId, setProcessingInfoRequestId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (authLoading || !user || role !== "admin") return;
-    async function fetchBlacklistRequests() {
+    async function fetch_data() {
       const token = getAccessToken();
       if (!token) return;
       try {
         const res = await fetch("/api/admin/blacklist-requests", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (res.ok) {
-          setBlacklistRequests(await res.json());
-        }
+        if (res.ok) setBlacklistRequests(await res.json());
       } catch {}
-      setLoadingBlacklist(false);
+      setLoading(false);
     }
-    async function fetchInfoRequests() {
-      const token = getAccessToken();
-      if (!token) return;
-      try {
-        const res = await fetch("/api/admin/info-requests", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setInfoRequests(await res.json());
-        }
-      } catch {}
-      setLoadingInfoRequests(false);
-    }
-    fetchBlacklistRequests();
-    fetchInfoRequests();
-  }, [authLoading, user, role, getAccessToken]);
+    fetch_data();
+  }, [getAccessToken]);
 
-  const updateRequestStatus = async (requestId: number, status: "approved" | "rejected") => {
+  const updateStatus = async (requestId: number, status: "approved" | "rejected") => {
     const token = getAccessToken();
     if (!token) return;
-    setProcessingRequestId(requestId);
+    setProcessingId(requestId);
     try {
       const res = await fetch(`/api/admin/blacklist-requests/${requestId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
@@ -674,20 +839,103 @@ export default function AdminPage() {
     } catch {
       toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
     }
-    setProcessingRequestId(null);
+    setProcessingId(null);
   };
 
-  const updateInfoRequestStatus = async (requestId: number, status: "approved" | "rejected" | "completed") => {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (blacklistRequests.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-muted-foreground">Aucune demande de blacklist.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {blacklistRequests.map(req => {
+        const isPending = req.status === "pending";
+        const statusBadge = req.status === "approved"
+          ? <Badge variant="default" className="gap-1" data-testid={`badge-status-${req.id}`}><Check className="w-3 h-3" />Approuvee</Badge>
+          : req.status === "rejected"
+          ? <Badge variant="destructive" className="gap-1" data-testid={`badge-status-${req.id}`}><X className="w-3 h-3" />Rejetee</Badge>
+          : <Badge variant="secondary" className="gap-1" data-testid={`badge-status-${req.id}`}><Clock className="w-3 h-3" />En attente</Badge>;
+
+        return (
+          <Card key={req.id} className="p-4" data-testid={`card-blacklist-${req.id}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs text-muted-foreground">#{req.id}</span>
+                  {statusBadge}
+                  <span className="text-xs text-muted-foreground">
+                    {req.createdAt ? new Date(req.createdAt).toLocaleDateString("fr-FR") : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  {req.firstName && <div><span className="text-muted-foreground">Prenom:</span> {req.firstName}</div>}
+                  {req.lastName && <div><span className="text-muted-foreground">Nom:</span> {req.lastName}</div>}
+                  {req.pseudo && <div><span className="text-muted-foreground">Pseudo:</span> {req.pseudo}</div>}
+                  {req.email && <div><span className="text-muted-foreground">Email:</span> {req.email}</div>}
+                  {req.phone && <div><span className="text-muted-foreground">Tel:</span> {req.phone}</div>}
+                  {req.address && <div className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {req.address}</div>}
+                  {req.reason && <div className="col-span-2"><span className="text-muted-foreground">Info:</span> {req.reason}</div>}
+                </div>
+              </div>
+              {isPending && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" onClick={() => updateStatus(req.id, "approved")} disabled={processingId === req.id} data-testid={`button-approve-${req.id}`}>
+                    {processingId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" />Approuver</>}
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => updateStatus(req.id, "rejected")} disabled={processingId === req.id} data-testid={`button-reject-${req.id}`}>
+                    {processingId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" />Rejeter</>}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function InfoRequestsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const [infoRequests, setInfoRequests] = useState<InfoRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetch_data() {
+      const token = getAccessToken();
+      if (!token) return;
+      try {
+        const res = await fetch("/api/admin/info-requests", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setInfoRequests(await res.json());
+      } catch {}
+      setLoading(false);
+    }
+    fetch_data();
+  }, [getAccessToken]);
+
+  const updateStatus = async (requestId: number, status: "approved" | "rejected" | "completed") => {
     const token = getAccessToken();
     if (!token) return;
-    setProcessingInfoRequestId(requestId);
+    setProcessingId(requestId);
     try {
       const res = await fetch(`/api/admin/info-requests/${requestId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
@@ -701,8 +949,114 @@ export default function AdminPage() {
     } catch {
       toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
     }
-    setProcessingInfoRequestId(null);
+    setProcessingId(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (infoRequests.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-muted-foreground">Aucune demande d'information.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {infoRequests.map(req => {
+        const isPending = req.status === "pending";
+        const statusBadge = req.status === "approved"
+          ? <Badge variant="default" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Check className="w-3 h-3" />Approuvee</Badge>
+          : req.status === "rejected"
+          ? <Badge variant="destructive" className="gap-1" data-testid={`badge-info-status-${req.id}`}><X className="w-3 h-3" />Rejetee</Badge>
+          : req.status === "completed"
+          ? <Badge variant="default" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Check className="w-3 h-3" />Terminee</Badge>
+          : <Badge variant="secondary" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Clock className="w-3 h-3" />En attente</Badge>;
+
+        return (
+          <Card key={req.id} className="p-4" data-testid={`card-info-${req.id}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs text-muted-foreground">#{req.id}</span>
+                  {statusBadge}
+                  {req.paid && <Badge variant="outline" className="gap-1">Payee</Badge>}
+                  <span className="text-xs text-muted-foreground">
+                    {req.createdAt ? new Date(req.createdAt).toLocaleDateString("fr-FR") : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  {req.discordId && <div><span className="text-muted-foreground">Discord ID:</span> {req.discordId}</div>}
+                  {req.email && <div><span className="text-muted-foreground">Email:</span> {req.email}</div>}
+                  {req.pseudo && <div><span className="text-muted-foreground">Pseudo:</span> {req.pseudo}</div>}
+                  {req.ipAddress && <div><span className="text-muted-foreground">IP:</span> {req.ipAddress}</div>}
+                  {req.additionalInfo && <div className="col-span-2"><span className="text-muted-foreground">Info:</span> {req.additionalInfo}</div>}
+                </div>
+              </div>
+              {isPending && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" onClick={() => updateStatus(req.id, "approved")} disabled={processingId === req.id} data-testid={`button-approve-info-${req.id}`}>
+                    {processingId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" />Approuver</>}
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => updateStatus(req.id, "rejected")} disabled={processingId === req.id} data-testid={`button-reject-info-${req.id}`}>
+                    {processingId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" />Rejeter</>}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function WantedSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const [wantedSubTab, setWantedSubTab] = useState<"form" | "history">("form");
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2">
+        <Button
+          variant={wantedSubTab === "form" ? "default" : "outline"}
+          onClick={() => setWantedSubTab("form")}
+          className="toggle-elevate"
+          data-testid="button-wanted-form-tab"
+        >
+          <UserPlus className="w-4 h-4 mr-2" />
+          Ajouter un profil
+        </Button>
+        <Button
+          variant={wantedSubTab === "history" ? "default" : "outline"}
+          onClick={() => setWantedSubTab("history")}
+          className="toggle-elevate"
+          data-testid="button-wanted-history-tab"
+        >
+          <Clock className="w-4 h-4 mr-2" />
+          Historique
+        </Button>
+      </div>
+
+      {wantedSubTab === "form" ? (
+        <WantedProfileForm getAccessToken={getAccessToken} />
+      ) : (
+        <WantedHistorySection getAccessToken={getAccessToken} />
+      )}
+    </div>
+  );
+}
+
+export default function AdminPage() {
+  const { user, role, loading: authLoading, getAccessToken } = useAuth();
+  const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState<AdminTab>("users");
 
   if (authLoading) {
     return (
@@ -717,13 +1071,13 @@ export default function AdminPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="p-8 max-w-md text-center space-y-4">
           <ShieldAlert className="w-12 h-12 text-destructive mx-auto" />
-          <h2 className="text-xl font-semibold">Accès interdit</h2>
+          <h2 className="text-xl font-semibold">Acces interdit</h2>
           <p className="text-muted-foreground text-sm">
-            Cette page est réservée aux administrateurs.
+            Cette page est reservee aux administrateurs.
           </p>
           <Button onClick={() => navigate("/")} data-testid="button-go-home">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour à l'accueil
+            Retour a l'accueil
           </Button>
         </Card>
       </div>
@@ -750,385 +1104,58 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="container max-w-4xl mx-auto px-4 py-8 space-y-10">
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <UserPlus className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">Ajouter un profil Wanted</h2>
-          </div>
-          <WantedProfileForm getAccessToken={getAccessToken} />
-        </section>
-
-        <section className="space-y-6">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3">
-              <Users className="w-6 h-6 text-primary" />
-              <h1 className="text-2xl font-display font-bold">Gestion des utilisateurs</h1>
-            </div>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un utilisateur..."
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                className="pl-9"
-                data-testid="input-user-search"
-              />
-            </div>
-          </div>
-
-          {loadingUsers ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : users.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">Aucun utilisateur trouvé.</p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {users.filter(u => {
-                if (!userSearch.trim()) return true;
-                const q = userSearch.toLowerCase();
-                const username = u.email.split("@")[0].toLowerCase();
-                const uid = u.unique_id ? `${u.unique_id}` : u.id.slice(0, 8);
-                return username.includes(q) || u.email.toLowerCase().includes(q) || uid.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
-              }).map(u => {
-                const currentRole = pendingChanges[u.id] || u.role;
-                const hasChange = pendingChanges[u.id] !== undefined && pendingChanges[u.id] !== u.role;
-                const username = u.email.split("@")[0];
-                const shortId = u.unique_id ? `${u.unique_id}` : u.id.slice(0, 8).toUpperCase();
-
+      <div className="container max-w-7xl mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <nav className="lg:w-64 shrink-0">
+            <div className="lg:sticky lg:top-24 space-y-1">
+              {ADMIN_TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.key;
                 return (
-                  <Card key={u.id} className={`p-4 ${u.frozen ? "border-blue-500/50 bg-blue-500/5" : ""}`} data-testid={`card-user-${u.id}`}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium" data-testid={`text-username-${u.id}`}>
-                            {username}
-                          </p>
-                          <Badge variant="outline" className="font-mono text-xs" data-testid={`badge-id-${u.id}`}>
-                            #{shortId}
-                          </Badge>
-                          {u.frozen && (
-                            <Badge variant="secondary" className="gap-1 text-blue-500" data-testid={`badge-frozen-${u.id}`}>
-                              <Snowflake className="w-3 h-3" />
-                              Gele
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate" data-testid={`text-email-${u.id}`}>
-                          {u.email}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Select
-                          value={currentRole}
-                          onValueChange={(val) => handleRoleChange(u.id, val)}
-                          disabled={u.id === user.id}
-                        >
-                          <SelectTrigger className="w-[130px]" data-testid={`select-role-${u.id}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="free">Free</SelectItem>
-                            <SelectItem value="vip">VIP</SelectItem>
-                            <SelectItem value="pro">PRO</SelectItem>
-                            <SelectItem value="business">Business</SelectItem>
-                            <SelectItem value="api">API</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        <Badge variant={(ROLE_CONFIG[u.role] || ROLE_CONFIG.free).variant} data-testid={`badge-role-${u.id}`}>
-                          {(ROLE_CONFIG[u.role] || ROLE_CONFIG.free).label}
-                        </Badge>
-
-                        {hasChange && (
-                          <Button
-                            size="sm"
-                            onClick={() => saveRole(u.id)}
-                            disabled={savingId === u.id}
-                            data-testid={`button-save-role-${u.id}`}
-                          >
-                            {savingId === u.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Save className="w-4 h-4 mr-1" />
-                                Sauvegarder
-                              </>
-                            )}
-                          </Button>
-                        )}
-
-                        {u.id !== user.id && (
-                          <Button
-                            variant={u.frozen ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => toggleFreeze(u.id, !u.frozen)}
-                            disabled={freezingId === u.id}
-                            title={u.frozen ? "Degeler le compte" : "Geler le compte"}
-                            data-testid={`button-freeze-${u.id}`}
-                          >
-                            {freezingId === u.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Snowflake className="w-4 h-4 mr-1" />
-                                {u.frozen ? "Degeler" : "Geler"}
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-colors text-left ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover-elevate"
+                    }`}
+                    data-testid={`button-tab-${tab.key}`}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <span className="flex-1">{tab.label}</span>
+                    {isActive && <ChevronRight className="w-4 h-4 shrink-0" />}
+                  </button>
                 );
               })}
             </div>
-          )}
-        </section>
+          </nav>
 
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <ShieldBan className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">Demandes de blacklist</h2>
-          </div>
-
-          {loadingBlacklist ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <main className="flex-1 min-w-0">
+            <div className="mb-6">
+              <h1 className="text-2xl font-display font-bold" data-testid="text-section-title">
+                {ADMIN_TABS.find(t => t.key === activeTab)?.label}
+              </h1>
             </div>
-          ) : blacklistRequests.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">Aucune demande de blacklist.</p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {blacklistRequests.map(req => {
-                const isPending = req.status === "pending";
-                const statusBadge = req.status === "approved"
-                  ? <Badge variant="default" className="gap-1" data-testid={`badge-status-${req.id}`}><Check className="w-3 h-3" />Approuvee</Badge>
-                  : req.status === "rejected"
-                  ? <Badge variant="destructive" className="gap-1" data-testid={`badge-status-${req.id}`}><X className="w-3 h-3" />Rejetee</Badge>
-                  : <Badge variant="secondary" className="gap-1" data-testid={`badge-status-${req.id}`}><Clock className="w-3 h-3" />En attente</Badge>;
 
-                return (
-                  <Card key={req.id} className="p-4" data-testid={`card-blacklist-${req.id}`}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs text-muted-foreground">#{req.id}</span>
-                          {statusBadge}
-                          <span className="text-xs text-muted-foreground">
-                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString("fr-FR") : ""}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                          {req.firstName && <div><span className="text-muted-foreground">Prenom:</span> {req.firstName}</div>}
-                          {req.lastName && <div><span className="text-muted-foreground">Nom:</span> {req.lastName}</div>}
-                          {req.pseudo && <div><span className="text-muted-foreground">Pseudo:</span> {req.pseudo}</div>}
-                          {req.email && <div><span className="text-muted-foreground">Email:</span> {req.email}</div>}
-                          {req.phone && <div><span className="text-muted-foreground">Tel:</span> {req.phone}</div>}
-                          {req.address && <div className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {req.address}</div>}
-                          {req.reason && <div className="col-span-2"><span className="text-muted-foreground">Info:</span> {req.reason}</div>}
-                        </div>
-                      </div>
-                      {isPending && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            onClick={() => updateRequestStatus(req.id, "approved")}
-                            disabled={processingRequestId === req.id}
-                            data-testid={`button-approve-${req.id}`}
-                          >
-                            {processingRequestId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" />Approuver</>}
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => updateRequestStatus(req.id, "rejected")}
-                            disabled={processingRequestId === req.id}
-                            data-testid={`button-reject-${req.id}`}
-                          >
-                            {processingRequestId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" />Rejeter</>}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </section>
+            {activeTab === "users" && (
+              <UsersSection getAccessToken={getAccessToken} userId={user.id} />
+            )}
 
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <Search className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">Demandes d'information</h2>
-          </div>
+            {activeTab === "blacklist" && (
+              <BlacklistSection getAccessToken={getAccessToken} />
+            )}
 
-          {loadingInfoRequests ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : infoRequests.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">Aucune demande d'information.</p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {infoRequests.map(req => {
-                const isPending = req.status === "pending";
-                const statusBadge = req.status === "approved"
-                  ? <Badge variant="default" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Check className="w-3 h-3" />Approuvee</Badge>
-                  : req.status === "rejected"
-                  ? <Badge variant="destructive" className="gap-1" data-testid={`badge-info-status-${req.id}`}><X className="w-3 h-3" />Rejetee</Badge>
-                  : req.status === "completed"
-                  ? <Badge variant="default" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Check className="w-3 h-3" />Terminee</Badge>
-                  : <Badge variant="secondary" className="gap-1" data-testid={`badge-info-status-${req.id}`}><Clock className="w-3 h-3" />En attente</Badge>;
+            {activeTab === "info" && (
+              <InfoRequestsSection getAccessToken={getAccessToken} />
+            )}
 
-                return (
-                  <Card key={req.id} className="p-4" data-testid={`card-info-${req.id}`}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs text-muted-foreground">#{req.id}</span>
-                          {statusBadge}
-                          {req.paid && <Badge variant="outline" className="gap-1">Payee</Badge>}
-                          <span className="text-xs text-muted-foreground">
-                            {req.createdAt ? new Date(req.createdAt).toLocaleDateString("fr-FR") : ""}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                          {req.discordId && <div><span className="text-muted-foreground">Discord ID:</span> {req.discordId}</div>}
-                          {req.email && <div><span className="text-muted-foreground">Email:</span> {req.email}</div>}
-                          {req.pseudo && <div><span className="text-muted-foreground">Pseudo:</span> {req.pseudo}</div>}
-                          {req.ipAddress && <div><span className="text-muted-foreground">IP:</span> {req.ipAddress}</div>}
-                          {req.additionalInfo && <div className="col-span-2"><span className="text-muted-foreground">Info:</span> {req.additionalInfo}</div>}
-                        </div>
-                      </div>
-                      {isPending && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            onClick={() => updateInfoRequestStatus(req.id, "approved")}
-                            disabled={processingInfoRequestId === req.id}
-                            data-testid={`button-approve-info-${req.id}`}
-                          >
-                            {processingInfoRequestId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" />Approuver</>}
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => updateInfoRequestStatus(req.id, "rejected")}
-                            disabled={processingInfoRequestId === req.id}
-                            data-testid={`button-reject-info-${req.id}`}
-                          >
-                            {processingInfoRequestId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" />Rejeter</>}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="space-y-6">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-3">
-              <LayoutGrid className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-display font-bold">Gestion des catégories</h2>
-            </div>
-            <Button
-              onClick={() => {
-                setEditingCategory(null);
-                setCategoryDialogOpen(true);
-              }}
-              data-testid="button-add-category"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Ajouter
-            </Button>
-          </div>
-
-          {loadingCategories ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : !categories || categories.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">Aucune catégorie. Cliquez sur "Ajouter" pour en créer une.</p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {categories.map((cat) => {
-                const Icon = getIconComponent(cat.icon);
-                return (
-                  <Card key={cat.id} className="p-4" data-testid={`card-category-${cat.id}`}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div
-                          className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: `${cat.color}18`, color: cat.color }}
-                        >
-                          <Icon className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-foreground truncate">
-                            {cat.name}
-                          </p>
-                          {cat.description && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {cat.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditingCategory(cat);
-                            setCategoryDialogOpen(true);
-                          }}
-                          title="Modifier"
-                          data-testid={`button-edit-category-${cat.id}`}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteCategory(cat.id)}
-                          title="Supprimer"
-                          data-testid={`button-delete-category-${cat.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </main>
-
-      <CategoryFormDialog
-        open={categoryDialogOpen}
-        onOpenChange={setCategoryDialogOpen}
-        editCategory={editingCategory}
-        getAccessToken={getAccessToken}
-      />
+            {activeTab === "wanted" && (
+              <WantedSection getAccessToken={getAccessToken} />
+            )}
+          </main>
+        </div>
+      </div>
     </div>
   );
 }
