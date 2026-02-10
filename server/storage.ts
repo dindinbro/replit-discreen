@@ -11,7 +11,7 @@ import {
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, asc, desc, sql, lte } from "drizzle-orm";
+import { eq, and, or, ilike, asc, desc, sql, lte } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface IStorage {
@@ -521,6 +521,63 @@ export class DatabaseStorage implements IStorage {
   async getDiscordId(userId: string): Promise<string | null> {
     const sub = await this.getSubscription(userId);
     return sub?.discordId || null;
+  }
+
+  async searchWantedProfiles(criteria: Record<string, string>): Promise<WantedProfile[]> {
+    const conditions: any[] = [];
+
+    for (const [key, value] of Object.entries(criteria)) {
+      if (!value || typeof value !== 'string') continue;
+
+      const val = value.trim();
+
+      if (key === "email") {
+        conditions.push(
+          or(
+            ilike(wantedProfiles.email, `%${val}%`),
+            sql`EXISTS (SELECT 1 FROM unnest(${wantedProfiles.emails}) e WHERE e ILIKE ${'%' + val + '%'})`
+          )
+        );
+      } else if (key === "phone" || key === "telephone") {
+        conditions.push(
+          or(
+            ilike(wantedProfiles.telephone, `%${val}%`),
+            sql`EXISTS (SELECT 1 FROM unnest(${wantedProfiles.phones}) p WHERE p ILIKE ${'%' + val + '%'})`
+          )
+        );
+      } else if (key === "ip" || key === "ipAddress") {
+        conditions.push(
+          or(
+            ilike(wantedProfiles.ip, `%${val}%`),
+            sql`EXISTS (SELECT 1 FROM unnest(${wantedProfiles.ips}) i WHERE i ILIKE ${'%' + val + '%'})`
+          )
+        );
+      } else if (key === "discordId") {
+        conditions.push(
+          or(
+            ilike(wantedProfiles.discordId, `%${val}%`),
+            sql`EXISTS (SELECT 1 FROM unnest(${wantedProfiles.discordIds}) d WHERE d ILIKE ${'%' + val + '%'})`
+          )
+        );
+      } else if (key === "nom") {
+        conditions.push(ilike(wantedProfiles.nom, `%${val}%`));
+      } else if (key === "prenom") {
+        conditions.push(ilike(wantedProfiles.prenom, `%${val}%`));
+      } else if (key === "pseudo") {
+        conditions.push(ilike(wantedProfiles.pseudo, `%${val}%`));
+      } else if (key === "discord") {
+        conditions.push(ilike(wantedProfiles.discord, `%${val}%`));
+      } else if (key === "notes") {
+        conditions.push(ilike(wantedProfiles.notes, `%${val}%`));
+      }
+    }
+
+    if (conditions.length === 0) return [];
+
+    return await db.select()
+      .from(wantedProfiles)
+      .where(and(...conditions))
+      .orderBy(desc(wantedProfiles.createdAt));
   }
 }
 
