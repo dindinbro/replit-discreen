@@ -1804,7 +1804,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/wanted/search", requireAuth, async (req, res) => {
+  app.get("/api/wanted/search", requireAuth, requireRole("pro", "business", "api"), async (req, res) => {
     try {
       const criteria = req.query as Record<string, string>;
       const results = await storage.searchWantedProfiles(criteria);
