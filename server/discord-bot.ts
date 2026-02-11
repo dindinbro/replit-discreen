@@ -925,26 +925,31 @@ export async function startDiscordBot() {
 
     if (interaction.commandName === "setplan") {
       try {
+        await interaction.deferReply({ ephemeral: true });
         const uniqueId = interaction.options.getInteger("idunique", true);
         const plan = interaction.options.getString("plan", true);
         const sub = await storage.getSubscriptionByUniqueId(uniqueId);
 
         if (!sub) {
-          await interaction.reply({ content: `Aucun utilisateur trouve avec l'ID unique \`${uniqueId}\`.`, ephemeral: true });
+          await interaction.editReply({ content: `Aucun utilisateur trouve avec l'ID unique \`${uniqueId}\`.` });
           return;
         }
 
         await storage.upsertSubscription(sub.userId, plan as PlanTier);
 
         let email = "Inconnu";
-        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (supabaseUrl && supabaseKey) {
-          const supaAdmin = createClient(supabaseUrl, supabaseKey);
-          const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
-          if (data?.user) {
-            email = data.user.email || "Inconnu";
+        try {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseKey) {
+            const supaAdmin = createClient(supabaseUrl, supabaseKey);
+            const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+            if (data?.user) {
+              email = data.user.email || "Inconnu";
+            }
           }
+        } catch (supaErr) {
+          log(`/setplan: Supabase lookup failed: ${supaErr}`, "discord");
         }
 
         const embed = new EmbedBuilder()
@@ -957,11 +962,15 @@ export async function startDiscordBot() {
           )
           .setTimestamp();
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.editReply({ embeds: [embed] });
         log(`/setplan: User #${uniqueId} set to ${plan} by ${interaction.user.username}`, "discord");
       } catch (err) {
         log(`Error in /setplan: ${err}`, "discord");
-        await interaction.reply({ content: "Erreur lors de la modification de l'abonnement.", ephemeral: true });
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de la modification de l'abonnement." });
+        } else if (!interaction.replied) {
+          await interaction.reply({ content: "Erreur lors de la modification de l'abonnement.", ephemeral: true });
+        }
       }
     }
 
