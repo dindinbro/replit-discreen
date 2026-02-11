@@ -50,8 +50,11 @@ async function buildAll() {
     entryPoints: ["server/index.ts"],
     platform: "node",
     bundle: true,
-    format: "cjs",
-    outfile: "dist/index.cjs",
+    format: "esm",
+    outfile: "dist/index.mjs",
+    banner: {
+      js: `import { createRequire } from "module"; const require = createRequire(import.meta.url); import { fileURLToPath } from "url"; import { dirname } from "path"; const __filename = fileURLToPath(import.meta.url); const __dirname = dirname(__filename);`,
+    },
     define: {
       "process.env.NODE_ENV": '"production"',
     },
@@ -61,8 +64,8 @@ async function buildAll() {
   });
 
   await writeFile(
-    "dist/vite.cjs",
-    'module.exports = { setupVite: () => { throw new Error("Vite is not available in production"); } };'
+    "dist/vite.mjs",
+    'export function setupVite() { throw new Error("Vite is not available in production"); }'
   );
 }
 
