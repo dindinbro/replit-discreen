@@ -260,7 +260,7 @@ export async function startDiscordBot() {
     );
 
   const wantedCommand = new SlashCommandBuilder()
-    .setName("wanted")
+    .setName("wantedlist")
     .setDescription("Lister tous les pseudos de l'historique Wanted")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
@@ -1249,7 +1249,7 @@ export async function startDiscordBot() {
       }
     }
 
-    if (interaction.commandName === "wanted") {
+    if (interaction.commandName === "wantedlist") {
       try {
         await interaction.deferReply({ ephemeral: true });
 
