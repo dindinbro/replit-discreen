@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType } from "@shared/schema";
+import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
 import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, SearchLimitError } from "@/hooks/use-search";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
@@ -39,6 +39,7 @@ import {
   X,
   ShieldAlert,
   Lock,
+  Gamepad2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -60,7 +61,8 @@ const FILTER_ICONS: Record<string, typeof User> = {
   iban: CreditCard,
   bic: CreditCard,
   discordId: Hash,
-  fivemLicense: Hash,
+  fivemLicense: Gamepad2,
+  steamId: Gamepad2,
   gender: User,
   hashedPassword: Hash,
   password: Hash,
@@ -84,6 +86,7 @@ const FILTER_PLACEHOLDERS: Record<string, string> = {
   bic: "ex: BNPAFRPP",
   discordId: "ex: 123456789012345678",
   fivemLicense: "ex: license:abc123def456",
+  steamId: "ex: steam:1100001xxxxxxxx",
   gender: "ex: M ou F",
   hashedPassword: "ex: 5f4dcc3b5aa765d61d8327deb882cf99",
   password: "ex: motdepasse123",
@@ -391,14 +394,12 @@ export default function SearchPage() {
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted">("internal");
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted" | "fivem">("internal");
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
 
-  const [criteria, setCriteria] = useState<CriterionRow[]>([
-    { id: String(nextCriterionId++), type: "username", value: "" },
-  ]);
+  const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -530,7 +531,7 @@ export default function SearchPage() {
     }
   };
 
-  const filterTypes = Object.keys(FilterLabels) as SearchFilterType[];
+  const filterTypes = [...MainSearchFilterTypes] as SearchFilterType[];
 
   const handleWantedSearch = async () => {
     const filledCriteria = criteria.filter((c) => c.value.trim() !== "");
@@ -627,19 +628,22 @@ export default function SearchPage() {
   const isUnlimited = isExternalMode ? leakosintUnlimited : internalUnlimited;
   const atLimit = isExternalMode ? leakosintAtLimit : internalAtLimit;
 
-  const addCriterion = () => {
+  const addCriterionWithType = (filterType: string) => {
+    setCriteria((prev) => [...prev, { id: String(nextCriterionId++), type: filterType, value: "" }]);
+  };
+
+  const getAvailableFilters = () => {
     const usedTypes = new Set(criteria.map((c) => c.type));
     if (searchMode === "wanted") {
-      const available = WantedFilterTypes.find((t) => !usedTypes.has(t)) || WantedFilterTypes[0];
-      setCriteria((prev) => [...prev, { id: String(nextCriterionId++), type: available, value: "" }]);
+      return WantedFilterTypes.filter((t) => !usedTypes.has(t));
+    } else if (searchMode === "fivem") {
+      return FivemFilterTypes.filter((t) => !usedTypes.has(t));
     } else {
-      const available = filterTypes.find((t) => !usedTypes.has(t)) || filterTypes[0];
-      setCriteria((prev) => [...prev, { id: String(nextCriterionId++), type: available, value: "" }]);
+      return filterTypes.filter((t) => !usedTypes.has(t));
     }
   };
 
   const removeCriterion = (id: string) => {
-    if (criteria.length <= 1) return;
     setCriteria((prev) => prev.filter((c) => c.id !== id));
   };
 
@@ -850,10 +854,7 @@ export default function SearchPage() {
         <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
           <Button
             variant={searchMode === "internal" ? "default" : "outline"}
-            onClick={() => {
-              setSearchMode("internal");
-              if (searchMode === "wanted") setCriteria([{ id: String(nextCriterionId++), type: "username", value: "" }]);
-            }}
+            onClick={() => { setSearchMode("internal"); setCriteria([]); }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-internal"
           >
@@ -862,7 +863,7 @@ export default function SearchPage() {
           </Button>
           <Button
             variant={searchMode === "external" ? "default" : "outline"}
-            onClick={() => setSearchMode("external")}
+            onClick={() => { setSearchMode("external"); setCriteria([]); }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-external"
           >
@@ -871,7 +872,7 @@ export default function SearchPage() {
           </Button>
           <Button
             variant={searchMode === "other" ? "default" : "outline"}
-            onClick={() => setSearchMode("other")}
+            onClick={() => { setSearchMode("other"); setCriteria([]); }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-other"
           >
@@ -880,7 +881,7 @@ export default function SearchPage() {
           </Button>
           <Button
             variant={searchMode === "phone" ? "default" : "outline"}
-            onClick={() => setSearchMode("phone")}
+            onClick={() => { setSearchMode("phone"); setCriteria([]); }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-phone"
           >
@@ -889,7 +890,7 @@ export default function SearchPage() {
           </Button>
           <Button
             variant={searchMode === "geoip" ? "default" : "outline"}
-            onClick={() => setSearchMode("geoip")}
+            onClick={() => { setSearchMode("geoip"); setCriteria([]); }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-geoip"
           >
@@ -898,7 +899,7 @@ export default function SearchPage() {
           </Button>
           <Button
             variant={searchMode === "nir" ? "default" : "outline"}
-            onClick={() => setSearchMode("nir")}
+            onClick={() => { setSearchMode("nir"); setCriteria([]); }}
             className="min-w-[180px] gap-2"
             data-testid="button-mode-nir"
           >
@@ -906,10 +907,22 @@ export default function SearchPage() {
             Decodeur NIR
           </Button>
           <Button
+            variant={searchMode === "fivem" ? "default" : "outline"}
+            onClick={() => {
+              setSearchMode("fivem");
+              setCriteria([]);
+            }}
+            className="min-w-[180px] gap-2"
+            data-testid="button-mode-fivem"
+          >
+            <Gamepad2 className="w-4 h-4" />
+            FiveM
+          </Button>
+          <Button
             variant={searchMode === "wanted" ? "default" : "outline"}
             onClick={() => {
               setSearchMode("wanted");
-              setCriteria([{ id: String(nextCriterionId++), type: "nom", value: "" }]);
+              setCriteria([]);
             }}
             className={`min-w-[180px] gap-2 ${searchMode === "wanted" ? "bg-red-600 hover:bg-red-700 text-white border-red-600" : ""}`}
             data-testid="button-mode-wanted"
@@ -933,16 +946,30 @@ export default function SearchPage() {
                   <Sparkles className="w-5 h-5 text-primary" />
                   <h2 className="text-xl font-bold tracking-tight">Recherche par Critères</h2>
                 </div>
-                <Button
-                  data-testid="button-add-criterion"
-                  variant="outline"
-                  size="sm"
-                  onClick={addCriterion}
-                  className="gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Ajouter un filtre
-                </Button>
+                {getAvailableFilters().length > 0 && (
+                  <Select
+                    value=""
+                    onValueChange={(val) => addCriterionWithType(val)}
+                  >
+                    <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-criterion">
+                      <Plus className="w-4 h-4" />
+                      <SelectValue placeholder="Ajouter un filtre" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableFilters().map((ft) => {
+                        const Icon = FILTER_ICONS[ft] || FileText;
+                        return (
+                          <SelectItem key={ft} value={ft}>
+                            <span className="flex items-center gap-2">
+                              <Icon className="w-4 h-4" />
+                              {FilterLabels[ft as SearchFilterType]}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -966,21 +993,9 @@ export default function SearchPage() {
                             </div>
                             
                             <div className="w-full sm:w-[220px]">
-                              <Select
-                                value={criterion.type}
-                                onValueChange={(val) => updateCriterion(criterion.id, "type", val)}
-                              >
-                                <SelectTrigger className="bg-background">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {filterTypes.map((ft) => (
-                                    <SelectItem key={ft} value={ft}>
-                                      {FilterLabels[ft]}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <span className="text-sm font-medium text-foreground">
+                                {FilterLabels[criterion.type as SearchFilterType]}
+                              </span>
                             </div>
 
                             <div className="flex-1 w-full relative">
@@ -996,17 +1011,15 @@ export default function SearchPage() {
                               />
                             </div>
 
-                            {criteria.length > 1 && (
-                              <Button
-                                data-testid={`button-remove-criterion-${criterion.id}`}
-                                variant="ghost"
-                                size="icon"
-                                className="shrink-0 hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => removeCriterion(criterion.id)}
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            )}
+                            <Button
+                              data-testid={`button-remove-criterion-${criterion.id}`}
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0"
+                              onClick={() => removeCriterion(criterion.id)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
                           </div>
                         </Card>
                       </motion.div>
@@ -1014,6 +1027,13 @@ export default function SearchPage() {
                   })}
                 </AnimatePresence>
               </div>
+
+              {criteria.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">Ajoutez un filtre pour lancer une recherche</p>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-2">
@@ -1025,6 +1045,128 @@ export default function SearchPage() {
 
                 <Button
                   data-testid="button-search"
+                  onClick={() => handleSearch(0)}
+                  disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
+                  className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
+                >
+                  {searchMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  Rechercher
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {searchMode === "fivem" && (
+            <motion.div
+              key="fivem"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Gamepad2 className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-bold tracking-tight">Recherche FiveM</h2>
+                </div>
+                {getAvailableFilters().length > 0 && (
+                  <Select
+                    value=""
+                    onValueChange={(val) => addCriterionWithType(val)}
+                  >
+                    <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-fivem-criterion">
+                      <Plus className="w-4 h-4" />
+                      <SelectValue placeholder="Ajouter un filtre" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableFilters().map((ft) => {
+                        const Icon = FILTER_ICONS[ft] || FileText;
+                        return (
+                          <SelectItem key={ft} value={ft}>
+                            <span className="flex items-center gap-2">
+                              <Icon className="w-4 h-4" />
+                              {FivemFilterLabels[ft as keyof typeof FivemFilterLabels]}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <AnimatePresence mode="popLayout">
+                  {criteria.map((criterion, idx) => {
+                    const IconComp = FILTER_ICONS[criterion.type] || FileText;
+                    return (
+                      <motion.div
+                        key={criterion.id}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="group relative"
+                      >
+                        <Card className="p-3 bg-secondary/30 border-border/50">
+                          <div className="flex flex-col sm:flex-row items-center gap-3">
+                            <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-primary">
+                              <IconComp className="w-4 h-4" />
+                            </div>
+                            <div className="w-full sm:w-[220px]">
+                              <span className="text-sm font-medium text-foreground">
+                                {FilterLabels[criterion.type as SearchFilterType]}
+                              </span>
+                            </div>
+                            <div className="flex-1 w-full relative">
+                              <Input
+                                data-testid={`input-fivem-criterion-value-${criterion.id}`}
+                                placeholder={FILTER_PLACEHOLDERS[criterion.type] || "Entrez une valeur..."}
+                                value={criterion.value}
+                                onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSearch(0);
+                                }}
+                                className="bg-background pr-10"
+                              />
+                            </div>
+                            <Button
+                              data-testid={`button-remove-fivem-criterion-${criterion.id}`}
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0"
+                              onClick={() => removeCriterion(criterion.id)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+
+              {criteria.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Gamepad2 className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">Ajoutez un filtre pour lancer une recherche FiveM</p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="h-7 bg-primary/5 text-primary border-primary/20 gap-1.5 font-medium">
+                    <Search className="w-3.5 h-3.5" />
+                    {isUnlimited ? `Illimité (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
+                  </Badge>
+                </div>
+
+                <Button
+                  data-testid="button-fivem-search"
                   onClick={() => handleSearch(0)}
                   disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
                   className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
@@ -1321,17 +1463,24 @@ export default function SearchPage() {
                     <ShieldAlert className="w-5 h-5 text-red-500" />
                     <h2 className="text-xl font-bold tracking-tight">Recherche par Critères (Wanted)</h2>
                   </div>
-                  <Button
-                    data-testid="button-add-criterion"
-                    variant="outline"
-                    size="sm"
-                    onClick={addCriterion}
-                    className="gap-2"
-                    tabIndex={canAccessWanted ? 0 : -1}
-                  >
-                    <Plus className="w-4 h-4" />
-                    Ajouter un filtre
-                  </Button>
+                  {getAvailableFilters().length > 0 && (
+                    <Select
+                      value=""
+                      onValueChange={(val) => addCriterionWithType(val)}
+                    >
+                      <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-wanted-criterion" tabIndex={canAccessWanted ? 0 : -1}>
+                        <Plus className="w-4 h-4" />
+                        <SelectValue placeholder="Ajouter un filtre" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getAvailableFilters().map((ft) => (
+                          <SelectItem key={ft} value={ft}>
+                            {WantedFilterLabels[ft as WantedFilterType]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -1355,21 +1504,9 @@ export default function SearchPage() {
                               </div>
                               
                               <div className="w-full sm:w-[220px]">
-                                <Select
-                                  value={criterion.type}
-                                  onValueChange={(val) => updateCriterion(criterion.id, "type", val)}
-                                >
-                                  <SelectTrigger className="bg-background">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {WantedFilterTypes.map((ft) => (
-                                      <SelectItem key={ft} value={ft}>
-                                        {WantedFilterLabels[ft]}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <span className="text-sm font-medium text-foreground">
+                                  {WantedFilterLabels[criterion.type as WantedFilterType]}
+                                </span>
                               </div>
 
                               <div className="flex-1 w-full relative">
@@ -1385,17 +1522,15 @@ export default function SearchPage() {
                                 />
                               </div>
 
-                              {criteria.length > 1 && (
-                                <Button
-                                  data-testid={`button-remove-criterion-${criterion.id}`}
-                                  variant="ghost"
-                                  size="icon"
-                                  className="shrink-0 hover:bg-destructive/10 hover:text-destructive"
-                                  onClick={() => removeCriterion(criterion.id)}
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <Button
+                                data-testid={`button-remove-criterion-${criterion.id}`}
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0"
+                                onClick={() => removeCriterion(criterion.id)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
                             </div>
                           </Card>
                         </motion.div>
@@ -1403,6 +1538,13 @@ export default function SearchPage() {
                     })}
                   </AnimatePresence>
                 </div>
+
+                {criteria.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ShieldAlert className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p className="text-sm">Ajoutez un filtre pour lancer une recherche Wanted</p>
+                  </div>
+                )}
 
                 <Button
                   data-testid="button-wanted-search"
@@ -1653,7 +1795,7 @@ export default function SearchPage() {
                 />
               ))}
 
-          {searchMode === "internal" && searchMutation.data && (searchMutation.data.total ?? 0) > pageSize && (
+          {(searchMode === "internal" || searchMode === "fivem") && searchMutation.data && (searchMutation.data.total ?? 0) > pageSize && (
                       <div className="flex items-center justify-center gap-2 pt-8">
                         <Button
                           variant="outline"

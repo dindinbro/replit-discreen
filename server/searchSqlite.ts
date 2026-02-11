@@ -433,6 +433,7 @@ const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   gender: ["gender", "civilite"],
   vin: ["vin"],
   fivemLicense: ["fivem"],
+  steamId: ["steam", "steamid", "steam_id"],
 };
 
 export function filterResultsByCriteria(
