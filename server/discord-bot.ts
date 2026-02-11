@@ -259,6 +259,11 @@ export async function startDiscordBot() {
         .addChannelTypes(ChannelType.GuildText)
     );
 
+  const wantedCommand = new SlashCommandBuilder()
+    .setName("wanted")
+    .setDescription("Lister tous les pseudos de l'historique Wanted")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+
   const rest = new REST({ version: "10" }).setToken(token);
 
   try {
@@ -280,7 +285,8 @@ export async function startDiscordBot() {
         statusCommand.toJSON(),
         soutienCommand.toJSON(),
         renewCommand.toJSON(),
-        linkCommand.toJSON()
+        linkCommand.toJSON(),
+        wantedCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -307,7 +313,8 @@ export async function startDiscordBot() {
       statusCommand.toJSON(),
       soutienCommand.toJSON(),
       renewCommand.toJSON(),
-      linkCommand.toJSON()
+      linkCommand.toJSON(),
+      wantedCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1238,6 +1245,58 @@ export async function startDiscordBot() {
           await interaction.editReply({ content: "Erreur lors de l'affichage des liens." });
         } else {
           await interaction.reply({ content: "Erreur lors de l'affichage des liens.", ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.commandName === "wanted") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const profiles = await storage.getWantedProfiles();
+
+        if (!profiles || profiles.length === 0) {
+          await interaction.editReply({ content: "Aucun profil dans l'historique Wanted." });
+          return;
+        }
+
+        const lines: string[] = [];
+        for (const p of profiles) {
+          const pseudo = p.pseudo || "N/A";
+          const nom = [p.prenom, p.nom].filter(Boolean).join(" ") || "";
+          const info = nom ? `${pseudo} (${nom})` : pseudo;
+          const date = p.createdAt ? new Date(p.createdAt).toLocaleDateString("fr-FR") : "";
+          lines.push(`\`#${p.id}\` ${info}${date ? ` — ${date}` : ""}`);
+        }
+
+        const chunks: string[] = [];
+        let current = "";
+        for (const line of lines) {
+          if ((current + "\n" + line).length > 4000) {
+            chunks.push(current);
+            current = line;
+          } else {
+            current = current ? current + "\n" + line : line;
+          }
+        }
+        if (current) chunks.push(current);
+
+        const embeds = chunks.map((chunk, i) =>
+          new EmbedBuilder()
+            .setColor(0x10b981)
+            .setTitle(i === 0 ? `Historique Wanted (${profiles.length} profils)` : `Wanted (suite)`)
+            .setDescription(chunk)
+            .setFooter({ text: "\u00A9 Discreen" })
+            .setTimestamp()
+        );
+
+        await interaction.editReply({ embeds: embeds.slice(0, 10) });
+      } catch (err) {
+        log(`Error in wanted command: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de la recuperation des profils Wanted." });
+        } else {
+          await interaction.reply({ content: "Erreur lors de la recuperation des profils Wanted.", ephemeral: true });
         }
       }
     }
