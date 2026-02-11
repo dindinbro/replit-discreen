@@ -680,10 +680,12 @@ export async function startDiscordBot() {
         }
       } catch (err) {
         log(`Error in say command: ${err}`, "discord");
-        await interaction.reply({
-          content: "Une erreur est survenue.",
-          ephemeral: true,
-        });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: "Une erreur est survenue.",
+            ephemeral: true,
+          });
+        }
       }
     }
 
