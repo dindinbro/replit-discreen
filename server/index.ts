@@ -194,9 +194,13 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  startDiscordBot().catch((err) => {
-    log(`Discord bot failed to start: ${err}`, "discord");
-  });
+  if (process.env.NODE_ENV === "production") {
+    startDiscordBot().catch((err) => {
+      log(`Discord bot failed to start: ${err}`, "discord");
+    });
+  } else {
+    log("Discord bot disabled in development (managed by VPS)", "discord");
+  }
 
   setInterval(async () => {
     try {
