@@ -1644,7 +1644,10 @@ function MaintenanceToggle({ getAccessToken }: { getAccessToken: () => string | 
 
   useEffect(() => {
     const token = getAccessToken();
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetch("/api/admin/maintenance", {
       headers: { Authorization: `Bearer ${token}` },
     })
