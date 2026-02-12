@@ -1554,6 +1554,29 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/subscriptions", requireAuth, requireAdmin, async (_req: Request, res: Response) => {
+    try {
+      const allSubs = await storage.getAllSubscriptions();
+      res.json(allSubs);
+    } catch (err) {
+      console.error("GET /api/admin/subscriptions error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/revoke-subscription", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: "userId requis" });
+      const success = await storage.revokeSubscription(userId);
+      if (!success) return res.status(404).json({ message: "Abonnement non trouve" });
+      res.json({ message: "Abonnement revoque" });
+    } catch (err) {
+      console.error("POST /api/admin/revoke-subscription error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // GET /api/subscription - get current user subscription
   app.get("/api/subscription", requireAuth, async (req, res) => {
     try {

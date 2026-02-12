@@ -9,6 +9,7 @@ interface AuthContextType {
   frozen: boolean;
   loading: boolean;
   displayName: string | null;
+  expiresAt: string | null;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signInWithDiscord: () => Promise<void>;
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [frozen, setFrozen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   const fetchRole = useCallback(async (accessToken: string) => {
     try {
@@ -37,15 +39,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(data.role || "user");
         setFrozen(!!data.frozen);
         setDisplayName(data.display_name || null);
+        setExpiresAt(data.expires_at || null);
       } else {
         setRole("user");
         setFrozen(false);
         setDisplayName(null);
+        setExpiresAt(null);
       }
     } catch {
       setRole("user");
       setFrozen(false);
       setDisplayName(null);
+      setExpiresAt(null);
     }
   }, []);
 
@@ -134,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       frozen,
       loading,
       displayName,
+      expiresAt,
       signInWithEmail,
       signUpWithEmail,
       signInWithDiscord,

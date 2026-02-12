@@ -71,6 +71,8 @@ export interface IStorage {
   updateWantedProfile(id: number, data: Partial<InsertWantedProfile>): Promise<WantedProfile | undefined>;
   deleteWantedProfile(id: number): Promise<boolean>;
   searchWantedProfiles(criteria: Record<string, string>): Promise<WantedProfile[]>;
+  getAllSubscriptions(): Promise<Subscription[]>;
+  revokeSubscription(userId: string): Promise<boolean>;
   deleteUserData(userId: string): Promise<void>;
   getSiteSetting(key: string): Promise<string | null>;
   setSiteSetting(key: string, value: string): Promise<void>;
@@ -586,6 +588,19 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWantedProfile(id: number): Promise<boolean> {
     const result = await db.delete(wantedProfiles).where(eq(wantedProfiles.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAllSubscriptions(): Promise<Subscription[]> {
+    return db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
+  }
+
+  async revokeSubscription(userId: string): Promise<boolean> {
+    const result = await db
+      .update(subscriptions)
+      .set({ tier: "free", expiresAt: null, frozen: false, frozenAt: null })
+      .where(eq(subscriptions.userId, userId))
+      .returning();
     return result.length > 0;
   }
 

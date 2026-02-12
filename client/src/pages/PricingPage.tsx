@@ -25,6 +25,7 @@ import {
   ArrowRight,
   Loader2,
   Key,
+  Clock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -142,7 +143,17 @@ export default function PricingPage() {
   const [redeemKey, setRedeemKey] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
   const { toast } = useToast();
-  const { getAccessToken, refreshRole } = useAuth();
+  const { getAccessToken, refreshRole, role, expiresAt } = useAuth();
+
+  const getDaysRemaining = (planId: string): number | null => {
+    if (!role || role === "free" || role === "admin") return null;
+    if (role !== planId) return null;
+    if (!expiresAt) return null;
+    const now = new Date();
+    const exp = new Date(expiresAt);
+    if (exp <= now) return null;
+    return Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
 
   async function handleRedeem() {
     if (!redeemKey.trim()) return;
@@ -346,31 +357,47 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  <Button
-                    data-testid={`button-subscribe-${plan.id}`}
-                    className="w-full gap-2"
-                    size="sm"
-                    variant={plan.popular ? "default" : "outline"}
-                    onClick={() => handleSubscribe(plan)}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Chargement...
-                      </>
-                    ) : plan.price === 0 ? (
-                      <>
-                        Commencer
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    ) : (
-                      <>
-                        S'abonner
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </Button>
+                  {(() => {
+                    const daysLeft = getDaysRemaining(plan.id);
+                    if (daysLeft !== null && daysLeft > 0) {
+                      return (
+                        <Badge
+                          data-testid={`badge-days-remaining-${plan.id}`}
+                          className="w-full justify-center py-2 bg-primary/10 text-primary border-primary/20 no-default-hover-elevate no-default-active-elevate"
+                        >
+                          <Clock className="w-3.5 h-3.5 mr-1.5" />
+                          {daysLeft} jour{daysLeft > 1 ? "s" : ""} restant{daysLeft > 1 ? "s" : ""}
+                        </Badge>
+                      );
+                    }
+                    return (
+                      <Button
+                        data-testid={`button-subscribe-${plan.id}`}
+                        className="w-full gap-2"
+                        size="sm"
+                        variant={plan.popular ? "default" : "outline"}
+                        onClick={() => handleSubscribe(plan)}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Chargement...
+                          </>
+                        ) : plan.price === 0 ? (
+                          <>
+                            Commencer
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </>
+                        ) : (
+                          <>
+                            S'abonner
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </>
+                        )}
+                      </Button>
+                    );
+                  })()}
                 </Card>
               </motion.div>
             );

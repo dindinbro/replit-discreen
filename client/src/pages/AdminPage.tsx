@@ -45,6 +45,9 @@ import {
   FileText,
   ChevronRight,
   Wrench,
+  KeyRound,
+  Ban,
+  Copy,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel";
@@ -73,10 +76,11 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "blacklist" | "info" | "wanted";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
+  { key: "keys", label: "Cles & Abonnements", icon: KeyRound },
   { key: "blacklist", label: "Demandes de blacklist", icon: ShieldBan },
   { key: "info", label: "Demandes d'information", icon: FileText },
   { key: "wanted", label: "Wanted", icon: Crosshair },
@@ -1591,6 +1595,374 @@ function InfoRequestsSection({ getAccessToken }: { getAccessToken: () => string 
   );
 }
 
+interface AdminSubscription {
+  id: number;
+  userId: string;
+  tier: string;
+  frozen: boolean;
+  frozenAt: string | null;
+  expiresAt: string | null;
+  discordId: string | null;
+  createdAt: string;
+}
+
+interface AdminLicenseKey {
+  id: number;
+  key: string;
+  tier: string;
+  used: boolean;
+  usedBy: string | null;
+  orderId: string | null;
+  createdAt: string;
+  usedAt: string | null;
+}
+
+function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const [subTab, setSubTab] = useState<"subscriptions" | "license-keys" | "generate">("subscriptions");
+  const [subs, setSubs] = useState<AdminSubscription[]>([]);
+  const [keys, setKeys] = useState<AdminLicenseKey[]>([]);
+  const [loadingSubs, setLoadingSubs] = useState(true);
+  const [loadingKeys, setLoadingKeys] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [generateTier, setGenerateTier] = useState("vip");
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    async function fetchData() {
+      const token = getAccessToken();
+      if (!token) return;
+      try {
+        const [subsRes, keysRes] = await Promise.all([
+          fetch("/api/admin/subscriptions", { headers: { Authorization: `Bearer ${token}` } }),
+          fetch("/api/admin/license-keys", { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        if (subsRes.ok) setSubs(await subsRes.json());
+        if (keysRes.ok) setKeys(await keysRes.json());
+      } catch {}
+      setLoadingSubs(false);
+      setLoadingKeys(false);
+    }
+    fetchData();
+  }, [getAccessToken]);
+
+  const handleFreeze = async (userId: string, freeze: boolean) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setActionLoading(userId);
+    try {
+      const res = await fetch("/api/admin/freeze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId, frozen: freeze }),
+      });
+      if (res.ok) {
+        setSubs(prev => prev.map(s => s.userId === userId ? { ...s, frozen: freeze, frozenAt: freeze ? new Date().toISOString() : null } : s));
+        toast({ title: freeze ? "Compte gele" : "Compte degele" });
+      } else {
+        toast({ title: "Erreur", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur reseau", variant: "destructive" });
+    }
+    setActionLoading(null);
+  };
+
+  const handleRevoke = async (userId: string) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setActionLoading(userId);
+    try {
+      const res = await fetch("/api/admin/revoke-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId }),
+      });
+      if (res.ok) {
+        setSubs(prev => prev.map(s => s.userId === userId ? { ...s, tier: "free", expiresAt: null, frozen: false, frozenAt: null } : s));
+        toast({ title: "Abonnement revoque" });
+      } else {
+        toast({ title: "Erreur", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur reseau", variant: "destructive" });
+    }
+    setActionLoading(null);
+  };
+
+  const handleGenerate = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    setGenerating(true);
+    setGeneratedKey(null);
+    try {
+      const res = await fetch("/api/admin/generate-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ tier: generateTier }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedKey(data.key);
+        const keysRes = await fetch("/api/admin/license-keys", { headers: { Authorization: `Bearer ${token}` } });
+        if (keysRes.ok) setKeys(await keysRes.json());
+        toast({ title: "Cle generee" });
+      } else {
+        toast({ title: "Erreur", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur reseau", variant: "destructive" });
+    }
+    setGenerating(false);
+  };
+
+  const getDaysRemaining = (expiresAt: string | null): string => {
+    if (!expiresAt) return "-";
+    const now = new Date();
+    const exp = new Date(expiresAt);
+    if (exp <= now) return "Expire";
+    const days = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return `${days}j`;
+  };
+
+  const activeSubs = subs.filter(s => s.tier !== "free");
+  const filteredSubs = searchTerm
+    ? activeSubs.filter(s => s.userId.includes(searchTerm) || (s.discordId && s.discordId.includes(searchTerm)))
+    : activeSubs;
+
+  const filteredKeys = searchTerm
+    ? keys.filter(k => k.key.includes(searchTerm) || k.tier.includes(searchTerm) || (k.usedBy && k.usedBy.includes(searchTerm)))
+    : keys;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          variant={subTab === "subscriptions" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSubTab("subscriptions")}
+          className="gap-2"
+          data-testid="button-keys-subtab-subs"
+        >
+          <Users className="w-4 h-4" />
+          Abonnements ({activeSubs.length})
+        </Button>
+        <Button
+          variant={subTab === "license-keys" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSubTab("license-keys")}
+          className="gap-2"
+          data-testid="button-keys-subtab-keys"
+        >
+          <KeyRound className="w-4 h-4" />
+          Cles ({keys.length})
+        </Button>
+        <Button
+          variant={subTab === "generate" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSubTab("generate")}
+          className="gap-2"
+          data-testid="button-keys-subtab-generate"
+        >
+          <Plus className="w-4 h-4" />
+          Generer une cle
+        </Button>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          data-testid="input-keys-search"
+          placeholder="Rechercher par ID, cle, tier..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {subTab === "subscriptions" && (
+        <div className="space-y-3">
+          {loadingSubs ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredSubs.length === 0 ? (
+            <Card className="p-6 text-center text-muted-foreground text-sm">
+              Aucun abonnement actif
+            </Card>
+          ) : (
+            filteredSubs.map(sub => {
+              const roleConf = ROLE_CONFIG[sub.tier] || ROLE_CONFIG.free;
+              const isActioning = actionLoading === sub.userId;
+              return (
+                <Card key={sub.id} className="p-4" data-testid={`card-sub-${sub.id}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono text-muted-foreground truncate max-w-[200px]" data-testid={`text-sub-userid-${sub.id}`}>
+                          {sub.userId.slice(0, 8)}...
+                        </span>
+                        <Badge variant={roleConf.variant} data-testid={`badge-sub-tier-${sub.id}`}>
+                          {roleConf.label}
+                        </Badge>
+                        {sub.frozen && (
+                          <Badge variant="destructive" data-testid={`badge-sub-frozen-${sub.id}`}>
+                            <Snowflake className="w-3 h-3 mr-1" />
+                            Gele
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {getDaysRemaining(sub.expiresAt)} restant
+                        </span>
+                        {sub.discordId && (
+                          <span>Discord: {sub.discordId}</span>
+                        )}
+                        <span>ID: #{sub.id}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleFreeze(sub.userId, !sub.frozen)}
+                        disabled={isActioning}
+                        data-testid={`button-freeze-${sub.id}`}
+                        className="gap-1.5"
+                      >
+                        {isActioning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Snowflake className="w-3.5 h-3.5" />}
+                        {sub.frozen ? "Degeler" : "Geler"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleRevoke(sub.userId)}
+                        disabled={isActioning}
+                        data-testid={`button-revoke-${sub.id}`}
+                        className="gap-1.5"
+                      >
+                        {isActioning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                        Revoquer
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {subTab === "license-keys" && (
+        <div className="space-y-3">
+          {loadingKeys ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredKeys.length === 0 ? (
+            <Card className="p-6 text-center text-muted-foreground text-sm">
+              Aucune cle trouvee
+            </Card>
+          ) : (
+            filteredKeys.map(k => (
+              <Card key={k.id} className="p-4" data-testid={`card-key-${k.id}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs truncate max-w-[220px]" data-testid={`text-key-value-${k.id}`}>
+                        {k.key}
+                      </span>
+                      <Badge variant={(ROLE_CONFIG[k.tier] || ROLE_CONFIG.free).variant}>
+                        {(ROLE_CONFIG[k.tier] || ROLE_CONFIG.free).label}
+                      </Badge>
+                      <Badge variant={k.used ? "secondary" : "outline"}>
+                        {k.used ? "Utilisee" : "Disponible"}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
+                      <span>Creee: {new Date(k.createdAt).toLocaleDateString("fr-FR")}</span>
+                      {k.usedBy && k.usedBy !== "REVOKED" && (
+                        <span>Utilisee par: {k.usedBy.slice(0, 8)}...</span>
+                      )}
+                      {k.usedBy === "REVOKED" && (
+                        <Badge variant="destructive" className="text-xs">Revoquee</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(k.key);
+                      toast({ title: "Cle copiee" });
+                    }}
+                    data-testid={`button-copy-key-${k.id}`}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {subTab === "generate" && (
+        <Card className="p-6 space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Tier de la cle</label>
+            <Select value={generateTier} onValueChange={setGenerateTier}>
+              <SelectTrigger data-testid="select-generate-tier">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vip">VIP</SelectItem>
+                <SelectItem value="pro">PRO</SelectItem>
+                <SelectItem value="business">Business</SelectItem>
+                <SelectItem value="api">API</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="gap-2"
+            data-testid="button-generate-key"
+          >
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Generer
+          </Button>
+          {generatedKey && (
+            <div className="p-4 rounded-md bg-primary/5 border border-primary/20">
+              <p className="text-sm font-medium mb-2">Cle generee :</p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs font-mono bg-background px-2 py-1 rounded flex-1 truncate" data-testid="text-generated-key">
+                  {generatedKey}
+                </code>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedKey);
+                    toast({ title: "Cle copiee" });
+                  }}
+                  data-testid="button-copy-generated-key"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function WantedSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const [wantedSubTab, setWantedSubTab] = useState<"form" | "history">("form");
   const [editProfile, setEditProfile] = useState<WantedProfile | null>(null);
@@ -1795,6 +2167,10 @@ export default function AdminPage() {
 
             {activeTab === "users" && (
               <UsersSection getAccessToken={getAccessToken} userId={user.id} />
+            )}
+
+            {activeTab === "keys" && (
+              <KeysSection getAccessToken={getAccessToken} />
             )}
 
             {activeTab === "blacklist" && (
