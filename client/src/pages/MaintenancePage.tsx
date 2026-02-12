@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Shield, Search, Moon, Sun, Lock, Database, Zap,
-  Mail, User, Phone, Globe, Hash,
+  Mail, User, Phone, Globe, Hash, MapPin, Key, Calendar,
 } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { motion } from "framer-motion";
@@ -30,11 +30,37 @@ function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: stri
 }
 
 const fakeResults = [
-  { type: "Email", value: "j••••@g••••.com", source: "Collection #2 - 2024", fields: 6 },
-  { type: "Pseudo", value: "D••k_R••der", source: "Forum DB - Mars 2024", fields: 4 },
-  { type: "Tel", value: "06 •• •• •• 42", source: "Telecom Leak FR", fields: 3 },
-  { type: "Email", value: "m••••@ou••••.fr", source: "Combolist FR #8", fields: 8 },
-  { type: "IP", value: "92.••.••.137", source: "Log Dump 2024", fields: 5 },
+  {
+    title: "j••••.d••••@gmail.com",
+    source: "Discreen",
+    fields: [
+      { icon: Mail, label: "Email", value: "j••••.d••••@gmail.com", color: "--primary" },
+      { icon: User, label: "Pseudo", value: "jd••••42", color: "--chart-2" },
+      { icon: Phone, label: "Telephone", value: "06 •• •• •• 78", color: "--chart-3" },
+      { icon: Key, label: "Mot de passe", value: "••••••••••", color: "--chart-4" },
+      { icon: MapPin, label: "Ville", value: "P••••s", color: "--chart-5" },
+      { icon: Calendar, label: "Date", value: "2024-••-••", color: "--chart-1" },
+    ],
+  },
+  {
+    title: "je••.du••••@outlook.fr",
+    source: "Discreen",
+    fields: [
+      { icon: Mail, label: "Email", value: "je••.du••••@outlook.fr", color: "--primary" },
+      { icon: User, label: "Nom", value: "D••••t", color: "--chart-2" },
+      { icon: Globe, label: "IP", value: "92.••.••.137", color: "--chart-3" },
+      { icon: Key, label: "Mot de passe", value: "••••••••", color: "--chart-4" },
+    ],
+  },
+  {
+    title: "jdup••••@yahoo.com",
+    source: "Discreen",
+    fields: [
+      { icon: Mail, label: "Email", value: "jdup••••@yahoo.com", color: "--primary" },
+      { icon: User, label: "Pseudo", value: "D••k_R••der", color: "--chart-2" },
+      { icon: Phone, label: "Telephone", value: "07 •• •• •• 15", color: "--chart-3" },
+    ],
+  },
 ];
 
 const criteria = [
@@ -53,7 +79,6 @@ export default function MaintenancePage() {
     return true;
   });
 
-  const [query, setQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [typedText, setTypedText] = useState("");
   const demoQuery = "jean.dupont@gmail.com";
@@ -108,7 +133,7 @@ export default function MaintenancePage() {
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 flex flex-col items-center px-6 pt-12 sm:pt-20">
+      <main className="relative z-10 flex-1 flex flex-col items-center px-4 sm:px-6 pt-10 sm:pt-16">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -120,7 +145,7 @@ export default function MaintenancePage() {
             <span className="text-primary">Instantanement.</span>
           </h1>
           <p className="text-muted-foreground text-sm sm:text-base mb-8 max-w-lg mx-auto">
-            Plus de 15 milliards d'enregistrements indexes.
+            Plus de 11 milliards de lignes indexees.
             Resultats en millisecondes.
           </p>
         </motion.div>
@@ -129,16 +154,14 @@ export default function MaintenancePage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.15 }}
-          className="w-full max-w-xl mb-4"
+          className="w-full max-w-2xl mb-4"
         >
-          <div className="relative">
-            <div className="flex items-center border border-border rounded-lg bg-card px-4 h-12 shadow-sm">
-              <Search className="w-4 h-4 text-muted-foreground shrink-0 mr-3" />
-              <span className="text-foreground text-sm flex-1 text-left">
-                {typedText}
-                <span className="inline-block w-[2px] h-4 bg-primary ml-0.5 animate-pulse align-middle" />
-              </span>
-            </div>
+          <div className="flex items-center border border-border rounded-lg bg-card px-4 h-12 shadow-sm">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0 mr-3" />
+            <span className="text-foreground text-sm flex-1 text-left">
+              {typedText}
+              <span className="inline-block w-[2px] h-4 bg-primary ml-0.5 animate-pulse align-middle" />
+            </span>
           </div>
         </motion.div>
 
@@ -165,11 +188,11 @@ export default function MaintenancePage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="w-full max-w-xl mb-8"
+            className="w-full max-w-2xl mb-8"
           >
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <p className="text-sm font-medium">
-                <span className="text-primary font-bold">2,847</span>{" "}
+                <span className="text-primary font-bold">2 847</span>{" "}
                 <span className="text-muted-foreground">resultats trouves en 0.12s</span>
               </p>
               <Badge variant="outline" className="text-xs gap-1">
@@ -178,36 +201,61 @@ export default function MaintenancePage() {
               </Badge>
             </div>
 
-            <div className="space-y-2 relative">
-              {fakeResults.map((r, i) => (
+            <div className="space-y-3 relative">
+              {fakeResults.map((result, i) => (
                 <Card
                   key={i}
-                  className="px-4 py-3 flex items-center justify-between gap-3"
-                  style={{ filter: i > 0 ? `blur(${Math.min(i * 1.5, 5)}px)` : "none" }}
+                  className="overflow-visible"
+                  style={{ filter: i > 0 ? `blur(${Math.min(i * 2.5, 6)}px)` : "none" }}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Badge variant="secondary" className="text-xs shrink-0">
-                      {r.type}
-                    </Badge>
-                    <span className="text-sm font-medium truncate">{r.value}</span>
+                  <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b border-border/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground truncate text-sm">{result.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{result.source}</p>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">{r.source}</span>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+                    {result.fields.map((field, fi) => {
+                      const Icon = field.icon;
+                      return (
+                        <div key={fi} className="flex items-start gap-3">
+                          <div
+                            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                            style={{
+                              color: `hsl(var(${field.color}))`,
+                              backgroundColor: `hsl(var(${field.color}) / 0.12)`,
+                            }}
+                          >
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs text-muted-foreground">{field.label}</p>
+                            <p className="text-sm font-medium text-foreground break-all leading-tight">{field.value}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </Card>
               ))}
 
-              <div className="absolute inset-0 top-16 flex items-center justify-center pointer-events-none">
-                <div className="bg-background/80 backdrop-blur-sm border border-border rounded-lg px-6 py-4 text-center pointer-events-auto">
-                  <Lock className="w-5 h-5 text-primary mx-auto mb-2" />
+              <div className="absolute inset-0 top-20 flex items-center justify-center pointer-events-none">
+                <div className="bg-background/80 backdrop-blur-sm border border-border rounded-lg px-6 py-5 text-center pointer-events-auto shadow-lg">
+                  <Lock className="w-6 h-6 text-primary mx-auto mb-2" />
                   <p className="text-sm font-semibold mb-1">Contenu verrouille</p>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Connectez-vous pour voir les resultats complets
+                  <p className="text-xs text-muted-foreground mb-4 max-w-xs">
+                    Connectez-vous pour voir les resultats complets et acceder a toutes les fonctionnalites
                   </p>
                   <Button
-                    size="sm"
                     onClick={() => window.open("https://discord.gg/discreen", "_blank")}
                     data-testid="button-discord-join"
                   >
-                    <SiDiscord className="w-3.5 h-3.5 mr-1.5" />
+                    <SiDiscord className="w-4 h-4 mr-2" />
                     Obtenir l'acces
                   </Button>
                 </div>
@@ -224,9 +272,9 @@ export default function MaintenancePage() {
         >
           <div className="text-center">
             <div className="text-2xl sm:text-3xl font-bold text-primary">
-              <AnimatedNumber target={15} suffix="B+" />
+              <AnimatedNumber target={11} suffix="B+" />
             </div>
-            <div className="text-xs text-muted-foreground mt-0.5">Enregistrements</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Lignes indexees</div>
           </div>
           <div className="w-px h-8 bg-border hidden sm:block" />
           <div className="text-center">
