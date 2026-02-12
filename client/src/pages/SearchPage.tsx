@@ -62,7 +62,10 @@ const FILTER_ICONS: Record<string, typeof User> = {
   bic: CreditCard,
   discordId: Hash,
   fivemLicense: Gamepad2,
+  fivemId: Gamepad2,
   steamId: Gamepad2,
+  xbox: Gamepad2,
+  live: Gamepad2,
   gender: User,
   hashedPassword: Hash,
   password: Hash,
@@ -86,7 +89,10 @@ const FILTER_PLACEHOLDERS: Record<string, string> = {
   bic: "ex: BNPAFRPP",
   discordId: "ex: 123456789012345678",
   fivemLicense: "ex: license:abc123def456",
+  fivemId: "ex: 12345",
   steamId: "ex: steam:1100001xxxxxxxx",
+  xbox: "ex: Gamertag123",
+  live: "ex: live:123456789",
   gender: "ex: M ou F",
   hashedPassword: "ex: 5f4dcc3b5aa765d61d8327deb882cf99",
   password: "ex: motdepasse123",
@@ -247,7 +253,7 @@ interface CriterionRow {
   value: string;
 }
 
-const HIDDEN_FIELDS = new Set(["_source", "_raw", "rownum", "Rownum", "line", "Line", "content", "Content"]);
+const HIDDEN_FIELDS = new Set(["_source", "_raw", "_api_source", "rownum", "Rownum", "line", "Line", "content", "Content"]);
 const FIELD_PRIORITY: Record<string, number> = {
   email: 1, mail: 1,
   identifiant: 2, username: 2, pseudo: 2,
@@ -284,8 +290,9 @@ function ResultCard({
 
   const sourceField = entries.find(([k]) => k.toLowerCase() === "source");
   const dbSource = row["_source"] as string | undefined;
+  const apiSource = row["_api_source"] as string | undefined;
   const rawSource = sourceField ? String(sourceField[1]) : (dbSource || "");
-  const sourceText = rawSource ? "Discreen" : "";
+  const sourceText = apiSource || (rawSource ? "Discreen" : "");
 
   const handleCopy = () => {
     const text = rawLine || visibleFields
@@ -313,6 +320,14 @@ function ResultCard({
     return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
   });
 
+  const BLUR_FIELDS = new Set([
+    "username", "pseudo", "identifiant", "nom", "name", "last_name", "lastname",
+    "surname", "prenom", "first_name", "firstname", "displayname", "nom_complet",
+    "email", "mail",
+  ]);
+
+  const shouldBlurField = (fieldName: string) => BLUR_FIELDS.has(fieldName.toLowerCase().replace(/[\s-]/g, "_"));
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -325,8 +340,8 @@ function ResultCard({
             <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground">
               {globalIndex + 1}
             </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
+            <div className="min-w-0 group/title">
+              <p className="font-semibold text-foreground truncate blur-sm group-hover/title:blur-none transition-all duration-200" data-testid={`text-result-title-${globalIndex}`}>
                 {titleField ? String(titleField[1]) : `Resultat ${globalIndex + 1}`}
               </p>
               {sourceText && (
@@ -372,7 +387,11 @@ function ResultCard({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">{getFieldLabel(col)}</p>
-                  <p className="text-sm font-medium text-foreground break-all leading-tight">{String(val ?? "")}</p>
+                  {shouldBlurField(col) ? (
+                    <p className="text-sm font-medium text-foreground break-all leading-tight blur-sm hover:blur-none transition-all duration-200 cursor-default" data-testid={`text-blurred-${col}-${globalIndex}`}>{String(val ?? "")}</p>
+                  ) : (
+                    <p className="text-sm font-medium text-foreground break-all leading-tight">{String(val ?? "")}</p>
+                  )}
                 </div>
               </div>
             );
@@ -402,6 +421,11 @@ export default function SearchPage() {
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 20;
+
+  const [externalResults, setExternalResults] = useState<Record<string, unknown>[]>([]);
+  const [leakosintInternalResults, setLeakosintInternalResults] = useState<Record<string, unknown>[]>([]);
+  const [loadingExternal, setLoadingExternal] = useState(false);
+  const [loadingLeakosintInternal, setLoadingLeakosintInternal] = useState(false);
 
   const [breachTerm, setBreachTerm] = useState("");
   const [breachSelectedFields, setBreachSelectedFields] = useState<string[]>(["email"]);
@@ -760,6 +784,44 @@ export default function SearchPage() {
     );
   };
 
+  const fireExternalSearches = (searchTerm: string) => {
+    const token = getAccessToken();
+    if (!token || !searchTerm) return;
+
+    setLoadingExternal(true);
+    setLoadingLeakosintInternal(true);
+    setExternalResults([]);
+    setLeakosintInternalResults([]);
+
+    fetch("/api/external-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ query: searchTerm }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.results && Array.isArray(data.results)) {
+          setExternalResults(data.results.map((r: Record<string, unknown>) => ({ ...r, _api_source: "API Externe" })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingExternal(false));
+
+    fetch("/api/leakosint-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.results && Array.isArray(data.results)) {
+          setLeakosintInternalResults(data.results.map((r: Record<string, unknown>) => ({ ...r, _api_source: "LeakOSINT" })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingLeakosintInternal(false));
+  };
+
   const handleSearch = (newPage = 0) => {
     const filledCriteria = criteria.filter((c) => c.value.trim());
     if (filledCriteria.length === 0) {
@@ -817,18 +879,26 @@ export default function SearchPage() {
         },
       }
     );
+
+    if (searchMode === "internal" && newPage === 0) {
+      const mainTerm = filledCriteria[0]?.value.trim();
+      if (mainTerm) {
+        fireExternalSearches(mainTerm);
+      }
+    }
   };
 
   const isWantedMode = searchMode === "wanted";
+  const isFivemMode = searchMode === "fivem";
 
   return (
-    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""}`}>
-      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
+    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""}`}>
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
 
       <div className="relative container max-w-5xl mx-auto px-4 py-12 space-y-12">
         <section className="text-center space-y-4 max-w-2xl mx-auto mb-8">
           <motion.h1
-            key={isWantedMode ? "wanted-title" : "normal-title"}
+            key={isWantedMode ? "wanted-title" : isFivemMode ? "fivem-title" : "normal-title"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-[1.1]"
@@ -838,6 +908,13 @@ export default function SearchPage() {
                 Profils <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">
                   Wanted
+                </span>
+              </>
+            ) : isFivemMode ? (
+              <>
+                Recherche <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">
+                  FiveM
                 </span>
               </>
             ) : (
@@ -912,7 +989,7 @@ export default function SearchPage() {
               setSearchMode("fivem");
               setCriteria([]);
             }}
-            className="min-w-[180px] gap-2"
+            className={`min-w-[180px] gap-2 ${searchMode === "fivem" ? "bg-orange-600 text-white border-orange-600" : ""}`}
             data-testid="button-mode-fivem"
           >
             <Gamepad2 className="w-4 h-4" />
@@ -1066,11 +1143,11 @@ export default function SearchPage() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
+              className="glass-panel-fivem rounded-2xl p-6 md:p-8 space-y-6"
             >
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Gamepad2 className="w-5 h-5 text-primary" />
+                  <Gamepad2 className="w-5 h-5 text-orange-500" />
                   <h2 className="text-xl font-bold tracking-tight">Recherche FiveM</h2>
                 </div>
                 {getAvailableFilters().length > 0 && (
@@ -1111,14 +1188,14 @@ export default function SearchPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="group relative"
                       >
-                        <Card className="p-3 bg-secondary/30 border-border/50">
+                        <Card className="p-3 bg-orange-500/5 dark:bg-orange-950/20 border-orange-500/10">
                           <div className="flex flex-col sm:flex-row items-center gap-3">
-                            <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-primary">
+                            <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-orange-500/10 text-orange-500">
                               <IconComp className="w-4 h-4" />
                             </div>
                             <div className="w-full sm:w-[220px]">
                               <span className="text-sm font-medium text-foreground">
-                                {FilterLabels[criterion.type as SearchFilterType]}
+                                {FivemFilterLabels[criterion.type as keyof typeof FivemFilterLabels] || FilterLabels[criterion.type as SearchFilterType]}
                               </span>
                             </div>
                             <div className="flex-1 w-full relative">
@@ -1152,16 +1229,16 @@ export default function SearchPage() {
 
               {criteria.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Gamepad2 className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <Gamepad2 className="w-10 h-10 mx-auto mb-3 opacity-40 text-orange-500" />
                   <p className="text-sm">Ajoutez un filtre pour lancer une recherche FiveM</p>
                 </div>
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="h-7 bg-primary/5 text-primary border-primary/20 gap-1.5 font-medium">
+                  <Badge variant="outline" className="h-7 bg-orange-500/5 text-orange-500 border-orange-500/20 gap-1.5 font-medium">
                     <Search className="w-3.5 h-3.5" />
-                    {isUnlimited ? `Illimité (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
+                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
                   </Badge>
                 </div>
 
@@ -1169,7 +1246,7 @@ export default function SearchPage() {
                   data-testid="button-fivem-search"
                   onClick={() => handleSearch(0)}
                   disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
-                  className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
+                  className="w-full h-11 bg-orange-600 text-white font-semibold gap-2 shadow-lg shadow-orange-500/25 border-orange-600"
                 >
                   {searchMutation.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1739,15 +1816,24 @@ export default function SearchPage() {
         {searchMode !== "other" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
-            const activeResults = searchMode === "external"
-              ? leakosintMutation.data?.results
-              : searchMutation.data?.results;
+            const dbResults = searchMode === "external"
+              ? []
+              : (searchMutation.data?.results || []);
+            const apiResults = searchMode === "internal" ? externalResults : [];
+            const leakResults = searchMode === "internal" ? leakosintInternalResults : [];
+            const externalOnlyResults = searchMode === "external" ? (leakosintMutation.data?.results || []) : [];
+
+            const allResults = searchMode === "external"
+              ? externalOnlyResults
+              : [...dbResults.map(r => ({ ...r, _api_source: r._api_source || "Base Discreen" })), ...apiResults, ...leakResults];
+
+            const activeResults = allResults.length > 0 ? allResults : undefined;
             const activeTotal = searchMode === "external"
               ? leakosintMutation.data?.results?.length
-              : searchMutation.data?.total;
+              : (searchMutation.data?.total ?? 0) + apiResults.length + leakResults.length;
             const isLoading = searchMode === "external"
               ? leakosintMutation.isPending
-              : searchMutation.isPending;
+              : (searchMutation.isPending || (searchMode === "internal" && (loadingExternal || loadingLeakosintInternal)));
 
             return (
               <>

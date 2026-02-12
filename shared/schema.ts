@@ -46,7 +46,10 @@ export const SearchFilterType = z.enum([
   "vin",
   "discordId",
   "fivemLicense",
-  "steamId"
+  "steamId",
+  "fivemId",
+  "xbox",
+  "live"
 ]);
 
 export type SearchFilterType = z.infer<typeof SearchFilterType>;
@@ -73,15 +76,21 @@ export const FilterLabels: Record<SearchFilterType, string> = {
   discordId: "Discord ID",
   fivemLicense: "License FiveM",
   steamId: "Steam ID",
+  fivemId: "ID FiveM",
+  xbox: "Xbox",
+  live: "Live",
 };
 
-export const FivemFilterTypes = ["discordId", "fivemLicense", "steamId"] as const;
+export const FivemFilterTypes = ["fivemId", "fivemLicense", "steamId", "discordId", "xbox", "live"] as const;
 export type FivemFilterType = typeof FivemFilterTypes[number];
 
 export const FivemFilterLabels: Record<FivemFilterType, string> = {
-  discordId: "Discord ID",
+  fivemId: "ID FiveM",
   fivemLicense: "License FiveM",
   steamId: "Steam ID",
+  discordId: "Discord ID",
+  xbox: "Xbox",
+  live: "Live",
 };
 
 export const MainSearchFilterTypes = [
