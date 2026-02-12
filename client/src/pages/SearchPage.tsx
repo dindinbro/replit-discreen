@@ -40,6 +40,7 @@ import {
   ShieldAlert,
   Lock,
   Gamepad2,
+  RotateCcw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -827,6 +828,26 @@ export default function SearchPage() {
 
   };
 
+  const handleReset = () => {
+    setCriteria([]);
+    setPage(0);
+    setLimitReached(false);
+    setBlacklistMatch(null);
+    setBreachTerm("");
+    setBreachSelectedFields(["email"]);
+    setLeakosintTerm("");
+    setPhoneLookupTerm("");
+    setPhoneLookupResult(null);
+    setNirTerm("");
+    setNirResult(null);
+    setGeoipTerm("");
+    setGeoipResult(null);
+    setWantedResults([]);
+    searchMutation.reset();
+    breachMutation.reset();
+    leakosintMutation.reset();
+  };
+
   const isWantedMode = searchMode === "wanted";
   const isFivemMode = searchMode === "fivem";
 
@@ -1059,19 +1080,31 @@ export default function SearchPage() {
                   </Badge>
                 </div>
 
-                <Button
-                  data-testid="button-search"
-                  onClick={() => handleSearch(0)}
-                  disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
-                  className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
-                >
-                  {searchMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  Rechercher
-                </Button>
+                <div className="flex gap-2 w-full">
+                  <Button
+                    data-testid="button-search"
+                    onClick={() => handleSearch(0)}
+                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
+                    className="flex-1 h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
+                  >
+                    {searchMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    Rechercher
+                  </Button>
+                  <Button
+                    data-testid="button-reset-internal"
+                    variant="outline"
+                    onClick={handleReset}
+                    disabled={searchMutation.isPending}
+                    className="h-11 gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reinitialiser
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1181,19 +1214,31 @@ export default function SearchPage() {
                   </Badge>
                 </div>
 
-                <Button
-                  data-testid="button-fivem-search"
-                  onClick={() => handleSearch(0)}
-                  disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
-                  className="w-full h-11 bg-orange-600 text-white font-semibold gap-2 shadow-lg shadow-orange-500/25 border-orange-600"
-                >
-                  {searchMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  Rechercher
-                </Button>
+                <div className="flex gap-2 w-full">
+                  <Button
+                    data-testid="button-fivem-search"
+                    onClick={() => handleSearch(0)}
+                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
+                    className="flex-1 h-11 bg-orange-600 text-white font-semibold gap-2 shadow-lg shadow-orange-500/25 border-orange-600"
+                  >
+                    {searchMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    Rechercher
+                  </Button>
+                  <Button
+                    data-testid="button-reset-fivem"
+                    variant="outline"
+                    onClick={handleReset}
+                    disabled={searchMutation.isPending}
+                    className="h-11 gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reinitialiser
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1259,19 +1304,31 @@ export default function SearchPage() {
                   </div>
                 </div>
 
-                <Button
-                  data-testid="button-leakosint-check"
-                  onClick={handleLeakosintSearch}
-                  disabled={leakosintMutation.isPending || !leakosintTerm.trim() || leakosintAtLimit || leakosintLimit === 0}
-                  className="w-full gap-2 shadow-lg shadow-primary/25"
-                >
-                  {leakosintMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  {leakosintLimit === 0 ? "Abonnement requis" : "Check"}
-                </Button>
+                <div className="flex gap-2 w-full">
+                  <Button
+                    data-testid="button-leakosint-check"
+                    onClick={handleLeakosintSearch}
+                    disabled={leakosintMutation.isPending || !leakosintTerm.trim() || leakosintAtLimit || leakosintLimit === 0}
+                    className="flex-1 gap-2 shadow-lg shadow-primary/25"
+                  >
+                    {leakosintMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    {leakosintLimit === 0 ? "Abonnement requis" : "Check"}
+                  </Button>
+                  <Button
+                    data-testid="button-reset-external"
+                    variant="outline"
+                    onClick={handleReset}
+                    disabled={leakosintMutation.isPending}
+                    className="gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reinitialiser
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1325,6 +1382,16 @@ export default function SearchPage() {
                 >
                   {phoneLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   <span className="ml-1.5">Lookup</span>
+                </Button>
+                <Button
+                  data-testid="button-reset-phone"
+                  variant="outline"
+                  onClick={handleReset}
+                  disabled={phoneLookupLoading}
+                  className="gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reinitialiser
                 </Button>
               </div>
 
@@ -1395,6 +1462,16 @@ export default function SearchPage() {
                 >
                   {geoipLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   <span className="ml-1.5">Lookup</span>
+                </Button>
+                <Button
+                  data-testid="button-reset-geoip"
+                  variant="outline"
+                  onClick={handleReset}
+                  disabled={geoipLoading}
+                  className="gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reinitialiser
                 </Button>
               </div>
 
@@ -1562,20 +1639,32 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                <Button
-                  data-testid="button-wanted-search"
-                  onClick={() => handleWantedSearch()}
-                  disabled={loadingWanted || !criteria.some((c) => c.value.trim())}
-                  className="w-full h-11 bg-red-600 text-white hover:bg-red-700 font-semibold gap-2 shadow-lg shadow-red-500/25 mt-6 border-red-600"
-                  tabIndex={canAccessWanted ? 0 : -1}
-                >
-                  {loadingWanted ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  Rechercher
-                </Button>
+                <div className="flex gap-2 w-full mt-6">
+                  <Button
+                    data-testid="button-wanted-search"
+                    onClick={() => handleWantedSearch()}
+                    disabled={loadingWanted || !criteria.some((c) => c.value.trim())}
+                    className="flex-1 h-11 bg-red-600 text-white hover:bg-red-700 font-semibold gap-2 shadow-lg shadow-red-500/25 border-red-600"
+                    tabIndex={canAccessWanted ? 0 : -1}
+                  >
+                    {loadingWanted ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    Rechercher
+                  </Button>
+                  <Button
+                    data-testid="button-reset-wanted"
+                    variant="outline"
+                    onClick={handleReset}
+                    disabled={loadingWanted}
+                    className="h-11 gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reinitialiser
+                  </Button>
+                </div>
               </div>
 
               {!canAccessWanted && (
@@ -1644,6 +1733,16 @@ export default function SearchPage() {
                   >
                     {nirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     <span className="ml-1.5">Decoder le NIR</span>
+                  </Button>
+                  <Button
+                    data-testid="button-reset-nir"
+                    variant="outline"
+                    onClick={handleReset}
+                    disabled={nirLoading}
+                    className="gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reinitialiser
                   </Button>
                 </div>
               </div>

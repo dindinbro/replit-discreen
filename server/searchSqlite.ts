@@ -29,7 +29,26 @@ interface DbInfo {
 const dbCache: Record<string, DbInfo> = {};
 
 function getDataDir(): string {
-  return process.env.DATA_DIR || path.join(process.cwd(), "server", "data");
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  const candidates = [
+    path.join(process.cwd(), "server", "data"),
+    path.join(process.cwd(), "data"),
+    path.resolve(__dirname, "..", "server", "data"),
+    path.resolve(__dirname, "..", "data"),
+    path.resolve(__dirname, "data"),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir).filter(f => f.endsWith(".db"));
+      if (files.length > 0) {
+        console.log(`[searchSqlite] Data directory found: ${dir} (${files.length} .db files)`);
+        return dir;
+      }
+    }
+  }
+  const fallback = candidates[0];
+  console.log(`[searchSqlite] No data directory with .db files found, using fallback: ${fallback}`);
+  return fallback;
 }
 
 function detectMainTable(db: Database.Database): { tableName: string; columns: string[]; isFts: boolean } {
