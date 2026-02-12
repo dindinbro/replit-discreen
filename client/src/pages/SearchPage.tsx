@@ -319,13 +319,6 @@ function ResultCard({
     return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
   });
 
-  const BLUR_FIELDS = new Set([
-    "username", "pseudo", "identifiant", "nom", "name", "last_name", "lastname",
-    "surname", "prenom", "first_name", "firstname", "displayname", "nom_complet",
-    "email", "mail",
-  ]);
-
-  const shouldBlurField = (fieldName: string) => BLUR_FIELDS.has(fieldName.toLowerCase().replace(/[\s-]/g, "_"));
 
   return (
     <motion.div
@@ -340,7 +333,7 @@ function ResultCard({
               {globalIndex + 1}
             </span>
             <div className="min-w-0 group/title">
-              <p className="font-semibold text-foreground truncate blur-sm group-hover/title:blur-none transition-all duration-200" data-testid={`text-result-title-${globalIndex}`}>
+              <p className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
                 {titleField ? String(titleField[1]) : `Resultat ${globalIndex + 1}`}
               </p>
               {sourceText && (
@@ -386,11 +379,7 @@ function ResultCard({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">{getFieldLabel(col)}</p>
-                  {shouldBlurField(col) ? (
-                    <p className="text-sm font-medium text-foreground break-all leading-tight blur-sm hover:blur-none transition-all duration-200 cursor-default" data-testid={`text-blurred-${col}-${globalIndex}`}>{String(val ?? "")}</p>
-                  ) : (
-                    <p className="text-sm font-medium text-foreground break-all leading-tight">{String(val ?? "")}</p>
-                  )}
+                  <p className="text-sm font-medium text-foreground break-all leading-tight">{String(val ?? "")}</p>
                 </div>
               </div>
             );
