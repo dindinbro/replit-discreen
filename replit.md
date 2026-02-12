@@ -13,6 +13,7 @@ The search system supports three modes (checked in this order):
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+**Important**: When the user reports issues or asks about the app, they are ALWAYS referring to the VPS production deployment (the real site), NOT Replit. All debugging and testing feedback comes from the VPS. After code changes here, the user does `git pull`, `npm run build`, and `pm2 restart ecosystem.config.cjs` on the VPS.
 
 ## System Architecture
 
