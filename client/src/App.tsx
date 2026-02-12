@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import BlacklistRequestPage from "@/pages/BlacklistRequestPage";
 import InfoRequestPage from "@/pages/InfoRequestPage";
 import UsersPage from "@/pages/UsersPage";
+import MaintenancePage from "@/pages/MaintenancePage";
 import Layout from "@/components/Layout";
 import { Loader2 } from "lucide-react";
 
@@ -125,6 +127,34 @@ function Router() {
   );
 }
 
+function MaintenanceGate({ children }: { children: React.ReactNode }) {
+  const { role, loading: authLoading } = useAuth();
+  const [maintenance, setMaintenance] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/site-status")
+      .then((r) => r.json())
+      .then((data) => setMaintenance(!!data.maintenance))
+      .catch(() => setMaintenance(false))
+      .finally(() => setStatusLoading(false));
+  }, []);
+
+  if (statusLoading || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (maintenance && role !== "admin") {
+    return <MaintenancePage />;
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -132,7 +162,9 @@ function App() {
         <ThemeProvider>
           <AuthProvider>
             <Toaster />
-            <Router />
+            <MaintenanceGate>
+              <Router />
+            </MaintenanceGate>
           </AuthProvider>
         </ThemeProvider>
       </TooltipProvider>

@@ -44,6 +44,7 @@ import {
   Crosshair,
   FileText,
   ChevronRight,
+  Wrench,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel";
@@ -1635,6 +1636,72 @@ function WantedSection({ getAccessToken }: { getAccessToken: () => string | null
   );
 }
 
+function MaintenanceToggle({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+    fetch("/api/admin/maintenance", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setEnabled(!!d.enabled))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [getAccessToken]);
+
+  const toggle = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    setToggling(true);
+    try {
+      const res = await fetch("/api/admin/maintenance", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEnabled(data.enabled);
+        toast({
+          title: data.enabled ? "Mode developpement active" : "Mode developpement desactive",
+          description: data.enabled
+            ? "Les visiteurs voient la page promotionnelle"
+            : "Le site est accessible a tous",
+        });
+      }
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+    setToggling(false);
+  };
+
+  if (loading) return null;
+
+  return (
+    <Button
+      variant={enabled ? "destructive" : "outline"}
+      onClick={toggle}
+      disabled={toggling}
+      data-testid="button-maintenance-toggle"
+    >
+      {toggling ? (
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      ) : (
+        <Wrench className="w-4 h-4 mr-2" />
+      )}
+      {enabled ? "Mode dev actif" : "Passer en mode dev"}
+    </Button>
+  );
+}
+
 export default function AdminPage() {
   const { user, role, loading: authLoading, getAccessToken } = useAuth();
   const [, navigate] = useLocation();
@@ -1679,10 +1746,13 @@ export default function AdminPage() {
             </span>
             <Badge variant="destructive" className="ml-2" data-testid="badge-admin">Admin</Badge>
           </div>
-          <Button variant="ghost" onClick={() => navigate("/")} data-testid="button-back-home">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <MaintenanceToggle getAccessToken={getAccessToken} />
+            <Button variant="ghost" onClick={() => navigate("/")} data-testid="button-back-home">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour
+            </Button>
+          </div>
         </div>
       </header>
 

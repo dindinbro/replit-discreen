@@ -420,6 +420,35 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/site-status", async (_req, res) => {
+    try {
+      const val = await storage.getSiteSetting("maintenance_mode");
+      res.json({ maintenance: val === "true" });
+    } catch {
+      res.json({ maintenance: false });
+    }
+  });
+
+  app.get("/api/admin/maintenance", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const val = await storage.getSiteSetting("maintenance_mode");
+      res.json({ enabled: val === "true" });
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/maintenance", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      await storage.setSiteSetting("maintenance_mode", enabled ? "true" : "false");
+      console.log(`[admin] Maintenance mode ${enabled ? "ENABLED" : "DISABLED"} by admin`);
+      res.json({ enabled: !!enabled });
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   // GET /api/admin/users — returns effective role for each user
   app.get("/api/admin/users", requireAuth, requireAdmin, async (_req, res) => {
     try {
