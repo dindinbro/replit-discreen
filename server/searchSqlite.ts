@@ -30,12 +30,11 @@ const dbCache: Record<string, DbInfo> = {};
 
 function getDataDir(): string {
   if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  const cwd = process.cwd();
   const candidates = [
-    path.join(process.cwd(), "server", "data"),
-    path.join(process.cwd(), "data"),
-    path.resolve(__dirname, "..", "server", "data"),
-    path.resolve(__dirname, "..", "data"),
-    path.resolve(__dirname, "data"),
+    path.join(cwd, "server", "data"),
+    path.join(cwd, "data"),
+    path.join(cwd, "dist", "data"),
   ];
   for (const dir of candidates) {
     if (fs.existsSync(dir)) {
