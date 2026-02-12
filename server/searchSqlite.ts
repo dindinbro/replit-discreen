@@ -694,7 +694,34 @@ export async function initSearchDatabases(): Promise<void> {
   if (process.env.SKIP_S3_SYNC === "true") {
     console.log("[s3sync] SKIP_S3_SYNC=true — skipping remote sync");
   } else {
-    await syncDatabasesFromS3(dataDir);
+    console.log("[s3sync] Starting background database sync from S3...");
+    syncDatabasesFromS3(dataDir).then((downloaded) => {
+      if (downloaded.length > 0) {
+        console.log(`[s3sync] Background sync complete: ${downloaded.join(", ")}`);
+        const BLACKLISTED_FILES_BG = new Set(["index2.db"]);
+        const newDbFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith(".db") && !BLACKLISTED_FILES_BG.has(f));
+        for (const file of newDbFiles) {
+          const sourceKey = file.replace(/\.db$/i, "");
+          if (!SOURCE_MAP[sourceKey]) {
+            SOURCE_MAP[sourceKey] = file;
+            try {
+              const info = openDb(sourceKey);
+              if (info) {
+                console.log(`[searchSqlite] Hot-loaded database: ${sourceKey}`);
+              }
+            } catch (err: any) {
+              console.warn(`[searchSqlite] Failed to hot-load ${file}:`, err?.message);
+              delete SOURCE_MAP[sourceKey];
+            }
+          }
+        }
+        console.log(`[searchSqlite] Active databases after sync: ${Object.keys(SOURCE_MAP).join(", ") || "none"}`);
+      } else {
+        console.log("[s3sync] Background sync: no new files downloaded");
+      }
+    }).catch((err) => {
+      console.error("[s3sync] Background sync error:", err);
+    });
   }
 
   const BLACKLISTED_FILES = new Set(["index2.db"]);

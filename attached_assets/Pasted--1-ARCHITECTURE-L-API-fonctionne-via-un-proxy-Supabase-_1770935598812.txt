@@ -1,0 +1,322 @@
+## 1. ARCHITECTURE
+
+L'API fonctionne via un proxy Supabase Edge Function.
+Le frontend n'appelle JAMAIS l'API Flask directement.
+
+Frontend → Supabase Edge Function (flask-proxy) → API Flask (SQLite)
+
+Le proxy gère :
+- L'authentification JWT (l'utilisateur doit être connecté via Supabase Auth)
+- L'ajout automatique du secret (X-Proxy-Secret) vers Flask
+- La validation d'origine (CORS)
+
+
+## 2. APPELS API (via Supabase)
+
+Toutes les requêtes passent par supabase.functions.invoke("flask-proxy", { body }).
+L'auth JWT est automatiquement incluse par le SDK Supabase.
+
+### 2.1 Health Check
+```typescript
+const { data, error } = await supabase.functions.invoke("flask-proxy", {
+  body: { action: "health" }
+});
+// Réponse: { status: "ok" }
+2.2 Recherche
+
+const { data, error } = await supabase.functions.invoke("flask-proxy", {
+  body: {
+    action: "search",
+    query: "dupont",           // Terme de recherche (obligatoire)
+    operator: "AUTO",          // "AND" | "OR" | "AUTO" (défaut: AUTO)
+    fields: {                  // Filtres optionnels
+      email: "test@gmail.com",
+      nom: "Dupont",
+      prenom: "Jean",
+      telephone: "0612345678",
+      adresse: "Paris"
+    }
+  }
+});
+Réponse :
+
+
+{
+  "results": {
+    "source_1": {
+      "label": "Base XYZ",
+      "data": {
+        "email": "test@gmail.com",
+        "nom": "Dupont",
+        "prenom": "Jean",
+        "telephone": "0612345678",
+        "adresse": "12 rue de Paris",
+        "ville": "Paris",
+        "code_postal": "75001"
+      },
+      "raw_lines": ["ligne brute 1", "ligne brute 2"],
+      "sources": ["fichier1.txt", "fichier2.csv"]
+    },
+    "source_2": { ... }
+  }
+}
+2.3 Phone Lookup
+
+const { data, error } = await supabase.functions.invoke("flask-proxy", {
+  body: {
+    action: "phone",
+    number: "+33612345678"     // Format international
+  }
+});
+Réponse :
+
+
+{
+  "formatted": "+33 6 12 34 56 78",
+  "national": "06 12 34 56 78",
+  "international": "+33612345678",
+  "country": "FR",
+  "carrier": "Orange",
+  "line_type": "mobile",
+  "valid": true
+}
+3. TYPES TYPESCRIPT
+
+export interface SearchResult {
+  label: string;
+  data: Record<string, any>;
+  raw_lines: string[];
+  sources: string[];
+}
+
+export interface PhoneLookupResult {
+  formatted?: string;
+  national?: string;
+  international?: string;
+  country?: string;
+  carrier?: string;
+  line_type?: string;
+  valid?: boolean;
+  error?: string;
+}
+4. HOOK REACT COMPLET (useFlaskApi.tsx)
+
+import { useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+async function invokeFlaskProxy<T>(payload: Record<string, any>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("flask-proxy", {
+    body: payload,
+  });
+  if (error) throw new Error(error.message || "Erreur de connexion à l'API");
+  return data as T;
+}
+
+export interface SearchResult {
+  label: string;
+  data: Record<string, any>;
+  raw_lines: string[];
+  sources: string[];
+}
+
+export interface PhoneLookupResult {
+  formatted?: string;
+  national?: string;
+  international?: string;
+  country?: string;
+  carrier?: string;
+  line_type?: string;
+  valid?: boolean;
+  error?: string;
+}
+
+export function useFlaskApi() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const search = useCallback(
+    async (
+      query: string,
+      fields?: Record<string, string>,
+      operator: "AND" | "OR" | "AUTO" = "AUTO"
+    ): Promise<Record<string, SearchResult>> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await invokeFlaskProxy<any>({
+          action: "search",
+          query,
+          operator,
+          fields: fields || {},
+        });
+        return data.results || data;
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const phoneLookup = useCallback(
+    async (phone: string): Promise<PhoneLookupResult> => {
+      setLoading(true);
+      setError(null);
+      try {
+        return await invokeFlaskProxy<PhoneLookupResult>({
+          action: "phone",
+          number: phone,
+        });
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const testConnection = useCallback(async (): Promise<boolean> => {
+    try {
+      const data = await invokeFlaskProxy<{ status: string }>({ action: "health" });
+      return data?.status === "ok";
+    } catch {
+      return false;
+    }
+  }, []);
+
+  return { search, phoneLookup, testConnection, loading, error };
+}
+5. PARSING DES RÉSULTATS
+Les résultats sont complexes : les données peuvent être dans data (objet structuré) OU dans raw_lines (texte brut CSV/JSON à parser).
+
+Champs connus et leurs icônes :
+Clé	Label	Type de donnée
+nom	Nom	Texte
+prenom	Prénom	Texte
+email	Email	Email
+telephone	Téléphone	Numéro FR
+telephone2	Téléphone 2	Numéro FR
+adresse	Adresse	Texte
+ville	Ville	Texte
+code_postal	Code Postal	5 chiffres
+ip	Adresse IP	IPv4
+nir	N° Sécu (NIR)	13-15 chiffres
+plaque	Plaque Immat.	Texte
+date_naissance	Date naissance	DD/MM/YYYY
+password	Mot de passe	Texte
+username	Pseudo	Texte
+discord_id	Discord ID	Nombre
+civilite	Civilité	M./Mme
+sexe	Sexe	M/F
+matricule	Matricule	Texte
+organisme	Organisme	Texte
+Aliases (normalisation automatique) :
+qualite → civilite
+courriel → email  
+voie → adresse
+commune → ville
+nom_adresse_postale → nom_complet
+cplt_adresse → complement_adresse
+cplt_commune → complement_ville
+Fonction d'extraction robuste :
+Les données arrivent sous plusieurs formes :
+
+result.data → objet JSON structuré (cas idéal)
+result.raw_lines → tableau de strings pouvant contenir :
+Du JSON stringifié
+Du CSV (séparateurs: , ; | ·)
+Du key:value ou key=value
+Du texte brut avec emails/téléphones à extraire par regex
+L'extracteur doit :
+
+Parser récursivement les objets imbriqués (max depth 3)
+Tenter JSON.parse sur chaque valeur string
+Extraire emails par regex: /[a-z0-9._%+-]+@[a-z0-9.-]+.[a-z]{2,}/i
+Extraire téléphones FR: /(?:+33|33|0)1-9{4}/
+Normaliser +33/33 → 0 (format 10 chiffres)
+Ignorer les clés "resume" et "statut" (meta, pas data)
+Appliquer les aliases ci-dessus
+Tronquer les valeurs à 260 caractères max
+6. AFFICHAGE DES RÉSULTATS
+Page de recherche :
+Champ de recherche principal (query)
+Sélecteur d'opérateur (AND/OR/AUTO)
+Filtres avancés optionnels (email, nom, prénom, téléphone, adresse)
+Bouton rechercher → appelle search()
+Les résultats sont stockés dans localStorage:
+
+localStorage.setItem("lastSearchResults", JSON.stringify({
+  results: data,
+  timestamp: Date.now(),
+  query: searchQuery
+}));
+Page de résultats :
+Grille de cartes (1-3 colonnes responsive)
+Chaque carte = 1 source/profil avec :
+Nom extrait (prenom + nom ou email ou label)
+Badge "Résultat X"
+Nombre de sources et de champs
+Les 5 premiers champs avec icône + label + valeur
+Clic sur un champ = copier la valeur
+Bouton "Voir détails" → dialog modal avec TOUS les champs
+Bouton "Recherche parenté" → relance une recherche avec le nom
+Dialog détail :
+Affiche TOUS les champs extraits (pas limité à 5)
+Chaque champ est cliquable (copie)
+Section "Sources" avec la liste des fichiers source
+Section "Données brutes" avec les raw_lines
+7. EDGE FUNCTION (flask-proxy)
+Le proxy Supabase Edge Function fait :
+
+Reçoit POST avec { action, query, operator, fields, number }
+Vérifie le JWT Supabase (utilisateur connecté obligatoire)
+Vérifie l'origine (CORS whitelist)
+Traduit l'action en GET vers Flask :
+action:"search" → GET /api/search?q=...&operator=...&email=...
+action:"phone" → GET /api/phone?number=...
+action:"health" → GET /api/health
+Ajoute le header X-Proxy-Secret (secret partagé)
+Forward la réponse JSON au frontend
+Secrets nécessaires (env vars de l'Edge Function) :
+Variable	Description
+FLASK_PROXY_SECRET	Secret partagé avec le serveur Flask
+FLASK_API_URL	URL du serveur Flask (avec port)
+FLASK_API_KEY	Clé API Flask (optionnel)
+Origines autorisées (à modifier pour ton nouveau site) :
+
+const ALLOWED_ORIGINS = [
+  "https://ton-site.com",
+  "http://localhost:5173",
+];
+8. CODES D'ERREUR
+Code	Signification
+200	Succès
+204	Accès bloqué (secret manquant côté Flask)
+400	Action invalide ou paramètres manquants
+401	Non authentifié (JWT manquant/invalide)
+500	Erreur serveur
+502	API Flask non accessible
+9. PRÉREQUIS POUR INTÉGRER SUR UN AUTRE SITE
+Projet Supabase configuré avec :
+
+Auth activée (email/password minimum)
+Edge Function "flask-proxy" déployée
+Secrets configurés (FLASK_PROXY_SECRET, FLASK_API_URL)
+Frontend React avec :
+
+@supabase/supabase-js installé
+Client Supabase configuré (URL + anon key)
+Authentification utilisateur implémentée
+Ajouter l'origine du nouveau site dans ALLOWED_ORIGINS de l'Edge Function
+
+Copier :
+
+Le hook useFlaskApi.tsx
+Le code de l'Edge Function flask-proxy
+Les types TypeScript
+La logique d'extraction/parsing des résultats
+=============================================================

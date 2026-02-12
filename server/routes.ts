@@ -967,9 +967,14 @@ export async function registerRoutes(
     try {
       const url = `http://81.17.101.243:8000/api/search?${params.toString()}`;
       console.log(`[external-search] GET ${url}`);
+      const headers: Record<string, string> = { "X-Proxy-Secret": proxySecret };
+      const apiKey = process.env.EXTERNAL_API_KEY;
+      const apiSecret = process.env.EXTERNAL_API_SECRET;
+      if (apiKey) headers["X-API-Key"] = apiKey;
+      if (apiSecret) headers["X-API-Secret"] = apiSecret;
       response = await fetch(url, {
         method: "GET",
-        headers: { "X-Proxy-Secret": proxySecret },
+        headers,
         signal: AbortSignal.timeout(30000),
       });
     } catch (fetchErr) {
