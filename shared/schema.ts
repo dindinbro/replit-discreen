@@ -377,4 +377,11 @@ export const pendingServiceRequests = pgTable("pending_service_requests", {
 
 export type PendingServiceRequest = typeof pendingServiceRequests.$inferSelect;
 
+export const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
+export type SiteSetting = typeof siteSettings.$inferSelect;
+
 export * from "./models/chat";

@@ -1,7 +1,7 @@
 import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
-  wantedProfiles,
+  wantedProfiles, siteSettings,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -72,6 +72,8 @@ export interface IStorage {
   deleteWantedProfile(id: number): Promise<boolean>;
   searchWantedProfiles(criteria: Record<string, string>): Promise<WantedProfile[]>;
   deleteUserData(userId: string): Promise<void>;
+  getSiteSetting(key: string): Promise<string | null>;
+  setSiteSetting(key: string, value: string): Promise<void>;
 }
 
 function hashKey(key: string): string {
@@ -659,6 +661,16 @@ export class DatabaseStorage implements IStorage {
       .from(wantedProfiles)
       .where(and(...conditions))
       .orderBy(desc(wantedProfiles.createdAt));
+  }
+  async getSiteSetting(key: string): Promise<string | null> {
+    const [row] = await db.select().from(siteSettings).where(eq(siteSettings.key, key));
+    return row?.value ?? null;
+  }
+
+  async setSiteSetting(key: string, value: string): Promise<void> {
+    await db.insert(siteSettings)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: siteSettings.key, set: { value } });
   }
 }
 
