@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -129,6 +129,7 @@ function Router() {
 
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const { role, loading: authLoading } = useAuth();
+  const [location] = useLocation();
   const [maintenance, setMaintenance] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true);
 
@@ -148,7 +149,10 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (maintenance && role !== "admin") {
+  const bypassPaths = ["/login", "/admin"];
+  const isBypassed = bypassPaths.some((p) => location === p || location.startsWith(p + "/"));
+
+  if (maintenance && role !== "admin" && !isBypassed) {
     return <MaintenancePage />;
   }
 
