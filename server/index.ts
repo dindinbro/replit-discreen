@@ -210,6 +210,15 @@ app.use((req, res, next) => {
     }
   }, 5 * 60 * 1000);
 
+  const apiKeyStatus = [
+    { key: "LEAK_OSINT_API_KEY", label: "LeakOSINT" },
+    { key: "LEAKOSINT_API_KEY", label: "LeakOSINT (alt)" },
+    { key: "EXTERNAL_PROXY_SECRET", label: "External Proxy" },
+    { key: "VPS_BRIDGE_SECRET", label: "VPS Bridge" },
+    { key: "VPS_SEARCH_URL", label: "VPS Search URL" },
+  ].map(({ key, label }) => `${label}: ${process.env[key] ? "OK" : "MISSING"}`);
+  log(`API config: ${apiKeyStatus.join(", ")}`);
+
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {

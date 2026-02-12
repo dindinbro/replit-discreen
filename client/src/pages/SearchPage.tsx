@@ -1775,6 +1775,9 @@ export default function SearchPage() {
             const isLoading = searchMode === "external"
               ? leakosintMutation.isPending
               : searchMutation.isPending;
+            const activeError = searchMode === "external"
+              ? leakosintMutation.error
+              : searchMutation.error;
 
             return (
               <>
@@ -1789,6 +1792,22 @@ export default function SearchPage() {
                     )}
                   </h3>
                 </div>
+
+                {activeError && !isLoading && (
+                  <Card className="p-8 text-center space-y-4 border-destructive/30 bg-destructive/5" data-testid="search-error-display">
+                    <div className="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+                      <ShieldAlert className="w-6 h-6 text-destructive" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-bold text-destructive">Erreur de recherche</h3>
+                      <p className="text-muted-foreground max-w-md mx-auto text-sm">
+                        {activeError instanceof SearchLimitError
+                          ? `Limite atteinte (${activeError.used}/${activeError.limit}) pour le plan ${activeError.tier.toUpperCase()}.`
+                          : activeError.message || "Le service est temporairement indisponible. Reessayez plus tard."}
+                      </p>
+                    </div>
+                  </Card>
+                )}
 
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-20 space-y-4">

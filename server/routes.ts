@@ -2003,20 +2003,34 @@ export async function registerRoutes(
         if (response.status === 429) {
           return res.status(429).json({ message: "Limite de requetes LeakOSINT atteinte. Reessayez plus tard." });
         }
-        return res.status(502).json({ message: "Erreur du service LeakOSINT." });
+        let errMsg = "Erreur du service LeakOSINT.";
+        try {
+          const errData = JSON.parse(errText);
+          if (errData.error) errMsg = `LeakOSINT: ${errData.error}`;
+        } catch {}
+        return res.status(502).json({ message: errMsg });
       }
 
       const data = await response.json() as Record<string, unknown>;
+      console.log("[leakosint] Response keys:", Object.keys(data), "Status field:", data["Status"]);
 
       if (data["Error code"]) {
         console.error("LeakOSINT API error code:", data["Error code"]);
         return res.status(502).json({ message: `Erreur LeakOSINT: ${data["Error code"]}` });
       }
 
+      if (data["error"]) {
+        console.error("LeakOSINT API error:", data["error"]);
+        return res.status(502).json({ message: `Erreur LeakOSINT: ${data["error"]}` });
+      }
+
       const listData = data["List"] as Record<string, { InfoLeak?: string; Data?: Record<string, unknown>[] }> | undefined;
       const results: Record<string, unknown>[] = [];
 
-      if (listData) {
+      if (!listData && !data["Found"]) {
+        console.warn("[leakosint] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
+        return res.status(502).json({ message: "Reponse inattendue du service LeakOSINT. Contactez un administrateur." });
+      } else if (listData) {
         for (const [dbName, dbInfo] of Object.entries(listData)) {
           if (dbName === "No results found") continue;
           if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
@@ -2025,6 +2039,7 @@ export async function registerRoutes(
             }
           }
         }
+        console.log(`[leakosint] Parsed ${results.length} results from ${Object.keys(listData).length} sources`);
       }
 
       const wUser = await buildUserInfo(req);
@@ -2033,6 +2048,7 @@ export async function registerRoutes(
       res.json({
         results,
         raw: data,
+        source: "leakosint",
         quota: {
           used: newCount,
           limit: leakosintLimit,
