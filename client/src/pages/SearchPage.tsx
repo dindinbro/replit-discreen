@@ -253,7 +253,7 @@ interface CriterionRow {
   value: string;
 }
 
-const HIDDEN_FIELDS = new Set(["_source", "_raw", "_api_source", "rownum", "Rownum", "line", "Line", "content", "Content"]);
+const HIDDEN_FIELDS = new Set(["_source", "_raw", "rownum", "Rownum", "line", "Line", "content", "Content"]);
 const FIELD_PRIORITY: Record<string, number> = {
   email: 1, mail: 1,
   identifiant: 2, username: 2, pseudo: 2,
@@ -290,9 +290,8 @@ function ResultCard({
 
   const sourceField = entries.find(([k]) => k.toLowerCase() === "source");
   const dbSource = row["_source"] as string | undefined;
-  const apiSource = row["_api_source"] as string | undefined;
   const rawSource = sourceField ? String(sourceField[1]) : (dbSource || "");
-  const sourceText = apiSource || (rawSource ? "Discreen" : "");
+  const sourceText = rawSource ? "Discreen" : "";
 
   const handleCopy = () => {
     const text = rawLine || visibleFields
@@ -421,11 +420,6 @@ export default function SearchPage() {
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 20;
-
-  const [externalResults, setExternalResults] = useState<Record<string, unknown>[]>([]);
-  const [leakosintInternalResults, setLeakosintInternalResults] = useState<Record<string, unknown>[]>([]);
-  const [loadingExternal, setLoadingExternal] = useState(false);
-  const [loadingLeakosintInternal, setLoadingLeakosintInternal] = useState(false);
 
   const [breachTerm, setBreachTerm] = useState("");
   const [breachSelectedFields, setBreachSelectedFields] = useState<string[]>(["email"]);
@@ -784,44 +778,6 @@ export default function SearchPage() {
     );
   };
 
-  const fireExternalSearches = (searchTerm: string) => {
-    const token = getAccessToken();
-    if (!token || !searchTerm) return;
-
-    setLoadingExternal(true);
-    setLoadingLeakosintInternal(true);
-    setExternalResults([]);
-    setLeakosintInternalResults([]);
-
-    fetch("/api/external-search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ query: searchTerm }),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.results && Array.isArray(data.results)) {
-          setExternalResults(data.results.map((r: Record<string, unknown>) => ({ ...r, _api_source: "API Externe" })));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingExternal(false));
-
-    fetch("/api/leakosint-search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.results && Array.isArray(data.results)) {
-          setLeakosintInternalResults(data.results.map((r: Record<string, unknown>) => ({ ...r, _api_source: "LeakOSINT" })));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingLeakosintInternal(false));
-  };
-
   const handleSearch = (newPage = 0) => {
     const filledCriteria = criteria.filter((c) => c.value.trim());
     if (filledCriteria.length === 0) {
@@ -880,12 +836,6 @@ export default function SearchPage() {
       }
     );
 
-    if (searchMode === "internal" && newPage === 0) {
-      const mainTerm = filledCriteria[0]?.value.trim();
-      if (mainTerm) {
-        fireExternalSearches(mainTerm);
-      }
-    }
   };
 
   const isWantedMode = searchMode === "wanted";
@@ -1816,24 +1766,15 @@ export default function SearchPage() {
         {searchMode !== "other" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
-            const dbResults = searchMode === "external"
-              ? []
-              : (searchMutation.data?.results || []);
-            const apiResults = searchMode === "internal" ? externalResults : [];
-            const leakResults = searchMode === "internal" ? leakosintInternalResults : [];
-            const externalOnlyResults = searchMode === "external" ? (leakosintMutation.data?.results || []) : [];
-
-            const allResults = searchMode === "external"
-              ? externalOnlyResults
-              : [...dbResults.map(r => ({ ...r, _api_source: r._api_source || "Base Discreen" })), ...apiResults, ...leakResults];
-
-            const activeResults = allResults.length > 0 ? allResults : undefined;
+            const activeResults = searchMode === "external"
+              ? leakosintMutation.data?.results
+              : searchMutation.data?.results;
             const activeTotal = searchMode === "external"
               ? leakosintMutation.data?.results?.length
-              : (searchMutation.data?.total ?? 0) + apiResults.length + leakResults.length;
+              : searchMutation.data?.total;
             const isLoading = searchMode === "external"
               ? leakosintMutation.isPending
-              : (searchMutation.isPending || (searchMode === "internal" && (loadingExternal || loadingLeakosintInternal)));
+              : searchMutation.isPending;
 
             return (
               <>
