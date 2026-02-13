@@ -10,7 +10,7 @@ interface WantedProfile {
   images: string[];
 }
 
-const WANTED_PROFILES: WantedProfile[] = [
+const MAIN_PROFILES: WantedProfile[] = [
   {
     pseudo: "Zaza",
     disc: "Disque de Diamant",
@@ -22,6 +22,21 @@ const WANTED_PROFILES: WantedProfile[] = [
     disc: "Disque de Diamant",
     description: "Badge Dev > Badge Quetes",
     images: ["https://cdn.discordapp.com/avatars/1205909587450921000/7a9f5341ec573f4ca071ec68c5160c24.webp?size=1024"],
+  },
+];
+
+const SECONDARY_PROFILES: WantedProfile[] = [
+  {
+    pseudo: "IMAD",
+    disc: "Disque de Platine",
+    description: "Humain multi-taches",
+    images: ["https://cdn.discordapp.com/avatars/1291217086907158529/5b68c25e221f67338cd3f4e88fe22de1.webp?size=1024"],
+  },
+  {
+    pseudo: "GKM",
+    disc: "Disque de Platine",
+    description: "Grand hagar",
+    images: ["https://cdn.discordapp.com/avatars/788515048569307154/0212df4a29f89e1bdbd3bdb77b114ce6.webp?size=1024"],
   },
 ];
 
@@ -173,7 +188,90 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
   );
 }
 
+function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: number }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const hasImages = profile.images.length > 0;
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: index * 0.1 }}
+        className="w-[200px] sm:w-[220px] flex-shrink-0"
+        data-testid={`card-secondary-${profile.pseudo}`}
+      >
+        <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 group">
+          <div
+            className="relative aspect-square bg-muted/30 cursor-pointer overflow-hidden"
+            onClick={() => hasImages && setModalOpen(true)}
+          >
+            {hasImages ? (
+              <img
+                src={profile.images[0]}
+                alt={profile.pseudo}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="w-14 h-14 rounded-full bg-muted/50 border border-border flex items-center justify-center">
+                  <span className="text-xl font-bold text-muted-foreground/40">
+                    {profile.pseudo.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="p-3 space-y-1">
+            <h3 className="text-sm font-bold tracking-wide uppercase text-foreground">
+              {profile.pseudo}
+            </h3>
+            <p className="text-xs text-foreground/60 font-medium flex items-center gap-1">
+              <span>🏆</span> {profile.disc}
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{profile.description}</p>
+          </div>
+        </Card>
+      </motion.div>
+
+      <AnimatePresence>
+        {modalOpen && hasImages && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative max-w-[90vw] max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setModalOpen(false)}
+                className="absolute -top-10 right-0 text-white/60 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <img
+                src={profile.images[0]}
+                alt={profile.pseudo}
+                className="max-w-full max-h-[85vh] rounded-lg object-contain"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 export default function UsersPage() {
+  const totalProfiles = MAIN_PROFILES.length + SECONDARY_PROFILES.length;
+
   return (
     <div className="container max-w-5xl mx-auto px-4 py-12">
       <motion.div
@@ -196,10 +294,31 @@ export default function UsersPage() {
       </motion.div>
 
       <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
-        {WANTED_PROFILES.map((profile, index) => (
+        {MAIN_PROFILES.map((profile, index) => (
           <ProfileCard key={profile.pseudo} profile={profile} index={index} />
         ))}
       </div>
+
+      {SECONDARY_PROFILES.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-14"
+        >
+          <div className="flex items-center gap-3 justify-center mb-6">
+            <div className="h-px bg-border flex-1 max-w-[80px]" />
+            <span className="text-xs text-muted-foreground uppercase tracking-widest">Disques de Platine</span>
+            <div className="h-px bg-border flex-1 max-w-[80px]" />
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-5">
+            {SECONDARY_PROFILES.map((profile, index) => (
+              <SmallProfileCard key={profile.pseudo} profile={profile} index={index} />
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -208,7 +327,7 @@ export default function UsersPage() {
         className="text-center mt-16"
       >
         <p className="text-muted-foreground/50 text-xs tracking-widest uppercase">
-          {WANTED_PROFILES.length} profil{WANTED_PROFILES.length > 1 ? "s" : ""} recenses
+          {totalProfiles} profil{totalProfiles > 1 ? "s" : ""} recenses
         </p>
       </motion.div>
     </div>
