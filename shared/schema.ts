@@ -111,6 +111,7 @@ export const WantedFilterTypes = [
   "address",
   "password",
   "iban",
+  "plaque",
   "notes",
 ] as const;
 
@@ -128,6 +129,7 @@ export const WantedFilterLabels: Record<WantedFilterType, string> = {
   address: "Adresse",
   password: "Password",
   iban: "IBAN",
+  plaque: "Plaque d'immatriculation",
   notes: "Notes / Signalement",
 };
 
@@ -143,6 +145,7 @@ export const WantedFilterToApiParam: Record<WantedFilterType, string> = {
   address: "adresse",
   password: "password",
   iban: "iban",
+  plaque: "plaque",
   notes: "notes",
 };
 
@@ -351,6 +354,7 @@ export const wantedProfiles = pgTable("wanted_profiles", {
   discordId: text("discord_id"), // Added Discord ID field
   password: text("password"),
   iban: text("iban"),
+  plaque: text("plaque"),
   notes: text("notes"),
   emails: text("emails").array(), // Added multiple emails
   phones: text("phones").array(), // Added multiple phones

@@ -118,6 +118,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
     discordId: "",
     password: "",
     iban: "",
+    plaque: "",
     notes: ""
   });
 
@@ -138,6 +139,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
         discordId: editProfile.discordId || "",
         password: editProfile.password || "",
         iban: editProfile.iban || "",
+        plaque: editProfile.plaque || "",
         notes: editProfile.notes || "",
       });
       setEmails(editProfile.emails?.length ? editProfile.emails : [editProfile.email || ""]);
@@ -156,7 +158,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
     setForm({
       nom: "", prenom: "", adresse: "",
       ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
-      pseudo: "", discord: "", discordId: "", password: "", iban: "", notes: ""
+      pseudo: "", discord: "", discordId: "", password: "", iban: "", plaque: "", notes: ""
     });
     setEmails([""]);
     setPhones([""]);
@@ -319,9 +321,15 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
           <Input value={form.password || ""} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" data-testid="input-password" />
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">IBAN</label>
-          <Input value={form.iban || ""} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." data-testid="input-iban" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">IBAN</label>
+            <Input value={form.iban || ""} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." data-testid="input-iban" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Plaque d'immatriculation</label>
+            <Input value={form.plaque || ""} onChange={e => setForm(p => ({ ...p, plaque: e.target.value.toUpperCase() }))} placeholder="AA-123-BB" data-testid="input-plaque" />
+          </div>
         </div>
 
         <div className="space-y-2">
