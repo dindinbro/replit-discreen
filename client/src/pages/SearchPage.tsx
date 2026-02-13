@@ -863,26 +863,6 @@ export default function SearchPage() {
 
       const errors: string[] = [];
 
-      const breachPromise = fetch("/api/breach-search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ term: searchTerm, fields: ["email", "username", "name", "phone", "ip", "password"] }),
-      })
-        .then(async (r) => {
-          if (!r.ok) {
-            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
-            if (r.status === 429) {
-              errors.push(`Breach: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
-            } else {
-              errors.push(`Breach: ${err.message || "erreur"}`);
-            }
-            return [];
-          }
-          const d = await r.json();
-          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "Breach" }));
-        })
-        .catch(() => { errors.push("Breach: service indisponible"); return []; });
-
       const leakosintPromise = fetch("/api/leakosint-search", {
         method: "POST",
         headers,
@@ -903,8 +883,8 @@ export default function SearchPage() {
         })
         .catch(() => { errors.push("LeakOSINT: service indisponible"); return []; });
 
-      Promise.all([breachPromise, leakosintPromise]).then(([breachRes, leakRes]) => {
-        setAdvancedResults([...breachRes, ...leakRes]);
+      leakosintPromise.then((leakRes) => {
+        setAdvancedResults(leakRes);
         setAdvancedLoading(false);
         if (errors.length > 0) {
           setAdvancedError(errors.join(" | "));
