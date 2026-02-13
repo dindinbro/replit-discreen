@@ -882,8 +882,28 @@ export default function SearchPage() {
         })
         .catch(() => { errors.push("LeakOSINT: service indisponible"); return []; });
 
-      leakosintPromise.then((leakRes) => {
-        setAdvancedResults(leakRes);
+      const daltonPromise = fetch("/api/dalton-search", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
+            if (r.status === 429) {
+              errors.push(`DaltonAPI: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
+            } else {
+              errors.push(`DaltonAPI: ${err.message || "erreur"}`);
+            }
+            return [];
+          }
+          const d = await r.json();
+          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "DaltonAPI" }));
+        })
+        .catch(() => { errors.push("DaltonAPI: service indisponible"); return []; });
+
+      Promise.all([leakosintPromise, daltonPromise]).then(([leakRes, daltonRes]) => {
+        setAdvancedResults([...leakRes, ...daltonRes]);
         setAdvancedLoading(false);
         if (errors.length > 0) {
           setAdvancedError(errors.join(" | "));

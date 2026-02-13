@@ -11,7 +11,7 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import {
-  webhookSearch, webhookBreachSearch, webhookExternalProxySearch, webhookLeakosintSearch, webhookApiSearch,
+  webhookSearch, webhookBreachSearch, webhookExternalProxySearch, webhookLeakosintSearch, webhookDaltonSearch, webhookApiSearch,
   webhookRoleChange, webhookFreeze, webhookInvoiceCreated, webhookPaymentCompleted,
   webhookKeyRedeemed, webhookKeyGenerated, webhookApiKeyCreated, webhookApiKeyRevoked,
   webhookPhoneLookup, webhookGeoIP, webhookVouchDeleted,
@@ -2221,6 +2221,144 @@ export async function registerRoutes(
       });
     } catch (err) {
       console.error("POST /api/leakosint-search error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/dalton-search - proxy to DaltonAPI (same format as LeakOSINT)
+  // Shares the same daily quota as LeakOSINT but does NOT increment it (LeakOSINT already counts for the advanced search)
+  app.post("/api/dalton-search", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+
+      if (await storage.isFrozen(userId)) {
+        return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+
+      const effectiveRole = await getEffectiveRole(userId);
+      const isAdmin = effectiveRole === "admin";
+
+      const sub = await storage.getSubscription(userId);
+      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
+      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
+      const leakosintLimit = planInfo.dailyLeakosintSearches;
+
+      if (!isAdmin && leakosintLimit === 0) {
+        return res.status(403).json({
+          message: "Votre abonnement ne permet pas d'utiliser cette source. Passez a un plan superieur.",
+          used: 0,
+          limit: 0,
+          tier,
+        });
+      }
+
+      const currentUsage = await storage.getLeakosintDailyUsage(userId, today);
+      if (!isAdmin && currentUsage >= leakosintLimit) {
+        return res.status(429).json({
+          message: "Limite de recherches Autre Source atteinte pour aujourd'hui.",
+          used: currentUsage,
+          limit: leakosintLimit,
+          tier,
+        });
+      }
+
+      const { request: searchRequest, limit: searchLimit, lang } = req.body;
+      if (!searchRequest || (typeof searchRequest !== "string" && !Array.isArray(searchRequest))) {
+        return res.status(400).json({ message: "Le terme de recherche est requis." });
+      }
+      if (typeof searchRequest === "string" && (searchRequest.length < 1 || searchRequest.length > 500)) {
+        return res.status(400).json({ message: "Le terme doit faire entre 1 et 500 caracteres." });
+      }
+
+      const daltonToken = process.env.DALTON_API_KEY;
+      if (!daltonToken) {
+        console.error("DALTON_API_KEY not configured");
+        return res.status(500).json({ message: "Service DaltonAPI non configure." });
+      }
+
+      let response: globalThis.Response;
+      try {
+        response = await fetch("https://leakosintapi.com/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token: daltonToken,
+            request: searchRequest,
+            limit: searchLimit || 100,
+            lang: lang || "en",
+            type: "json",
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+      } catch (fetchErr) {
+        console.error("DaltonAPI fetch error:", fetchErr);
+        return res.status(502).json({ message: "Impossible de joindre le service DaltonAPI." });
+      }
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("DaltonAPI error:", response.status, errText.slice(0, 300));
+        if (response.status === 429) {
+          return res.status(429).json({ message: "Limite de requetes DaltonAPI atteinte. Reessayez plus tard." });
+        }
+        let errMsg = "Erreur du service DaltonAPI.";
+        try {
+          const errData = JSON.parse(errText);
+          if (errData.error) errMsg = `DaltonAPI: ${errData.error}`;
+        } catch {}
+        return res.status(502).json({ message: errMsg });
+      }
+
+      const data = await response.json() as Record<string, unknown>;
+      console.log("[dalton] Response keys:", Object.keys(data), "Status field:", data["Status"]);
+
+      if (data["Error code"]) {
+        console.error("DaltonAPI error code:", data["Error code"]);
+        return res.status(502).json({ message: `Erreur DaltonAPI: ${data["Error code"]}` });
+      }
+
+      if (data["error"]) {
+        console.error("DaltonAPI error:", data["error"]);
+        return res.status(502).json({ message: `Erreur DaltonAPI: ${data["error"]}` });
+      }
+
+      const listData = data["List"] as Record<string, { InfoLeak?: string; Data?: Record<string, unknown>[] }> | undefined;
+      const results: Record<string, unknown>[] = [];
+
+      if (!listData && !data["Found"]) {
+        console.warn("[dalton] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
+        return res.status(502).json({ message: "Reponse inattendue du service DaltonAPI. Contactez un administrateur." });
+      } else if (listData) {
+        for (const [dbName, dbInfo] of Object.entries(listData)) {
+          if (dbName === "No results found") continue;
+          if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
+            for (const row of dbInfo.Data) {
+              results.push({ _source: dbName, ...row });
+            }
+          }
+        }
+        console.log(`[dalton] Parsed ${results.length} results from ${Object.keys(listData).length} sources`);
+      }
+
+      const wUser = await buildUserInfo(req);
+      webhookDaltonSearch(wUser, String(searchRequest), results.length);
+
+      res.json({
+        results,
+        raw: data,
+        source: "dalton",
+        quota: {
+          used: currentUsage,
+          limit: leakosintLimit,
+          tier,
+        },
+      });
+    } catch (err) {
+      console.error("POST /api/dalton-search error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

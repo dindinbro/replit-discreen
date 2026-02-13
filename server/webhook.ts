@@ -161,6 +161,22 @@ export function webhookLeakosintSearch(user: UserInfo, request: string, resultCo
   });
 }
 
+export function webhookDaltonSearch(user: UserInfo, request: string, resultCount: number) {
+  const desc = [
+    userBlock(user),
+    sep(),
+    `**Requete** : \`${String(request).slice(0, 200)}\``,
+    sep(),
+    `**Resultat** : **${resultCount}** trouve(s)`,
+  ].join("\n");
+
+  sendSearchWebhook({
+    title: "\u{1F4E1} Recherche DaltonAPI",
+    description: desc,
+    color: COLORS.search,
+  });
+}
+
 export function webhookApiSearch(userId: string, criteria: string, resultCount: number) {
   const desc = [
     `>>> **Information Utilisateur**`,
