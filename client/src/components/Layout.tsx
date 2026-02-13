@@ -165,21 +165,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-1.5" data-testid="button-user-menu">
-                      <User className="w-4 h-4" />
-                      <span className="hidden md:inline truncate max-w-[120px] text-xs" title={displayName || user.email || ""}>
-                        {displayName || user.email?.split("@")[0]}
-                      </span>
-                      {role && (
-                        <Badge
-                          variant={(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).variant}
-                          data-testid="badge-user-role"
-                          className="no-default-hover-elevate no-default-active-elevate"
-                        >
-                          {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
-                        </Badge>
-                      )}
-                      <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                    <Button variant="ghost" size="sm" className="gap-2 h-auto py-1.5 px-2.5" data-testid="button-user-menu">
+                      <div className="hidden md:flex flex-col items-end leading-tight">
+                        <span className="text-xs font-medium truncate max-w-[120px]" title={displayName || user.email || ""}>
+                          {displayName || user.email?.split("@")[0]}
+                        </span>
+                        {role && (
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                            role === "admin" ? "text-red-400" :
+                            role === "pro" || role === "business" ? "text-primary" :
+                            role === "vip" ? "text-amber-400" :
+                            "text-muted-foreground"
+                          }`}>
+                            {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+                        <User className="w-4 h-4 text-primary" />
+                      </div>
+                      <ChevronDown className="w-3 h-3 text-muted-foreground hidden md:block" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
