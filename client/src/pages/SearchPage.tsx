@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -41,6 +42,7 @@ import {
   Lock,
   Gamepad2,
   RotateCcw,
+  Zap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -424,6 +426,11 @@ export default function SearchPage() {
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
+  const [advancedSearch, setAdvancedSearch] = useState(false);
+  const [advancedResults, setAdvancedResults] = useState<Record<string, unknown>[]>([]);
+  const [advancedLoading, setAdvancedLoading] = useState(false);
+  const [advancedError, setAdvancedError] = useState<string | null>(null);
+  const [advancedSearched, setAdvancedSearched] = useState(false);
 
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [page, setPage] = useState(0);
@@ -844,6 +851,73 @@ export default function SearchPage() {
       }
     );
 
+    if (advancedSearch) {
+      setAdvancedLoading(true);
+      setAdvancedResults([]);
+      setAdvancedError(null);
+      setAdvancedSearched(true);
+      const searchTerm = filledCriteria.map((c) => c.value.trim()).join(" ");
+      const token = getAccessToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const errors: string[] = [];
+
+      const breachPromise = fetch("/api/breach-search", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ term: searchTerm, fields: ["email", "username", "name", "phone", "ip", "password"] }),
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
+            if (r.status === 429) {
+              errors.push(`Breach: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
+            } else {
+              errors.push(`Breach: ${err.message || "erreur"}`);
+            }
+            return [];
+          }
+          const d = await r.json();
+          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "Breach" }));
+        })
+        .catch(() => { errors.push("Breach: service indisponible"); return []; });
+
+      const leakosintPromise = fetch("/api/leakosint-search", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
+            if (r.status === 429) {
+              errors.push(`LeakOSINT: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
+            } else {
+              errors.push(`LeakOSINT: ${err.message || "erreur"}`);
+            }
+            return [];
+          }
+          const d = await r.json();
+          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "LeakOSINT" }));
+        })
+        .catch(() => { errors.push("LeakOSINT: service indisponible"); return []; });
+
+      Promise.all([breachPromise, leakosintPromise]).then(([breachRes, leakRes]) => {
+        setAdvancedResults([...breachRes, ...leakRes]);
+        setAdvancedLoading(false);
+        if (errors.length > 0) {
+          setAdvancedError(errors.join(" | "));
+        }
+        queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/leakosint-quota"] });
+      });
+    } else {
+      setAdvancedResults([]);
+      setAdvancedError(null);
+      setAdvancedSearched(false);
+    }
+
   };
 
   const handleReset = () => {
@@ -861,6 +935,10 @@ export default function SearchPage() {
     setGeoipTerm("");
     setGeoipResult(null);
     setWantedResults([]);
+    setAdvancedResults([]);
+    setAdvancedLoading(false);
+    setAdvancedError(null);
+    setAdvancedSearched(false);
     searchMutation.reset();
     breachMutation.reset();
     leakosintMutation.reset();
@@ -1090,33 +1168,75 @@ export default function SearchPage() {
                 </div>
               )}
 
+              <label
+                data-testid="toggle-advanced-search"
+                className={`flex items-center justify-between gap-4 p-4 rounded-xl border cursor-pointer transition-all duration-300 select-none ${
+                  advancedSearch
+                    ? "border-primary/40 bg-primary/5 shadow-md shadow-primary/10"
+                    : "border-border/50 bg-secondary/20 hover:border-primary/20 hover:bg-secondary/30"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                    advancedSearch ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
+                  }`}>
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Recherche Discreen Avancee</p>
+                    <p className="text-xs text-muted-foreground">
+                      {advancedSearch
+                        ? "Active — interroge toutes les sources en parallele"
+                        : "Desactivee — recherche dans les bases internes uniquement"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={advancedSearch}
+                  onCheckedChange={setAdvancedSearch}
+                  data-testid="switch-advanced-search"
+                />
+              </label>
+
               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="h-7 bg-primary/5 text-primary border-primary/20 gap-1.5 font-medium">
                     <Search className="w-3.5 h-3.5" />
-                    {isUnlimited ? `Illimité (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
+                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
                   </Badge>
+                  {advancedSearch && (
+                    <Badge variant="outline" className="h-7 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 gap-1.5 font-medium">
+                      <Zap className="w-3.5 h-3.5" />
+                      Mode Avance
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="flex gap-2 w-full">
                   <Button
                     data-testid="button-search"
                     onClick={() => handleSearch(0)}
-                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
-                    className="flex-1 h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-2 shadow-lg shadow-primary/25"
+                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || atLimit}
+                    className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${
+                      advancedSearch
+                        ? "bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground hover:from-primary/90 hover:to-emerald-500/90 shadow-primary/25"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/25"
+                    }`}
                   >
-                    {searchMutation.isPending ? (
+                    {(searchMutation.isPending || advancedLoading) ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : advancedSearch ? (
+                      <Zap className="w-4 h-4" />
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    Rechercher
+                    {advancedSearch ? "Recherche Avancee" : "Rechercher"}
                   </Button>
                   <Button
                     data-testid="button-reset-internal"
                     variant="outline"
                     onClick={handleReset}
-                    disabled={searchMutation.isPending}
+                    disabled={searchMutation.isPending || advancedLoading}
                     className="h-11 gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -1872,15 +1992,21 @@ export default function SearchPage() {
         {searchMode !== "other" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
-            const activeResults = searchMode === "external"
+            const baseResults = searchMode === "external"
               ? leakosintMutation.data?.results
               : searchMutation.data?.results;
-            const activeTotal = searchMode === "external"
+            const activeResults = (searchMode === "internal" && advancedSearch && advancedResults.length > 0)
+              ? [...(baseResults || []), ...advancedResults]
+              : baseResults;
+            const baseTotal = searchMode === "external"
               ? leakosintMutation.data?.results?.length
               : searchMutation.data?.total;
+            const activeTotal = (searchMode === "internal" && advancedSearch && advancedResults.length > 0)
+              ? (baseTotal ?? 0) + advancedResults.length
+              : baseTotal;
             const isLoading = searchMode === "external"
               ? leakosintMutation.isPending
-              : searchMutation.isPending;
+              : (searchMutation.isPending || advancedLoading);
             const activeError = searchMode === "external"
               ? leakosintMutation.error
               : searchMutation.error;
@@ -1898,6 +2024,13 @@ export default function SearchPage() {
                     )}
                   </h3>
                 </div>
+
+                {advancedSearched && advancedError && !advancedLoading && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center gap-2 text-sm" data-testid="advanced-search-error">
+                    <Zap className="w-4 h-4 shrink-0" />
+                    <span>Sources avancees : {advancedError}</span>
+                  </div>
+                )}
 
                 {activeError && !isLoading && (
                   <Card className="p-8 text-center space-y-4 border-destructive/30 bg-destructive/5" data-testid="search-error-display">
