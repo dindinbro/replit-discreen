@@ -1349,7 +1349,7 @@ export async function startDiscordBot() {
 
     if (interaction.commandName === "wantedpreview") {
       try {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ ephemeral: false });
 
         const profiles = await storage.getWantedProfiles();
 
