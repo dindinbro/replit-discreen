@@ -825,7 +825,9 @@ export async function startDiscordBot() {
         webhookBotGkey(interaction.user.tag, tier, license.key);
       } catch (err) {
         log(`Error generating key: ${err}`, "discord");
-        await interaction.reply({ content: "Erreur lors de la generation.", ephemeral: true });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Erreur lors de la generation.", ephemeral: true });
+        }
       }
     }
 
@@ -842,7 +844,9 @@ export async function startDiscordBot() {
         webhookBotRkey(interaction.user.tag, key, !!success);
       } catch (err) {
         log(`Error revoking key: ${err}`, "discord");
-        await interaction.reply({ content: "Erreur lors de la revocation.", ephemeral: true });
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Erreur lors de la revocation.", ephemeral: true });
+        }
       }
     }
 
