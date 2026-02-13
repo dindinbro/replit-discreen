@@ -48,7 +48,7 @@ const SECONDARY_PROFILES: WantedProfile[] = [
     pseudo: "Les Daltons",
     disc: "Disque de Platine",
     description: "Lomix, Lasko, Lahyat, Bognon, 92",
-    images: [],
+    images: ["https://media.discordapp.net/attachments/1458943228714811412/1471780647982071839/4ccb6c38aff978bd6f2c58cf89705b7a.png?ex=69902e0a&is=698edc8a&hm=77c87e5104965635c87ce81f5f56ce8031848f8f4fd54c245ff05e5038e68fc3&=&format=webp&quality=lossless"],
   },
 ];
 
