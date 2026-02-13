@@ -1168,35 +1168,53 @@ export default function SearchPage() {
                 </div>
               )}
 
-              <label
-                data-testid="toggle-advanced-search"
-                className={`flex items-center justify-between gap-4 p-4 rounded-xl border cursor-pointer transition-all duration-300 select-none ${
-                  advancedSearch
-                    ? "border-primary/40 bg-primary/5 shadow-md shadow-primary/10"
-                    : "border-border/50 bg-secondary/20 hover:border-primary/20 hover:bg-secondary/30"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                    advancedSearch ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
-                  }`}>
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Recherche Discreen Avancee</p>
-                    <p className="text-xs text-muted-foreground">
-                      {advancedSearch
-                        ? "Active — interroge toutes les sources en parallele"
-                        : "Desactivee — recherche dans les bases internes uniquement"}
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={advancedSearch}
-                  onCheckedChange={setAdvancedSearch}
-                  data-testid="switch-advanced-search"
-                />
-              </label>
+              {(() => {
+                const advancedTiers = ["pro", "business", "api"];
+                const canUseAdvanced = advancedTiers.includes(internalTier);
+                return (
+                  <label
+                    data-testid="toggle-advanced-search"
+                    className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-all duration-300 select-none ${
+                      !canUseAdvanced
+                        ? "border-border/30 bg-secondary/10 opacity-60 cursor-not-allowed"
+                        : advancedSearch
+                          ? "border-primary/40 bg-primary/5 shadow-md shadow-primary/10 cursor-pointer"
+                          : "border-border/50 bg-secondary/20 hover:border-primary/20 hover:bg-secondary/30 cursor-pointer"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                        !canUseAdvanced
+                          ? "bg-secondary text-muted-foreground"
+                          : advancedSearch ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
+                      }`}>
+                        {canUseAdvanced ? <Zap className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Recherche Discreen Avancee</p>
+                        <p className="text-xs text-muted-foreground">
+                          {!canUseAdvanced
+                            ? "Disponible a partir de l'abonnement PRO"
+                            : advancedSearch
+                              ? "Active — interroge toutes les sources en parallele"
+                              : "Desactivee — recherche dans les bases internes uniquement"}
+                        </p>
+                      </div>
+                    </div>
+                    {canUseAdvanced ? (
+                      <Switch
+                        checked={advancedSearch}
+                        onCheckedChange={setAdvancedSearch}
+                        data-testid="switch-advanced-search"
+                      />
+                    ) : (
+                      <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-600 dark:text-amber-400">
+                        PRO+
+                      </Badge>
+                    )}
+                  </label>
+                );
+              })()}
 
               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                 <div className="flex items-center gap-2">
