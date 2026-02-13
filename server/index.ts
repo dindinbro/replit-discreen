@@ -195,9 +195,13 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  startDiscordBot().catch((err) => {
-    log(`Discord bot failed to start: ${err}`, "discord");
-  });
+  if (process.env.REPL_ID || process.env.REPLIT_DEPLOYMENT) {
+    log("Skipping Discord bot on Replit (bot runs on VPS only)", "discord");
+  } else {
+    startDiscordBot().catch((err) => {
+      log(`Discord bot failed to start: ${err}`, "discord");
+    });
+  }
 
   setInterval(async () => {
     try {
