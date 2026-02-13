@@ -1390,7 +1390,11 @@ export async function startDiscordBot() {
             .setCustomId(`wpreview_next_${interaction.user.id}_0`)
             .setLabel("Suivant ▶")
             .setStyle(ButtonStyle.Secondary)
-            .setDisabled(totalPages <= 1)
+            .setDisabled(totalPages <= 1),
+          new ButtonBuilder()
+            .setCustomId(`wpreview_all_${interaction.user.id}`)
+            .setLabel("Tout afficher")
+            .setStyle(ButtonStyle.Primary)
         );
 
         await interaction.editReply({ embeds: [embed], components: [row] });
@@ -1572,20 +1576,83 @@ async function handleWantedPreviewButton(interaction: ButtonInteraction) {
   const parts = customId.split("_");
   const direction = parts[1];
   const ownerId = parts[2];
-  const currentPage = parseInt(parts[3], 10);
 
   if (interaction.user.id !== ownerId) {
     await interaction.reply({ content: "Seul l'auteur de la commande peut naviguer.", ephemeral: true });
     return;
   }
 
-  const newPage = direction === "next" ? currentPage + 1 : currentPage - 1;
-
   try {
     const profiles = await storage.getWantedProfiles();
     const pseudos = (profiles || [])
       .map((p) => p.pseudo || "N/A")
       .filter((p) => p !== "N/A");
+
+    if (direction === "all") {
+      const perChunk = 40;
+      const chunks: string[][] = [];
+      for (let i = 0; i < pseudos.length; i += perChunk) {
+        chunks.push(pseudos.slice(i, i + perChunk));
+      }
+
+      const embeds = chunks.slice(0, 10).map((chunk, idx) => {
+        const startIdx = idx * perChunk;
+        return new EmbedBuilder()
+          .setColor(0x10b981)
+          .setTitle(idx === 0 ? `Wanted — Liste complete (${pseudos.length} pseudos)` : `Wanted (suite)`)
+          .setDescription(chunk.map((p, i) => `\`${startIdx + i + 1}.\` ${p}`).join("\n"))
+          .setFooter({ text: "© Discreen" });
+      });
+
+      const row = new ActionRowBuilder<ButtonBuilder>();
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`wpreview_pages_${ownerId}_0`)
+          .setLabel("Retour pagination")
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      await interaction.update({ embeds, components: [row] });
+      return;
+    }
+
+    if (direction === "pages") {
+      const currentPage = 0;
+      const perPage = 10;
+      const totalPages = Math.ceil(pseudos.length / perPage);
+      const pageItems = pseudos.slice(0, perPage);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x10b981)
+        .setTitle(`Wanted — Liste des pseudos (${pseudos.length})`)
+        .setDescription(pageItems.map((p, i) => `\`${i + 1}.\` ${p}`).join("\n"))
+        .setFooter({ text: `Page 1/${totalPages} • © Discreen` })
+        .setTimestamp();
+
+      const row = new ActionRowBuilder<ButtonBuilder>();
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`wpreview_prev_${ownerId}_0`)
+          .setLabel("◀ Precedent")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(true),
+        new ButtonBuilder()
+          .setCustomId(`wpreview_next_${ownerId}_0`)
+          .setLabel("Suivant ▶")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(totalPages <= 1),
+        new ButtonBuilder()
+          .setCustomId(`wpreview_all_${ownerId}`)
+          .setLabel("Tout afficher")
+          .setStyle(ButtonStyle.Primary)
+      );
+
+      await interaction.update({ embeds: [embed], components: [row] });
+      return;
+    }
+
+    const currentPage = parseInt(parts[3], 10);
+    const newPage = direction === "next" ? currentPage + 1 : currentPage - 1;
 
     const perPage = 10;
     const totalPages = Math.ceil(pseudos.length / perPage);
@@ -1610,7 +1677,11 @@ async function handleWantedPreviewButton(interaction: ButtonInteraction) {
         .setCustomId(`wpreview_next_${ownerId}_${safePage}`)
         .setLabel("Suivant ▶")
         .setStyle(ButtonStyle.Secondary)
-        .setDisabled(safePage >= totalPages - 1)
+        .setDisabled(safePage >= totalPages - 1),
+      new ButtonBuilder()
+        .setCustomId(`wpreview_all_${ownerId}`)
+        .setLabel("Tout afficher")
+        .setStyle(ButtonStyle.Primary)
     );
 
     await interaction.update({ embeds: [embed], components: [row] });
