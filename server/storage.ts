@@ -672,6 +672,8 @@ export class DatabaseStorage implements IStorage {
         conditions.push(ilike(wantedProfiles.password, `%${val}%`));
       } else if (key === "iban") {
         conditions.push(ilike(wantedProfiles.iban, `%${val}%`));
+      } else if (key === "bic") {
+        conditions.push(ilike(wantedProfiles.bic, `%${val}%`));
       } else if (key === "plaque") {
         conditions.push(ilike(wantedProfiles.plaque, `%${val}%`));
       }

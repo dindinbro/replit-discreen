@@ -118,6 +118,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
     discordId: "",
     password: "",
     iban: "",
+    bic: "",
     plaque: "",
     notes: ""
   });
@@ -139,6 +140,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
         discordId: editProfile.discordId || "",
         password: editProfile.password || "",
         iban: editProfile.iban || "",
+        bic: editProfile.bic || "",
         plaque: editProfile.plaque || "",
         notes: editProfile.notes || "",
       });
@@ -158,7 +160,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
     setForm({
       nom: "", prenom: "", adresse: "",
       ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
-      pseudo: "", discord: "", discordId: "", password: "", iban: "", plaque: "", notes: ""
+      pseudo: "", discord: "", discordId: "", password: "", iban: "", bic: "", plaque: "", notes: ""
     });
     setEmails([""]);
     setPhones([""]);
@@ -321,10 +323,14 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
           <Input value={form.password || ""} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" data-testid="input-password" />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">IBAN</label>
             <Input value={form.iban || ""} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." data-testid="input-iban" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">BIC</label>
+            <Input value={form.bic || ""} onChange={e => setForm(p => ({ ...p, bic: e.target.value.toUpperCase() }))} placeholder="BNPAFRPP" data-testid="input-bic" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Plaque d'immatriculation</label>
@@ -403,7 +409,10 @@ function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () =
       (p.ips || []).some(ip => ip.toLowerCase().includes(q)) ||
       (p.discordIds || []).some(d => d.toLowerCase().includes(q)) ||
       (p.adresse || "").toLowerCase().includes(q) ||
-      ((p as any).addresses || []).some((a: string) => a.toLowerCase().includes(q))
+      ((p as any).addresses || []).some((a: string) => a.toLowerCase().includes(q)) ||
+      (p.iban || "").toLowerCase().includes(q) ||
+      (p.bic || "").toLowerCase().includes(q) ||
+      (p.plaque || "").toLowerCase().includes(q)
     );
   });
 
@@ -469,6 +478,8 @@ function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () =
                     )}
                     {profile.dateNaissance && <div><span className="text-muted-foreground">Naissance:</span> {profile.dateNaissance}</div>}
                     {profile.iban && <div><span className="text-muted-foreground">IBAN:</span> {profile.iban}</div>}
+                    {profile.bic && <div><span className="text-muted-foreground">BIC:</span> {profile.bic}</div>}
+                    {profile.plaque && <div><span className="text-muted-foreground">Plaque:</span> {profile.plaque}</div>}
                     {profile.password && <div><span className="text-muted-foreground">MDP:</span> {profile.password}</div>}
                     {profile.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {profile.notes}</div>}
                   </div>
