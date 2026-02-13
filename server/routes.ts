@@ -2081,26 +2081,10 @@ export async function registerRoutes(
     }
   });
 
-  const advancedSearchCooldowns = new Map<string, number>();
-  const ADVANCED_COOLDOWN_MS = 30_000;
-
   // POST /api/leakosint-search - proxy to LeakOSINT API
   app.post("/api/leakosint-search", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user.id;
-
-      const lastUsed = advancedSearchCooldowns.get(userId) || 0;
-      const elapsed = Date.now() - lastUsed;
-      if (elapsed < ADVANCED_COOLDOWN_MS) {
-        const remaining = Math.ceil((ADVANCED_COOLDOWN_MS - elapsed) / 1000);
-        return res.status(429).json({
-          message: `Veuillez patienter ${remaining}s avant de relancer une recherche avancee.`,
-          cooldown: true,
-          retryAfter: remaining,
-        });
-      }
-
-      advancedSearchCooldowns.set(userId, Date.now());
 
       if (await storage.isFrozen(userId)) {
         return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
@@ -2241,7 +2225,6 @@ export async function registerRoutes(
         results,
         raw: data,
         source: "leakosint",
-        cooldownSeconds: ADVANCED_COOLDOWN_MS / 1000,
         quota: {
           used: newCount,
           limit: leakosintLimit,
