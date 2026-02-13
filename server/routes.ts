@@ -543,7 +543,31 @@ export async function registerRoutes(
       }
 
       const adminEmail = (req as any).user?.email || "admin";
-      webhookRoleChange(adminEmail, parsed.userId, parsed.role);
+
+      let targetEmail = parsed.userId;
+      let targetUsername = "N/A";
+      let targetUniqueId: number | null = null;
+      try {
+        if (supabaseAdmin) {
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("email, username")
+            .eq("id", parsed.userId)
+            .single();
+          if (profile) {
+            targetEmail = profile.email || parsed.userId;
+            targetUsername = profile.username || "N/A";
+          }
+        }
+        const sub = await storage.getSubscription(parsed.userId);
+        if (sub) {
+          targetUniqueId = (sub as any).uniqueId ?? null;
+        }
+      } catch (e) {
+        console.error("webhookRoleChange: failed to fetch target info", e);
+      }
+
+      webhookRoleChange(adminEmail, { email: targetEmail, username: targetUsername, uniqueId: targetUniqueId, userId: parsed.userId }, parsed.role);
 
       res.json({ success: true, userId: parsed.userId, role: parsed.role });
     } catch (err) {

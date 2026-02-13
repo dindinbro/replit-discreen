@@ -178,12 +178,15 @@ export function webhookApiSearch(userId: string, criteria: string, resultCount: 
   });
 }
 
-export function webhookRoleChange(adminEmail: string, targetUserId: string, newRole: string) {
+export function webhookRoleChange(adminEmail: string, target: { email: string; username: string; uniqueId: number | null; userId: string }, newRole: string) {
   const desc = [
     `>>> **Action Admin**`,
     `**Admin** : \`${adminEmail}\``,
     sep(),
-    `**Cible** : \`${targetUserId}\``,
+    `**Cible** : \`${target.email}\``,
+    `**Nom d'utilisateur** : \`${target.username}\``,
+    `**ID Unique** : \`${target.uniqueId ?? "N/A"}\``,
+    `**ID** : \`${target.userId}\``,
     `**Nouveau Role** : \`${newRole.toUpperCase()}\``,
   ].join("\n");
 
