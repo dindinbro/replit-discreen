@@ -229,8 +229,8 @@ function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: n
             )}
           </div>
           <div className="p-3 space-y-1">
-            <h3 className="text-sm font-bold tracking-wide uppercase text-foreground">
-              {profile.pseudo}
+            <h3 className="text-sm font-bold tracking-wide uppercase flex items-center gap-1.5">
+              <span className="bg-gradient-to-r from-slate-300 via-gray-100 to-slate-400 bg-clip-text text-transparent drop-shadow-sm">{profile.pseudo}</span>
             </h3>
             <p className="text-xs text-foreground/60 font-medium flex items-center gap-1">
               <span>🏆</span> {profile.disc}

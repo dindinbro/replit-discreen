@@ -2081,6 +2081,50 @@ export async function registerRoutes(
     }
   });
 
+  const apiTokenLastUsed = {
+    leakosint: 0,
+    dalton: 0,
+  };
+  const API_TOKEN_COOLDOWN_MS = 30_000;
+
+  const apiQueues: Record<string, Array<() => void>> = {
+    leakosint: [],
+    dalton: [],
+  };
+
+  function waitForApiSlot(apiName: "leakosint" | "dalton"): Promise<void> {
+    return new Promise((resolve) => {
+      const tryExecute = () => {
+        const now = Date.now();
+        const elapsed = now - apiTokenLastUsed[apiName];
+        if (elapsed >= API_TOKEN_COOLDOWN_MS) {
+          apiTokenLastUsed[apiName] = now;
+          resolve();
+        } else {
+          const waitTime = API_TOKEN_COOLDOWN_MS - elapsed;
+          setTimeout(() => {
+            apiTokenLastUsed[apiName] = Date.now();
+            resolve();
+          }, waitTime);
+        }
+      };
+
+      if (apiQueues[apiName].length === 0) {
+        apiQueues[apiName].push(tryExecute);
+        tryExecute();
+      } else {
+        apiQueues[apiName].push(tryExecute);
+      }
+    });
+  }
+
+  function releaseApiSlot(apiName: "leakosint" | "dalton") {
+    apiQueues[apiName].shift();
+    if (apiQueues[apiName].length > 0) {
+      apiQueues[apiName][0]();
+    }
+  }
+
   // POST /api/leakosint-search - proxy to LeakOSINT API
   app.post("/api/leakosint-search", requireAuth, async (req, res) => {
     try {
@@ -2140,6 +2184,8 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Service LeakOSINT non configure." });
       }
 
+      await waitForApiSlot("leakosint");
+
       let response: globalThis.Response;
       try {
         response = await fetch("https://leakosintapi.com/", {
@@ -2154,9 +2200,10 @@ export async function registerRoutes(
             lang: lang || "en",
             type: "json",
           }),
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(45000),
         });
       } catch (fetchErr) {
+        releaseApiSlot("leakosint");
         console.error("LeakOSINT API fetch error:", fetchErr);
         const wUser = await buildUserInfo(req);
         webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
@@ -2164,6 +2211,7 @@ export async function registerRoutes(
       }
 
       if (!response.ok) {
+        releaseApiSlot("leakosint");
         const errText = await response.text().catch(() => "");
         console.error("LeakOSINT API error:", response.status, errText.slice(0, 300));
         const wUser = await buildUserInfo(req);
@@ -2221,6 +2269,8 @@ export async function registerRoutes(
       const wUser = await buildUserInfo(req);
       webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
 
+      releaseApiSlot("leakosint");
+
       res.json({
         results,
         raw: data,
@@ -2232,6 +2282,7 @@ export async function registerRoutes(
         },
       });
     } catch (err) {
+      releaseApiSlot("leakosint");
       console.error("POST /api/leakosint-search error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
@@ -2291,6 +2342,8 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Service DaltonAPI non configure." });
       }
 
+      await waitForApiSlot("dalton");
+
       let response: globalThis.Response;
       try {
         response = await fetch("https://leakosintapi.com/", {
@@ -2305,9 +2358,10 @@ export async function registerRoutes(
             lang: lang || "en",
             type: "json",
           }),
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(45000),
         });
       } catch (fetchErr) {
+        releaseApiSlot("dalton");
         console.error("DaltonAPI fetch error:", fetchErr);
         const wUser = await buildUserInfo(req);
         webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
@@ -2315,6 +2369,7 @@ export async function registerRoutes(
       }
 
       if (!response.ok) {
+        releaseApiSlot("dalton");
         const errText = await response.text().catch(() => "");
         console.error("DaltonAPI error:", response.status, errText.slice(0, 300));
         const wUser = await buildUserInfo(req);
@@ -2336,6 +2391,7 @@ export async function registerRoutes(
       console.log("[dalton] Response keys:", Object.keys(data), "Status field:", data["Status"]);
 
       if (data["Error code"]) {
+        releaseApiSlot("dalton");
         console.error("DaltonAPI error code:", data["Error code"]);
         const wUser = await buildUserInfo(req);
         webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
@@ -2343,6 +2399,7 @@ export async function registerRoutes(
       }
 
       if (data["error"]) {
+        releaseApiSlot("dalton");
         console.error("DaltonAPI error:", data["error"]);
         const wUser = await buildUserInfo(req);
         webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
@@ -2353,6 +2410,7 @@ export async function registerRoutes(
       const results: Record<string, unknown>[] = [];
 
       if (!listData && !data["Found"]) {
+        releaseApiSlot("dalton");
         console.warn("[dalton] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
         const wUser = await buildUserInfo(req);
         webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
@@ -2369,6 +2427,8 @@ export async function registerRoutes(
         console.log(`[dalton] Parsed ${results.length} results from ${Object.keys(listData).length} sources`);
       }
 
+      releaseApiSlot("dalton");
+
       const wUser = await buildUserInfo(req);
       webhookDaltonSearch(wUser, String(searchRequest), results.length, "ok");
 
@@ -2383,6 +2443,7 @@ export async function registerRoutes(
         },
       });
     } catch (err) {
+      releaseApiSlot("dalton");
       console.error("POST /api/dalton-search error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
