@@ -431,6 +431,7 @@ export default function SearchPage() {
   const [advancedLoading, setAdvancedLoading] = useState(false);
   const [advancedError, setAdvancedError] = useState<string | null>(null);
   const [advancedSearched, setAdvancedSearched] = useState(false);
+  const [searchCooldown, setSearchCooldown] = useState(0);
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 20;
@@ -490,6 +491,17 @@ export default function SearchPage() {
     proxy?: boolean;
     hosting?: boolean;
   } | null>(null);
+
+  useEffect(() => {
+    if (searchCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setSearchCooldown((prev) => {
+        if (prev <= 1) { clearInterval(timer); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [searchCooldown]);
 
   const handleGeoip = async () => {
     if (!geoipTerm.trim()) return;
@@ -838,12 +850,19 @@ export default function SearchPage() {
         offset: newPage * pageSize,
       },
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
           queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
+          if (data.cooldownSeconds && data.cooldownSeconds > 0) {
+            setSearchCooldown(data.cooldownSeconds);
+          }
         },
         onError: (err) => {
           if (err instanceof SearchLimitError) {
-            setLimitReached(true);
+            if (err.cooldown && err.remainingSeconds) {
+              setSearchCooldown(err.remainingSeconds);
+            } else {
+              setLimitReached(true);
+            }
           }
         },
       }
@@ -1225,21 +1244,25 @@ export default function SearchPage() {
                   <Button
                     data-testid="button-search"
                     onClick={() => handleSearch(0)}
-                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || atLimit}
+                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || atLimit || searchCooldown > 0}
                     className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${
-                      advancedSearch
+                      searchCooldown > 0
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : advancedSearch
                         ? "bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground hover:from-primary/90 hover:to-emerald-500/90 shadow-primary/25"
                         : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/25"
                     }`}
                   >
                     {(searchMutation.isPending || advancedLoading) ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : searchCooldown > 0 ? (
+                      <Loader2 className="w-4 h-4" />
                     ) : advancedSearch ? (
                       <Zap className="w-4 h-4" />
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    {advancedSearch ? "Recherche Avancee" : "Rechercher"}
+                    {searchCooldown > 0 ? `Patientez ${searchCooldown}s` : advancedSearch ? "Recherche Avancee" : "Rechercher"}
                   </Button>
                   <Button
                     data-testid="button-reset-internal"
@@ -1365,15 +1388,17 @@ export default function SearchPage() {
                   <Button
                     data-testid="button-fivem-search"
                     onClick={() => handleSearch(0)}
-                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit}
-                    className="flex-1 h-11 bg-orange-600 text-white font-semibold gap-2 shadow-lg shadow-orange-500/25 border-orange-600"
+                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit || searchCooldown > 0}
+                    className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${searchCooldown > 0 ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-orange-600 text-white shadow-orange-500/25 border-orange-600"}`}
                   >
                     {searchMutation.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : searchCooldown > 0 ? (
+                      <Loader2 className="w-4 h-4" />
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    Rechercher
+                    {searchCooldown > 0 ? `Patientez ${searchCooldown}s` : "Rechercher"}
                   </Button>
                   <Button
                     data-testid="button-reset-fivem"

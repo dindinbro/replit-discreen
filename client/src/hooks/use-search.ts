@@ -16,13 +16,17 @@ export class SearchLimitError extends Error {
   used: number;
   limit: number;
   tier: string;
+  cooldown?: boolean;
+  remainingSeconds?: number;
 
-  constructor(message: string, used: number, limit: number, tier: string) {
+  constructor(message: string, used: number, limit: number, tier: string, cooldown?: boolean, remainingSeconds?: number) {
     super(message);
     this.name = "SearchLimitError";
     this.used = used;
     this.limit = limit;
     this.tier = tier;
+    this.cooldown = cooldown;
+    this.remainingSeconds = remainingSeconds;
   }
 }
 
@@ -191,13 +195,15 @@ export function usePerformSearch(getAccessToken: () => string | null) {
             err.message || "Limite atteinte",
             err.used || 0,
             err.limit || 0,
-            err.tier || "free"
+            err.tier || "free",
+            err.cooldown || false,
+            err.remainingSeconds || 0
           );
         }
         throw new Error(err.message || "Search failed");
       }
 
-      return (await res.json()) as SearchResponseWithQuota;
+      return (await res.json()) as SearchResponseWithQuota & { cooldownSeconds?: number };
     },
   });
 }

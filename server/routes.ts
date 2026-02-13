@@ -1240,6 +1240,21 @@ export async function registerRoutes(
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
       const isUnlimited = isAdmin || planInfo.dailySearches === -1;
 
+      if (!COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
+        const lastSearch = userSearchCooldowns.get(userId);
+        if (lastSearch) {
+          const elapsed = Date.now() - lastSearch;
+          if (elapsed < USER_SEARCH_COOLDOWN_MS) {
+            const remaining = Math.ceil((USER_SEARCH_COOLDOWN_MS - elapsed) / 1000);
+            return res.status(429).json({
+              message: `Veuillez patienter ${remaining}s avant de relancer une recherche.`,
+              cooldown: true,
+              remainingSeconds: remaining,
+            });
+          }
+        }
+      }
+
       const newCount = await storage.incrementDailyUsage(userId, today);
 
       if (!isUnlimited && newCount > planInfo.dailySearches) {
@@ -1309,9 +1324,14 @@ export async function registerRoutes(
         }
       }
 
+      if (!COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
+        userSearchCooldowns.set(userId, Date.now());
+      }
+
       res.json({
         results,
         total,
+        cooldownSeconds: COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier) ? 0 : USER_SEARCH_COOLDOWN_MS / 1000,
         quota: {
           used: newCount,
           limit: planInfo.dailySearches,
@@ -2081,6 +2101,10 @@ export async function registerRoutes(
     }
   });
 
+  const userSearchCooldowns = new Map<string, number>();
+  const USER_SEARCH_COOLDOWN_MS = 10_000;
+  const COOLDOWN_EXEMPT_ROLES = new Set(["api", "admin"]);
+
   const apiTokenLastUsed = {
     leakosint: 0,
     dalton: 0,
@@ -2233,6 +2257,7 @@ export async function registerRoutes(
       console.log("[leakosint] Response keys:", Object.keys(data), "Status field:", data["Status"]);
 
       if (data["Error code"]) {
+        releaseApiSlot("leakosint");
         console.error("LeakOSINT API error code:", data["Error code"]);
         const wUser = await buildUserInfo(req);
         webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
@@ -2240,6 +2265,7 @@ export async function registerRoutes(
       }
 
       if (data["error"]) {
+        releaseApiSlot("leakosint");
         console.error("LeakOSINT API error:", data["error"]);
         const wUser = await buildUserInfo(req);
         webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
@@ -2250,6 +2276,7 @@ export async function registerRoutes(
       const results: Record<string, unknown>[] = [];
 
       if (!listData && !data["Found"]) {
+        releaseApiSlot("leakosint");
         console.warn("[leakosint] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
         const wUser = await buildUserInfo(req);
         webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
