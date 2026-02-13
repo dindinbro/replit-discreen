@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Trophy } from "lucide-react";
+import { Card } from "@/components/ui/card";
 
 interface WantedProfile {
   pseudo: string;
@@ -23,25 +24,6 @@ const WANTED_PROFILES: WantedProfile[] = [
     images: [],
   },
 ];
-
-function Sparkle({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M12 0L13.5 8.5L22 10L13.5 11.5L12 20L10.5 11.5L2 10L10.5 8.5L12 0Z"
-        fill="currentColor"
-        fillOpacity="0.4"
-      />
-    </svg>
-  );
-}
 
 function ProfileCard({ profile, index }: { profile: WantedProfile; index: number }) {
   const [currentImage, setCurrentImage] = useState(0);
@@ -68,9 +50,9 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
         className="w-[280px] sm:w-[300px] flex-shrink-0"
         data-testid={`card-wanted-${profile.pseudo}`}
       >
-        <div className="rounded-xl overflow-hidden bg-[#1a1d25] border border-white/[0.06] shadow-xl hover:border-white/[0.12] transition-colors duration-300 group">
+        <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group">
           <div
-            className="relative aspect-[4/5] bg-[#12141a] cursor-pointer overflow-hidden"
+            className="relative aspect-[4/5] bg-muted/30 cursor-pointer overflow-hidden"
             onClick={() => hasImages && setModalOpen(true)}
           >
             {hasImages ? (
@@ -113,25 +95,25 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-20 h-20 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-3">
-                    <span className="text-3xl font-bold text-white/20">
+                  <div className="w-20 h-20 rounded-full bg-muted/50 border border-border flex items-center justify-center mx-auto mb-3">
+                    <span className="text-3xl font-bold text-muted-foreground/40">
                       {profile.pseudo.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <p className="text-white/20 text-xs">Aucune photo</p>
+                  <p className="text-muted-foreground/40 text-xs">Aucune photo</p>
                 </div>
               </div>
             )}
           </div>
 
           <div className="p-4 space-y-1.5">
-            <h3 className="text-lg font-bold text-[#6c7cff] tracking-wide uppercase">
+            <h3 className="text-lg font-bold text-primary tracking-wide uppercase">
               {profile.pseudo}
             </h3>
-            <p className="text-sm text-white/70 font-medium">{profile.realName}</p>
-            <p className="text-xs text-white/40 leading-relaxed pt-1">{profile.description}</p>
+            <p className="text-sm text-foreground/70 font-medium">{profile.realName}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed pt-1">{profile.description}</p>
           </div>
-        </div>
+        </Card>
       </motion.div>
 
       <AnimatePresence>
@@ -190,85 +172,42 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
 
 export default function UsersPage() {
   return (
-    <div className="min-h-[80vh] bg-[#0d0f14] relative overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8 -mb-8 -mt-4 px-4 sm:px-6 lg:px-8">
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `
-            linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
-          `,
-          backgroundSize: "60px 60px",
-        }}
-      />
-
-      <Sparkle className="absolute top-[8%] right-[12%] text-white/20 animate-pulse" />
-      <Sparkle className="absolute top-[15%] left-[8%] text-white/10 w-4 h-4" />
-      <Sparkle className="absolute top-[35%] right-[25%] text-white/15 w-3 h-3 animate-pulse" />
-      <Sparkle className="absolute top-[55%] left-[15%] text-white/10 w-5 h-5" />
-      <Sparkle className="absolute top-[70%] right-[10%] text-white/[0.07] w-4 h-4 animate-pulse" />
-      <Sparkle className="absolute top-[45%] left-[45%] text-white/10 w-3 h-3" />
-      <Sparkle className="absolute bottom-[20%] left-[30%] text-white/[0.07] w-4 h-4 animate-pulse" />
-      <Sparkle className="absolute bottom-[10%] right-[35%] text-white/10 w-3 h-3" />
-
-      <div className="relative z-10 px-4 py-16 sm:py-24">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Sparkle className="text-white/30 w-6 h-6" />
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight" data-testid="heading-wanted">
-              <span className="text-white">DISCREEN </span>
-              <span className="text-[#6c7cff]">OF FAME</span>
-            </h1>
-            <Sparkle className="text-white/30 w-6 h-6" />
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.3 }}
-            className="inline-block"
-          >
-            <div className="border border-white/10 rounded-full px-6 py-2">
-              <p className="text-white/40 text-sm italic tracking-wide">
-  Trophee De Discreen
-              </p>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-6"
-          >
-            <Sparkle className="text-white/20 w-5 h-5 mx-auto" />
-          </motion.div>
-        </motion.div>
-
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
-            {WANTED_PROFILES.map((profile, index) => (
-              <ProfileCard key={profile.pseudo} profile={profile} index={index} />
-            ))}
-          </div>
+    <div className="container max-w-5xl mx-auto px-4 py-12">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="text-center mb-12"
+      >
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <Trophy className="w-7 h-7 text-primary" />
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight" data-testid="heading-wanted">
+            <span className="text-foreground">DISCREEN </span>
+            <span className="text-primary">OF FAME</span>
+          </h1>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="text-center mt-20"
-        >
-          <p className="text-white/15 text-xs tracking-widest uppercase">
-            {WANTED_PROFILES.length} profil{WANTED_PROFILES.length > 1 ? "s" : ""} recense{WANTED_PROFILES.length > 1 ? "s" : ""}
-          </p>
-        </motion.div>
+        <p className="text-muted-foreground text-sm">
+          Trophee De Discreen
+        </p>
+      </motion.div>
+
+      <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
+        {WANTED_PROFILES.map((profile, index) => (
+          <ProfileCard key={profile.pseudo} profile={profile} index={index} />
+        ))}
       </div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1 }}
+        className="text-center mt-16"
+      >
+        <p className="text-muted-foreground/50 text-xs tracking-widest uppercase">
+          {WANTED_PROFILES.length} profil{WANTED_PROFILES.length > 1 ? "s" : ""} recense{WANTED_PROFILES.length > 1 ? "s" : ""}
+        </p>
+      </motion.div>
     </div>
   );
 }
