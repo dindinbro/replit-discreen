@@ -654,12 +654,11 @@ export default function SearchPage() {
   const leakosintUnlimited = leakosintLimit === -1;
   const leakosintAtLimit = !leakosintUnlimited && leakosintUsed >= leakosintLimit;
 
-  const isExternalMode = searchMode === "external";
-  const displayUsed = isExternalMode ? leakosintUsed : internalUsed;
-  const displayLimit = isExternalMode ? leakosintLimit : internalLimit;
-  const displayTier = isExternalMode ? leakosintTier : internalTier;
-  const isUnlimited = isExternalMode ? leakosintUnlimited : internalUnlimited;
-  const atLimit = isExternalMode ? leakosintAtLimit : internalAtLimit;
+  const displayUsed = internalUsed;
+  const displayLimit = internalLimit;
+  const displayTier = internalTier;
+  const isUnlimited = internalUnlimited;
+  const atLimit = internalAtLimit;
 
   const addCriterionWithType = (filterType: string) => {
     setCriteria((prev) => [...prev, { id: String(nextCriterionId++), type: filterType, value: "" }]);
@@ -973,15 +972,6 @@ export default function SearchPage() {
           >
             <Sparkles className="w-4 h-4" />
             Recherche par Critères
-          </Button>
-          <Button
-            variant={searchMode === "external" ? "default" : "outline"}
-            onClick={() => { setSearchMode("external"); setCriteria([]); }}
-            className="min-w-[180px] gap-2"
-            data-testid="button-mode-external"
-          >
-            <Globe className="w-4 h-4" />
-            Recherche Global
           </Button>
           <Button
             variant={searchMode === "other" ? "default" : "outline"}
@@ -1370,96 +1360,6 @@ export default function SearchPage() {
                     onClick={handleReset}
                     disabled={searchMutation.isPending}
                     className="h-11 gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reinitialiser
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {searchMode === "external" && (
-            <motion.div
-              key="external"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
-            >
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-primary" />
-                  <h2 className="text-xl font-semibold">Recherche Global</h2>
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Terme de recherche</Label>
-                  <div className="flex items-center gap-3">
-                    <div className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
-                      style={{ color: "hsl(var(--primary))", backgroundColor: "hsl(var(--primary) / 0.1)" }}>
-                      <Search className="w-4 h-4" />
-                    </div>
-                    <Input
-                      data-testid="input-leakosint-term"
-                      placeholder="Entrez un terme (email, nom, telephone...)..."
-                      value={leakosintTerm}
-                      onChange={(e) => setLeakosintTerm(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter" && leakosintLimit !== 0) handleLeakosintSearch(); }}
-                      className="flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="text-leakosint-quota-info">
-                    {leakosintUnlimited ? (
-                      <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
-                        <Search className="w-3 h-3" />
-                        Illimite ({leakosintTier.toUpperCase()})
-                      </Badge>
-                    ) : leakosintLimit === 0 ? (
-                      <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">
-                        Non disponible ({leakosintTier.toUpperCase()}) - Passez a un plan superieur
-                      </Badge>
-                    ) : (
-                      <>
-                        <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
-                          {leakosintTier.toUpperCase()}
-                        </Badge>
-                        <span>{leakosintUsed} / {leakosintLimit} recherches aujourd'hui</span>
-                        {leakosintUsed >= leakosintLimit && (
-                          <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">
-                            Limite atteinte
-                          </Badge>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2 w-full">
-                  <Button
-                    data-testid="button-leakosint-check"
-                    onClick={handleLeakosintSearch}
-                    disabled={leakosintMutation.isPending || !leakosintTerm.trim() || leakosintAtLimit || leakosintLimit === 0}
-                    className="flex-1 gap-2 shadow-lg shadow-primary/25"
-                  >
-                    {leakosintMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    {leakosintLimit === 0 ? "Abonnement requis" : "Check"}
-                  </Button>
-                  <Button
-                    data-testid="button-reset-external"
-                    variant="outline"
-                    onClick={handleReset}
-                    disabled={leakosintMutation.isPending}
-                    className="gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Reinitialiser
