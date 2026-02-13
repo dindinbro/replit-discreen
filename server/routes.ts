@@ -1018,14 +1018,82 @@ export async function registerRoutes(
       return Object.keys(row).some(k => !META_KEYS.has(k) && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== "");
     }
 
+    function isFivemData(flat: Record<string, string>): boolean {
+      const allText = Object.keys(flat).concat(Object.values(flat)).join(" ");
+      return /license|steam|fivem|check-host\.net|steamcommunity/i.test(allText);
+    }
+
+    function parseFivemData(flat: Record<string, string>): Record<string, string> {
+      const reconstructed = Object.entries(flat)
+        .map(([k, v]) => `${k}:${v}`)
+        .join(" ");
+
+      const result: Record<string, string> = {};
+
+      const licenseMatch = reconstructed.match(/license2?[:\s']*([a-f0-9]{30,50})/i);
+      if (licenseMatch) result["license2"] = licenseMatch[1];
+
+      const steamMatch = reconstructed.match(/steam[:\s'[\]]*([0-9a-f]{10,20})/i);
+      if (steamMatch) result["steam"] = steamMatch[1];
+
+      const ipMatch = reconstructed.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+      if (ipMatch) result["ip"] = ipMatch[1];
+
+      const dateMatch = reconstructed.match(/(\d{4}-\d{2}-\d{2}[\s:T]+\d{2}[:\s]\d{2}[:\s]\d{2})/);
+      if (dateMatch) result["date"] = dateMatch[1].replace(/\s+/g, " ").trim();
+
+      const discordMatch = reconstructed.match(/discord[:\s'[\]]*(\d{17,20})/i);
+      if (discordMatch) result["discord"] = discordMatch[1];
+
+      const xblMatch = reconstructed.match(/xbl[:\s'[\]]*(\d{10,20})/i);
+      if (xblMatch) result["xbl"] = xblMatch[1];
+
+      const liveMatch = reconstructed.match(/live[:\s'[\]]*(\d{10,20})/i);
+      if (liveMatch) result["live"] = liveMatch[1];
+
+      return result;
+    }
+
+    function cleanExternalValue(val: string): string {
+      let s = val;
+      s = s.replace(/\[([^\]]*)\]\(https?:\/\/[^)]*\)/g, "$1");
+      s = s.replace(/\(https?:\/\/[^)]*\)/g, "");
+      s = s.replace(/https?:\/\/[^\s'")\]]+/g, "");
+      s = s.replace(/[\[\]()]/g, "");
+      s = s.replace(/^['"\s]+|['"\s]+$/g, "");
+      return s.trim();
+    }
+
+    function cleanExternalKey(key: string): string {
+      let s = key;
+      s = s.replace(/^['"\s]+|['"\s]+$/g, "");
+      s = s.replace(/[\[\]]/g, "");
+      s = s.replace(/\(https?:\/\/[^)]*\)/g, "");
+      s = s.replace(/https?:\/\/[^\s'")\]]+/g, "");
+      return s.trim().toLowerCase().replace(/\s+/g, "_");
+    }
+
     function normalizeRow(obj: Record<string, any>, label: string, sourceFiles: string): Record<string, unknown> | null {
       const flat = flattenObject(obj);
       const row: Record<string, unknown> = { _source: `External - ${label}` };
+
+      if (isFivemData(flat)) {
+        const fivemParsed = parseFivemData(flat);
+        for (const [k, v] of Object.entries(fivemParsed)) {
+          if (v) row[k] = v;
+        }
+        if (sourceFiles) row["source"] = sourceFiles;
+        return Object.keys(row).length > 1 ? row : null;
+      }
+
       for (const [k, v] of Object.entries(flat)) {
         if (k === "resume" || k === "statut") continue;
-        const normalizedKey = FIELD_ALIASES[k] || k;
-        const strVal = String(v ?? "").slice(0, 260);
-        if (strVal) row[normalizedKey] = strVal;
+        const cleanKey = cleanExternalKey(k);
+        const cleanVal = cleanExternalValue(String(v ?? "")).slice(0, 260);
+        if (cleanKey && cleanVal) {
+          const normalizedKey = FIELD_ALIASES[cleanKey] || cleanKey;
+          row[normalizedKey] = cleanVal;
+        }
       }
       if (sourceFiles) row["source"] = sourceFiles;
       return Object.keys(row).length > 1 ? row : null;
