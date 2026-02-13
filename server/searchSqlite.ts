@@ -621,12 +621,6 @@ async function searchRemoteBridge(
           total: data.total,
         };
       }
-
-      const filtered = filterResultsByCriteria(data.results, criteria);
-      return {
-        results: filtered.slice(0, limit) as SearchResult["results"],
-        total: filtered.length,
-      };
     }
 
     return data;
