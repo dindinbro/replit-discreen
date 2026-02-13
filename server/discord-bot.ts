@@ -272,6 +272,11 @@ export async function startDiscordBot() {
     .setName("wantedpreview")
     .setDescription("Voir la liste des pseudos Wanted (10 par page)");
 
+  const wrefreshCommand = new SlashCommandBuilder()
+    .setName("wrefresh")
+    .setDescription("Actualiser la liste Wanted et voir les ajouts recents")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+
   const rest = new REST({ version: "10" }).setToken(token);
 
   try {
@@ -295,7 +300,8 @@ export async function startDiscordBot() {
         renewCommand.toJSON(),
         linkCommand.toJSON(),
         wantedCommand.toJSON(),
-        wantedPreviewCommand.toJSON()
+        wantedPreviewCommand.toJSON(),
+        wrefreshCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -323,7 +329,9 @@ export async function startDiscordBot() {
       soutienCommand.toJSON(),
       renewCommand.toJSON(),
       linkCommand.toJSON(),
-      wantedCommand.toJSON()
+      wantedCommand.toJSON(),
+      wantedPreviewCommand.toJSON(),
+      wrefreshCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1392,6 +1400,53 @@ export async function startDiscordBot() {
           await interaction.editReply({ content: "Erreur lors de la recuperation des profils Wanted." });
         } else {
           await interaction.reply({ content: "Erreur lors de la recuperation des profils Wanted.", ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.commandName === "wrefresh") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const profiles = await storage.getWantedProfiles();
+        const total = profiles?.length || 0;
+
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        const recentProfiles = (profiles || []).filter(p => new Date(p.createdAt) > oneDayAgo);
+        const weekProfiles = (profiles || []).filter(p => new Date(p.createdAt) > oneWeekAgo);
+
+        const embed = new EmbedBuilder()
+          .setColor(0x10b981)
+          .setTitle("Wanted — Actualisation")
+          .addFields(
+            { name: "Total profils", value: `${total}`, inline: true },
+            { name: "Ajouts (24h)", value: `${recentProfiles.length}`, inline: true },
+            { name: "Ajouts (7j)", value: `${weekProfiles.length}`, inline: true }
+          )
+          .setTimestamp()
+          .setFooter({ text: "© Discreen" });
+
+        if (recentProfiles.length > 0) {
+          const recentList = recentProfiles
+            .slice(0, 10)
+            .map((p, i) => `\`${i + 1}.\` ${p.pseudo || "N/A"}`)
+            .join("\n");
+          embed.addFields({
+            name: `Derniers ajouts (${Math.min(recentProfiles.length, 10)}/${recentProfiles.length})`,
+            value: recentList
+          });
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (err) {
+        log(`Error in wrefresh command: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de l'actualisation Wanted." });
+        } else {
+          await interaction.reply({ content: "Erreur lors de l'actualisation Wanted.", ephemeral: true });
         }
       }
     }
