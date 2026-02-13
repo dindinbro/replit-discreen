@@ -630,11 +630,11 @@ async function searchRemoteBridge(
   }
 }
 
-export function searchAllIndexes(
+export async function searchAllIndexes(
   criteria: SearchCriterion[],
   limit: number = 20,
   offset: number = 0
-): SearchResult | Promise<SearchResult> {
+): Promise<SearchResult> {
   const filled = criteria.filter((c) => c.value.trim());
   if (filled.length === 0) {
     return { results: [], total: 0 };
@@ -645,7 +645,11 @@ export function searchAllIndexes(
 
   if (useRemoteBridge) {
     console.log(`[searchAllIndexes] Using REMOTE BRIDGE for ${filled.length} criteria`);
-    return searchRemoteBridge(filled, safeLimit, safeOffset);
+    const bridgeResult = await searchRemoteBridge(filled, safeLimit, safeOffset);
+    if (bridgeResult.results.length > 0) {
+      return bridgeResult;
+    }
+    console.log(`[searchAllIndexes] Bridge returned 0 results, trying fallback sources...`);
   }
 
   if (isR2SearchEnabled()) {

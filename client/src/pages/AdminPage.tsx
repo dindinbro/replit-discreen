@@ -1710,7 +1710,8 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
         if (keysRes.ok) setKeys(await keysRes.json());
         toast({ title: "Cle generee" });
       } else {
-        toast({ title: "Erreur", variant: "destructive" });
+        const errData = await res.json().catch(() => null);
+        toast({ title: "Erreur", description: errData?.message || `Erreur ${res.status}`, variant: "destructive" });
       }
     } catch {
       toast({ title: "Erreur reseau", variant: "destructive" });
