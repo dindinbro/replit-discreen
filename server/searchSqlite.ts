@@ -481,28 +481,6 @@ export function filterResultsByCriteria(
       }
 
       if (!foundInAllowedField) {
-        const raw = String(row["_raw"] ?? "").toLowerCase();
-        if (raw) {
-          const rawParts = raw.split(/[;|:,\t]+/).map(p => p.trim().toLowerCase());
-          const matched = rawParts.some(part => part.includes(searchVal));
-          if (matched) {
-            foundInAllowedField = true;
-          }
-        }
-      }
-
-      if (!foundInAllowedField) {
-        for (const [key, val] of Object.entries(row)) {
-          if (key.startsWith("_")) continue;
-          const strVal = String(val ?? "").toLowerCase();
-          if (strVal.includes(searchVal)) {
-            foundInAllowedField = true;
-            break;
-          }
-        }
-      }
-
-      if (!foundInAllowedField) {
         return false;
       }
     }
