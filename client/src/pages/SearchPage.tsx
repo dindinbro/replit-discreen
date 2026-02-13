@@ -871,16 +871,16 @@ export default function SearchPage() {
           if (!r.ok) {
             const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
             if (r.status === 429) {
-              errors.push(`LeakOSINT: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
-            } else {
-              errors.push(`LeakOSINT: ${err.message || "erreur"}`);
+              errors.push(`Source 1: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
+            } else if (r.status === 403) {
+              errors.push("Source 1: acces non autorise pour votre abonnement");
             }
             return [];
           }
           const d = await r.json();
           return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "LeakOSINT" }));
         })
-        .catch(() => { errors.push("LeakOSINT: service indisponible"); return []; });
+        .catch(() => []);
 
       const daltonPromise = fetch("/api/dalton-search", {
         method: "POST",
@@ -891,16 +891,16 @@ export default function SearchPage() {
           if (!r.ok) {
             const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
             if (r.status === 429) {
-              errors.push(`DaltonAPI: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
-            } else {
-              errors.push(`DaltonAPI: ${err.message || "erreur"}`);
+              errors.push(`Source 2: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
+            } else if (r.status === 403) {
+              errors.push("Source 2: acces non autorise pour votre abonnement");
             }
             return [];
           }
           const d = await r.json();
           return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "DaltonAPI" }));
         })
-        .catch(() => { errors.push("DaltonAPI: service indisponible"); return []; });
+        .catch(() => []);
 
       Promise.all([leakosintPromise, daltonPromise]).then(([leakRes, daltonRes]) => {
         setAdvancedResults([...leakRes, ...daltonRes]);
