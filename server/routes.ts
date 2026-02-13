@@ -1872,6 +1872,126 @@ export async function registerRoutes(
     }
   });
 
+  function getOperatorByPrefix(nationalNumber: string, type: string): string {
+    if (type !== "mobile") {
+      const voipOps: Record<string, string> = {
+        "90": "Free", "91": "Free", "92": "Free", "93": "Free",
+        "94": "Free", "95": "Free", "96": "Free", "97": "Free", "98": "Free", "99": "Free",
+      };
+      if (type === "voip" && voipOps[nationalNumber.slice(0, 2)]) {
+        return voipOps[nationalNumber.slice(0, 2)];
+      }
+      return "Non identifiable (fixe/VoIP)";
+    }
+
+    const prefix2 = nationalNumber.slice(0, 2);
+    const prefix3 = nationalNumber.slice(0, 3);
+    const prefix4 = nationalNumber.slice(0, 4);
+
+    const mobileOps4: Record<string, string> = {
+      "6440": "Free Mobile", "6441": "Free Mobile", "6442": "Free Mobile", "6443": "Free Mobile",
+      "6444": "Free Mobile", "6445": "Free Mobile", "6446": "Free Mobile", "6447": "Free Mobile",
+      "6448": "Free Mobile", "6449": "Free Mobile",
+      "6950": "Free Mobile", "6951": "Free Mobile", "6952": "Free Mobile",
+      "7000": "Transatel", "7001": "Transatel",
+      "7002": "Syma Mobile", "7003": "Syma Mobile",
+      "7004": "Lycamobile", "7005": "Lycamobile", "7006": "Lycamobile", "7007": "Lycamobile",
+      "7008": "Lycamobile", "7009": "Lycamobile",
+      "7010": "Mundio Mobile", "7011": "Mundio Mobile",
+      "7012": "Legos", "7013": "Legos",
+      "7020": "Truphone", "7021": "Truphone",
+      "7030": "Coriolis", "7031": "Coriolis",
+      "7040": "Sisteer", "7041": "Sisteer",
+      "7050": "Free Mobile", "7051": "Free Mobile", "7052": "Free Mobile",
+      "7053": "Free Mobile", "7054": "Free Mobile", "7055": "Free Mobile",
+      "7056": "Free Mobile", "7057": "Free Mobile", "7058": "Free Mobile", "7059": "Free Mobile",
+      "7800": "Bouygues Telecom", "7801": "Bouygues Telecom",
+      "7810": "SFR", "7811": "SFR",
+      "7820": "Orange", "7821": "Orange",
+      "7830": "Free Mobile", "7831": "Free Mobile",
+      "7840": "Orange", "7841": "Orange",
+      "7850": "SFR", "7851": "SFR",
+      "7860": "Bouygues Telecom", "7861": "Bouygues Telecom",
+      "7870": "Free Mobile", "7871": "Free Mobile",
+      "7880": "Orange", "7881": "Orange",
+      "7890": "SFR", "7891": "SFR",
+    };
+    if (mobileOps4[prefix4]) return mobileOps4[prefix4];
+
+    const mobileOps3: Record<string, string> = {
+      "600": "Orange", "601": "Orange", "602": "Orange", "603": "Orange",
+      "604": "Orange", "605": "Orange", "606": "Orange", "607": "Orange", "608": "Orange",
+      "609": "SFR",
+      "610": "Orange", "611": "Orange", "612": "Orange", "613": "Orange",
+      "614": "Orange", "615": "Orange", "616": "Orange", "617": "Orange",
+      "618": "Orange", "619": "Orange",
+      "620": "SFR", "621": "SFR", "622": "SFR", "623": "SFR",
+      "624": "SFR", "625": "SFR", "626": "SFR", "627": "SFR", "628": "SFR", "629": "SFR",
+      "630": "Bouygues Telecom", "631": "Bouygues Telecom", "632": "Bouygues Telecom",
+      "633": "Bouygues Telecom", "634": "Bouygues Telecom", "635": "Bouygues Telecom",
+      "636": "Bouygues Telecom", "637": "Bouygues Telecom", "638": "Bouygues Telecom", "639": "Bouygues Telecom",
+      "640": "Bouygues Telecom", "641": "Bouygues Telecom", "642": "Bouygues Telecom", "643": "Bouygues Telecom",
+      "644": "Free Mobile",
+      "645": "Free Mobile", "646": "Free Mobile", "647": "Free Mobile",
+      "648": "Free Mobile", "649": "Free Mobile",
+      "650": "Bouygues Telecom", "651": "Bouygues Telecom", "652": "Bouygues Telecom",
+      "653": "Bouygues Telecom", "654": "Bouygues Telecom", "655": "Bouygues Telecom",
+      "656": "Bouygues Telecom", "657": "Bouygues Telecom", "658": "Bouygues Telecom", "659": "Bouygues Telecom",
+      "660": "SFR", "661": "SFR", "662": "SFR", "663": "SFR",
+      "664": "SFR", "665": "SFR", "666": "SFR", "667": "SFR", "668": "SFR", "669": "SFR",
+      "670": "Orange", "671": "Orange", "672": "Orange", "673": "Orange",
+      "674": "Orange", "675": "Orange", "676": "Orange", "677": "Orange", "678": "Orange", "679": "Orange",
+      "680": "Orange", "681": "Orange", "682": "Orange", "683": "Orange", "684": "Orange",
+      "685": "SFR", "686": "SFR", "687": "SFR", "688": "SFR", "689": "SFR",
+      "690": "Orange", "691": "Orange", "692": "Orange", "693": "Orange",
+      "694": "Orange", "695": "Free Mobile",
+      "696": "Orange", "697": "Orange", "698": "Orange", "699": "Orange",
+      "730": "Free Mobile", "731": "Free Mobile", "732": "Free Mobile",
+      "733": "Free Mobile", "734": "Free Mobile", "735": "Free Mobile",
+      "736": "Free Mobile", "737": "Free Mobile", "738": "Free Mobile", "739": "Free Mobile",
+      "740": "Bouygues Telecom", "741": "Bouygues Telecom", "742": "Bouygues Telecom",
+      "743": "Bouygues Telecom", "744": "Bouygues Telecom",
+      "745": "Free Mobile", "746": "Free Mobile", "747": "Free Mobile",
+      "748": "Free Mobile", "749": "Free Mobile",
+      "750": "Free Mobile", "751": "Free Mobile", "752": "Free Mobile",
+      "753": "Free Mobile", "754": "Free Mobile", "755": "Free Mobile",
+      "756": "Free Mobile", "757": "Free Mobile", "758": "Free Mobile", "759": "Free Mobile",
+      "760": "Orange", "761": "Orange", "762": "Orange", "763": "Orange",
+      "764": "Orange", "765": "Orange", "766": "Orange", "767": "Orange", "768": "Orange", "769": "Orange",
+      "770": "SFR", "771": "SFR", "772": "SFR", "773": "SFR",
+      "774": "SFR", "775": "SFR", "776": "SFR", "777": "SFR", "778": "SFR", "779": "SFR",
+      "780": "Bouygues Telecom",
+      "781": "SFR",
+      "782": "Orange",
+      "783": "Free Mobile",
+      "784": "Orange",
+      "785": "SFR",
+      "786": "Bouygues Telecom",
+      "787": "Free Mobile",
+      "788": "Orange",
+      "789": "SFR",
+      "790": "Bouygues Telecom", "791": "Bouygues Telecom", "792": "Bouygues Telecom",
+      "793": "Bouygues Telecom", "794": "Bouygues Telecom", "795": "Bouygues Telecom",
+      "796": "Bouygues Telecom", "797": "Bouygues Telecom", "798": "Bouygues Telecom", "799": "Bouygues Telecom",
+    };
+    if (mobileOps3[prefix3]) return mobileOps3[prefix3];
+
+    const mobileOps2: Record<string, string> = {
+      "60": "Orange", "61": "Orange",
+      "62": "SFR", "63": "Bouygues Telecom",
+      "64": "Bouygues Telecom", "65": "Bouygues Telecom",
+      "66": "SFR", "67": "Orange",
+      "68": "Orange", "69": "Orange",
+      "73": "Free Mobile", "74": "Bouygues Telecom",
+      "75": "Free Mobile", "76": "Orange",
+      "77": "SFR", "78": "Orange",
+      "79": "Bouygues Telecom",
+    };
+    if (mobileOps2[prefix2]) return mobileOps2[prefix2];
+
+    return "Non identifié";
+  }
+
   // POST /api/phone/lookup - French phone number lookup
   app.post("/api/phone/lookup", requireAuth, async (req, res) => {
     try {
@@ -1904,6 +2024,9 @@ export async function registerRoutes(
       }
 
       const firstDigit = afterPrefix[0];
+      const first2 = afterPrefix.slice(0, 2);
+      const first3 = afterPrefix.slice(0, 3);
+      const first4 = afterPrefix.slice(0, 4);
 
       const regionMap: Record<string, string> = {
         "1": "Île-de-France",
@@ -1931,12 +2054,14 @@ export async function registerRoutes(
         return res.json({ ok: false, message: "Préfixe non reconnu" });
       }
 
+      const operator = getOperatorByPrefix(afterPrefix, type);
+
       res.json({
         ok: true,
         country: "FR",
         type,
         region,
-        operator: "Inconnu (nécessite lookup opérateur/portabilité)",
+        operator,
         e164: normalized,
       });
 

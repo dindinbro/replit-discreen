@@ -1502,9 +1502,9 @@ export default function SearchPage() {
                         <p className="text-sm font-mono font-medium" data-testid="text-phone-e164">{phoneLookupResult.e164}</p>
                       </div>
                       <div className="sm:col-span-2 md:col-span-4 space-y-1">
-                        <p className="text-xs text-muted-foreground">Operateur</p>
-                        <p className="text-sm text-muted-foreground italic" data-testid="text-phone-operator">{phoneLookupResult.operator}</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Operateur exact necessite une API payante (HLR)</p>
+                        <p className="text-xs text-muted-foreground">Opérateur d'attribution</p>
+                        <p className="text-sm font-medium" data-testid="text-phone-operator">{phoneLookupResult.operator}</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Basé sur les préfixes ARCEP — peut différer si le numéro a été porté</p>
                       </div>
                     </div>
                   ) : (
