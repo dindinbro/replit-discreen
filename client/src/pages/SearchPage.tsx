@@ -175,12 +175,12 @@ const FIELD_ICON_MAP: Record<string, typeof User> = {
 };
 
 function getFieldIcon(fieldName: string) {
-  const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
+  const key = fieldName.replace(/^['"]|['"]$/g, "").toLowerCase().replace(/[\s-]/g, "_");
   return FIELD_ICON_MAP[key] || FileText;
 }
 
 function getFieldColorVar(fieldName: string): string {
-  const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
+  const key = fieldName.replace(/^['"]|['"]$/g, "").toLowerCase().replace(/[\s-]/g, "_");
   if (["nom", "name", "last_name", "lastname", "surname", "prenom", "first_name", "firstname", "username", "pseudo", "identifiant", "displayname", "civilite", "nom_complet", "allocataire"].includes(key))
     return "--field-person";
   if (["email", "mail"].includes(key))
@@ -201,7 +201,7 @@ function getFieldColorVar(fieldName: string): string {
 }
 
 function getFieldLabel(fieldName: string): string {
-  const key = fieldName.toLowerCase().replace(/[\s-]/g, "_");
+  const key = fieldName.replace(/^['"]|['"]$/g, "").toLowerCase().replace(/[\s-]/g, "_");
   const labels: Record<string, string> = {
     nom: "Nom", name: "Nom", last_name: "Nom", lastname: "Nom", surname: "Nom",
     prenom: "Prenom", first_name: "Prenom", firstname: "Prenom", displayname: "Nom d'affichage",
@@ -220,6 +220,8 @@ function getFieldLabel(fieldName: string): string {
     telephone2: "Telephone 2", nir: "N Secu (NIR)", plaque: "Plaque immat.",
     discord_id: "Discord ID", complement_adresse: "Complement adresse", complement_ville: "Complement ville",
     product: "Produit", description: "Description", status: "Statut",
+    license2: "License FiveM", license: "License", steam: "Steam ID", steamid: "Steam ID", steam_id: "Steam ID",
+    fivem: "FiveM", xbl: "Xbox Live", live: "Live ID",
     donnee: "Donnee", champ_1: "Champ 1", champ_2: "Champ 2", champ_3: "Champ 3",
     champ_4: "Champ 4", champ_5: "Champ 5", champ_6: "Champ 6",
     nom_complet: "Nom complet", matricule: "Matricule", organisme: "Organisme",
@@ -266,6 +268,19 @@ const FIELD_PRIORITY: Record<string, number> = {
   source: 99,
 };
 
+function cleanFieldValue(val: unknown): string {
+  const s = String(val ?? "");
+  const mdLink = s.match(/^\[([^\]]*)\]\(https?:\/\/[^)]*\)$/);
+  if (mdLink) return mdLink[1];
+  const cleaned = s.replace(/\[([^\]]*)\]\(https?:\/\/[^)]*\)/g, "$1");
+  const trimmed = cleaned.replace(/^['"]|['"]$/g, "").trim();
+  return trimmed;
+}
+
+function cleanFieldName(name: string): string {
+  return name.replace(/^['"]|['"]$/g, "").trim();
+}
+
 function ResultCard({
   row,
   index,
@@ -296,7 +311,7 @@ function ResultCard({
 
   const handleCopy = () => {
     const text = rawLine || visibleFields
-      .map(([k, v]) => `${k}: ${v}`)
+      .map(([k, v]) => `${cleanFieldName(k)}: ${cleanFieldValue(v)}`)
       .join("\n");
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -305,7 +320,7 @@ function ResultCard({
   };
 
   const handleCopyJSON = () => {
-    const clean = Object.fromEntries(visibleFields);
+    const clean = Object.fromEntries(visibleFields.map(([k, v]) => [cleanFieldName(k), cleanFieldValue(v)]));
     navigator.clipboard.writeText(JSON.stringify(clean, null, 2));
     toast({ title: "JSON copie !" });
   };
@@ -335,7 +350,7 @@ function ResultCard({
             </span>
             <div className="min-w-0 group/title">
               <p className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
-                {titleField ? String(titleField[1]) : `Resultat ${globalIndex + 1}`}
+                {titleField ? cleanFieldValue(titleField[1]) : `Resultat ${globalIndex + 1}`}
               </p>
               {sourceText && (
                 <p className="text-xs text-muted-foreground truncate mt-0.5">{sourceText}</p>
@@ -380,7 +395,7 @@ function ResultCard({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground">{getFieldLabel(col)}</p>
-                  <p className="text-sm font-medium text-foreground break-all leading-tight">{String(val ?? "")}</p>
+                  <p className="text-sm font-medium text-foreground break-all leading-tight">{cleanFieldValue(val)}</p>
                 </div>
               </div>
             );
