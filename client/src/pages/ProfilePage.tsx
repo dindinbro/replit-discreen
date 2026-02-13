@@ -154,6 +154,7 @@ export default function ProfilePage() {
         toast({ title: "Photo de profil mise a jour" });
         setAvatarDialogOpen(false);
         setProfile((p) => p ? { ...p, avatar_url: data.avatar_url } : p);
+        await refreshRole();
       } else {
         toast({ title: "Erreur", description: data.message, variant: "destructive" });
       }

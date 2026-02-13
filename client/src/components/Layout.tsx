@@ -81,7 +81,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, role, frozen, signOut, displayName } = useAuth();
+  const { user, role, frozen, signOut, displayName, avatarUrl } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -181,8 +181,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           </span>
                         )}
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
-                        <User className="w-4 h-4 text-primary" />
+                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-primary" />
+                        )}
                       </div>
                       <ChevronDown className="w-3 h-3 text-muted-foreground hidden md:block" />
                     </Button>

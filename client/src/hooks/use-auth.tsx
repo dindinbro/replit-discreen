@@ -9,6 +9,7 @@ interface AuthContextType {
   frozen: boolean;
   loading: boolean;
   displayName: string | null;
+  avatarUrl: string | null;
   expiresAt: string | null;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -27,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [frozen, setFrozen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   const fetchRole = useCallback(async (accessToken: string) => {
@@ -39,17 +41,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(data.role || "user");
         setFrozen(!!data.frozen);
         setDisplayName(data.display_name || null);
+        setAvatarUrl(data.avatar_url || null);
         setExpiresAt(data.expires_at || null);
       } else {
         setRole("user");
         setFrozen(false);
         setDisplayName(null);
+        setAvatarUrl(null);
         setExpiresAt(null);
       }
     } catch {
       setRole("user");
       setFrozen(false);
       setDisplayName(null);
+      setAvatarUrl(null);
       setExpiresAt(null);
     }
   }, []);
@@ -139,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       frozen,
       loading,
       displayName,
+      avatarUrl,
       expiresAt,
       signInWithEmail,
       signUpWithEmail,
