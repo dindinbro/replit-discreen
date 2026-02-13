@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, Trophy } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Disc3 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 interface WantedProfile {
   pseudo: string;
-  realName: string;
+  disc: string;
   description: string;
   images: string[];
 }
@@ -13,14 +13,14 @@ interface WantedProfile {
 const WANTED_PROFILES: WantedProfile[] = [
   {
     pseudo: "Zaza",
-    realName: "Zaza",
-    description: "Profil recherche — fichier en cours de traitement.",
+    disc: "Disque de Diamant",
+    description: "Jefe Dalton, Master Early",
     images: [],
   },
   {
     pseudo: "Yanis",
-    realName: "Yanis",
-    description: "Profil recherche — fichier en cours de traitement.",
+    disc: "Disque de Diamant",
+    description: "Badge Dev > Badge Quetes",
     images: [],
   },
 ];
@@ -110,7 +110,9 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
             <h3 className="text-lg font-bold text-primary tracking-wide uppercase">
               {profile.pseudo}
             </h3>
-            <p className="text-sm text-foreground/70 font-medium">{profile.realName}</p>
+            <p className="text-sm text-foreground/70 font-medium flex items-center gap-1.5">
+              <span className="text-base">💎</span> {profile.disc}
+            </p>
             <p className="text-xs text-muted-foreground leading-relaxed pt-1">{profile.description}</p>
           </div>
         </Card>
@@ -180,15 +182,15 @@ export default function UsersPage() {
         className="text-center mb-12"
       >
         <div className="flex items-center justify-center gap-3 mb-3">
-          <Trophy className="w-7 h-7 text-primary" />
+          <Disc3 className="w-7 h-7 text-primary" />
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight" data-testid="heading-wanted">
-            <span className="text-foreground">DISCREEN </span>
-            <span className="text-primary">OF FAME</span>
+            <span className="text-foreground">LES DISQUES </span>
+            <span className="text-primary">DE DISCREEN</span>
           </h1>
         </div>
 
-        <p className="text-muted-foreground text-sm">
-          Trophee De Discreen
+        <p className="text-muted-foreground text-sm italic">
+          La Page d'Or
         </p>
       </motion.div>
 
