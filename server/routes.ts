@@ -1613,17 +1613,21 @@ export async function registerRoutes(
   app.post("/api/admin/generate-key", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const { tier } = req.body;
+      console.log("[generate-key] Request body:", JSON.stringify(req.body), "tier:", tier);
       if (!tier || !PLAN_LIMITS[tier as PlanTier] || tier === "free") {
-        return res.status(400).json({ message: "Tier invalide" });
+        console.log("[generate-key] Invalid tier:", tier, "available:", Object.keys(PLAN_LIMITS));
+        return res.status(400).json({ message: `Tier invalide: ${tier}. Tiers disponibles: ${Object.keys(PLAN_LIMITS).filter(t => t !== "free").join(", ")}` });
       }
 
       const adminEmail = (req as any).user?.email || "admin";
+      console.log("[generate-key] Creating key for tier:", tier, "by:", adminEmail);
       const license = await storage.createLicenseKey(tier as PlanTier, `manual_${Date.now()}`, `admin:${adminEmail}`);
+      console.log("[generate-key] Key created:", license.key);
       webhookKeyGenerated(adminEmail, tier, license.key);
       res.json({ key: license.key, tier: license.tier });
-    } catch (err) {
-      console.error("POST /api/admin/generate-key error:", err);
-      res.status(500).json({ message: "Internal server error" });
+    } catch (err: any) {
+      console.error("POST /api/admin/generate-key error:", err?.message || err, err?.stack);
+      res.status(500).json({ message: `Erreur generation: ${err?.message || "Erreur interne"}` });
     }
   });
 
