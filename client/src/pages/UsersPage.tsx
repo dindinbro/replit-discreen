@@ -15,13 +15,13 @@ const WANTED_PROFILES: WantedProfile[] = [
     pseudo: "Zaza",
     disc: "Disque de Diamant",
     description: "Jefe Dalton, Master Early",
-    images: [],
+    images: ["https://cdn.discordapp.com/avatars/1458697577670246582/7b7477069dff6c92424641b8a67952e5.webp?size=1024"],
   },
   {
     pseudo: "Yanis",
     disc: "Disque de Diamant",
     description: "Badge Dev > Badge Quetes",
-    images: [],
+    images: ["https://cdn.discordapp.com/avatars/1205909587450921000/7a9f5341ec573f4ca071ec68c5160c24.webp?size=1024"],
   },
 ];
 
@@ -207,7 +207,7 @@ export default function UsersPage() {
         className="text-center mt-16"
       >
         <p className="text-muted-foreground/50 text-xs tracking-widest uppercase">
-          {WANTED_PROFILES.length} profil{WANTED_PROFILES.length > 1 ? "s" : ""} recense{WANTED_PROFILES.length > 1 ? "s" : ""}
+          {WANTED_PROFILES.length} profil{WANTED_PROFILES.length > 1 ? "s" : ""} recenses
         </p>
       </motion.div>
     </div>
