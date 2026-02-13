@@ -166,13 +166,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  try {
-    await pool.query(`ALTER TABLE license_keys ADD COLUMN IF NOT EXISTS created_by TEXT;`);
-    console.log("[migration] license_keys.created_by column ensured");
-  } catch (err: any) {
-    console.warn("[migration] Could not add created_by column:", err?.message);
-  }
-
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

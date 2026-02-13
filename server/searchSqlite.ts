@@ -643,6 +643,36 @@ export async function searchAllIndexes(
   const safeLimit = Math.min(Math.max(1, limit), 50);
   const safeOffset = Math.max(0, offset);
 
+  const hasLocalDbs = Object.keys(SOURCE_MAP).length > 0;
+
+  if (useRemoteBridge && hasLocalDbs) {
+    console.log(`[searchAllIndexes] Using BRIDGE + LOCAL .db in parallel for ${filled.length} criteria`);
+    const fetchLimit = safeLimit * 2;
+    const [bridgeResult, localResult] = await Promise.all([
+      searchRemoteBridge(filled, fetchLimit, safeOffset).catch((err: any) => {
+        console.error("[searchAllIndexes] Bridge failed:", err);
+        return { results: [] as SearchResult["results"], total: 0 };
+      }),
+      Promise.resolve().then(() => searchLocal(filled, fetchLimit, safeOffset)).catch((err: any) => {
+        console.error("[searchAllIndexes] Local search failed:", err);
+        return { results: [] as SearchResult["results"], total: 0 };
+      }),
+    ]);
+    const combined: SearchResult["results"] = [];
+    const half = Math.ceil(safeLimit / 2);
+    const localSlice = localResult.results.slice(0, half);
+    const bridgeSlice = bridgeResult.results.slice(0, half);
+    combined.push(...localSlice, ...bridgeSlice);
+    const remaining = safeLimit - combined.length;
+    if (remaining > 0) {
+      const extra = [...bridgeResult.results.slice(half), ...localResult.results.slice(half)];
+      combined.push(...extra.slice(0, remaining));
+    }
+    const total = (bridgeResult.total || 0) + (localResult.total || 0);
+    console.log(`[searchAllIndexes] Combined: ${bridgeResult.results.length} bridge + ${localResult.results.length} local = ${combined.length} (showing ${combined.length})`);
+    return { results: combined, total };
+  }
+
   if (useRemoteBridge) {
     console.log(`[searchAllIndexes] Using REMOTE BRIDGE for ${filled.length} criteria`);
     const bridgeResult = await searchRemoteBridge(filled, safeLimit, safeOffset);
@@ -652,13 +682,18 @@ export async function searchAllIndexes(
     console.log(`[searchAllIndexes] Bridge returned 0 results, trying fallback sources...`);
   }
 
+  if (hasLocalDbs) {
+    console.log(`[searchAllIndexes] Using LOCAL search for ${filled.length} criteria`);
+    return searchLocal(filled, safeLimit, safeOffset);
+  }
+
   if (isR2SearchEnabled()) {
     console.log(`[searchAllIndexes] Using R2 STREAMING search for ${filled.length} criteria`);
     return searchR2(filled, safeLimit, safeOffset);
   }
 
-  console.log(`[searchAllIndexes] Using LOCAL search for ${filled.length} criteria`);
-  return searchLocal(filled, safeLimit, safeOffset);
+  console.log(`[searchAllIndexes] No search sources available`);
+  return { results: [], total: 0 };
 }
 
 function searchLocal(
@@ -720,9 +755,12 @@ export async function initSearchDatabases(): Promise<void> {
     } catch (err) {
       console.warn("[searchSqlite] VPS bridge health check failed — will retry on search:", err);
     }
-    if (bridgeOnline) return;
-    useRemoteBridge = false;
-    console.log("[searchSqlite] Bridge offline — disabled remote bridge, loading local .db files as fallback...");
+    if (!bridgeOnline) {
+      useRemoteBridge = false;
+      console.log("[searchSqlite] Bridge offline — disabled remote bridge, loading local .db files as fallback...");
+    } else {
+      console.log("[searchSqlite] Bridge online — also loading local .db files to combine results...");
+    }
   }
 
   const dataDir = getDataDir();

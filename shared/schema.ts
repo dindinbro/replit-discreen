@@ -241,7 +241,6 @@ export const licenseKeys = pgTable("license_keys", {
   used: boolean("used").notNull().default(false),
   usedBy: text("used_by"),
   orderId: text("order_id").unique(),
-  createdBy: text("created_by"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
   usedAt: timestamp("used_at"),
 });

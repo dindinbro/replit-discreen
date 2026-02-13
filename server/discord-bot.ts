@@ -809,7 +809,7 @@ export async function startDiscordBot() {
     if (interaction.commandName === "gkey") {
       try {
         const tier = interaction.options.getString("tier", true) as any;
-        const license = await (storage as any).createLicenseKey(tier, undefined, `discord:${interaction.user.id}`);
+        const license = await (storage as any).createLicenseKey(tier);
         
         const embed = new EmbedBuilder()
           .setColor(0x10b981)

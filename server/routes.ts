@@ -1523,7 +1523,7 @@ export async function registerRoutes(
           const tier = tierMatch ? tierMatch[1] as PlanTier : null;
 
           if (tier) {
-            const license = await storage.createLicenseKey(tier, orderStr, "plisio");
+            const license = await storage.createLicenseKey(tier, orderStr);
             console.log(`License key for order ${orderStr}: ${license.key}`);
             webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"));
           }
@@ -1588,8 +1588,8 @@ export async function registerRoutes(
       const licenseInfo = await storage.getLicenseKey(key.trim());
       let userDiscordId: string | null = null;
       try { userDiscordId = await storage.getDiscordId(userId); } catch {}
-      webhookKeyRedeemed(wUser, result.tier || "unknown", key.trim(), userDiscordId, licenseInfo?.createdBy);
-      webhookBotKeyRedeemed(wUser.username || wUser.email, wUser.uniqueId, userDiscordId, result.tier || "unknown", key.trim(), licenseInfo?.createdBy || null);
+      webhookKeyRedeemed(wUser, result.tier || "unknown", key.trim(), userDiscordId, undefined);
+      webhookBotKeyRedeemed(wUser.username || wUser.email, wUser.uniqueId, userDiscordId, result.tier || "unknown", key.trim(), null);
 
       res.json({ message: result.message, tier: result.tier });
     } catch (err) {
@@ -1621,7 +1621,7 @@ export async function registerRoutes(
 
       const adminEmail = (req as any).user?.email || "admin";
       console.log("[generate-key] Creating key for tier:", tier, "by:", adminEmail);
-      const license = await storage.createLicenseKey(tier as PlanTier, `manual_${Date.now()}`, `admin:${adminEmail}`);
+      const license = await storage.createLicenseKey(tier as PlanTier, `manual_${Date.now()}`);
       console.log("[generate-key] Key created:", license.key);
       webhookKeyGenerated(adminEmail, tier, license.key);
       res.json({ key: license.key, tier: license.tier });
