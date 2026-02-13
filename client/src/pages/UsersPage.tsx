@@ -107,8 +107,9 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
           </div>
 
           <div className="p-4 space-y-1.5">
-            <h3 className="text-lg font-bold text-primary tracking-wide uppercase">
-              {profile.pseudo}
+            <h3 className="text-lg font-bold tracking-wide uppercase flex items-center gap-2">
+              <span className="text-amber-400">👑</span>
+              <span className="text-amber-400">{profile.pseudo}</span>
             </h3>
             <p className="text-sm text-foreground/70 font-medium flex items-center gap-1.5">
               <span className="text-base">💎</span> {profile.disc}
