@@ -256,7 +256,7 @@ interface CriterionRow {
   value: string;
 }
 
-const HIDDEN_FIELDS = new Set(["_source", "_raw", "rownum", "Rownum", "line", "Line", "content", "Content"]);
+const HIDDEN_FIELDS = new Set(["_source", "_raw", "source", "rownum", "Rownum", "line", "Line", "content", "Content"]);
 const FIELD_PRIORITY: Record<string, number> = {
   email: 1, mail: 1,
   identifiant: 2, username: 2, pseudo: 2,
@@ -304,23 +304,26 @@ function ResultCard({
       return pa - pb;
     });
 
-  const sourceField = entries.find(([k]) => k.toLowerCase() === "source");
-  const dbSource = row["_source"] as string | undefined;
-  const rawSource = sourceField ? String(sourceField[1]) : (dbSource || "");
-  const sourceText = rawSource ? "Discreen" : "";
+  const sourceText = "Discreen";
 
   const handleCopy = () => {
-    const text = rawLine || visibleFields
-      .map(([k, v]) => `${cleanFieldName(k)}: ${cleanFieldValue(v)}`)
-      .join("\n");
-    navigator.clipboard.writeText(text);
+    const lines = visibleFields
+      .filter(([k]) => k.toLowerCase() !== "source")
+      .map(([k, v]) => `${cleanFieldName(k)}: ${cleanFieldValue(v)}`);
+    lines.push("Source: Discreen");
+    navigator.clipboard.writeText(lines.join("\n"));
     setCopied(true);
     toast({ title: "Copie !" });
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleCopyJSON = () => {
-    const clean = Object.fromEntries(visibleFields.map(([k, v]) => [cleanFieldName(k), cleanFieldValue(v)]));
+    const clean = Object.fromEntries(
+      visibleFields
+        .filter(([k]) => k.toLowerCase() !== "source")
+        .map(([k, v]) => [cleanFieldName(k), cleanFieldValue(v)])
+    );
+    clean["source"] = "Discreen";
     navigator.clipboard.writeText(JSON.stringify(clean, null, 2));
     toast({ title: "JSON copie !" });
   };
