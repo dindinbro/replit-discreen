@@ -451,6 +451,144 @@ export function webhookSubscriptionExpired(count: number) {
 
 const ALERT_ROLE_ID = "1469798855099945172";
 
+function getBotLogsWebhookUrl(): string | undefined {
+  return process.env.DISCORD_BOT_LOGS_WEBHOOK_URL;
+}
+
+async function sendBotLogsWebhook(options: WebhookOptions): Promise<void> {
+  const url = getBotLogsWebhookUrl();
+  if (!url) {
+    console.warn("[webhook] DISCORD_BOT_LOGS_WEBHOOK_URL not set, skipping bot log");
+    return;
+  }
+  await sendToWebhook(url, options, "bot-logs");
+}
+
+export function webhookBotGkey(adminTag: string, tier: string, key: string) {
+  const desc = [
+    `>>> **Commande Bot**`,
+    `**Admin** : \`${adminTag}\``,
+    sep(),
+    `**Tier** : \`${tier.toUpperCase()}\``,
+    `**Cle** : ||\`${key}\`||`,
+  ].join("\n");
+
+  sendBotLogsWebhook({
+    title: "\u{1F511} /gkey - Cle Generee",
+    description: desc,
+    color: COLORS.admin,
+  });
+}
+
+export function webhookBotRkey(adminTag: string, key: string, success: boolean) {
+  const desc = [
+    `>>> **Commande Bot**`,
+    `**Admin** : \`${adminTag}\``,
+    sep(),
+    `**Cle** : \`${key}\``,
+    `**Resultat** : ${success ? "Revoquee" : "Introuvable"}`,
+  ].join("\n");
+
+  sendBotLogsWebhook({
+    title: "\u{26D4} /rkey - Revocation Cle",
+    description: desc,
+    color: success ? COLORS.admin : COLORS.security,
+  });
+}
+
+export function webhookBotIkey(adminTag: string, key: string, found: boolean, tier?: string, used?: boolean, usedBy?: string) {
+  const details: string[] = [
+    `>>> **Commande Bot**`,
+    `**Admin** : \`${adminTag}\``,
+    sep(),
+    `**Cle** : \`${key}\``,
+  ];
+
+  if (found) {
+    details.push(`**Tier** : \`${(tier || "").toUpperCase()}\``);
+    details.push(`**Utilisee** : ${used ? "Oui" : "Non"}`);
+    if (usedBy) details.push(`**Par** : \`${usedBy}\``);
+  } else {
+    details.push(`**Resultat** : Introuvable`);
+  }
+
+  sendBotLogsWebhook({
+    title: "\u{1F50D} /ikey - Info Cle",
+    description: details.join("\n"),
+    color: COLORS.info,
+  });
+}
+
+export function webhookBotIuser(adminTag: string, uniqueId: number, found: boolean, email?: string, tier?: string, frozen?: boolean) {
+  const details: string[] = [
+    `>>> **Commande Bot**`,
+    `**Admin** : \`${adminTag}\``,
+    sep(),
+    `**ID Unique** : \`#${uniqueId}\``,
+  ];
+
+  if (found) {
+    if (email) details.push(`**Email** : \`${email}\``);
+    if (tier) details.push(`**Tier** : \`${tier.toUpperCase()}\``);
+    if (frozen !== undefined) details.push(`**Gele** : ${frozen ? "Oui" : "Non"}`);
+  } else {
+    details.push(`**Resultat** : Utilisateur introuvable`);
+  }
+
+  sendBotLogsWebhook({
+    title: "\u{1F464} /iuser - Info Utilisateur",
+    description: details.join("\n"),
+    color: COLORS.info,
+  });
+}
+
+export function webhookBotSetplan(adminTag: string, uniqueId: number, email: string, plan: string) {
+  const desc = [
+    `>>> **Commande Bot**`,
+    `**Admin** : \`${adminTag}\``,
+    sep(),
+    `**ID Unique** : \`#${uniqueId}\``,
+    `**Email** : \`${email}\``,
+    `**Nouveau Plan** : \`${plan.toUpperCase()}\``,
+  ].join("\n");
+
+  sendBotLogsWebhook({
+    title: "\u{1F3AD} /setplan - Plan Modifie",
+    description: desc,
+    color: COLORS.role,
+  });
+}
+
+export function webhookBotWantedlist(adminTag: string, count: number) {
+  const desc = [
+    `>>> **Commande Bot**`,
+    `**Admin** : \`${adminTag}\``,
+    sep(),
+    `**Profils trouves** : **${count}**`,
+  ].join("\n");
+
+  sendBotLogsWebhook({
+    title: "\u{1F4CB} /wantedlist - Liste Wanted",
+    description: desc,
+    color: COLORS.info,
+  });
+}
+
+export function webhookBotGeneric(adminTag: string, command: string, details?: string) {
+  const desc = [
+    `>>> **Commande Bot**`,
+    `**Admin** : \`${adminTag}\``,
+    `**Commande** : \`/${command}\``,
+    ...(details ? [sep(), details] : []),
+  ].join("\n");
+
+  sendBotLogsWebhook({
+    title: `\u{2699}\u{FE0F} /${command}`,
+    description: desc,
+    color: COLORS.info,
+  });
+}
+
 export function webhookAbnormalActivity(user: UserInfo, searchCount: number, limit: number) {
   const desc = [
     userBlock(user),

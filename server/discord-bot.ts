@@ -9,6 +9,10 @@ import { storage } from "./storage";
 import { log } from "./index";
 import { createClient } from "@supabase/supabase-js";
 import type { PlanTier } from "@shared/schema";
+import {
+  webhookBotGkey, webhookBotRkey, webhookBotIkey, webhookBotIuser,
+  webhookBotSetplan, webhookBotWantedlist, webhookBotGeneric
+} from "./webhook";
 
 let client: Client | null = null;
 const SOUTIEN_ROLE_ID = "1469926673582653648";
@@ -614,6 +618,7 @@ export async function startDiscordBot() {
           .setFooter({ text: `Execute par ${interaction.user.username}` });
 
         await interaction.editReply({ embeds: [embed] });
+        webhookBotGeneric(interaction.user.tag, "massiverole", `**Role** : ${role.name}\n**Ajoute** : ${added}\n**Ignore** : ${skipped}\n**Echoue** : ${failed}`);
         log(`massiverole: ${added} added, ${skipped} skipped, ${failed} failed for role ${role.name}`, "discord");
       } catch (err) {
         log(`Error in massiverole: ${err}`, "discord");
@@ -672,6 +677,7 @@ export async function startDiscordBot() {
             content: `Message envoye dans <#${salon.id}>`,
             ephemeral: true,
           });
+          webhookBotGeneric(interaction.user.tag, "say", `**Salon** : <#${salon.id}>\n**Message** : \`${message.slice(0, 100)}${message.length > 100 ? "..." : ""}\``);
         } else {
           await interaction.reply({
             content: "Impossible d'envoyer dans ce salon.",
@@ -816,6 +822,7 @@ export async function startDiscordBot() {
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+        webhookBotGkey(interaction.user.tag, tier, license.key);
       } catch (err) {
         log(`Error generating key: ${err}`, "discord");
         await interaction.reply({ content: "Erreur lors de la generation.", ephemeral: true });
@@ -832,6 +839,7 @@ export async function startDiscordBot() {
         } else {
           await interaction.reply({ content: "Cle introuvable.", ephemeral: true });
         }
+        webhookBotRkey(interaction.user.tag, key, !!success);
       } catch (err) {
         log(`Error revoking key: ${err}`, "discord");
         await interaction.reply({ content: "Erreur lors de la revocation.", ephemeral: true });
@@ -845,6 +853,7 @@ export async function startDiscordBot() {
 
         if (!sub) {
           await interaction.reply({ content: `Aucun utilisateur trouve avec l'ID unique \`${uniqueId}\`.`, ephemeral: true });
+          webhookBotIuser(interaction.user.tag, uniqueId, false);
           return;
         }
 
@@ -917,6 +926,7 @@ export async function startDiscordBot() {
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+        webhookBotIuser(interaction.user.tag, uniqueId, true, email, tier, sub.frozen);
       } catch (err) {
         log(`Error in /iuser: ${err}`, "discord");
         await interaction.reply({ content: "Erreur lors de la recuperation des informations.", ephemeral: true });
@@ -963,6 +973,7 @@ export async function startDiscordBot() {
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
+        webhookBotSetplan(interaction.user.tag, uniqueId, email, plan);
         log(`/setplan: User #${uniqueId} set to ${plan} by ${interaction.user.username}`, "discord");
       } catch (err) {
         log(`Error in /setplan: ${err}`, "discord");
@@ -1007,6 +1018,7 @@ export async function startDiscordBot() {
 
         await (targetChannel as any).send({ embeds: [ticketEmbed], components: [row1, row2] });
         await interaction.reply({ content: `Systeme de tickets configure dans <#${salon.id}>`, ephemeral: true });
+        webhookBotGeneric(interaction.user.tag, "setupticket", `**Salon** : <#${salon.id}>`);
         log(`Ticket system setup in #${salon.id} by ${interaction.user.username}`, "discord");
       } catch (err) {
         log(`Error in setupticket: ${err}`, "discord");
@@ -1021,6 +1033,7 @@ export async function startDiscordBot() {
         
         if (!license) {
           await interaction.reply({ content: "Cle introuvable.", ephemeral: true });
+          webhookBotIkey(interaction.user.tag, key, false);
           return;
         }
 
@@ -1041,6 +1054,7 @@ export async function startDiscordBot() {
         }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+        webhookBotIkey(interaction.user.tag, key, true, license.tier, license.used, license.usedBy || undefined);
       } catch (err) {
         log(`Error getting key info: ${err}`, "discord");
         await interaction.reply({ content: "Erreur lors de la recuperation des infos.", ephemeral: true });
@@ -1178,6 +1192,7 @@ export async function startDiscordBot() {
         if (channel && channel.isTextBased() && "send" in channel) {
           await (channel as any).send({ embeds: [embed] });
           await interaction.editReply({ content: `Statut envoye dans <#${targetChannel.id}>` });
+          webhookBotGeneric(interaction.user.tag, "status", `**Salon** : <#${targetChannel.id}>`);
         } else {
           await interaction.editReply({ content: "Impossible d'envoyer dans ce salon." });
         }
@@ -1215,6 +1230,7 @@ export async function startDiscordBot() {
         if (channel && channel.isTextBased() && "send" in channel) {
           await (channel as any).send({ embeds: [embed] });
           await interaction.editReply({ content: `Embed Soutien envoye dans <#${targetChannel.id}>` });
+          webhookBotGeneric(interaction.user.tag, "soutien", `**Salon** : <#${targetChannel.id}>`);
         } else {
           await interaction.editReply({ content: "Impossible d'envoyer dans ce salon." });
         }
@@ -1250,6 +1266,7 @@ export async function startDiscordBot() {
 
         await (channel as any).send({ embeds: [embed] });
         await interaction.reply({ content: `Liens envoyes dans <#${targetChannel.id}>.`, ephemeral: true });
+        webhookBotGeneric(interaction.user.tag, "link", `**Salon** : <#${targetChannel.id}>`);
       } catch (err) {
         log(`Error in link command: ${err}`, "discord");
         if (interaction.deferred) {
@@ -1302,6 +1319,7 @@ export async function startDiscordBot() {
         );
 
         await interaction.editReply({ embeds: embeds.slice(0, 10) });
+        webhookBotWantedlist(interaction.user.tag, profiles.length);
       } catch (err) {
         log(`Error in wanted command: ${err}`, "discord");
         if (interaction.deferred) {
@@ -1364,6 +1382,7 @@ export async function startDiscordBot() {
 
         await oldChannel.delete().catch(() => {});
 
+        webhookBotGeneric(interaction.user.tag, "renew", `**Salon** : #${name}`);
         log(`Channel #${name} renewed by ${interaction.user.tag}`, "discord");
       } catch (err) {
         log(`Error in renew command: ${err}`, "discord");
