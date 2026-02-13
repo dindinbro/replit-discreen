@@ -5,7 +5,7 @@ import { api } from "@shared/routes";
 import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { searchAllIndexes, initSearchDatabases } from "./searchSqlite";
+import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria } from "./searchSqlite";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import crypto from "crypto";
 import path from "path";
@@ -1282,8 +1282,11 @@ export async function registerRoutes(
       }
 
       if (externalResults.length > 0) {
-        results = [...results, ...externalResults];
-        total = (total ?? 0) + externalResults.length;
+        const filteredExternal = request.criteria.length > 1
+          ? filterResultsByCriteria(externalResults, request.criteria)
+          : externalResults;
+        results = [...results, ...filteredExternal];
+        total = (total ?? 0) + filteredExternal.length;
       }
 
       console.log(`[search] Done in ${Date.now() - searchStart}ms — internal: ${results.length - externalResults.length}, external: ${externalResults.length}, total: ${total}`);

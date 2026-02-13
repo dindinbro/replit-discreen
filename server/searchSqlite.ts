@@ -434,8 +434,8 @@ const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   email: ["email", "mail"],
   username: ["identifiant", "username", "pseudo", "nom"],
   displayName: ["identifiant", "username", "pseudo", "nom", "name", "prenom"],
-  lastName: ["nom", "name", "last_name", "lastname", "surname", "identifiant"],
-  firstName: ["prenom", "first_name", "firstname", "identifiant", "nom"],
+  lastName: ["nom", "name", "last_name", "lastname", "surname"],
+  firstName: ["prenom", "first_name", "firstname"],
   phone: ["telephone", "phone", "tel", "mobile"],
   ipAddress: ["ip"],
   address: ["adresse", "address", "rue", "street", "ville", "city", "code_postal"],
@@ -621,6 +621,12 @@ async function searchRemoteBridge(
           total: data.total,
         };
       }
+
+      const filtered = filterResultsByCriteria(data.results, criteria);
+      return {
+        results: filtered.slice(0, limit) as SearchResult["results"],
+        total: filtered.length,
+      };
     }
 
     return data;
