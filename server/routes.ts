@@ -2082,7 +2082,7 @@ export async function registerRoutes(
   });
 
   const advancedSearchCooldowns = new Map<string, number>();
-  const ADVANCED_COOLDOWN_MS = 10_000;
+  const ADVANCED_COOLDOWN_MS = 30_000;
 
   // POST /api/leakosint-search - proxy to LeakOSINT API
   app.post("/api/leakosint-search", requireAuth, async (req, res) => {
