@@ -2100,6 +2100,8 @@ export async function registerRoutes(
         });
       }
 
+      advancedSearchCooldowns.set(userId, Date.now());
+
       if (await storage.isFrozen(userId)) {
         return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
       }
@@ -2232,8 +2234,6 @@ export async function registerRoutes(
         console.log(`[leakosint] Parsed ${results.length} results from ${Object.keys(listData).length} sources`);
       }
 
-      advancedSearchCooldowns.set(userId, Date.now());
-
       const wUser = await buildUserInfo(req);
       webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
 
@@ -2256,20 +2256,10 @@ export async function registerRoutes(
 
   // POST /api/dalton-search - proxy to DaltonAPI (same format as LeakOSINT)
   // Shares the same daily quota as LeakOSINT but does NOT increment it (LeakOSINT already counts for the advanced search)
+  // No separate cooldown check here - LeakOSINT route handles cooldown for both (called in parallel from frontend)
   app.post("/api/dalton-search", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user.id;
-
-      const lastUsed = advancedSearchCooldowns.get(userId) || 0;
-      const elapsed = Date.now() - lastUsed;
-      if (elapsed < ADVANCED_COOLDOWN_MS) {
-        const remaining = Math.ceil((ADVANCED_COOLDOWN_MS - elapsed) / 1000);
-        return res.status(429).json({
-          message: `Veuillez patienter ${remaining}s avant de relancer une recherche avancee.`,
-          cooldown: true,
-          retryAfter: remaining,
-        });
-      }
 
       if (await storage.isFrozen(userId)) {
         return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });

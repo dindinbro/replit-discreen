@@ -882,6 +882,7 @@ export default function SearchPage() {
       setAdvancedResults([]);
       setAdvancedError(null);
       setAdvancedSearched(true);
+      setAdvancedCooldown(30);
       const searchTerm = filledCriteria.map((c) => c.value.trim()).join(" ");
       const token = getAccessToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
