@@ -27,7 +27,7 @@ const MAIN_PROFILES: WantedProfile[] = [
 
 const SECONDARY_PROFILES: WantedProfile[] = [
   {
-    pseudo: "IMAD",
+    pseudo: "POINTU",
     disc: "Disque de Platine",
     description: "Humain multi-taches",
     images: ["https://cdn.discordapp.com/avatars/1291217086907158529/5b68c25e221f67338cd3f4e88fe22de1.webp?size=1024"],
@@ -39,10 +39,16 @@ const SECONDARY_PROFILES: WantedProfile[] = [
     images: ["https://cdn.discordapp.com/avatars/788515048569307154/0212df4a29f89e1bdbd3bdb77b114ce6.webp?size=1024"],
   },
   {
-    pseudo: "Sinistral",
+    pseudo: "SMOK",
     disc: "Disque de Platine",
     description: "BDG BDB BDDB",
     images: ["https://cdn.discordapp.com/avatars/1457570822565793843/34b9e08128ff24080b5611397e499cf4.webp?size=1024"],
+  },
+  {
+    pseudo: "Les Daltons",
+    disc: "Disque de Platine",
+    description: "Lomix, Lasko, Lahyat, Bognon, 92",
+    images: [],
   },
 ];
 
@@ -73,15 +79,16 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
       >
         <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group">
           <div
-            className="relative aspect-[4/5] bg-muted/30 cursor-pointer overflow-hidden"
-            onClick={() => hasImages && setModalOpen(true)}
+            className="relative aspect-[4/5] bg-muted/30 overflow-hidden"
           >
             {hasImages ? (
               <>
                 <img
                   src={profile.images[currentImage]}
                   alt={profile.pseudo}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                  onClick={() => setModalOpen(true)}
+                  data-testid={`img-profile-${profile.pseudo}`}
                 />
                 {totalImages > 1 && (
                   <>
@@ -209,14 +216,15 @@ function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: n
       >
         <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 group">
           <div
-            className="relative aspect-square bg-muted/30 cursor-pointer overflow-hidden"
-            onClick={() => hasImages && setModalOpen(true)}
+            className="relative aspect-square bg-muted/30 overflow-hidden"
           >
             {hasImages ? (
               <img
                 src={profile.images[0]}
                 alt={profile.pseudo}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                onClick={() => setModalOpen(true)}
+                data-testid={`img-profile-${profile.pseudo}`}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
