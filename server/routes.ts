@@ -1766,12 +1766,18 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Au moins un champ est requis (max 10)." });
       }
 
+      const breachApiKey = process.env.BREACH_API_KEY;
+      if (!breachApiKey) {
+        return res.status(503).json({ message: "Cle API Breach non configuree." });
+      }
+
       let response: globalThis.Response;
       try {
         response = await fetch("https://breach.vip/api/search", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Api-Key": breachApiKey,
           },
           body: JSON.stringify({
             term,
