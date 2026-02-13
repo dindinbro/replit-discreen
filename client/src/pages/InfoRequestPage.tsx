@@ -5,23 +5,55 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Loader2, ArrowRight, CreditCard, CheckCircle, Search } from "lucide-react";
+import { Loader2, ArrowRight, CreditCard, CheckCircle, Plus, X } from "lucide-react";
 
 export default function InfoRequestPage() {
   const { getAccessToken } = useAuth();
   const { toast } = useToast();
 
-  const [discordId, setDiscordId] = useState("");
-  const [email, setEmail] = useState("");
-  const [pseudo, setPseudo] = useState("");
-  const [ipAddress, setIpAddress] = useState("");
+  const [emails, setEmails] = useState<string[]>([""]);
+  const [pseudos, setPseudos] = useState<string[]>([""]);
+  const [discordIds, setDiscordIds] = useState<string[]>([""]);
+  const [ips, setIps] = useState<string[]>([""]);
+  const [phones, setPhones] = useState<string[]>([""]);
   const [additionalInfo, setAdditionalInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"form" | "payment">("form");
 
+  const addField = (setter: React.Dispatch<React.SetStateAction<string[]>>) => setter(prev => [...prev, ""]);
+  const removeField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number) => setter(prev => prev.filter((_, i) => i !== index));
+  const updateField = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number, value: string) => setter(prev => prev.map((v, i) => i === index ? value : v));
+
+  const DynamicFields = ({ label, values, setter, placeholder }: { label: string; values: string[]; setter: React.Dispatch<React.SetStateAction<string[]>>; placeholder: string }) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">{label}</label>
+        <Button type="button" variant="ghost" size="sm" onClick={() => addField(setter)} data-testid={`button-add-${label.toLowerCase()}`}>
+          <Plus className="w-3 h-3 mr-1" /> Ajouter
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {values.map((val: string, i: number) => (
+          <div key={i} className="flex gap-2">
+            <Input
+              value={val}
+              onChange={e => updateField(setter, i, e.target.value)}
+              placeholder={placeholder}
+              data-testid={`input-${label.toLowerCase()}-${i}`}
+            />
+            {values.length > 1 && (
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeField(setter, i)} data-testid={`button-remove-${label.toLowerCase()}-${i}`}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   async function handleNext() {
-    const hasAnyField = [discordId, email, pseudo, ipAddress].some(f => f.trim().length > 0);
+    const hasAnyField = [...emails, ...pseudos, ...discordIds, ...ips, ...phones].some(f => f.trim().length > 0);
     if (!hasAnyField) {
       toast({ title: "Erreur", description: "Veuillez remplir au moins un champ.", variant: "destructive" });
       return;
@@ -40,10 +72,11 @@ export default function InfoRequestPage() {
       }
 
       const formData = {
-        discordId: discordId.trim() || null,
-        email: email.trim() || null,
-        pseudo: pseudo.trim() || null,
-        ipAddress: ipAddress.trim() || null,
+        discordId: discordIds.filter(Boolean).join(", ") || null,
+        email: emails.filter(Boolean).join(", ") || null,
+        pseudo: pseudos.filter(Boolean).join(", ") || null,
+        ipAddress: ips.filter(Boolean).join(", ") || null,
+        phone: phones.filter(Boolean).join(", ") || null,
         additionalInfo: additionalInfo.trim() || null,
       };
 
@@ -64,10 +97,11 @@ export default function InfoRequestPage() {
             title: "Facture creee",
             description: "La facture a ete ouverte dans un nouvel onglet. Une fois le paiement effectue, votre demande sera automatiquement envoyee.",
           });
-          setDiscordId("");
-          setEmail("");
-          setPseudo("");
-          setIpAddress("");
+          setEmails([""]);
+          setPseudos([""]);
+          setDiscordIds([""]);
+          setIps([""]);
+          setPhones([""]);
           setAdditionalInfo("");
           setStep("form");
         }
@@ -81,6 +115,12 @@ export default function InfoRequestPage() {
       setLoading(false);
     }
   }
+
+  const filledEmails = emails.filter(Boolean);
+  const filledPseudos = pseudos.filter(Boolean);
+  const filledDiscordIds = discordIds.filter(Boolean);
+  const filledIps = ips.filter(Boolean);
+  const filledPhones = phones.filter(Boolean);
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -106,64 +146,26 @@ export default function InfoRequestPage() {
       {step === "form" && (
         <Card className="p-6">
           <div className="space-y-6" data-testid="form-info-request">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="discordId">Discord ID</Label>
-                <Input
-                  id="discordId"
-                  data-testid="input-discordId"
-                  placeholder="123456789012345678"
-                  value={discordId}
-                  onChange={(e) => setDiscordId(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  data-testid="input-email"
-                  type="email"
-                  placeholder="exemple@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DynamicFields label="Emails" values={emails} setter={setEmails} placeholder="exemple@email.com" />
+              <DynamicFields label="Pseudos" values={pseudos} setter={setPseudos} placeholder="Pseudo de la personne" />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="pseudo">Pseudo</Label>
-                <Input
-                  id="pseudo"
-                  data-testid="input-pseudo"
-                  placeholder="Pseudo de la personne"
-                  value={pseudo}
-                  onChange={(e) => setPseudo(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ipAddress">Adresse IP</Label>
-                <Input
-                  id="ipAddress"
-                  data-testid="input-ipAddress"
-                  placeholder="192.168.1.1"
-                  value={ipAddress}
-                  onChange={(e) => setIpAddress(e.target.value)}
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DynamicFields label="Discord IDs" values={discordIds} setter={setDiscordIds} placeholder="123456789012345678" />
+              <DynamicFields label="IPs" values={ips} setter={setIps} placeholder="192.168.1.1" />
             </div>
+
+            <DynamicFields label="Telephones" values={phones} setter={setPhones} placeholder="+33 6 00 00 00 00" />
 
             <div className="space-y-2">
-              <Label htmlFor="additionalInfo">Informations supplementaires</Label>
+              <label className="text-sm font-medium">Informations supplementaires</label>
               <Textarea
-                id="additionalInfo"
                 data-testid="textarea-additionalInfo"
                 placeholder="Ajoutez toute information supplementaire utile (autres pseudos, numeros de telephone, etc.)..."
                 value={additionalInfo}
                 onChange={(e) => setAdditionalInfo(e.target.value)}
-                className="resize-none"
+                className="min-h-[100px]"
                 rows={5}
               />
             </div>
@@ -193,10 +195,11 @@ export default function InfoRequestPage() {
             <Card className="p-4 bg-muted/50">
               <h3 className="font-medium mb-3 text-left">Recapitulatif</h3>
               <div className="text-sm text-left space-y-1 text-muted-foreground">
-                {discordId && <p>Discord ID : {discordId}</p>}
-                {email && <p>Email : {email}</p>}
-                {pseudo && <p>Pseudo : {pseudo}</p>}
-                {ipAddress && <p>IP : {ipAddress}</p>}
+                {filledEmails.length > 0 && <p>Email(s) : {filledEmails.join(", ")}</p>}
+                {filledPseudos.length > 0 && <p>Pseudo(s) : {filledPseudos.join(", ")}</p>}
+                {filledDiscordIds.length > 0 && <p>Discord ID(s) : {filledDiscordIds.join(", ")}</p>}
+                {filledIps.length > 0 && <p>IP(s) : {filledIps.join(", ")}</p>}
+                {filledPhones.length > 0 && <p>Telephone(s) : {filledPhones.join(", ")}</p>}
                 {additionalInfo && <p>Infos : {additionalInfo}</p>}
               </div>
             </Card>
