@@ -460,8 +460,6 @@ export function filterResultsByCriteria(
 ): Record<string, unknown>[] {
   if (criteria.length === 0) return results;
 
-  const hasMultipleCriteria = criteria.filter(c => c.value.trim()).length > 1;
-
   return results.filter((row) => {
     for (const criterion of criteria) {
       const allowedFields = CRITERION_TO_PARSED_FIELDS[criterion.type];
@@ -484,33 +482,17 @@ export function filterResultsByCriteria(
 
       if (!foundInAllowedField) {
         const raw = String(row["_raw"] ?? "").toLowerCase();
-        if (hasMultipleCriteria) {
+        if (raw) {
           const rawParts = raw.split(/[;|:,\t]+/).map(p => p.trim().toLowerCase());
           const matched = rawParts.some(part => part.includes(searchVal));
           if (matched) {
-            foundInAllowedField = true;
-          }
-        } else {
-          if (raw.includes(searchVal)) {
             foundInAllowedField = true;
           }
         }
       }
 
       if (!foundInAllowedField) {
-        if (hasMultipleCriteria) {
-          return false;
-        }
-        let foundAnywhere = false;
-        for (const [key, val] of Object.entries(row)) {
-          if (key.startsWith("_")) continue;
-          const strVal = String(val ?? "").toLowerCase();
-          if (strVal.includes(searchVal)) {
-            foundAnywhere = true;
-            break;
-          }
-        }
-        if (!foundAnywhere) return false;
+        return false;
       }
     }
     return true;
