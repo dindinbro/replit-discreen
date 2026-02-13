@@ -1720,12 +1720,15 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
   };
 
   const getDaysRemaining = (expiresAt: string | null): string => {
-    if (!expiresAt) return "-";
+    if (!expiresAt) return "Pas d'expiration";
     const now = new Date();
     const exp = new Date(expiresAt);
     if (exp <= now) return "Expire";
-    const days = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return `${days}j`;
+    const diff = exp.getTime() - now.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    if (days > 0) return `${days}j ${hours}h`;
+    return `${hours}h`;
   };
 
   const activeSubs = subs.filter(s => s.tier !== "free");
@@ -1818,7 +1821,7 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
                       <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {getDaysRemaining(sub.expiresAt)} restant
+                          {getDaysRemaining(sub.expiresAt)}
                         </span>
                         {sub.discordId && (
                           <span>Discord: {sub.discordId}</span>
@@ -1886,6 +1889,10 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
                       <span>Creee: {new Date(k.createdAt).toLocaleDateString("fr-FR")}</span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        30j
+                      </span>
                       {k.usedBy && k.usedBy !== "REVOKED" && (
                         <span>Utilisee par: {k.usedBy.slice(0, 8)}...</span>
                       )}
