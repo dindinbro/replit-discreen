@@ -38,6 +38,12 @@ const SECONDARY_PROFILES: WantedProfile[] = [
     description: "Grand hagar",
     images: ["https://cdn.discordapp.com/avatars/788515048569307154/0212df4a29f89e1bdbd3bdb77b114ce6.webp?size=1024"],
   },
+  {
+    pseudo: "Sinistral",
+    disc: "Disque de Platine",
+    description: "BDG BDB BDDB",
+    images: ["https://cdn.discordapp.com/avatars/1457570822565793843/34b9e08128ff24080b5611397e499cf4.webp?size=1024"],
+  },
 ];
 
 function ProfileCard({ profile, index }: { profile: WantedProfile; index: number }) {
