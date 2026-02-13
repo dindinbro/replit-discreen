@@ -2230,47 +2230,40 @@ export async function registerRoutes(
   const USER_SEARCH_COOLDOWN_MS = 10_000;
   const COOLDOWN_EXEMPT_ROLES = new Set(["api", "admin"]);
 
-  const apiTokenLastUsed = {
-    leakosint: 0,
-    dalton: 0,
-  };
   const API_TOKEN_COOLDOWN_MS = 30_000;
+  let leakosintEndpointLastUsed = 0;
+  const leakosintEndpointQueue: Array<() => void> = [];
 
-  const apiQueues: Record<string, Array<() => void>> = {
-    leakosint: [],
-    dalton: [],
-  };
-
-  function waitForApiSlot(apiName: "leakosint" | "dalton"): Promise<void> {
+  function waitForApiSlot(_apiName: "leakosint" | "dalton"): Promise<void> {
     return new Promise((resolve) => {
       const tryExecute = () => {
         const now = Date.now();
-        const elapsed = now - apiTokenLastUsed[apiName];
+        const elapsed = now - leakosintEndpointLastUsed;
         if (elapsed >= API_TOKEN_COOLDOWN_MS) {
-          apiTokenLastUsed[apiName] = now;
+          leakosintEndpointLastUsed = now;
           resolve();
         } else {
           const waitTime = API_TOKEN_COOLDOWN_MS - elapsed;
           setTimeout(() => {
-            apiTokenLastUsed[apiName] = Date.now();
+            leakosintEndpointLastUsed = Date.now();
             resolve();
           }, waitTime);
         }
       };
 
-      if (apiQueues[apiName].length === 0) {
-        apiQueues[apiName].push(tryExecute);
+      if (leakosintEndpointQueue.length === 0) {
+        leakosintEndpointQueue.push(tryExecute);
         tryExecute();
       } else {
-        apiQueues[apiName].push(tryExecute);
+        leakosintEndpointQueue.push(tryExecute);
       }
     });
   }
 
-  function releaseApiSlot(apiName: "leakosint" | "dalton") {
-    apiQueues[apiName].shift();
-    if (apiQueues[apiName].length > 0) {
-      apiQueues[apiName][0]();
+  function releaseApiSlot(_apiName: "leakosint" | "dalton") {
+    leakosintEndpointQueue.shift();
+    if (leakosintEndpointQueue.length > 0) {
+      leakosintEndpointQueue[0]();
     }
   }
 
