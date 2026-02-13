@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
 import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, SearchLimitError } from "@/hooks/use-search";
 import { useAuth } from "@/hooks/use-auth";
@@ -43,6 +43,7 @@ import {
   Gamepad2,
   RotateCcw,
   Zap,
+  Timer,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -431,6 +432,23 @@ export default function SearchPage() {
   const [advancedLoading, setAdvancedLoading] = useState(false);
   const [advancedError, setAdvancedError] = useState<string | null>(null);
   const [advancedSearched, setAdvancedSearched] = useState(false);
+  const [advancedCooldown, setAdvancedCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (advancedCooldown > 0) {
+      cooldownRef.current = setInterval(() => {
+        setAdvancedCooldown((prev) => {
+          if (prev <= 1) {
+            if (cooldownRef.current) clearInterval(cooldownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
+    }
+  }, [advancedCooldown > 0]);
 
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [page, setPage] = useState(0);
@@ -851,6 +869,15 @@ export default function SearchPage() {
     );
 
     if (advancedSearch) {
+      if (advancedCooldown > 0) {
+        toast({
+          title: "Cooldown actif",
+          description: `Veuillez patienter ${advancedCooldown}s avant de relancer une recherche avancee.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       setAdvancedLoading(true);
       setAdvancedResults([]);
       setAdvancedError(null);
@@ -870,7 +897,10 @@ export default function SearchPage() {
         .then(async (r) => {
           if (!r.ok) {
             const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
-            if (r.status === 429) {
+            if (r.status === 429 && err.cooldown) {
+              setAdvancedCooldown(err.retryAfter || 10);
+              errors.push(`Cooldown: patientez ${err.retryAfter || 10}s`);
+            } else if (r.status === 429) {
               errors.push(`Source 1: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
             } else if (r.status === 403) {
               errors.push("Source 1: acces non autorise pour votre abonnement");
@@ -878,6 +908,9 @@ export default function SearchPage() {
             return [];
           }
           const d = await r.json();
+          if (d.cooldownSeconds) {
+            setAdvancedCooldown(d.cooldownSeconds);
+          }
           return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "LeakOSINT" }));
         })
         .catch(() => []);
@@ -890,7 +923,9 @@ export default function SearchPage() {
         .then(async (r) => {
           if (!r.ok) {
             const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
-            if (r.status === 429) {
+            if (r.status === 429 && err.cooldown) {
+              return [];
+            } else if (r.status === 429) {
               errors.push(`Source 2: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
             } else if (r.status === 403) {
               errors.push("Source 2: acces non autorise pour votre abonnement");
@@ -1224,21 +1259,27 @@ export default function SearchPage() {
                   <Button
                     data-testid="button-search"
                     onClick={() => handleSearch(0)}
-                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || atLimit}
+                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || atLimit || (advancedSearch && advancedCooldown > 0)}
                     className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${
-                      advancedSearch
-                        ? "bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground hover:from-primary/90 hover:to-emerald-500/90 shadow-primary/25"
-                        : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/25"
+                      advancedSearch && advancedCooldown > 0
+                        ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none"
+                        : advancedSearch
+                          ? "bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground hover:from-primary/90 hover:to-emerald-500/90 shadow-primary/25"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/25"
                     }`}
                   >
                     {(searchMutation.isPending || advancedLoading) ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : advancedSearch && advancedCooldown > 0 ? (
+                      <Timer className="w-4 h-4" />
                     ) : advancedSearch ? (
                       <Zap className="w-4 h-4" />
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    {advancedSearch ? "Recherche Avancee" : "Rechercher"}
+                    {advancedSearch && advancedCooldown > 0
+                      ? `Cooldown ${advancedCooldown}s`
+                      : advancedSearch ? "Recherche Avancee" : "Rechercher"}
                   </Button>
                   <Button
                     data-testid="button-reset-internal"
