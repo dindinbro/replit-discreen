@@ -268,6 +268,10 @@ export async function startDiscordBot() {
     .setDescription("Lister tous les pseudos de l'historique Wanted")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
+  const wantedPreviewCommand = new SlashCommandBuilder()
+    .setName("wantedpreview")
+    .setDescription("Voir la liste des pseudos Wanted (10 par page)");
+
   const rest = new REST({ version: "10" }).setToken(token);
 
   try {
@@ -290,7 +294,8 @@ export async function startDiscordBot() {
         soutienCommand.toJSON(),
         renewCommand.toJSON(),
         linkCommand.toJSON(),
-        wantedCommand.toJSON()
+        wantedCommand.toJSON(),
+        wantedPreviewCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -1334,6 +1339,63 @@ export async function startDiscordBot() {
       }
     }
 
+    if (interaction.commandName === "wantedpreview") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const profiles = await storage.getWantedProfiles();
+
+        if (!profiles || profiles.length === 0) {
+          await interaction.editReply({ content: "Aucun profil dans l'historique Wanted." });
+          return;
+        }
+
+        const pseudos = profiles
+          .map((p) => p.pseudo || "N/A")
+          .filter((p) => p !== "N/A");
+
+        if (pseudos.length === 0) {
+          await interaction.editReply({ content: "Aucun pseudo trouve dans l'historique Wanted." });
+          return;
+        }
+
+        const perPage = 10;
+        const totalPages = Math.ceil(pseudos.length / perPage);
+        const page = 0;
+        const pageItems = pseudos.slice(page * perPage, (page + 1) * perPage);
+
+        const embed = new EmbedBuilder()
+          .setColor(0x10b981)
+          .setTitle(`Wanted — Liste des pseudos (${pseudos.length})`)
+          .setDescription(pageItems.map((p, i) => `\`${page * perPage + i + 1}.\` ${p}`).join("\n"))
+          .setFooter({ text: `Page ${page + 1}/${totalPages} • © Discreen` })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder<ButtonBuilder>();
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`wpreview_prev_${interaction.user.id}_0`)
+            .setLabel("◀ Precedent")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true),
+          new ButtonBuilder()
+            .setCustomId(`wpreview_next_${interaction.user.id}_0`)
+            .setLabel("Suivant ▶")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(totalPages <= 1)
+        );
+
+        await interaction.editReply({ embeds: [embed], components: [row] });
+      } catch (err) {
+        log(`Error in wantedpreview command: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de la recuperation des profils Wanted." });
+        } else {
+          await interaction.reply({ content: "Erreur lors de la recuperation des profils Wanted.", ephemeral: true });
+        }
+      }
+    }
+
     if (interaction.commandName === "renew") {
       try {
         await interaction.deferReply({ ephemeral: true });
@@ -1448,9 +1510,67 @@ function parseColor(input: string): number | null {
   return null;
 }
 
+async function handleWantedPreviewButton(interaction: ButtonInteraction) {
+  const customId = interaction.customId;
+  if (!customId.startsWith("wpreview_")) return;
+
+  const parts = customId.split("_");
+  const direction = parts[1];
+  const ownerId = parts[2];
+  const currentPage = parseInt(parts[3], 10);
+
+  if (interaction.user.id !== ownerId) {
+    await interaction.reply({ content: "Seul l'auteur de la commande peut naviguer.", ephemeral: true });
+    return;
+  }
+
+  const newPage = direction === "next" ? currentPage + 1 : currentPage - 1;
+
+  try {
+    const profiles = await storage.getWantedProfiles();
+    const pseudos = (profiles || [])
+      .map((p) => p.pseudo || "N/A")
+      .filter((p) => p !== "N/A");
+
+    const perPage = 10;
+    const totalPages = Math.ceil(pseudos.length / perPage);
+    const safePage = Math.max(0, Math.min(newPage, totalPages - 1));
+    const pageItems = pseudos.slice(safePage * perPage, (safePage + 1) * perPage);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x10b981)
+      .setTitle(`Wanted — Liste des pseudos (${pseudos.length})`)
+      .setDescription(pageItems.map((p, i) => `\`${safePage * perPage + i + 1}.\` ${p}`).join("\n"))
+      .setFooter({ text: `Page ${safePage + 1}/${totalPages} • © Discreen` })
+      .setTimestamp();
+
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`wpreview_prev_${ownerId}_${safePage}`)
+        .setLabel("◀ Precedent")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(safePage <= 0),
+      new ButtonBuilder()
+        .setCustomId(`wpreview_next_${ownerId}_${safePage}`)
+        .setLabel("Suivant ▶")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(safePage >= totalPages - 1)
+    );
+
+    await interaction.update({ embeds: [embed], components: [row] });
+  } catch (err) {
+    log(`Error in wantedpreview button: ${err}`, "discord");
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: "Erreur lors de la navigation.", ephemeral: true });
+    }
+  }
+}
+
 function handleEmbedInteractions(client: Client) {
   client.on("interactionCreate", async (interaction) => {
     if (interaction.isButton()) {
+      await handleWantedPreviewButton(interaction);
       await handleEmbedButton(interaction);
     }
     if (interaction.isModalSubmit()) {
