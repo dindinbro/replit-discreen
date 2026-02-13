@@ -190,7 +190,7 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
 
 export default function UsersPage() {
   return (
-    <div className="min-h-screen bg-[#0d0f14] relative overflow-hidden">
+    <div className="min-h-[80vh] bg-[#0d0f14] relative overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8 -mb-8 -mt-4 px-4 sm:px-6 lg:px-8">
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
@@ -221,8 +221,8 @@ export default function UsersPage() {
           <div className="flex items-center justify-center gap-3 mb-4">
             <Sparkle className="text-white/30 w-6 h-6" />
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight" data-testid="heading-wanted">
-              <span className="text-white">HALL OF </span>
-              <span className="text-[#6c7cff]">SHAME</span>
+              <span className="text-white">DISCREEN </span>
+              <span className="text-[#6c7cff]">OF FAME</span>
             </h1>
             <Sparkle className="text-white/30 w-6 h-6" />
           </div>
@@ -235,7 +235,7 @@ export default function UsersPage() {
           >
             <div className="border border-white/10 rounded-full px-6 py-2">
               <p className="text-white/40 text-sm italic tracking-wide">
-                " Sanctionner quand le respect n'est plus servi "
+  Trophee De Discreen
               </p>
             </div>
           </motion.div>

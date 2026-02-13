@@ -75,7 +75,7 @@ const NAV_ITEMS = [
   { label: "Home", href: "/", icon: Home },
   { label: "Recherche", href: "/search", icon: Search },
   { label: "Avis", href: "/avis", icon: Star },
-  { label: "Utilisateurs", href: "/users", icon: Users },
+  { label: "D.O.F", href: "/users", icon: Users },
   { label: "Prix", href: "/pricing", icon: CreditCard },
   { label: "Contact", href: "/contact", icon: MessageSquare },
 ];
