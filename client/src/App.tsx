@@ -102,7 +102,7 @@ function Router() {
         <ProtectedRoute component={InfoRequestPage} />
       </Route>
       <Route path="/users">
-        <PublicRoute component={UsersPage} />
+        <UsersPage />
       </Route>
       <Route path="/documentation">
         <PublicRoute component={DocumentationPage} />

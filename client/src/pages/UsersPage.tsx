@@ -1,187 +1,274 @@
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Users, Loader2, Crown, Search } from "lucide-react";
-import { motion } from "framer-motion";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { useState, useMemo } from "react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
-interface PublicUser {
-  id: string;
-  role: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  created_at: string;
+interface WantedProfile {
+  pseudo: string;
+  realName: string;
+  description: string;
+  images: string[];
 }
 
-function formatJoinDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+const WANTED_PROFILES: WantedProfile[] = [
+  {
+    pseudo: "Zaza",
+    realName: "Zaza",
+    description: "Profil recherche — fichier en cours de traitement.",
+    images: [],
+  },
+  {
+    pseudo: "Yanis",
+    realName: "Yanis",
+    description: "Profil recherche — fichier en cours de traitement.",
+    images: [],
+  },
+];
 
-  if (diffDays < 1) return "Rejoint aujourd'hui";
-  if (diffDays === 1) return "Rejoint hier";
-  if (diffDays < 30) return `Rejoint il y a ${diffDays} jours`;
-
-  const day = date.getDate().toString().padStart(2, "0");
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-  const year = date.getFullYear();
-  return `Rejoint le ${day}/${month}/${year}`;
-}
-
-function getDisplayIdentifier(user: PublicUser): string {
-  if (user.display_name) return user.display_name;
-  return "Utilisateur";
-}
-
-function getInitials(user: PublicUser): string {
-  const name = user.display_name || "U";
-  return name.slice(0, 2).toUpperCase();
-}
-
-function RoleBadge({ role }: { role: string }) {
+function Sparkle({ className }: { className?: string }) {
   return (
-    <Badge
-      variant="outline"
-      className="gap-1 border-yellow-500/50 text-yellow-500"
-      data-testid={`badge-role-${role}`}
+    <svg
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
     >
-      <Crown className="w-3 h-3" />
-      {role.toUpperCase()}
-    </Badge>
+      <path
+        d="M12 0L13.5 8.5L22 10L13.5 11.5L12 20L10.5 11.5L2 10L10.5 8.5L12 0Z"
+        fill="currentColor"
+        fillOpacity="0.4"
+      />
+    </svg>
   );
 }
 
-function UserCard({ user }: { user: PublicUser }) {
+function ProfileCard({ profile, index }: { profile: WantedProfile; index: number }) {
+  const [currentImage, setCurrentImage] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const hasImages = profile.images.length > 0;
+  const totalImages = profile.images.length;
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (totalImages > 1) setCurrentImage((prev) => (prev + 1) % totalImages);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (totalImages > 1) setCurrentImage((prev) => (prev - 1 + totalImages) % totalImages);
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <Card className="hover-elevate" data-testid={`card-user-${user.id}`}>
-        <CardContent className="flex items-center gap-4 p-4">
-          <Avatar className="w-12 h-12 border-2 border-primary/30">
-            {user.avatar_url ? (
-              <AvatarImage src={user.avatar_url} alt={getDisplayIdentifier(user)} />
-            ) : null}
-            <AvatarFallback className="bg-primary/10 text-primary font-bold">
-              {getInitials(user)}
-            </AvatarFallback>
-          </Avatar>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: index * 0.15 }}
+        className="w-[280px] sm:w-[300px] flex-shrink-0"
+        data-testid={`card-wanted-${profile.pseudo}`}
+      >
+        <div className="rounded-xl overflow-hidden bg-[#1a1d25] border border-white/[0.06] shadow-xl hover:border-white/[0.12] transition-colors duration-300 group">
+          <div
+            className="relative aspect-[4/5] bg-[#12141a] cursor-pointer overflow-hidden"
+            onClick={() => hasImages && setModalOpen(true)}
+          >
+            {hasImages ? (
+              <>
+                <img
+                  src={profile.images[currentImage]}
+                  alt={profile.pseudo}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                {totalImages > 1 && (
+                  <>
+                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-0.5 rounded-full font-medium">
+                      {currentImage + 1}/{totalImages}
+                    </div>
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {profile.images.map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                            i === currentImage ? "bg-white" : "bg-white/30"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-20 h-20 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-3">
+                    <span className="text-3xl font-bold text-white/20">
+                      {profile.pseudo.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="text-white/20 text-xs">Aucune photo</p>
+                </div>
+              </div>
+            )}
+          </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className="font-bold text-foreground truncate"
-                data-testid={`text-user-displayname-${user.id}`}
+          <div className="p-4 space-y-1.5">
+            <h3 className="text-lg font-bold text-[#6c7cff] tracking-wide uppercase">
+              {profile.pseudo}
+            </h3>
+            <p className="text-sm text-white/70 font-medium">{profile.realName}</p>
+            <p className="text-xs text-white/40 leading-relaxed pt-1">{profile.description}</p>
+          </div>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {modalOpen && hasImages && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative max-w-[90vw] max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setModalOpen(false)}
+                className="absolute -top-10 right-0 text-white/60 hover:text-white transition-colors"
               >
-                {getDisplayIdentifier(user)}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-user-joined-${user.id}`}>
-              {formatJoinDate(user.created_at)}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <RoleBadge role={user.role} />
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+                <X className="w-6 h-6" />
+              </button>
+              <img
+                src={profile.images[currentImage]}
+                alt={profile.pseudo}
+                className="max-w-full max-h-[85vh] rounded-lg object-contain"
+              />
+              {totalImages > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4">
+                  <button
+                    onClick={prevImage}
+                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <span className="text-white text-sm font-medium">
+                    {currentImage + 1} / {totalImages}
+                  </span>
+                  <button
+                    onClick={nextImage}
+                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
 export default function UsersPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const { data, isLoading } = useQuery<{ users: PublicUser[] }>({
-    queryKey: ["/api/users"],
-  });
-
-  const users = data?.users || [];
-
-  const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return users;
-    const q = searchQuery.toLowerCase();
-    return users.filter(
-      (u) => u.display_name && u.display_name.toLowerCase().includes(q)
-    );
-  }, [users, searchQuery]);
-
-  const adminUsers = filteredUsers.filter((u) => u.role === "admin");
-
   return (
-    <div className="container max-w-3xl mx-auto px-4 py-12">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
-      >
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Users className="w-7 h-7 text-primary" />
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-users">
-            Utilisateurs
-          </h1>
-        </div>
-        <p className="text-muted-foreground text-sm">
-          L'equipe derriere Discreen
-        </p>
-      </motion.div>
+    <div className="min-h-screen bg-[#0d0f14] relative overflow-hidden">
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)
+          `,
+          backgroundSize: "60px 60px",
+        }}
+      />
 
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher un utilisateur..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-users"
-          />
-        </div>
-      </div>
+      <Sparkle className="absolute top-[8%] right-[12%] text-white/20 animate-pulse" />
+      <Sparkle className="absolute top-[15%] left-[8%] text-white/10 w-4 h-4" />
+      <Sparkle className="absolute top-[35%] right-[25%] text-white/15 w-3 h-3 animate-pulse" />
+      <Sparkle className="absolute top-[55%] left-[15%] text-white/10 w-5 h-5" />
+      <Sparkle className="absolute top-[70%] right-[10%] text-white/[0.07] w-4 h-4 animate-pulse" />
+      <Sparkle className="absolute top-[45%] left-[45%] text-white/10 w-3 h-3" />
+      <Sparkle className="absolute bottom-[20%] left-[30%] text-white/[0.07] w-4 h-4 animate-pulse" />
+      <Sparkle className="absolute bottom-[10%] right-[35%] text-white/10 w-3 h-3" />
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      ) : (
-        <>
-          {adminUsers.length > 0 && (
-            <div className="mb-8">
-              <div className="flex items-center gap-2 mb-4">
-                <Crown className="w-5 h-5 text-yellow-500" />
-                <h2 className="font-semibold text-lg" data-testid="heading-admin-section">
-                  ADMIN
-                </h2>
-                <span className="text-sm text-muted-foreground">
-                  ({adminUsers.length})
-                </span>
-              </div>
-              <div className="space-y-2">
-                {adminUsers.map((user) => (
-                  <UserCard key={user.id} user={user} />
-                ))}
-              </div>
+      <div className="relative z-10 px-4 py-16 sm:py-24">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-16"
+        >
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Sparkle className="text-white/30 w-6 h-6" />
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight" data-testid="heading-wanted">
+              <span className="text-white">HALL OF </span>
+              <span className="text-[#6c7cff]">SHAME</span>
+            </h1>
+            <Sparkle className="text-white/30 w-6 h-6" />
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="inline-block"
+          >
+            <div className="border border-white/10 rounded-full px-6 py-2">
+              <p className="text-white/40 text-sm italic tracking-wide">
+                " Sanctionner quand le respect n'est plus servi "
+              </p>
             </div>
-          )}
+          </motion.div>
 
-          {filteredUsers.length === 0 && (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-muted-foreground" data-testid="text-no-users">
-                  Aucun utilisateur trouve.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="mt-6"
+          >
+            <Sparkle className="text-white/20 w-5 h-5 mx-auto" />
+          </motion.div>
+        </motion.div>
+
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
+            {WANTED_PROFILES.map((profile, index) => (
+              <ProfileCard key={profile.pseudo} profile={profile} index={index} />
+            ))}
+          </div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="text-center mt-20"
+        >
+          <p className="text-white/15 text-xs tracking-widest uppercase">
+            {WANTED_PROFILES.length} profil{WANTED_PROFILES.length > 1 ? "s" : ""} recense{WANTED_PROFILES.length > 1 ? "s" : ""}
+          </p>
+        </motion.div>
+      </div>
     </div>
   );
 }
