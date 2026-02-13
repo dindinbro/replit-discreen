@@ -880,26 +880,6 @@ export default function SearchPage() {
 
       const errors: string[] = [];
 
-      const leakosintPromise = fetch("/api/leakosint-search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
-      })
-        .then(async (r) => {
-          if (!r.ok) {
-            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
-            if (r.status === 429) {
-              errors.push(`Source 1: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
-            } else if (r.status === 403) {
-              errors.push("Source 1: acces non autorise pour votre abonnement");
-            }
-            return [];
-          }
-          const d = await r.json();
-          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "LeakOSINT" }));
-        })
-        .catch(() => []);
-
       const daltonPromise = fetch("/api/dalton-search", {
         method: "POST",
         headers,
@@ -922,8 +902,28 @@ export default function SearchPage() {
         })
         .catch(() => []);
 
-      Promise.all([leakosintPromise, daltonPromise]).then(([leakRes, daltonRes]) => {
-        setAdvancedResults([...leakRes, ...daltonRes]);
+      const leakosintPromise = fetch("/api/leakosint-search", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
+            if (r.status === 429) {
+              errors.push(`Source 1: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
+            } else if (r.status === 403) {
+              errors.push("Source 1: acces non autorise pour votre abonnement");
+            }
+            return [];
+          }
+          const d = await r.json();
+          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "LeakOSINT" }));
+        })
+        .catch(() => []);
+
+      Promise.all([daltonPromise, leakosintPromise]).then(([daltonRes, leakRes]) => {
+        setAdvancedResults([...daltonRes, ...leakRes]);
         setAdvancedLoading(false);
         if (errors.length > 0) {
           setAdvancedError(errors.join(" | "));
