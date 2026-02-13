@@ -360,46 +360,50 @@ export class DatabaseStorage implements IStorage {
   async createLicenseKey(tier: PlanTier, orderId?: string, createdBy?: string): Promise<LicenseKey> {
     const key = `DSC-${tier.toUpperCase()}-${crypto.randomBytes(12).toString("hex").toUpperCase()}`;
 
-    const tryInsert = async (withCreatedBy: boolean): Promise<LicenseKey | null> => {
-      try {
-        const values: any = { key, tier };
-        if (orderId) values.orderId = orderId;
-        if (withCreatedBy) values.createdBy = createdBy || null;
+    try {
+      const values: any = { key, tier };
+      if (orderId) values.orderId = orderId;
+      values.createdBy = createdBy || null;
 
-        if (orderId) {
-          const [created] = await db
-            .insert(licenseKeys)
-            .values(values)
-            .onConflictDoNothing({ target: licenseKeys.orderId })
-            .returning();
-          if (!created) {
-            const [existing] = await db.select().from(licenseKeys).where(eq(licenseKeys.orderId, orderId));
-            return existing;
-          }
-          return created;
-        }
-
+      if (orderId) {
         const [created] = await db
           .insert(licenseKeys)
           .values(values)
+          .onConflictDoNothing({ target: licenseKeys.orderId })
           .returning();
-        return created;
-      } catch (err: any) {
-        const msg = (err?.message || "").toLowerCase();
-        const code = err?.code || "";
-        if (withCreatedBy && (msg.includes("created_by") || msg.includes("column") || code === "42703")) {
-          return null;
+        if (!created) {
+          const [existing] = await db.select().from(licenseKeys).where(eq(licenseKeys.orderId, orderId));
+          return existing;
         }
-        throw err;
+        return created;
       }
-    };
 
-    const result = await tryInsert(true);
-    if (result) return result;
-    console.warn("[storage] created_by column missing, inserting without it");
-    const fallback = await tryInsert(false);
-    if (fallback) return fallback;
-    throw new Error("Failed to create license key");
+      const [created] = await db
+        .insert(licenseKeys)
+        .values(values)
+        .returning();
+      return created;
+    } catch (err: any) {
+      const msg = (err?.message || "").toLowerCase();
+      const code = err?.code || "";
+      if (msg.includes("created_by") || code === "42703") {
+        console.warn("[storage] created_by column missing, using raw SQL fallback");
+        const result = await db.execute(sql`
+          INSERT INTO license_keys (key, tier${orderId ? sql`, order_id` : sql``})
+          VALUES (${key}, ${tier}${orderId ? sql`, ${orderId}` : sql``})
+          ${orderId ? sql`ON CONFLICT (order_id) DO NOTHING` : sql``}
+          RETURNING *
+        `);
+        const row = (result as any).rows?.[0] || (result as any)[0];
+        if (!row && orderId) {
+          const [existing] = await db.select().from(licenseKeys).where(eq(licenseKeys.orderId, orderId));
+          return existing;
+        }
+        if (row) return row as LicenseKey;
+        throw new Error("Failed to create license key");
+      }
+      throw err;
+    }
   }
 
   async redeemLicenseKey(key: string, userId: string): Promise<{ success: boolean; tier?: PlanTier; message: string }> {
