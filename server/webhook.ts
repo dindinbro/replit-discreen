@@ -249,12 +249,31 @@ export function webhookPaymentCompleted(orderId: string, tier: string, amount: s
   });
 }
 
-export function webhookKeyRedeemed(user: UserInfo, tier: string) {
-  const desc = [
+export function webhookKeyRedeemed(user: UserInfo, tier: string, key?: string, discordId?: string | null, createdBy?: string | null) {
+  const lines = [
     userBlock(user),
     sep(),
     `**Tier** : \`${tier.toUpperCase()}\``,
-  ].join("\n");
+    `**Duree** : 30 jours`,
+  ];
+
+  if (key) lines.push(`**Cle** : ||\`${key}\`||`);
+  if (discordId) lines.push(`**Discord** : <@${discordId}> (\`${discordId}\`)`);
+
+  if (createdBy) {
+    if (createdBy === "plisio") {
+      lines.push(`**Cree par** : Plisio (paiement auto)`);
+    } else if (createdBy.startsWith("discord:")) {
+      const cid = createdBy.replace("discord:", "");
+      lines.push(`**Cree par** : <@${cid}> (Bot Discord)`);
+    } else if (createdBy.startsWith("admin:")) {
+      lines.push(`**Cree par** : \`${createdBy.replace("admin:", "")}\` (Panel Admin)`);
+    } else {
+      lines.push(`**Cree par** : \`${createdBy}\``);
+    }
+  }
+
+  const desc = lines.join("\n");
 
   sendWebhook({
     title: "\u{1F511} Cle de Licence Activee",
@@ -464,12 +483,14 @@ async function sendBotLogsWebhook(options: WebhookOptions): Promise<void> {
   await sendToWebhook(url, options, "bot-logs");
 }
 
-export function webhookBotGkey(adminTag: string, tier: string, key: string) {
+export function webhookBotGkey(adminTag: string, adminDiscordId: string, tier: string, key: string) {
   const desc = [
     `>>> **Commande Bot**`,
-    `**Admin** : \`${adminTag}\``,
+    `**Admin** : <@${adminDiscordId}> (\`${adminTag}\`)`,
+    `**Discord ID** : \`${adminDiscordId}\``,
     sep(),
     `**Tier** : \`${tier.toUpperCase()}\``,
+    `**Duree** : 30 jours`,
     `**Cle** : ||\`${key}\`||`,
   ].join("\n");
 
@@ -586,6 +607,46 @@ export function webhookBotGeneric(adminTag: string, command: string, details?: s
     title: `\u{2699}\u{FE0F} /${command}`,
     description: desc,
     color: COLORS.info,
+  });
+}
+
+export function webhookBotKeyRedeemed(username: string, uniqueId: number | undefined, discordId: string | null, tier: string, key: string, createdBy: string | null) {
+  const lines = [
+    `>>> **Cle Activee**`,
+    `**Utilisateur** : \`${username}\``,
+    `**ID Unique** : \`#${uniqueId ?? "N/A"}\``,
+  ];
+
+  if (discordId) {
+    lines.push(`**Discord** : <@${discordId}> (\`${discordId}\`)`);
+  } else {
+    lines.push(`**Discord** : Non lie`);
+  }
+
+  lines.push(sep());
+  lines.push(`**Tier** : \`${tier.toUpperCase()}\``);
+  lines.push(`**Duree** : 30 jours`);
+  lines.push(`**Cle** : ||\`${key}\`||`);
+
+  if (createdBy) {
+    if (createdBy === "plisio") {
+      lines.push(`**Cree par** : Plisio (paiement auto)`);
+    } else if (createdBy.startsWith("discord:")) {
+      const cid = createdBy.replace("discord:", "");
+      lines.push(`**Cree par** : <@${cid}> (Bot Discord)`);
+    } else if (createdBy.startsWith("admin:")) {
+      lines.push(`**Cree par** : \`${createdBy.replace("admin:", "")}\` (Panel Admin)`);
+    } else {
+      lines.push(`**Cree par** : \`${createdBy}\``);
+    }
+  } else {
+    lines.push(`**Cree par** : Inconnu`);
+  }
+
+  sendBotLogsWebhook({
+    title: "\u{2705} Cle de Licence Activee",
+    description: lines.join("\n"),
+    color: COLORS.payment,
   });
 }
 

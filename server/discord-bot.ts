@@ -809,7 +809,7 @@ export async function startDiscordBot() {
     if (interaction.commandName === "gkey") {
       try {
         const tier = interaction.options.getString("tier", true) as any;
-        const license = await (storage as any).createLicenseKey(tier);
+        const license = await (storage as any).createLicenseKey(tier, undefined, `discord:${interaction.user.id}`);
         
         const embed = new EmbedBuilder()
           .setColor(0x10b981)
@@ -822,7 +822,7 @@ export async function startDiscordBot() {
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
-        webhookBotGkey(interaction.user.tag, tier, license.key);
+        webhookBotGkey(interaction.user.tag, interaction.user.id, tier, license.key);
       } catch (err) {
         log(`Error generating key: ${err}`, "discord");
         if (!interaction.replied && !interaction.deferred) {

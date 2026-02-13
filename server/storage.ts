@@ -42,7 +42,7 @@ export interface IStorage {
   getVouches(): Promise<Vouch[]>;
   getVouchByDiscordUser(discordUserId: string): Promise<Vouch | undefined>;
   deleteVouch(id: number): Promise<boolean>;
-  createLicenseKey(tier: PlanTier, orderId?: string): Promise<LicenseKey>;
+  createLicenseKey(tier: PlanTier, orderId?: string, createdBy?: string): Promise<LicenseKey>;
   redeemLicenseKey(key: string, userId: string): Promise<{ success: boolean; tier?: PlanTier; message: string }>;
   getLicenseKeys(): Promise<LicenseKey[]>;
   getLicenseKeyByOrder(orderId: string): Promise<LicenseKey | undefined>;
@@ -357,12 +357,12 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async createLicenseKey(tier: PlanTier, orderId?: string): Promise<LicenseKey> {
+  async createLicenseKey(tier: PlanTier, orderId?: string, createdBy?: string): Promise<LicenseKey> {
     const key = `DSC-${tier.toUpperCase()}-${crypto.randomBytes(12).toString("hex").toUpperCase()}`;
     if (orderId) {
       const [created] = await db
         .insert(licenseKeys)
-        .values({ key, tier, orderId })
+        .values({ key, tier, orderId, createdBy: createdBy || null })
         .onConflictDoNothing({ target: licenseKeys.orderId })
         .returning();
       if (!created) {
@@ -373,7 +373,7 @@ export class DatabaseStorage implements IStorage {
     }
     const [created] = await db
       .insert(licenseKeys)
-      .values({ key, tier })
+      .values({ key, tier, createdBy: createdBy || null })
       .returning();
     return created;
   }
