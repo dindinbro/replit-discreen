@@ -492,6 +492,17 @@ export function filterResultsByCriteria(
       }
 
       if (!foundInAllowedField) {
+        for (const [key, val] of Object.entries(row)) {
+          if (key.startsWith("_")) continue;
+          const strVal = String(val ?? "").toLowerCase();
+          if (strVal.includes(searchVal)) {
+            foundInAllowedField = true;
+            break;
+          }
+        }
+      }
+
+      if (!foundInAllowedField) {
         return false;
       }
     }
