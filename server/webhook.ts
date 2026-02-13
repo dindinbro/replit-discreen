@@ -145,35 +145,41 @@ export function webhookExternalProxySearch(user: UserInfo, term: string, resultC
   });
 }
 
-export function webhookLeakosintSearch(user: UserInfo, request: string, resultCount: number) {
+export function webhookLeakosintSearch(user: UserInfo, request: string, resultCount: number, status?: "ok" | "error", errorReason?: string) {
+  const statusIcon = status === "error" ? "\u{1F534}" : "\u{1F7E2}";
+  const statusLabel = status === "error" ? `Erreur (${errorReason || "inconnu"})` : "Fonctionnel";
   const desc = [
     userBlock(user),
     sep(),
     `**Requete** : \`${String(request).slice(0, 200)}\``,
     sep(),
     `**Resultat** : **${resultCount}** trouve(s)`,
+    `**Etat API** : ${statusIcon} ${statusLabel}`,
   ].join("\n");
 
   sendSearchWebhook({
     title: "\u{1F4E1} Recherche LeakOSINT",
     description: desc,
-    color: COLORS.search,
+    color: status === "error" ? COLORS.admin : COLORS.search,
   });
 }
 
-export function webhookDaltonSearch(user: UserInfo, request: string, resultCount: number) {
+export function webhookDaltonSearch(user: UserInfo, request: string, resultCount: number, status?: "ok" | "error", errorReason?: string) {
+  const statusIcon = status === "error" ? "\u{1F534}" : "\u{1F7E2}";
+  const statusLabel = status === "error" ? `Erreur (${errorReason || "inconnu"})` : "Fonctionnel";
   const desc = [
     userBlock(user),
     sep(),
     `**Requete** : \`${String(request).slice(0, 200)}\``,
     sep(),
     `**Resultat** : **${resultCount}** trouve(s)`,
+    `**Etat API** : ${statusIcon} ${statusLabel}`,
   ].join("\n");
 
   sendSearchWebhook({
     title: "\u{1F4E1} Recherche DaltonAPI",
     description: desc,
-    color: COLORS.search,
+    color: status === "error" ? COLORS.admin : COLORS.search,
   });
 }
 

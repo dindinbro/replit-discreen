@@ -2158,20 +2158,26 @@ export async function registerRoutes(
         });
       } catch (fetchErr) {
         console.error("LeakOSINT API fetch error:", fetchErr);
+        const wUser = await buildUserInfo(req);
+        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
         return res.status(502).json({ message: "Impossible de joindre le service LeakOSINT." });
       }
 
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
         console.error("LeakOSINT API error:", response.status, errText.slice(0, 300));
+        const wUser = await buildUserInfo(req);
         if (response.status === 429) {
+          webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
           return res.status(429).json({ message: "Limite de requetes LeakOSINT atteinte. Reessayez plus tard." });
         }
         let errMsg = "Erreur du service LeakOSINT.";
+        let errReason = "Erreur API";
         try {
           const errData = JSON.parse(errText);
-          if (errData.error) errMsg = `LeakOSINT: ${errData.error}`;
+          if (errData.error) { errMsg = `LeakOSINT: ${errData.error}`; errReason = errData.error; }
         } catch {}
+        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", errReason);
         return res.status(502).json({ message: errMsg });
       }
 
@@ -2180,11 +2186,15 @@ export async function registerRoutes(
 
       if (data["Error code"]) {
         console.error("LeakOSINT API error code:", data["Error code"]);
+        const wUser = await buildUserInfo(req);
+        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
         return res.status(502).json({ message: `Erreur LeakOSINT: ${data["Error code"]}` });
       }
 
       if (data["error"]) {
         console.error("LeakOSINT API error:", data["error"]);
+        const wUser = await buildUserInfo(req);
+        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
         return res.status(502).json({ message: `Erreur LeakOSINT: ${data["error"]}` });
       }
 
@@ -2193,6 +2203,8 @@ export async function registerRoutes(
 
       if (!listData && !data["Found"]) {
         console.warn("[leakosint] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
+        const wUser = await buildUserInfo(req);
+        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
         return res.status(502).json({ message: "Reponse inattendue du service LeakOSINT. Contactez un administrateur." });
       } else if (listData) {
         for (const [dbName, dbInfo] of Object.entries(listData)) {
@@ -2207,7 +2219,7 @@ export async function registerRoutes(
       }
 
       const wUser = await buildUserInfo(req);
-      webhookLeakosintSearch(wUser, String(searchRequest), results.length);
+      webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
 
       res.json({
         results,
@@ -2296,20 +2308,26 @@ export async function registerRoutes(
         });
       } catch (fetchErr) {
         console.error("DaltonAPI fetch error:", fetchErr);
+        const wUser = await buildUserInfo(req);
+        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
         return res.status(502).json({ message: "Impossible de joindre le service DaltonAPI." });
       }
 
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
         console.error("DaltonAPI error:", response.status, errText.slice(0, 300));
+        const wUser = await buildUserInfo(req);
         if (response.status === 429) {
+          webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
           return res.status(429).json({ message: "Limite de requetes DaltonAPI atteinte. Reessayez plus tard." });
         }
         let errMsg = "Erreur du service DaltonAPI.";
+        let errReason = "Erreur API";
         try {
           const errData = JSON.parse(errText);
-          if (errData.error) errMsg = `DaltonAPI: ${errData.error}`;
+          if (errData.error) { errMsg = `DaltonAPI: ${errData.error}`; errReason = errData.error; }
         } catch {}
+        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", errReason);
         return res.status(502).json({ message: errMsg });
       }
 
@@ -2318,11 +2336,15 @@ export async function registerRoutes(
 
       if (data["Error code"]) {
         console.error("DaltonAPI error code:", data["Error code"]);
+        const wUser = await buildUserInfo(req);
+        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
         return res.status(502).json({ message: `Erreur DaltonAPI: ${data["Error code"]}` });
       }
 
       if (data["error"]) {
         console.error("DaltonAPI error:", data["error"]);
+        const wUser = await buildUserInfo(req);
+        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
         return res.status(502).json({ message: `Erreur DaltonAPI: ${data["error"]}` });
       }
 
@@ -2331,6 +2353,8 @@ export async function registerRoutes(
 
       if (!listData && !data["Found"]) {
         console.warn("[dalton] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
+        const wUser = await buildUserInfo(req);
+        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
         return res.status(502).json({ message: "Reponse inattendue du service DaltonAPI. Contactez un administrateur." });
       } else if (listData) {
         for (const [dbName, dbInfo] of Object.entries(listData)) {
@@ -2345,7 +2369,7 @@ export async function registerRoutes(
       }
 
       const wUser = await buildUserInfo(req);
-      webhookDaltonSearch(wUser, String(searchRequest), results.length);
+      webhookDaltonSearch(wUser, String(searchRequest), results.length, "ok");
 
       res.json({
         results,
