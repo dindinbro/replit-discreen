@@ -705,6 +705,7 @@ export async function initSearchDatabases(): Promise<void> {
     useRemoteBridge = true;
     console.log(`[searchSqlite] Remote VPS bridge configured: ${remoteBridgeUrl}`);
 
+    let bridgeOnline = false;
     try {
       const healthRes = await fetch(`${remoteBridgeUrl}/health`, {
         signal: AbortSignal.timeout(5000),
@@ -712,13 +713,16 @@ export async function initSearchDatabases(): Promise<void> {
       if (healthRes.ok) {
         const health = await healthRes.json() as { databases: number; names: string[] };
         console.log(`[searchSqlite] VPS bridge online: ${health.databases} database(s) [${health.names?.join(", ")}]`);
+        bridgeOnline = true;
       } else {
         console.warn(`[searchSqlite] VPS bridge health check failed: ${healthRes.status}`);
       }
     } catch (err) {
       console.warn("[searchSqlite] VPS bridge health check failed — will retry on search:", err);
     }
-    return;
+    if (bridgeOnline) return;
+    useRemoteBridge = false;
+    console.log("[searchSqlite] Bridge offline — disabled remote bridge, loading local .db files as fallback...");
   }
 
   const dataDir = getDataDir();
