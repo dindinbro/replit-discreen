@@ -375,6 +375,129 @@ export async function registerRoutes(
     }
   });
 
+  const pendingOAuthStates = new Map<string, { createdAt: number }>();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [state, data] of pendingOAuthStates) {
+      if (now - data.createdAt > 10 * 60 * 1000) pendingOAuthStates.delete(state);
+    }
+  }, 60 * 1000);
+
+  function getTaskBotRedirectUri(req: Request): string {
+    if (process.env.TASK_BOT_REDIRECT_URI) return process.env.TASK_BOT_REDIRECT_URI;
+    const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
+    return `${baseUrl}/api/discord-task/callback`;
+  }
+
+  app.get("/api/discord-task/authorize", (req, res) => {
+    const clientId = process.env.TASK_BOT_CLIENT_ID;
+    if (!clientId) {
+      res.status(503).json({ message: "Task bot not configured" });
+      return;
+    }
+    const state = crypto.randomBytes(32).toString("hex");
+    pendingOAuthStates.set(state, { createdAt: Date.now() });
+    const redirectUri = getTaskBotRedirectUri(req);
+    const scope = "identify guilds.join";
+    const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+    res.redirect(url);
+  });
+
+  app.get("/api/discord-task/callback", async (req, res) => {
+    const { code, state } = req.query;
+    if (!code || typeof code !== "string") {
+      res.status(400).send("Code manquant.");
+      return;
+    }
+    if (!state || typeof state !== "string" || !pendingOAuthStates.has(state)) {
+      res.status(403).send("Etat invalide ou expire.");
+      return;
+    }
+    pendingOAuthStates.delete(state);
+
+    const clientId = process.env.TASK_BOT_CLIENT_ID;
+    const clientSecret = process.env.TASK_BOT_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      res.status(503).send("Task bot not configured.");
+      return;
+    }
+
+    const redirectUri = getTaskBotRedirectUri(req);
+
+    try {
+      const tokenRes = await fetch("https://discord.com/api/v10/oauth2/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      });
+
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text();
+        console.error("Discord OAuth token exchange failed:", errText);
+        res.status(400).send("Erreur d'authentification Discord.");
+        return;
+      }
+
+      const tokenData: any = await tokenRes.json();
+
+      const userRes = await fetch("https://discord.com/api/v10/users/@me", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+
+      if (!userRes.ok) {
+        res.status(400).send("Impossible de recuperer les informations Discord.");
+        return;
+      }
+
+      const userData: any = await userRes.json();
+      const discordId = userData.id;
+      const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+      const { discordOAuthTokens } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+
+      const existing = await db.select().from(discordOAuthTokens).where(eq(discordOAuthTokens.discordId, discordId));
+      if (existing.length > 0) {
+        await db.update(discordOAuthTokens)
+          .set({
+            accessToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token || null,
+            expiresAt,
+            scope: tokenData.scope,
+            updatedAt: new Date(),
+          })
+          .where(eq(discordOAuthTokens.discordId, discordId));
+      } else {
+        await db.insert(discordOAuthTokens).values({
+          discordId,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || null,
+          expiresAt,
+          scope: tokenData.scope,
+        });
+      }
+
+      res.send(`
+        <!DOCTYPE html>
+        <html><head><title>Autorisation reussie</title>
+        <style>body{background:#0a0a0a;color:#10b981;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}
+        .box{text-align:center;padding:2rem;border:1px solid #10b981;border-radius:8px;}
+        h1{font-size:1.5rem;}p{color:#9ca3af;}</style></head>
+        <body><div class="box"><h1>Autorisation reussie</h1><p>Votre compte Discord (${userData.username}) a ete autorise.<br>Vous pouvez fermer cette page.</p></div></body></html>
+      `);
+    } catch (err) {
+      console.error("Discord Task OAuth callback error:", err);
+      res.status(500).send("Erreur interne.");
+    }
+  });
+
   // GET /api/profile/2fa/status — check if 2FA is enabled
   app.get("/api/profile/2fa/status", requireAuth, async (req, res) => {
     try {

@@ -433,4 +433,17 @@ export const DOF_TEMPLATES: Record<string, { tier: DofTier; pseudo: string; desc
   empty: [],
 };
 
+export const discordOAuthTokens = pgTable("discord_oauth_tokens", {
+  id: serial("id").primaryKey(),
+  discordId: text("discord_id").notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  scope: text("scope"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type DiscordOAuthToken = typeof discordOAuthTokens.$inferSelect;
+
 export * from "./models/chat";

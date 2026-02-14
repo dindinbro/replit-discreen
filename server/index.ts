@@ -28,6 +28,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startDiscordBot } from "./discord-bot";
+import { startTaskBot } from "./task-bot";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { webhookSubscriptionExpired } from "./webhook";
@@ -200,6 +201,9 @@ app.use((req, res, next) => {
   } else {
     startDiscordBot().catch((err) => {
       log(`Discord bot failed to start: ${err}`, "discord");
+    });
+    startTaskBot().catch((err) => {
+      log(`Task bot failed to start: ${err}`, "task-bot");
     });
   }
 
