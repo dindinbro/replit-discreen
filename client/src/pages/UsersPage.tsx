@@ -44,6 +44,12 @@ const SECONDARY_PROFILES: WantedProfile[] = [
     description: "BDG BDB BDDB",
     images: ["https://cdn.discordapp.com/avatars/1457570822565793843/34b9e08128ff24080b5611397e499cf4.webp?size=1024"],
   },
+  {
+    pseudo: "GKM",
+    disc: "Disque de Platine",
+    description: "Grand hagar",
+    images: ["https://cdn.discordapp.com/avatars/788515048569307154/0212df4a29f89e1bdbd3bdb77b114ce6.webp?size=1024"],
+  },
 ];
 
 interface LabelProfile {
@@ -65,7 +71,7 @@ const LABEL_PROFILES: LabelProfile[] = [
   },
   {
     pseudo: "Hat Project",
-    description: "GKM, PSK",
+    description: "",
     images: ["https://cdn.discordapp.com/attachments/1458942097716547796/1472085911247392789/image.png?ex=69914a57&is=698ff8d7&hm=23f93687152de78c5d06620793ceed80bca6343153fcd6ea0c42a6e5945ec128&"],
   },
 ];
