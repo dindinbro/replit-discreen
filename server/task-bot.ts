@@ -57,6 +57,16 @@ export async function startTaskBot() {
           .setRequired(true)
       )
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+      .setName("users")
+      .setDescription("Voir la liste des utilisateurs ayant autorise le bot")
+      .addIntegerOption((opt) =>
+        opt.setName("page")
+          .setDescription("Numero de la page")
+          .setMinValue(1)
+          .setRequired(false)
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   ];
 
   const rest = new REST().setToken(token);
@@ -86,6 +96,10 @@ export async function startTaskBot() {
 
     if (interaction.commandName === "recup") {
       await handleRecup(interaction);
+    }
+
+    if (interaction.commandName === "users") {
+      await handleUsers(interaction);
     }
   });
 
@@ -233,6 +247,57 @@ async function handleRecup(interaction: any) {
       } else {
         await interaction.reply({ content: "Erreur lors de l'envoi du message.", ephemeral: true });
       }
+    } catch {}
+  }
+}
+
+async function handleUsers(interaction: any) {
+  try {
+    await interaction.deferReply({ ephemeral: true });
+
+    const tokens = await db.select().from(discordOAuthTokens);
+    if (tokens.length === 0) {
+      await interaction.editReply({ content: "Aucun utilisateur n'a autorise le bot." });
+      return;
+    }
+
+    const PAGE_SIZE = 10;
+    const totalPages = Math.ceil(tokens.length / PAGE_SIZE);
+    const page = Math.min(interaction.options.getInteger("page") || 1, totalPages);
+    const start = (page - 1) * PAGE_SIZE;
+    const pageTokens = tokens.slice(start, start + PAGE_SIZE);
+
+    const botToken = process.env.TASK_BOT_TOKEN!;
+    const lines: string[] = [];
+
+    for (const t of pageTokens) {
+      try {
+        const userRes = await fetch(`https://discord.com/api/v10/users/${t.discordId}`, {
+          headers: { Authorization: `Bot ${botToken}` },
+        });
+        if (userRes.ok) {
+          const userData: any = await userRes.json();
+          lines.push(`\`${t.discordId}\` - **${userData.username}**`);
+        } else {
+          lines.push(`\`${t.discordId}\` - *Utilisateur inconnu*`);
+        }
+      } catch {
+        lines.push(`\`${t.discordId}\` - *Erreur*`);
+      }
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x10b981)
+      .setTitle("Utilisateurs autorises")
+      .setDescription(lines.join("\n"))
+      .setFooter({ text: `Page ${page}/${totalPages} - ${tokens.length} utilisateur(s) au total` })
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+  } catch (err) {
+    log(`Users command error: ${err}`, "task-bot");
+    try {
+      await interaction.editReply({ content: "Erreur lors de la recuperation des utilisateurs." });
     } catch {}
   }
 }
