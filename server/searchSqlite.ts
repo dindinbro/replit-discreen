@@ -427,6 +427,83 @@ function getFieldCI(r: Record<string, string>, ...keys: string[]): string {
   return "";
 }
 
+const sourceHeaderCache: Record<string, string[]> = {};
+
+function buildHeaderCache(db: Database.Database, tableName: string, isFts: boolean): void {
+  try {
+    const sourceCol = isFts ? "source" : "source";
+    const lineCol = isFts ? "line" : "line";
+    const sources = db.prepare(
+      `SELECT DISTINCT "${sourceCol}" FROM "${tableName}" WHERE "${sourceCol}" IS NOT NULL LIMIT 500`
+    ).all() as Record<string, string>[];
+
+    for (const row of sources) {
+      const src = row[sourceCol] || row["Source"];
+      if (!src || sourceHeaderCache[src]) continue;
+      try {
+        const firstRow = db.prepare(
+          `SELECT "${lineCol}" FROM "${tableName}" WHERE "${sourceCol}" = ? AND rownum = 1 LIMIT 1`
+        ).get(src) as Record<string, string> | undefined;
+        if (firstRow) {
+          const headerLine = firstRow[lineCol] || firstRow["Line"] || firstRow["data"] || "";
+          if (headerLine && headerLine.includes("|")) {
+            const headers = headerLine.split("|").map(h => h.trim().toLowerCase());
+            const looksLikeHeader = headers.every(h => /^[a-z_\s]+$/.test(h) && h.length < 40);
+            if (looksLikeHeader && headers.length >= 2) {
+              sourceHeaderCache[src] = headers;
+            }
+          }
+        }
+      } catch {}
+    }
+    console.log(`[searchSqlite] Header cache built: ${Object.keys(sourceHeaderCache).length} sources with headers`);
+  } catch (err: any) {
+    console.warn(`[searchSqlite] Could not build header cache:`, err?.message);
+  }
+}
+
+const HEADER_FIELD_MAP: Record<string, string> = {
+  id: "identifiant", email: "email", mail: "email", "e-mail": "email",
+  first_name: "prenom", firstname: "prenom", prenom: "prenom", prénom: "prenom",
+  last_name: "nom", lastname: "nom", nom: "nom", name: "nom", username: "identifiant",
+  phone: "telephone", telephone: "telephone", tel: "telephone", mobile: "telephone",
+  address: "adresse", adresse: "adresse", addr: "adresse", street: "adresse",
+  city: "ville", ville: "ville", zip: "code_postal", zipcode: "code_postal",
+  code_postal: "code_postal", postal_code: "code_postal", postcode: "code_postal",
+  password: "mot_de_passe", pwd: "mot_de_passe", pass: "mot_de_passe", mot_de_passe: "mot_de_passe",
+  hash: "hash", ip: "ip", ip_address: "ip",
+  country: "pays", pays: "pays",
+  created_at: "date_creation", date: "date", dob: "date_naissance", birthdate: "date_naissance",
+  total_spent: "total_depense", currency: "devise",
+  url: "url", website: "url", site: "url",
+  company: "entreprise", societe: "entreprise",
+  gender: "genre", sexe: "genre",
+  login: "identifiant", user: "identifiant", pseudo: "identifiant",
+};
+
+function parseLineWithHeaders(line: string, headers: string[], source: string): Record<string, string> {
+  const parts = line.split("|").map(p => p.trim());
+  const parsed: Record<string, string> = {};
+
+  for (let i = 0; i < headers.length && i < parts.length; i++) {
+    const headerKey = headers[i];
+    const value = parts[i];
+    if (!value || value === "null" || value === "NULL" || value === "") continue;
+    const mappedKey = HEADER_FIELD_MAP[headerKey] || headerKey;
+    parsed[mappedKey] = value;
+  }
+
+  for (let i = headers.length; i < parts.length; i++) {
+    const value = parts[i]?.trim();
+    if (value && value !== "null" && value !== "NULL") {
+      parsed[`champ_${i + 1}`] = value;
+    }
+  }
+
+  if (source) parsed["source"] = source;
+  return parsed;
+}
+
 function processResults(rows: Record<string, string>[], sourceKey: string): Record<string, unknown>[] {
   return rows
     .map((r) => {
@@ -438,6 +515,16 @@ function processResults(rows: Record<string, string>[], sourceKey: string): Reco
       }
 
       if (line && typeof line === "string" && line.length > 0) {
+        const headers = source ? sourceHeaderCache[source] : undefined;
+        if (headers && line.includes("|")) {
+          const parts = line.split("|").map(p => p.trim().toLowerCase());
+          const isHeaderRow = parts.length >= 2 && parts.every(p => /^[a-z_\s]*$/.test(p));
+          if (isHeaderRow) return null;
+
+          const parsed = parseLineWithHeaders(line, headers, source);
+          return { _source: sourceKey, _raw: line, ...parsed };
+        }
+
         const parsed = parseLineField(line, source);
         return { _source: sourceKey, _raw: line, ...parsed };
       }
@@ -885,4 +972,12 @@ export async function initSearchDatabases(): Promise<void> {
     delete SOURCE_MAP[k];
   }
   console.log(`[searchSqlite] Active databases: ${Object.keys(SOURCE_MAP).join(", ") || "none"}`);
+
+  for (const [key, info] of Object.entries(dbCache)) {
+    try {
+      buildHeaderCache(info.db, info.tableName, info.isFts);
+    } catch (err: any) {
+      console.warn(`[searchSqlite] Header cache build failed for ${key}:`, err?.message);
+    }
+  }
 }
