@@ -62,8 +62,19 @@ export async function startLinksBot() {
     log(`Links bot command registration error: ${err}`, "links-bot");
   }
 
-  linksClient.once("ready", () => {
+  linksClient.once("ready", async () => {
     log(`Links bot ready as ${linksClient?.user?.tag}`, "links-bot");
+    try {
+      if (linksClient?.user) {
+        const rest = new REST().setToken(token);
+        await rest.patch(Routes.user(), {
+          body: { bio: "/links en MP pour le rôle Customer !" },
+        });
+        log("Links bot bio updated", "links-bot");
+      }
+    } catch (bioErr) {
+      log(`Could not update bot bio: ${bioErr}`, "links-bot");
+    }
   });
 
   linksClient.on("interactionCreate", async (interaction) => {
