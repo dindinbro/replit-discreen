@@ -1,0 +1,236 @@
+{
+  "nav": {
+    "home": "Home",
+    "search": "Search",
+    "reviews": "Reviews",
+    "dof": "D.O.F",
+    "pricing": "Pricing",
+    "contact": "Contact",
+    "darkMode": "Dark mode",
+    "lightMode": "Light mode"
+  },
+  "header": {
+    "onlineUsers": "{{count}} user online",
+    "onlineUsers_plural": "{{count}} users online",
+    "frozen": "Account frozen",
+    "operational": "Operational",
+    "myAccount": "My account",
+    "apiKeys": "API Keys",
+    "documentation": "Documentation",
+    "admin": "Administration",
+    "signOut": "Sign out"
+  },
+  "landing": {
+    "badge": "Data Intelligence Platform",
+    "title1": "Explore the Power of",
+    "title2": "Discreen",
+    "subtitle": "Access comprehensive databases, powerful search tools and advanced analytics to uncover information across Discord, FiveM and other platforms in a centralized hub.",
+    "joinPrefix": "Join",
+    "usersSuffix": "users searching across",
+    "dataSuffix": "of data",
+    "startSearch": "Start Searching",
+    "viewPricing": "View Pricing",
+    "needHelp": "Need help?",
+    "joinDiscord": "Join our official Discord",
+    "searchPlaceholder": "Search...",
+    "disclaimer": "Access over 15 billion public records. By using this service, you agree to our",
+    "terms": "Terms of Service",
+    "and": "and",
+    "privacy": "Privacy Policy",
+    "authRequired": "Authentication required",
+    "authDesc": "Access to search tools is restricted. Please log in or create an account to view real-time data.",
+    "signUp": "Sign up",
+    "filters": {
+      "email": "Email",
+      "username": "Username",
+      "phone": "Phone",
+      "ip": "IP Address",
+      "discord": "Discord ID"
+    },
+    "placeholders": {
+      "email": "Enter an email...",
+      "username": "Enter a username...",
+      "phone": "Enter a phone number...",
+      "ip": "Enter an IP address...",
+      "discord": "Enter a Discord ID..."
+    },
+    "features": {
+      "databases": "Databases",
+      "databasesDesc": "Access millions of indexed and regularly updated records.",
+      "advancedSearch": "Advanced Search",
+      "advancedSearchDesc": "Multi-criteria filters for precise and fast searching.",
+      "secure": "Secure",
+      "secureDesc": "Robust authentication and role-based access control.",
+      "fast": "Fast",
+      "fastDesc": "FTS5 search engine optimized for instant results."
+    }
+  },
+  "pricing": {
+    "badge": "Pricing",
+    "title": "Choose your",
+    "titleHighlight": "Plan",
+    "subtitle": "Unlock powerful data intelligence tools with our flexible subscriptions. All plans include daily credit renewal.",
+    "popular": "Popular",
+    "free": "Free",
+    "perMonth": "/month",
+    "startNow": "Get Started",
+    "subscribe": "Subscribe",
+    "loading": "Loading...",
+    "daysRemaining": "{{count}} day remaining",
+    "daysRemaining_plural": "{{count}} days remaining",
+    "highlights": {
+      "dailyRenewal": "Daily renewal",
+      "allDatabases": "All databases included",
+      "paramSearch": "Parametric search",
+      "securePayments": "Secure payments"
+    },
+    "redeem": {
+      "title": "Already have a key?",
+      "subtitle": "Redeem it in your subscription settings",
+      "button": "Redeem",
+      "dialogTitle": "Redeem a key",
+      "dialogDesc": "Enter your license key to activate your subscription.",
+      "cancel": "Cancel",
+      "activate": "Activate"
+    },
+    "plans": {
+      "free": {
+        "name": "Free",
+        "subtitle": "To get started",
+        "features": ["5 searches per day", "Limited databases", "Basic search", "Limited results"]
+      },
+      "vip": {
+        "name": "VIP",
+        "subtitle": "For regular users",
+        "features": ["50 searches per day", "FiveM Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock"]
+      },
+      "pro": {
+        "name": "PRO",
+        "subtitle": "Maximum power",
+        "features": ["200 searches per day", "FiveM Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock", "Wanted search engine", "Referral program"]
+      },
+      "business": {
+        "name": "Business",
+        "subtitle": "For professionals",
+        "features": ["500 searches per day", "FiveM Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock", "Wanted search engine", "Referral program", "Priority Support"]
+      },
+      "api": {
+        "name": "API",
+        "subtitle": "Unlimited search + resale",
+        "features": ["Unlimited searches", "Dedicated API key", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock", "Wanted search engine", "Resale capability", "API endpoint /api/v1/search", "Premium 24/7 support"]
+      }
+    },
+    "errors": {
+      "mustBeLoggedIn": "You must be logged in to subscribe.",
+      "mustBeLoggedInRedeem": "You must be logged in to redeem a key.",
+      "freePlan": "You are already using the free plan by default.",
+      "invoiceError": "Error creating invoice",
+      "keyActivated": "Key activated",
+      "invalidKey": "Invalid key",
+      "error": "Error",
+      "redeemError": "Error during redemption"
+    }
+  },
+  "auth": {
+    "loginTitle": "Log in to access search",
+    "registerTitle": "Create an account to get started",
+    "email": "Email address",
+    "password": "Password",
+    "login": "Log in",
+    "register": "Create account",
+    "or": "or",
+    "discordLogin": "Log in with Discord",
+    "noAccount": "Don't have an account?",
+    "createAccount": "Create an account",
+    "hasAccount": "Already have an account?",
+    "signIn": "Log in"
+  },
+  "contact": {
+    "badge": "Contact",
+    "title": "Get in",
+    "titleHighlight": "Touch",
+    "subtitle": "For any questions, suggestions or support requests, join our Discord server or our Telegram.",
+    "discord": "Discord",
+    "discordDesc": "Fast support and community",
+    "join": "Join",
+    "telegram": "Telegram",
+    "telegramDesc": "Coming soon",
+    "soon": "Soon",
+    "blacklist": "Blacklist Request",
+    "blacklistDesc": "Want your data removed? Submit a request.",
+    "makeRequest": "Make a request",
+    "infoRequest": "Information Request",
+    "infoRequestDesc": "Looking for information? Submit a request."
+  },
+  "search": {
+    "title": "Search",
+    "badge": "Search Engine",
+    "tabs": {
+      "internal": "Internal",
+      "exiftool": "ExifTool",
+      "phone": "Phone",
+      "geoip": "GeoIP",
+      "nir": "NIR Decoder",
+      "xeuledoc": "Google OSINT",
+      "sherlock": "Sherlock",
+      "fivem": "FiveM",
+      "wanted": "Wanted"
+    },
+    "criteria": "Search criteria",
+    "addCriterion": "Add criterion",
+    "searchButton": "Search",
+    "searching": "Searching...",
+    "results": "Results",
+    "noResults": "No results",
+    "source": "Source",
+    "total": "Total",
+    "page": "Page",
+    "quotaUsed": "Quota used",
+    "quotaRemaining": "Quota remaining",
+    "requiresVip": "Requires VIP minimum",
+    "requiresPro": "Requires PRO minimum",
+    "dailyQuota": "Daily quota",
+    "unlimited": "Unlimited",
+    "exiftool": {
+      "title": "ExifTool - Metadata Extraction",
+      "desc": "Extract hidden metadata from your files (images, PDF, documents). Discover information like camera model, GPS coordinates, creation date, software used and more.",
+      "upload": "Drop a file or click to select",
+      "uploadHint": "Images (JPEG, PNG, TIFF, HEIC), PDF, Office Documents",
+      "maxSize": "Maximum size: 20 MB",
+      "analyzing": "Analyzing...",
+      "noMetadata": "No metadata found in this file.",
+      "fileName": "File name",
+      "fileSize": "File size",
+      "metadata": "Metadata",
+      "category": {
+        "camera": "Camera",
+        "location": "Location",
+        "datetime": "Date & Time",
+        "software": "Software",
+        "image": "Image",
+        "document": "Document",
+        "other": "Other"
+      }
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "language": {
+    "fr": "Francais",
+    "en": "English"
+  }
+}

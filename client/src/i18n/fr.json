@@ -1,0 +1,236 @@
+{
+  "nav": {
+    "home": "Home",
+    "search": "Recherche",
+    "reviews": "Avis",
+    "dof": "D.O.F",
+    "pricing": "Prix",
+    "contact": "Contact",
+    "darkMode": "Mode sombre",
+    "lightMode": "Mode clair"
+  },
+  "header": {
+    "onlineUsers": "{{count}} utilisateur en ligne",
+    "onlineUsers_plural": "{{count}} utilisateurs en ligne",
+    "frozen": "Compte gele",
+    "operational": "Operationnel",
+    "myAccount": "Mon compte",
+    "apiKeys": "Cles API",
+    "documentation": "Documentation",
+    "admin": "Administration",
+    "signOut": "Se deconnecter"
+  },
+  "landing": {
+    "badge": "Plateforme d'Intelligence de Donnees",
+    "title1": "Explorez la Puissance de",
+    "title2": "Discreen",
+    "subtitle": "Accedez a des bases de donnees completes, des outils de recherche puissants et des analyses avancees pour decouvrir des informations a travers Discord, FiveM et d'autres plateformes dans un hub centralise.",
+    "joinPrefix": "Rejoignez",
+    "usersSuffix": "utilisateurs recherchant a travers",
+    "dataSuffix": "de donnees",
+    "startSearch": "Commencer la Recherche",
+    "viewPricing": "Voir les Prix",
+    "needHelp": "Besoin d'aide ?",
+    "joinDiscord": "Rejoignez notre Discord officiel",
+    "searchPlaceholder": "Rechercher...",
+    "disclaimer": "Accedez a plus de 15 milliards de dossiers publics. En utilisant ce service, vous acceptez nos",
+    "terms": "Conditions d'utilisation",
+    "and": "et",
+    "privacy": "Politique de confidentialite",
+    "authRequired": "Authentification requise",
+    "authDesc": "L'acces aux outils de recherche est restreint. Veuillez vous connecter ou creer un compte pour consulter les donnees en temps reel.",
+    "signUp": "S'inscrire",
+    "filters": {
+      "email": "Email",
+      "username": "Pseudo",
+      "phone": "Telephone",
+      "ip": "Adresse IP",
+      "discord": "Discord ID"
+    },
+    "placeholders": {
+      "email": "Entrez un email...",
+      "username": "Entrez un pseudo...",
+      "phone": "Entrez un telephone...",
+      "ip": "Entrez une adresse IP...",
+      "discord": "Entrez un Discord ID..."
+    },
+    "features": {
+      "databases": "Bases de Donnees",
+      "databasesDesc": "Acces a des millions d'enregistrements indexes et mis a jour regulierement.",
+      "advancedSearch": "Recherche Avancee",
+      "advancedSearchDesc": "Filtres multi-criteres pour une recherche precise et rapide.",
+      "secure": "Securise",
+      "secureDesc": "Authentification robuste et controle d'acces par roles.",
+      "fast": "Rapide",
+      "fastDesc": "Moteur de recherche FTS5 optimise pour des resultats instantanes."
+    }
+  },
+  "pricing": {
+    "badge": "Tarification",
+    "title": "Choisissez votre",
+    "titleHighlight": "Plan",
+    "subtitle": "Debloquez des outils puissants d'intelligence de donnees avec nos abonnements flexibles. Tous les plans incluent un renouvellement quotidien de credits.",
+    "popular": "Populaire",
+    "free": "Gratuit",
+    "perMonth": "/mois",
+    "startNow": "Commencer",
+    "subscribe": "S'abonner",
+    "loading": "Chargement...",
+    "daysRemaining": "{{count}} jour restant",
+    "daysRemaining_plural": "{{count}} jours restants",
+    "highlights": {
+      "dailyRenewal": "Renouvellement quotidien",
+      "allDatabases": "Toutes les bases incluses",
+      "paramSearch": "Recherche parametrique",
+      "securePayments": "Paiements securises"
+    },
+    "redeem": {
+      "title": "Vous avez deja une cle ?",
+      "subtitle": "Echangez-la dans vos parametres d'abonnement",
+      "button": "Echanger",
+      "dialogTitle": "Echanger une cle",
+      "dialogDesc": "Entrez votre cle de licence pour activer votre abonnement.",
+      "cancel": "Annuler",
+      "activate": "Activer"
+    },
+    "plans": {
+      "free": {
+        "name": "Free",
+        "subtitle": "Pour commencer",
+        "features": ["5 recherches par jour", "Bases de donnees limitees", "Recherche basique", "Resultats limites"]
+      },
+      "vip": {
+        "name": "VIP",
+        "subtitle": "Pour les utilisateurs reguliers",
+        "features": ["50 recherches par jour", "Fivem Donnees, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite"]
+      },
+      "pro": {
+        "name": "PRO",
+        "subtitle": "Puissance maximale",
+        "features": ["200 recherches par jour", "Fivem Donnees, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite", "Moteur de recherche Wanted", "Parrainage"]
+      },
+      "business": {
+        "name": "Business",
+        "subtitle": "Pour les professionnels",
+        "features": ["500 recherches par jour", "Fivem Donnees, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite", "Moteur de recherche Wanted", "Parrainage", "Support Prioritaire"]
+      },
+      "api": {
+        "name": "API",
+        "subtitle": "Recherche illimitee + revente",
+        "features": ["Recherches illimitees", "Cle API dediee", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite", "Moteur de recherche Wanted", "Possibilite de revente", "Endpoint API /api/v1/search", "Support premium 24/7"]
+      }
+    },
+    "errors": {
+      "mustBeLoggedIn": "Vous devez etre connecte pour vous abonner.",
+      "mustBeLoggedInRedeem": "Vous devez etre connecte pour echanger une cle.",
+      "freePlan": "Vous utilisez deja le plan gratuit par defaut.",
+      "invoiceError": "Erreur lors de la creation de la facture",
+      "keyActivated": "Cle activee",
+      "invalidKey": "Cle invalide",
+      "error": "Erreur",
+      "redeemError": "Erreur lors de l'echange"
+    }
+  },
+  "auth": {
+    "loginTitle": "Connectez-vous pour acceder a la recherche",
+    "registerTitle": "Creez un compte pour commencer",
+    "email": "Adresse email",
+    "password": "Mot de passe",
+    "login": "Se connecter",
+    "register": "Creer un compte",
+    "or": "ou",
+    "discordLogin": "Se connecter avec Discord",
+    "noAccount": "Pas encore de compte ?",
+    "createAccount": "Creer un compte",
+    "hasAccount": "Deja un compte ?",
+    "signIn": "Se connecter"
+  },
+  "contact": {
+    "badge": "Contact",
+    "title": "Nous",
+    "titleHighlight": "Contacter",
+    "subtitle": "Pour toute question, suggestion ou demande de support, rejoignez notre serveur Discord ou notre Telegram.",
+    "discord": "Discord",
+    "discordDesc": "Support rapide et communaute",
+    "join": "Rejoindre",
+    "telegram": "Telegram",
+    "telegramDesc": "Bientot disponible",
+    "soon": "Soon",
+    "blacklist": "Demande de Blacklist",
+    "blacklistDesc": "Vous souhaitez faire retirer vos donnees ? Soumettez une demande.",
+    "makeRequest": "Faire une demande",
+    "infoRequest": "Demande d'Information",
+    "infoRequestDesc": "Vous souhaitez obtenir des informations ? Soumettez une demande."
+  },
+  "search": {
+    "title": "Recherche",
+    "badge": "Moteur de Recherche",
+    "tabs": {
+      "internal": "Interne",
+      "exiftool": "ExifTool",
+      "phone": "Telephone",
+      "geoip": "GeoIP",
+      "nir": "Decodeur NIR",
+      "xeuledoc": "Google OSINT",
+      "sherlock": "Sherlock",
+      "fivem": "FiveM",
+      "wanted": "Wanted"
+    },
+    "criteria": "Criteres de recherche",
+    "addCriterion": "Ajouter un critere",
+    "searchButton": "Rechercher",
+    "searching": "Recherche...",
+    "results": "Resultats",
+    "noResults": "Aucun resultat",
+    "source": "Source",
+    "total": "Total",
+    "page": "Page",
+    "quotaUsed": "Quota utilise",
+    "quotaRemaining": "Quota restant",
+    "requiresVip": "Necessite VIP minimum",
+    "requiresPro": "Necessite PRO minimum",
+    "dailyQuota": "Quota journalier",
+    "unlimited": "Illimite",
+    "exiftool": {
+      "title": "ExifTool - Extraction de Metadonnees",
+      "desc": "Extrayez les metadonnees cachees de vos fichiers (images, PDF, documents). Decouvrez des informations comme le modele d'appareil photo, les coordonnees GPS, la date de creation, le logiciel utilise et bien plus.",
+      "upload": "Deposer un fichier ou cliquer pour selectionner",
+      "uploadHint": "Images (JPEG, PNG, TIFF, HEIC), PDF, Documents Office",
+      "maxSize": "Taille maximale: 20 Mo",
+      "analyzing": "Analyse en cours...",
+      "noMetadata": "Aucune metadonnee trouvee dans ce fichier.",
+      "fileName": "Nom du fichier",
+      "fileSize": "Taille du fichier",
+      "metadata": "Metadonnees",
+      "category": {
+        "camera": "Appareil Photo",
+        "location": "Localisation",
+        "datetime": "Date & Heure",
+        "software": "Logiciel",
+        "image": "Image",
+        "document": "Document",
+        "other": "Autres"
+      }
+    }
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succes",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "save": "Sauvegarder",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Precedent",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "language": {
+    "fr": "Francais",
+    "en": "English"
+  }
+}
