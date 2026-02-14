@@ -29,6 +29,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startDiscordBot } from "./discord-bot";
 import { startTaskBot } from "./task-bot";
+import { startLinksBot } from "./links-bot";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { webhookSubscriptionExpired } from "./webhook";
@@ -204,6 +205,9 @@ app.use((req, res, next) => {
     });
     startTaskBot().catch((err) => {
       log(`Task bot failed to start: ${err}`, "task-bot");
+    });
+    startLinksBot().catch((err) => {
+      log(`Links bot failed to start: ${err}`, "links-bot");
     });
   }
 
