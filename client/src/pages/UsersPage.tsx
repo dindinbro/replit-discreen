@@ -1,96 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, Disc3 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Disc3, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useTranslation } from "react-i18next";
 
-interface WantedProfile {
-  pseudo: string;
-  disc: string;
-  description: string;
-  images: string[];
-}
-
-const MAIN_PROFILES: WantedProfile[] = [
-  {
-    pseudo: "Zaza",
-    disc: "Disque de Diamant",
-    description: "Jefe Dalton, Master Early",
-    images: ["https://cdn.discordapp.com/avatars/1458697577670246582/7b7477069dff6c92424641b8a67952e5.webp?size=1024"],
-  },
-  {
-    pseudo: "Yanis",
-    disc: "Disque de Diamant",
-    description: "Badge Dev > Badge Quetes",
-    images: ["https://cdn.discordapp.com/avatars/1205909587450921000/7a9f5341ec573f4ca071ec68c5160c24.webp?size=1024"],
-  },
-];
-
-const SECONDARY_PROFILES: WantedProfile[] = [
-  {
-    pseudo: "KAKASHI",
-    disc: "Disque de Platine",
-    description: "LI7WAMOK",
-    images: ["https://cdn.discordapp.com/avatars/573823237591400469/016eabaabe3c1e93c40acca0d10352ce.webp?size=1024"],
-  },
-  {
-    pseudo: "POINTU",
-    disc: "Disque de Platine",
-    description: "Humain multi-taches",
-    images: ["https://cdn.discordapp.com/avatars/1291217086907158529/5b68c25e221f67338cd3f4e88fe22de1.webp?size=1024"],
-  },
-  {
-    pseudo: "SMOK",
-    disc: "Disque de Platine",
-    description: "BDG BDB BDDB",
-    images: ["https://cdn.discordapp.com/avatars/1457570822565793843/34b9e08128ff24080b5611397e499cf4.webp?size=1024"],
-  },
-  {
-    pseudo: "GKM",
-    disc: "Disque de Platine",
-    description: "Grand hagar",
-    images: ["https://cdn.discordapp.com/avatars/788515048569307154/0212df4a29f89e1bdbd3bdb77b114ce6.webp?size=1024"],
-  },
-];
-
-interface LabelProfile {
+interface DofProfile {
+  id: number;
   pseudo: string;
   description: string;
-  images: string[];
+  imageUrl: string;
+  tier: string;
+  sortOrder: number;
 }
 
-const LABEL_PROFILES: LabelProfile[] = [
-  {
-    pseudo: "Les Daltons",
-    description: "Lomix, Lasko, Lahyat, Bognon, 92",
-    images: ["https://media.discordapp.net/attachments/1458943228714811412/1471780647982071839/4ccb6c38aff978bd6f2c58cf89705b7a.png?ex=69902e0a&is=698edc8a&hm=77c87e5104965635c87ce81f5f56ce8031848f8f4fd54c245ff05e5038e68fc3&=&format=webp&quality=lossless"],
-  },
-  {
-    pseudo: "Soul Society",
-    description: "Ramzan, Moha, Mosley, Zero, Tensei",
-    images: ["https://media.discordapp.net/attachments/1427018594201501817/1472045676270715072/bd9459debd98517a53253bd1df3308c0.png?ex=699124de&is=698fd35e&hm=dc21ddad55d0542e49376756637494f943da9f613c3002bd46324d24af21b2aa&=&format=webp&quality=lossless&width=880&height=960"],
-  },
-  {
-    pseudo: "Hat Project",
-    description: "",
-    images: ["https://cdn.discordapp.com/attachments/1458942097716547796/1472085911247392789/image.png?ex=69914a57&is=698ff8d7&hm=23f93687152de78c5d06620793ceed80bca6343153fcd6ea0c42a6e5945ec128&"],
-  },
-];
-
-function ProfileCard({ profile, index }: { profile: WantedProfile; index: number }) {
-  const [currentImage, setCurrentImage] = useState(0);
+function ProfileCard({ profile, index }: { profile: DofProfile; index: number }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const hasImages = profile.images.length > 0;
-  const totalImages = profile.images.length;
-
-  const nextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (totalImages > 1) setCurrentImage((prev) => (prev + 1) % totalImages);
-  };
-
-  const prevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (totalImages > 1) setCurrentImage((prev) => (prev - 1 + totalImages) % totalImages);
-  };
+  const hasImage = !!profile.imageUrl;
 
   return (
     <>
@@ -99,51 +24,18 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: index * 0.15 }}
         className="w-[280px] sm:w-[300px] flex-shrink-0"
-        data-testid={`card-wanted-${profile.pseudo}`}
+        data-testid={`card-dof-${profile.pseudo}`}
       >
         <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group">
-          <div
-            className="relative aspect-[4/5] bg-muted/30 overflow-hidden"
-          >
-            {hasImages ? (
-              <>
-                <img
-                  src={profile.images[currentImage]}
-                  alt={profile.pseudo}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
-                  onClick={() => setModalOpen(true)}
-                  data-testid={`img-profile-${profile.pseudo}`}
-                />
-                {totalImages > 1 && (
-                  <>
-                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-0.5 rounded-full font-medium">
-                      {currentImage + 1}/{totalImages}
-                    </div>
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                      {profile.images.map((_, i) => (
-                        <div
-                          key={i}
-                          className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                            i === currentImage ? "bg-white" : "bg-white/30"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <button
-                      onClick={prevImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={nextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-              </>
+          <div className="relative aspect-[4/5] bg-muted/30 overflow-hidden">
+            {hasImage ? (
+              <img
+                src={profile.imageUrl}
+                alt={profile.pseudo}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                onClick={() => setModalOpen(true)}
+                data-testid={`img-profile-${profile.pseudo}`}
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
@@ -160,19 +52,21 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
 
           <div className="p-4 space-y-1.5">
             <h3 className="text-lg font-bold tracking-wide uppercase flex items-center gap-2">
-              <span className="text-amber-400">👑</span>
+              <Disc3 className="w-4 h-4 text-amber-400" />
               <span className="text-amber-400">{profile.pseudo}</span>
             </h3>
-            <p className="text-sm text-foreground/70 font-medium flex items-center gap-1.5">
-              <span className="text-base">💎</span> {profile.disc}
+            <p className="text-sm text-foreground/70 font-medium">
+              {profile.tier === "diamant" ? "Disque de Diamant" : profile.tier === "platine" ? "Disque de Platine" : "Label"}
             </p>
-            <p className="text-xs text-muted-foreground leading-relaxed pt-1">{profile.description}</p>
+            {profile.description && (
+              <p className="text-xs text-muted-foreground leading-relaxed pt-1">{profile.description}</p>
+            )}
           </div>
         </Card>
       </motion.div>
 
       <AnimatePresence>
-        {modalOpen && hasImages && (
+        {modalOpen && hasImage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -194,29 +88,10 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
                 <X className="w-6 h-6" />
               </button>
               <img
-                src={profile.images[currentImage]}
+                src={profile.imageUrl}
                 alt={profile.pseudo}
                 className="max-w-full max-h-[85vh] rounded-lg object-contain"
               />
-              {totalImages > 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4">
-                  <button
-                    onClick={prevImage}
-                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <span className="text-white text-sm font-medium">
-                    {currentImage + 1} / {totalImages}
-                  </span>
-                  <button
-                    onClick={nextImage}
-                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
             </motion.div>
           </motion.div>
         )}
@@ -225,9 +100,9 @@ function ProfileCard({ profile, index }: { profile: WantedProfile; index: number
   );
 }
 
-function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: number }) {
+function SmallProfileCard({ profile, index }: { profile: DofProfile; index: number }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const hasImages = profile.images.length > 0;
+  const hasImage = !!profile.imageUrl;
 
   return (
     <>
@@ -239,12 +114,10 @@ function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: n
         data-testid={`card-secondary-${profile.pseudo}`}
       >
         <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 group">
-          <div
-            className="relative aspect-square bg-muted/30 overflow-hidden"
-          >
-            {hasImages ? (
+          <div className="relative aspect-square bg-muted/30 overflow-hidden">
+            {hasImage ? (
               <img
-                src={profile.images[0]}
+                src={profile.imageUrl}
                 alt={profile.pseudo}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
                 onClick={() => setModalOpen(true)}
@@ -261,19 +134,21 @@ function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: n
             )}
           </div>
           <div className="p-3 space-y-1">
-            <h3 className="text-sm font-bold tracking-wide uppercase flex items-center gap-1.5">
+            <h3 className="text-sm font-bold tracking-wide uppercase">
               <span className="bg-gradient-to-r from-slate-300 via-gray-100 to-slate-400 bg-clip-text text-transparent drop-shadow-sm">{profile.pseudo}</span>
             </h3>
-            <p className="text-xs text-foreground/60 font-medium flex items-center gap-1">
-              <span>🏆</span> {profile.disc}
+            <p className="text-xs text-foreground/60 font-medium">
+              {profile.tier === "label" ? "Label" : "Disque de Platine"}
             </p>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">{profile.description}</p>
+            {profile.description && (
+              <p className="text-[11px] text-muted-foreground leading-relaxed">{profile.description}</p>
+            )}
           </div>
         </Card>
       </motion.div>
 
       <AnimatePresence>
-        {modalOpen && hasImages && (
+        {modalOpen && hasImage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -295,7 +170,7 @@ function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: n
                 <X className="w-6 h-6" />
               </button>
               <img
-                src={profile.images[0]}
+                src={profile.imageUrl}
                 alt={profile.pseudo}
                 className="max-w-full max-h-[85vh] rounded-lg object-contain"
               />
@@ -308,7 +183,30 @@ function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: n
 }
 
 export default function UsersPage() {
-  const totalProfiles = MAIN_PROFILES.length + SECONDARY_PROFILES.length + LABEL_PROFILES.length;
+  const { t } = useTranslation();
+  const [profiles, setProfiles] = useState<DofProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/dof-profiles")
+      .then((res) => res.json())
+      .then((data) => setProfiles(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const diamantProfiles = profiles.filter((p) => p.tier === "diamant");
+  const platineProfiles = profiles.filter((p) => p.tier === "platine");
+  const labelProfiles = profiles.filter((p) => p.tier === "label");
+  const totalProfiles = profiles.length;
+
+  if (loading) {
+    return (
+      <div className="container max-w-5xl mx-auto px-4 py-12 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-5xl mx-auto px-4 py-12">
@@ -320,63 +218,78 @@ export default function UsersPage() {
       >
         <div className="flex items-center justify-center gap-3 mb-3">
           <Disc3 className="w-7 h-7 text-primary" />
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight" data-testid="heading-wanted">
-            <span className="text-foreground">LES DISQUES </span>
-            <span className="text-primary">DE DISCREEN</span>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight" data-testid="heading-dof">
+            <span className="text-foreground">{t("dof.titlePart1", "LES DISQUES")} </span>
+            <span className="text-primary">{t("dof.titlePart2", "DE DISCREEN")}</span>
           </h1>
         </div>
 
         <p className="text-muted-foreground text-sm italic">
-          La Page d'Or
+          {t("dof.subtitle", "La Page d'Or")}
         </p>
       </motion.div>
 
-      <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
-        {MAIN_PROFILES.map((profile, index) => (
-          <ProfileCard key={profile.pseudo} profile={profile} index={index} />
-        ))}
-      </div>
-
-      {SECONDARY_PROFILES.length > 0 && (
+      {totalProfiles === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="mt-14"
+          className="text-center py-16"
         >
-          <div className="flex items-center gap-3 justify-center mb-6">
-            <div className="h-px bg-border flex-1 max-w-[80px]" />
-            <span className="text-xs text-muted-foreground uppercase tracking-widest">Disques de Platine</span>
-            <div className="h-px bg-border flex-1 max-w-[80px]" />
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-5">
-            {SECONDARY_PROFILES.map((profile, index) => (
-              <SmallProfileCard key={profile.pseudo} profile={profile} index={index} />
-            ))}
-          </div>
+          <Disc3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">{t("dof.empty", "Aucun profil pour le moment.")}</p>
         </motion.div>
-      )}
+      ) : (
+        <>
+          {diamantProfiles.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
+              {diamantProfiles.map((profile, index) => (
+                <ProfileCard key={profile.id} profile={profile} index={index} />
+              ))}
+            </div>
+          )}
 
-      {LABEL_PROFILES.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="mt-14"
-        >
-          <div className="flex items-center gap-3 justify-center mb-6">
-            <div className="h-px bg-border flex-1 max-w-[80px]" />
-            <span className="text-xs text-muted-foreground uppercase tracking-widest">Labels</span>
-            <div className="h-px bg-border flex-1 max-w-[80px]" />
-          </div>
+          {platineProfiles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="mt-14"
+            >
+              <div className="flex items-center gap-3 justify-center mb-6">
+                <div className="h-px bg-border flex-1 max-w-[80px]" />
+                <span className="text-xs text-muted-foreground uppercase tracking-widest">{t("dof.platine", "Disques de Platine")}</span>
+                <div className="h-px bg-border flex-1 max-w-[80px]" />
+              </div>
 
-          <div className="flex flex-wrap justify-center gap-5">
-            {LABEL_PROFILES.map((profile, index) => (
-              <SmallProfileCard key={profile.pseudo} profile={{ ...profile, disc: "Label" }} index={index} />
-            ))}
-          </div>
-        </motion.div>
+              <div className="flex flex-wrap justify-center gap-5">
+                {platineProfiles.map((profile, index) => (
+                  <SmallProfileCard key={profile.id} profile={profile} index={index} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {labelProfiles.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="mt-14"
+            >
+              <div className="flex items-center gap-3 justify-center mb-6">
+                <div className="h-px bg-border flex-1 max-w-[80px]" />
+                <span className="text-xs text-muted-foreground uppercase tracking-widest">{t("dof.labels", "Labels")}</span>
+                <div className="h-px bg-border flex-1 max-w-[80px]" />
+              </div>
+
+              <div className="flex flex-wrap justify-center gap-5">
+                {labelProfiles.map((profile, index) => (
+                  <SmallProfileCard key={profile.id} profile={profile} index={index} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </>
       )}
 
       <motion.div
@@ -386,7 +299,7 @@ export default function UsersPage() {
         className="text-center mt-16"
       >
         <p className="text-muted-foreground/50 text-xs tracking-widest uppercase">
-          {totalProfiles} profil{totalProfiles > 1 ? "s" : ""} recenses
+          {totalProfiles} {t("dof.profilesCounted", "profil(s) recenses")}
         </p>
       </motion.div>
     </div>

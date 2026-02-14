@@ -398,6 +398,15 @@
     "noPhoto": "Aucune photo",
     "profilesCounted": "profils recenses"
   },
+  "dof": {
+    "titlePart1": "LES DISQUES",
+    "titlePart2": "DE DISCREEN",
+    "subtitle": "La Page d'Or",
+    "platine": "Disques de Platine",
+    "labels": "Labels",
+    "empty": "Aucun profil pour le moment.",
+    "profilesCounted": "profil(s) recenses"
+  },
   "blacklistRequest": {
     "title": "Demande de Blacklist",
     "description": "Remplissez ce formulaire pour soumettre une demande de suppression de vos donnees. Tous les champs sont facultatifs mais au moins un doit etre rempli.",

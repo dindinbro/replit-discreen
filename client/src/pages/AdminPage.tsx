@@ -48,7 +48,10 @@ import {
   KeyRound,
   Ban,
   Copy,
+  Disc3,
+  Image,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel";
 
@@ -76,7 +79,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -84,6 +87,7 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "blacklist", label: "Demandes de blacklist", icon: ShieldBan },
   { key: "info", label: "Demandes d'information", icon: FileText },
   { key: "wanted", label: "Wanted", icon: Crosshair },
+  { key: "dof", label: "D.O.F - Disques", icon: Disc3 },
 ];
 
 interface CategoryFormData {
@@ -1990,6 +1994,359 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
   );
 }
 
+interface DofProfileData {
+  id: number;
+  pseudo: string;
+  description: string;
+  imageUrl: string;
+  tier: string;
+  sortOrder: number;
+}
+
+const DOF_TIER_LABELS: Record<string, { label: string; color: string }> = {
+  diamant: { label: "Diamant", color: "text-amber-400" },
+  platine: { label: "Platine", color: "text-slate-300" },
+  label: { label: "Label", color: "text-blue-400" },
+};
+
+const DOF_TEMPLATES: Record<string, { name: string; profiles: Omit<DofProfileData, "id">[] }> = {
+  team: {
+    name: "Equipe classique",
+    profiles: [
+      { pseudo: "Fondateur", description: "Fondateur du projet", imageUrl: "", tier: "diamant", sortOrder: 0 },
+      { pseudo: "Co-Fondateur", description: "Co-fondateur du projet", imageUrl: "", tier: "diamant", sortOrder: 1 },
+      { pseudo: "Developpeur", description: "Developpeur principal", imageUrl: "", tier: "platine", sortOrder: 2 },
+      { pseudo: "Moderateur", description: "Moderateur de la communaute", imageUrl: "", tier: "platine", sortOrder: 3 },
+    ],
+  },
+  labels: {
+    name: "Labels uniquement",
+    profiles: [
+      { pseudo: "Mon Label", description: "Membres: ...", imageUrl: "", tier: "label", sortOrder: 0 },
+      { pseudo: "Deuxieme Label", description: "Membres: ...", imageUrl: "", tier: "label", sortOrder: 1 },
+    ],
+  },
+  full: {
+    name: "Complet (Diamant + Platine + Labels)",
+    profiles: [
+      { pseudo: "Leader", description: "Chef de file", imageUrl: "", tier: "diamant", sortOrder: 0 },
+      { pseudo: "Bras Droit", description: "Adjoint", imageUrl: "", tier: "diamant", sortOrder: 1 },
+      { pseudo: "Membre 1", description: "Membre actif", imageUrl: "", tier: "platine", sortOrder: 2 },
+      { pseudo: "Membre 2", description: "Membre actif", imageUrl: "", tier: "platine", sortOrder: 3 },
+      { pseudo: "Membre 3", description: "Membre actif", imageUrl: "", tier: "platine", sortOrder: 4 },
+      { pseudo: "Label", description: "Membres: ...", imageUrl: "", tier: "label", sortOrder: 5 },
+    ],
+  },
+};
+
+function DofProfileAvatar({ imageUrl, pseudo }: { imageUrl: string; pseudo: string }) {
+  const [imgError, setImgError] = useState(false);
+  if (!imageUrl || imgError) {
+    return (
+      <div className="w-10 h-10 rounded-md bg-muted/30 flex-shrink-0 border border-border flex items-center justify-center text-muted-foreground text-sm font-bold">
+        {pseudo.charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+  return (
+    <div className="w-10 h-10 rounded-md overflow-hidden bg-muted/30 flex-shrink-0 border border-border">
+      <img
+        src={imageUrl}
+        alt={pseudo}
+        className="w-full h-full object-cover"
+        onError={() => setImgError(true)}
+      />
+    </div>
+  );
+}
+
+function DofSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [profiles, setProfiles] = useState<DofProfileData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [form, setForm] = useState({
+    pseudo: "",
+    description: "",
+    imageUrl: "",
+    tier: "platine",
+    sortOrder: 0,
+  });
+
+  const fetchProfiles = async () => {
+    try {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/dof-profiles", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfiles(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch D.O.F profiles:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchProfiles(); }, []);
+
+  const resetForm = () => {
+    setForm({ pseudo: "", description: "", imageUrl: "", tier: "platine", sortOrder: 0 });
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const handleSave = async () => {
+    if (!form.pseudo.trim()) {
+      toast({ title: "Le pseudo est obligatoire", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = getAccessToken();
+      const url = editingId
+        ? `/api/admin/dof-profiles/${editingId}`
+        : "/api/admin/dof-profiles";
+      const method = editingId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        toast({ title: editingId ? "Profil modifie" : "Profil cree" });
+        resetForm();
+        fetchProfiles();
+      } else {
+        const data = await res.json();
+        toast({ title: data.message || "Erreur", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur de connexion", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Supprimer ce profil D.O.F ?")) return;
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/dof-profiles/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "Profil supprime" });
+        fetchProfiles();
+      }
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleEdit = (profile: DofProfileData) => {
+    setForm({
+      pseudo: profile.pseudo,
+      description: profile.description,
+      imageUrl: profile.imageUrl,
+      tier: profile.tier,
+      sortOrder: profile.sortOrder,
+    });
+    setEditingId(profile.id);
+    setShowForm(true);
+  };
+
+  const applyTemplate = async (templateKey: string) => {
+    const template = DOF_TEMPLATES[templateKey];
+    if (!template) return;
+    if (profiles.length > 0 && !confirm("Cela va ajouter des profils en plus de ceux existants. Continuer ?")) return;
+    setSaving(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/dof-profiles/bulk", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ profiles: template.profiles }),
+      });
+      if (res.ok) {
+        toast({ title: `Template "${template.name}" applique` });
+        fetchProfiles();
+      }
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          onClick={() => { resetForm(); setShowForm(true); }}
+          className="gap-2"
+          data-testid="button-add-dof"
+        >
+          <Plus className="w-4 h-4" />
+          Ajouter un profil
+        </Button>
+
+        <Select onValueChange={(v) => applyTemplate(v)}>
+          <SelectTrigger className="w-[220px]" data-testid="select-dof-template">
+            <SelectValue placeholder="Appliquer un template..." />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(DOF_TEMPLATES).map(([key, tmpl]) => (
+              <SelectItem key={key} value={key}>{tmpl.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {showForm && (
+        <Card className="p-5 space-y-4">
+          <h3 className="text-lg font-semibold" data-testid="text-dof-form-title">
+            {editingId ? "Modifier le profil" : "Nouveau profil D.O.F"}
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Pseudo</Label>
+              <Input
+                value={form.pseudo}
+                onChange={(e) => setForm({ ...form, pseudo: e.target.value })}
+                placeholder="Pseudo du profil"
+                data-testid="input-dof-pseudo"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Categorie</Label>
+              <Select value={form.tier} onValueChange={(v) => setForm({ ...form, tier: v })}>
+                <SelectTrigger data-testid="select-dof-tier">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="diamant">Disque de Diamant</SelectItem>
+                  <SelectItem value="platine">Disque de Platine</SelectItem>
+                  <SelectItem value="label">Label</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs text-muted-foreground">Description</Label>
+              <Input
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Description courte"
+                data-testid="input-dof-description"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs text-muted-foreground">URL de l'image</Label>
+              <Input
+                value={form.imageUrl}
+                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                placeholder="https://cdn.discordapp.com/avatars/..."
+                data-testid="input-dof-image"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Ordre d'affichage</Label>
+              <Input
+                type="number"
+                value={form.sortOrder}
+                onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
+                data-testid="input-dof-sort"
+              />
+            </div>
+          </div>
+
+          {form.imageUrl && (
+            <div className="flex items-center gap-3">
+              <img
+                src={form.imageUrl}
+                alt="Apercu"
+                className="w-16 h-16 rounded-md object-cover border border-border"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+              <span className="text-xs text-muted-foreground">Apercu de l'image</span>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving} className="gap-2" data-testid="button-save-dof">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {editingId ? "Enregistrer" : "Creer"}
+            </Button>
+            <Button variant="outline" onClick={resetForm} data-testid="button-cancel-dof">
+              Annuler
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {profiles.length === 0 ? (
+        <Card className="p-8 text-center">
+          <Disc3 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">Aucun profil D.O.F pour l'instant.</p>
+          <p className="text-muted-foreground/60 text-xs mt-1">Utilisez un template ou ajoutez des profils manuellement.</p>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {["diamant", "platine", "label"].map((tier) => {
+            const tierProfiles = profiles.filter((p) => p.tier === tier);
+            if (tierProfiles.length === 0) return null;
+            const tierInfo = DOF_TIER_LABELS[tier] || { label: tier, color: "text-foreground" };
+            return (
+              <div key={tier} className="space-y-2">
+                <div className="flex items-center gap-2 pt-3">
+                  <span className={`text-sm font-semibold uppercase tracking-wider ${tierInfo.color}`}>
+                    {tierInfo.label}
+                  </span>
+                  <Badge variant="outline" className="text-xs">{tierProfiles.length}</Badge>
+                </div>
+                {tierProfiles.map((profile) => (
+                  <Card key={profile.id} className="p-3 flex items-center gap-3" data-testid={`card-dof-${profile.id}`}>
+                    <DofProfileAvatar imageUrl={profile.imageUrl} pseudo={profile.pseudo} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{profile.pseudo}</p>
+                      <p className="text-xs text-muted-foreground truncate">{profile.description || "—"}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs flex-shrink-0">#{profile.sortOrder}</Badge>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button size="icon" variant="ghost" onClick={() => handleEdit(profile)} data-testid={`button-edit-dof-${profile.id}`}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => handleDelete(profile.id)} data-testid={`button-delete-dof-${profile.id}`}>
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WantedSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const [wantedSubTab, setWantedSubTab] = useState<"form" | "history">("form");
   const [editProfile, setEditProfile] = useState<WantedProfile | null>(null);
@@ -2210,6 +2567,10 @@ export default function AdminPage() {
 
             {activeTab === "wanted" && (
               <WantedSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "dof" && (
+              <DofSection getAccessToken={getAccessToken} />
             )}
           </main>
         </div>

@@ -398,6 +398,15 @@
     "noPhoto": "No photo",
     "profilesCounted": "profiles recorded"
   },
+  "dof": {
+    "titlePart1": "THE DISCS",
+    "titlePart2": "OF DISCREEN",
+    "subtitle": "The Golden Page",
+    "platine": "Platinum Discs",
+    "labels": "Labels",
+    "empty": "No profiles yet.",
+    "profilesCounted": "profile(s) recorded"
+  },
   "blacklistRequest": {
     "title": "Blacklist Request",
     "description": "Fill out this form to submit a data removal request. All fields are optional but at least one must be filled.",

@@ -1,14 +1,14 @@
 import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
-  wantedProfiles, siteSettings, discordLinkCodes,
+  wantedProfiles, siteSettings, discordLinkCodes, dofProfiles,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
   type BlacklistEntry, type InsertBlacklistEntry,
   type InfoRequest, type InsertInfoRequest, type PendingServiceRequest,
   type WantedProfile, type InsertWantedProfile,
-  type DiscordLinkCode,
+  type DiscordLinkCode, type DofProfile, type InsertDofProfile,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -80,6 +80,11 @@ export interface IStorage {
   createDiscordLinkCode(userId: string): Promise<string>;
   consumeDiscordLinkCode(code: string): Promise<{ userId: string } | null>;
   getSubscriptionByDiscordId(discordId: string): Promise<Subscription | undefined>;
+  getDofProfiles(): Promise<DofProfile[]>;
+  getDofProfileById(id: number): Promise<DofProfile | undefined>;
+  createDofProfile(data: InsertDofProfile): Promise<DofProfile>;
+  updateDofProfile(id: number, data: Partial<InsertDofProfile>): Promise<DofProfile | undefined>;
+  deleteDofProfile(id: number): Promise<boolean>;
 }
 
 function hashKey(key: string): string {
@@ -729,6 +734,30 @@ export class DatabaseStorage implements IStorage {
   async getSubscriptionByDiscordId(discordId: string): Promise<Subscription | undefined> {
     const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.discordId, discordId));
     return sub;
+  }
+
+  async getDofProfiles(): Promise<DofProfile[]> {
+    return db.select().from(dofProfiles).orderBy(asc(dofProfiles.sortOrder), asc(dofProfiles.id));
+  }
+
+  async getDofProfileById(id: number): Promise<DofProfile | undefined> {
+    const [profile] = await db.select().from(dofProfiles).where(eq(dofProfiles.id, id));
+    return profile;
+  }
+
+  async createDofProfile(data: InsertDofProfile): Promise<DofProfile> {
+    const [profile] = await db.insert(dofProfiles).values(data).returning();
+    return profile;
+  }
+
+  async updateDofProfile(id: number, data: Partial<InsertDofProfile>): Promise<DofProfile | undefined> {
+    const [profile] = await db.update(dofProfiles).set(data).where(eq(dofProfiles.id, id)).returning();
+    return profile;
+  }
+
+  async deleteDofProfile(id: number): Promise<boolean> {
+    const result = await db.delete(dofProfiles).where(eq(dofProfiles.id, id)).returning();
+    return result.length > 0;
   }
 }
 

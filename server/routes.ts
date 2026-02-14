@@ -2727,6 +2727,107 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/dof-profiles", async (_req, res) => {
+    try {
+      const profiles = await storage.getDofProfiles();
+      res.json(profiles);
+    } catch (err) {
+      console.error("GET /api/dof-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/dof-profiles", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const profiles = await storage.getDofProfiles();
+      res.json(profiles);
+    } catch (err) {
+      console.error("GET /api/admin/dof-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/dof-profiles", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { pseudo, description, imageUrl, tier, sortOrder } = req.body;
+      if (!pseudo || typeof pseudo !== "string" || pseudo.trim().length === 0) {
+        return res.status(400).json({ message: "Le pseudo est obligatoire" });
+      }
+      if (tier && !["diamant", "platine", "label"].includes(tier)) {
+        return res.status(400).json({ message: "Tier invalide" });
+      }
+      const profile = await storage.createDofProfile({
+        pseudo: pseudo.trim(),
+        description: description || "",
+        imageUrl: imageUrl || "",
+        tier: tier || "platine",
+        sortOrder: typeof sortOrder === "number" ? sortOrder : 0,
+      });
+      res.json(profile);
+    } catch (err) {
+      console.error("POST /api/admin/dof-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/admin/dof-profiles/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const { pseudo, description, imageUrl, tier, sortOrder } = req.body;
+      if (tier && !["diamant", "platine", "label"].includes(tier)) {
+        return res.status(400).json({ message: "Tier invalide" });
+      }
+      const update: Record<string, any> = {};
+      if (pseudo !== undefined) update.pseudo = String(pseudo).trim();
+      if (description !== undefined) update.description = String(description);
+      if (imageUrl !== undefined) update.imageUrl = String(imageUrl);
+      if (tier !== undefined) update.tier = tier;
+      if (sortOrder !== undefined) update.sortOrder = typeof sortOrder === "number" ? sortOrder : 0;
+      const profile = await storage.updateDofProfile(id, update);
+      if (profile) {
+        res.json(profile);
+      } else {
+        res.status(404).json({ message: "Profil introuvable" });
+      }
+    } catch (err) {
+      console.error("PATCH /api/admin/dof-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/admin/dof-profiles/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const deleted = await storage.deleteDofProfile(id);
+      if (deleted) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Profil introuvable" });
+      }
+    } catch (err) {
+      console.error("DELETE /api/admin/dof-profiles error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/dof-profiles/bulk", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { profiles } = req.body;
+      if (!Array.isArray(profiles)) return res.status(400).json({ message: "profiles array required" });
+      const created = [];
+      for (const p of profiles) {
+        const profile = await storage.createDofProfile(p);
+        created.push(profile);
+      }
+      res.json(created);
+    } catch (err) {
+      console.error("POST /api/admin/dof-profiles/bulk error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.get("/api/_deploy-file", (req: Request, res: Response) => {
     const secret = req.query.s;
     if (secret !== "xK9mBridge2026") {

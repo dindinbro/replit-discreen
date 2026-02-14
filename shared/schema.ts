@@ -403,4 +403,34 @@ export const discordLinkCodes = pgTable("discord_link_codes", {
 
 export type DiscordLinkCode = typeof discordLinkCodes.$inferSelect;
 
+export const dofProfiles = pgTable("dof_profiles", {
+  id: serial("id").primaryKey(),
+  pseudo: text("pseudo").notNull(),
+  description: text("description").notNull().default(""),
+  imageUrl: text("image_url").notNull().default(""),
+  tier: text("tier").notNull().default("platine"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const insertDofProfileSchema = createInsertSchema(dofProfiles).omit({ id: true, createdAt: true });
+export type InsertDofProfile = z.infer<typeof insertDofProfileSchema>;
+export type DofProfile = typeof dofProfiles.$inferSelect;
+
+export const DOF_TIERS = ["diamant", "platine", "label"] as const;
+export type DofTier = (typeof DOF_TIERS)[number];
+
+export const DOF_TEMPLATES: Record<string, { tier: DofTier; pseudo: string; description: string; imageUrl: string }[]> = {
+  team: [
+    { tier: "diamant", pseudo: "Fondateur", description: "Fondateur du projet", imageUrl: "" },
+    { tier: "diamant", pseudo: "Co-Fondateur", description: "Co-fondateur du projet", imageUrl: "" },
+    { tier: "platine", pseudo: "Developpeur", description: "Developpeur principal", imageUrl: "" },
+    { tier: "platine", pseudo: "Moderateur", description: "Moderateur de la communaute", imageUrl: "" },
+  ],
+  label: [
+    { tier: "label", pseudo: "Mon Label", description: "Membres: ...", imageUrl: "" },
+  ],
+  empty: [],
+};
+
 export * from "./models/chat";
