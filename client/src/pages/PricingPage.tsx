@@ -109,6 +109,7 @@ const PLANS = [
     name: "API",
     subtitle: "Recherche illimitee + revente",
     price: 49.99,
+    originalPrice: 99.99,
     icon: Code,
     popular: false,
     features: [
@@ -352,12 +353,27 @@ export default function PricingPage() {
                       <p className="text-xs text-muted-foreground">{plan.subtitle}</p>
                     </div>
 
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-display font-bold text-primary">
-                        {plan.price === 0 ? t("pricing.free") : `€${plan.price.toFixed(2)}`}
-                      </span>
-                      {plan.price > 0 && (
-                        <span className="text-xs text-muted-foreground">{t("pricing.perMonth")}</span>
+                    <div className="space-y-1">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-2xl font-display font-bold text-primary">
+                          {plan.price === 0 ? t("pricing.free") : `€${plan.price.toFixed(2)}`}
+                        </span>
+                        {plan.price > 0 && (
+                          <span className="text-xs text-muted-foreground">{t("pricing.perMonth")}</span>
+                        )}
+                        {"originalPrice" in plan && (plan as any).originalPrice && (
+                          <Badge variant="secondary" className="text-[10px] font-bold text-primary">
+                            -{ Math.round((1 - plan.price / (plan as any).originalPrice) * 100) }%
+                          </Badge>
+                        )}
+                      </div>
+                      {"originalPrice" in plan && (plan as any).originalPrice && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm text-muted-foreground line-through">
+                            €{(plan as any).originalPrice.toFixed(2)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">/mois</span>
+                        </div>
                       )}
                     </div>
                   </div>
