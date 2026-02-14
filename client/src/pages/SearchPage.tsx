@@ -232,7 +232,7 @@ function getFieldLabel(fieldName: string): string {
     donnee: "Donnee", champ_1: "Champ 1", champ_2: "Champ 2", champ_3: "Champ 3",
     champ_4: "Champ 4", champ_5: "Champ 5", champ_6: "Champ 6",
     total_depense: "Total depense", devise: "Devise", genre: "Genre",
-    entreprise: "Entreprise", pays: "Pays",
+    entreprise: "Entreprise",
     mot_de_passe: "Mot de passe",
     nom_complet: "Nom complet", matricule: "Matricule", organisme: "Organisme",
     situation: "Situation", allocataire: "Allocataire", qualite: "Qualite",
