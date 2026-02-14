@@ -2573,6 +2573,18 @@ export default function SearchPage() {
                     </div>
                     <p className="text-muted-foreground animate-pulse">Recherche en cours...</p>
                   </div>
+                ) : blacklistMatch?.blacklisted && (!activeResults || activeResults.length === 0) ? (
+                  <Card className="p-12 text-center space-y-6 border-destructive/20 bg-destructive/5">
+                    <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+                      <ShieldAlert className="w-8 h-8 text-destructive" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-bold text-destructive" data-testid="text-blacklisted-no-results">Utilisateur Blacklisté</h3>
+                      <p className="text-muted-foreground max-w-md mx-auto">
+                        Cette personne figure dans la blacklist de Discreen. Les informations ne peuvent pas etre affichees car une demande de retrait a ete approuvee.
+                      </p>
+                    </div>
+                  </Card>
                 ) : activeResults && activeResults.length > 0 ? (
                   <div className="relative">
                     {blacklistMatch?.blacklisted && (
