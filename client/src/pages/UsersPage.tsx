@@ -39,28 +39,34 @@ const SECONDARY_PROFILES: WantedProfile[] = [
     images: ["https://cdn.discordapp.com/avatars/1291217086907158529/5b68c25e221f67338cd3f4e88fe22de1.webp?size=1024"],
   },
   {
-    pseudo: "GKM",
-    disc: "Disque de Platine",
-    description: "Grand hagar",
-    images: ["https://cdn.discordapp.com/avatars/788515048569307154/0212df4a29f89e1bdbd3bdb77b114ce6.webp?size=1024"],
-  },
-  {
     pseudo: "SMOK",
     disc: "Disque de Platine",
     description: "BDG BDB BDDB",
     images: ["https://cdn.discordapp.com/avatars/1457570822565793843/34b9e08128ff24080b5611397e499cf4.webp?size=1024"],
   },
+];
+
+interface LabelProfile {
+  pseudo: string;
+  description: string;
+  images: string[];
+}
+
+const LABEL_PROFILES: LabelProfile[] = [
   {
     pseudo: "Les Daltons",
-    disc: "Disque de Platine",
     description: "Lomix, Lasko, Lahyat, Bognon, 92",
     images: ["https://media.discordapp.net/attachments/1458943228714811412/1471780647982071839/4ccb6c38aff978bd6f2c58cf89705b7a.png?ex=69902e0a&is=698edc8a&hm=77c87e5104965635c87ce81f5f56ce8031848f8f4fd54c245ff05e5038e68fc3&=&format=webp&quality=lossless"],
   },
   {
     pseudo: "Soul Society",
-    disc: "Disque de Platine",
     description: "Ramzan, Moha, Mosley, Zero, Tensei",
     images: ["https://media.discordapp.net/attachments/1427018594201501817/1472045676270715072/bd9459debd98517a53253bd1df3308c0.png?ex=699124de&is=698fd35e&hm=dc21ddad55d0542e49376756637494f943da9f613c3002bd46324d24af21b2aa&=&format=webp&quality=lossless&width=880&height=960"],
+  },
+  {
+    pseudo: "Hat Project",
+    description: "GKM, PSK",
+    images: ["https://cdn.discordapp.com/attachments/1458942097716547796/1472085911247392789/image.png?ex=69914a57&is=698ff8d7&hm=23f93687152de78c5d06620793ceed80bca6343153fcd6ea0c42a6e5945ec128&"],
   },
 ];
 
@@ -296,7 +302,7 @@ function SmallProfileCard({ profile, index }: { profile: WantedProfile; index: n
 }
 
 export default function UsersPage() {
-  const totalProfiles = MAIN_PROFILES.length + SECONDARY_PROFILES.length;
+  const totalProfiles = MAIN_PROFILES.length + SECONDARY_PROFILES.length + LABEL_PROFILES.length;
 
   return (
     <div className="container max-w-5xl mx-auto px-4 py-12">
@@ -341,6 +347,27 @@ export default function UsersPage() {
           <div className="flex flex-wrap justify-center gap-5">
             {SECONDARY_PROFILES.map((profile, index) => (
               <SmallProfileCard key={profile.pseudo} profile={profile} index={index} />
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {LABEL_PROFILES.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="mt-14"
+        >
+          <div className="flex items-center gap-3 justify-center mb-6">
+            <div className="h-px bg-border flex-1 max-w-[80px]" />
+            <span className="text-xs text-muted-foreground uppercase tracking-widest">Labels</span>
+            <div className="h-px bg-border flex-1 max-w-[80px]" />
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-5">
+            {LABEL_PROFILES.map((profile, index) => (
+              <SmallProfileCard key={profile.pseudo} profile={{ ...profile, disc: "Label" }} index={index} />
             ))}
           </div>
         </motion.div>
