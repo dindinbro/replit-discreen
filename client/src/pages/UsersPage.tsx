@@ -57,7 +57,7 @@ const SECONDARY_PROFILES: WantedProfile[] = [
     images: ["https://media.discordapp.net/attachments/1458943228714811412/1471780647982071839/4ccb6c38aff978bd6f2c58cf89705b7a.png?ex=69902e0a&is=698edc8a&hm=77c87e5104965635c87ce81f5f56ce8031848f8f4fd54c245ff05e5038e68fc3&=&format=webp&quality=lossless"],
   },
   {
-    pseudo: "Akatsuki",
+    pseudo: "Soul Society",
     disc: "Disque de Platine",
     description: "Ramzan, Moha, Mosley, Zero, Tensei",
     images: ["https://media.discordapp.net/attachments/1427018594201501817/1472045676270715072/bd9459debd98517a53253bd1df3308c0.png?ex=699124de&is=698fd35e&hm=dc21ddad55d0542e49376756637494f943da9f613c3002bd46324d24af21b2aa&=&format=webp&quality=lossless&width=880&height=960"],
