@@ -1312,9 +1312,9 @@ export async function startDiscordBot() {
           .setColor(0x10b981)
           .setTitle("Liens officiels - Discreen")
           .addFields(
-            { name: "Site", value: "Bientot disponible", inline: false },
+            { name: "Site", value: "https://discreen.site", inline: false },
             { name: "Discord", value: "https://discord.gg/discreen", inline: false },
-            { name: "Telegram", value: "Bientot disponible", inline: false }
+            { name: "Telegram", value: "Bientot Disponible", inline: false }
           )
           .setFooter({ text: "\u00A9 Discreen" })
           .setTimestamp();
