@@ -1,23 +1,23 @@
 import { useEffect, useRef } from "react";
 
 export default function InteractiveGrid() {
-  const spotlightRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const spotlight = spotlightRef.current;
-    if (!spotlight) return;
+    const glow = glowRef.current;
+    if (!glow) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      spotlight.style.setProperty("--mx", `${e.clientX}px`);
-      spotlight.style.setProperty("--my", `${e.clientY}px`);
-      spotlight.style.opacity = "1";
+      glow.style.setProperty("--mx", `${e.clientX}px`);
+      glow.style.setProperty("--my", `${e.clientY}px`);
+      glow.style.opacity = "1";
     };
 
     const handleMouseLeave = () => {
-      spotlight.style.opacity = "0";
+      glow.style.opacity = "0";
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
     document.addEventListener("mouseleave", handleMouseLeave);
 
     return () => {
@@ -30,8 +30,8 @@ export default function InteractiveGrid() {
     <>
       <div className="interactive-grid-lines" aria-hidden="true" />
       <div
-        ref={spotlightRef}
-        className="interactive-grid-spotlight"
+        ref={glowRef}
+        className="interactive-grid-glow"
         aria-hidden="true"
         style={{ "--mx": "-1000px", "--my": "-1000px", opacity: 0 } as React.CSSProperties}
       />

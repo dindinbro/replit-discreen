@@ -212,15 +212,26 @@
   background-size: 50px 50px;
 }
 
-.interactive-grid-spotlight {
+.interactive-grid-glow {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 1;
-  transition: opacity 0.4s ease;
-  background: radial-gradient(
-    600px circle at var(--mx) var(--my),
-    rgba(52, 211, 153, 0.07),
-    transparent 40%
+  transition: opacity 0.35s ease;
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.15) 1px, transparent 1px);
+  background-size: 50px 50px;
+  -webkit-mask-image: radial-gradient(
+    350px circle at var(--mx) var(--my),
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 0.3) 40%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(
+    350px circle at var(--mx) var(--my),
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 0.3) 40%,
+    transparent 70%
   );
 }
