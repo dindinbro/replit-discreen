@@ -59,7 +59,7 @@ export async function startTaskBot() {
     log(`Task bot command registration error: ${err}`, "task-bot");
   }
 
-  taskClient.once("clientReady", () => {
+  taskClient.once("ready", () => {
     log(`Task bot ready as ${taskClient?.user?.tag}`, "task-bot");
   });
 

@@ -321,7 +321,7 @@ export async function startDiscordBot() {
     return;
   }
 
-  client.once("clientReady", async () => {
+  client.once("ready", async () => {
     log(`Discord bot logged in as ${client?.user?.tag}`, "discord");
     const commands = [
       vouchCommand.toJSON(),
