@@ -167,7 +167,7 @@
     "badge": "Search Engine",
     "tabs": {
       "internal": "Internal",
-      "exiftool": "ExifTool",
+      "exiftool": "Metadata",
       "phone": "Phone",
       "geoip": "GeoIP",
       "nir": "NIR Decoder",
@@ -197,7 +197,7 @@
     "dailyQuota": "Daily quota",
     "unlimited": "Unlimited",
     "exiftool": {
-      "title": "ExifTool - Metadata Extraction",
+      "title": "Metadata Extraction",
       "description": "Extract hidden metadata from your files (images, PDF, documents). Discover information like camera model, GPS coordinates, creation date, software used and more.",
       "dropzone": "Drop a file or click to select",
       "supportedFormats": "Images, PDF, Videos, Office Documents (max 25 MB)",

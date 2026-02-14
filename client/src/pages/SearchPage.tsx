@@ -1147,7 +1147,7 @@ export default function SearchPage() {
             data-testid="button-mode-exiftool"
           >
             <FileSearch className="w-4 h-4" />
-            ExifTool
+            {t("search.tabs.exiftool")}
           </Button>
           <Button
             variant={searchMode === "phone" ? "default" : "outline"}

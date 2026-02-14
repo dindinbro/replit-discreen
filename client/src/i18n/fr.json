@@ -167,7 +167,7 @@
     "badge": "Moteur de Recherche",
     "tabs": {
       "internal": "Interne",
-      "exiftool": "ExifTool",
+      "exiftool": "Metadonnees",
       "phone": "Telephone",
       "geoip": "GeoIP",
       "nir": "Decodeur NIR",
@@ -197,7 +197,7 @@
     "dailyQuota": "Quota journalier",
     "unlimited": "Illimite",
     "exiftool": {
-      "title": "ExifTool - Extraction de Metadonnees",
+      "title": "Extraction de Metadonnees",
       "description": "Extrayez les metadonnees cachees de vos fichiers (images, PDF, documents). Decouvrez des informations comme le modele d'appareil photo, les coordonnees GPS, la date de creation, le logiciel utilise et bien plus.",
       "dropzone": "Deposer un fichier ou cliquer pour selectionner",
       "supportedFormats": "Images, PDF, Videos, Documents Office (max 25 Mo)",
