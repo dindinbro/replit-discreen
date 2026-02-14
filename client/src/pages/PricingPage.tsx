@@ -19,6 +19,7 @@ import {
   Briefcase,
   Code,
   Check,
+  X,
   RefreshCw,
   Database,
   Search,
@@ -59,6 +60,7 @@ const PLANS = [
       "Fivem Donnees, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
+      { text: "Recherche avancee Discreen", excluded: true },
       "Google OSINT illimite",
       "Username Sherlock illimite",
     ],
@@ -75,6 +77,7 @@ const PLANS = [
       "Fivem Donnees, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
+      "Recherche avancee Discreen",
       "Google OSINT illimite",
       "Username Sherlock illimite",
       "Moteur de recherche Wanted",
@@ -93,6 +96,7 @@ const PLANS = [
       "Fivem Donnees, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
+      "Recherche avancee Discreen",
       "Google OSINT illimite",
       "Username Sherlock illimite",
       "Moteur de recherche Wanted",
@@ -111,6 +115,7 @@ const PLANS = [
       "Recherches illimitees",
       "Cle API dediee",
       "Acces toutes les bases",
+      "Recherche avancee Discreen",
       "Google OSINT illimite",
       "Username Sherlock illimite",
       "Moteur de recherche Wanted",
@@ -358,12 +363,20 @@ export default function PricingPage() {
                   </div>
 
                   <ul className="space-y-2 mb-6 flex-1">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-xs">
-                        <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
+                    {plan.features.map((feature) => {
+                      const isExcluded = typeof feature === "object" && feature.excluded;
+                      const featureText = typeof feature === "object" ? feature.text : feature;
+                      return (
+                        <li key={featureText} className={`flex items-start gap-2 text-xs ${isExcluded ? "text-muted-foreground/50 line-through" : ""}`}>
+                          {isExcluded ? (
+                            <X className="w-3.5 h-3.5 text-destructive/60 mt-0.5 shrink-0" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                          )}
+                          <span>{featureText}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
 
                   {(() => {
