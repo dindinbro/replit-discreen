@@ -71,10 +71,18 @@ export async function startTaskBot() {
 
   const rest = new REST().setToken(token);
   try {
-    await rest.put(Routes.applicationCommands(clientId), {
-      body: commands.map((c) => c.toJSON()),
-    });
-    log("Task bot slash commands registered", "task-bot");
+    const guildId = process.env.TASK_BOT_GUILD_ID;
+    if (guildId) {
+      await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+        body: commands.map((c) => c.toJSON()),
+      });
+      log(`Task bot slash commands registered for guild ${guildId}`, "task-bot");
+    } else {
+      await rest.put(Routes.applicationCommands(clientId), {
+        body: commands.map((c) => c.toJSON()),
+      });
+      log("Task bot slash commands registered globally", "task-bot");
+    }
   } catch (err) {
     log(`Task bot command registration error: ${err}`, "task-bot");
   }
