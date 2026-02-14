@@ -154,7 +154,7 @@ const VISITOR_TIMEOUT = 90_000;
 
 function cleanupVisitors() {
   const now = Date.now();
-  for (const [id, lastSeen] of onlineVisitors) {
+  for (const [id, lastSeen] of Array.from(onlineVisitors.entries())) {
     if (now - lastSeen > VISITOR_TIMEOUT) onlineVisitors.delete(id);
   }
 }
@@ -378,7 +378,7 @@ export async function registerRoutes(
   const pendingOAuthStates = new Map<string, { createdAt: number }>();
   setInterval(() => {
     const now = Date.now();
-    for (const [state, data] of pendingOAuthStates) {
+    for (const [state, data] of Array.from(pendingOAuthStates.entries())) {
       if (now - data.createdAt > 10 * 60 * 1000) pendingOAuthStates.delete(state);
     }
   }, 60 * 1000);
@@ -2322,7 +2322,7 @@ export async function registerRoutes(
         let nirNum = BigInt(digits);
         if (deptStr === "2A") nirNum = BigInt(digits.replace("2A", "19"));
         if (deptStr === "2B") nirNum = BigInt(digits.replace("2B", "18"));
-        const expectedKey = 97 - Number(nirNum % 97n);
+        const expectedKey = 97 - Number(nirNum % BigInt(97));
         keyValid = keyNum === expectedKey;
       }
 

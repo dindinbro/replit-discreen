@@ -429,8 +429,25 @@ function getFieldCI(r: Record<string, string>, ...keys: string[]): string {
 
 const sourceHeaderCache: Record<string, string[]> = {};
 
-function buildHeaderCache(db: Database.Database, tableName: string, isFts: boolean): void {
+const MAX_DB_SIZE_FOR_HEADER_CACHE = 5 * 1024 * 1024 * 1024;
+
+function buildHeaderCache(db: Database.Database, tableName: string, isFts: boolean, sourceKey?: string): void {
   try {
+    if (sourceKey) {
+      const dataDir = getDataDir();
+      const filename = SOURCE_MAP[sourceKey];
+      if (filename) {
+        const filePath = path.join(dataDir, filename);
+        try {
+          const stat = fs.statSync(filePath);
+          if (stat.size > MAX_DB_SIZE_FOR_HEADER_CACHE) {
+            console.log(`[searchSqlite] Skipping header cache for ${sourceKey}: file too large (${(stat.size / 1e9).toFixed(1)} GB)`);
+            return;
+          }
+        } catch {}
+      }
+    }
+
     const rows = db.prepare(
       `SELECT source, line FROM "${tableName}" WHERE rownum = 1 LIMIT 200`
     ).all() as { source: string; line: string }[];
@@ -967,7 +984,7 @@ export async function initSearchDatabases(): Promise<void> {
   setTimeout(() => {
     for (const [key, info] of Object.entries(dbCache)) {
       try {
-        buildHeaderCache(info.db, info.tableName, info.isFts);
+        buildHeaderCache(info.db, info.tableName, info.isFts, key);
       } catch (err: any) {
         console.warn(`[searchSqlite] Header cache build failed for ${key}:`, err?.message);
       }
