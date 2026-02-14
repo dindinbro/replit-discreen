@@ -795,10 +795,63 @@ export async function initSearchDatabases(): Promise<void> {
           keysToRemove.push(key);
         }
       } catch (err: any) {
-        console.warn(`[searchSqlite] ${key} (${filename}) failed verification, removing:`, err?.message);
-        failedDbs.add(key);
-        delete dbCache[key];
-        keysToRemove.push(key);
+        console.warn(`[searchSqlite] ${key} (${filename}) failed verification:`, err?.message);
+        if (err?.message?.includes("fts5") && err?.message?.includes("corruption")) {
+          console.log(`[searchSqlite] ${key}: FTS5 corruption detected, attempting rebuild...`);
+          try {
+            delete dbCache[key];
+            failedDbs.delete(key);
+            const rwDb = new Database(filePath, { readonly: false });
+            const { tableName, isFts } = detectMainTable(rwDb);
+            if (isFts) {
+              rwDb.prepare(`INSERT INTO "${tableName}"("${tableName}") VALUES('rebuild')`).run();
+              console.log(`[searchSqlite] ${key}: FTS5 index rebuilt successfully`);
+            }
+            rwDb.close();
+            const info2 = openDb(key);
+            if (info2) {
+              info2.db.prepare(`SELECT 1 FROM "${info2.tableName}" LIMIT 1`).get();
+              console.log(`[searchSqlite] ${key} (${filename}) loaded after FTS5 rebuild`);
+            } else {
+              keysToRemove.push(key);
+            }
+          } catch (rebuildErr: any) {
+            console.warn(`[searchSqlite] ${key}: FTS5 rebuild failed:`, rebuildErr?.message);
+            console.log(`[searchSqlite] ${key}: Trying to open as regular (non-FTS) table...`);
+            try {
+              delete dbCache[key];
+              failedDbs.delete(key);
+              const fallbackDb = new Database(filePath, { readonly: true });
+              const allTables = fallbackDb.prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '%_data' AND name NOT LIKE '%_idx' AND name NOT LIKE '%_content' AND name NOT LIKE '%_docsize' AND name NOT LIKE '%_config' AND name NOT LIKE 'sqlite_%'"
+              ).all() as { name: string }[];
+              const regularTable = allTables.find(t => {
+                const sql = (fallbackDb.prepare("SELECT sql FROM sqlite_master WHERE name=?").get(t.name) as any)?.sql || "";
+                return !sql.toUpperCase().includes("USING FTS5");
+              });
+              if (regularTable) {
+                const pragma = fallbackDb.prepare(`PRAGMA table_info("${regularTable.name}")`).all() as { name: string }[];
+                const cols = pragma.map(p => p.name);
+                const info: DbInfo = { db: fallbackDb, tableName: regularTable.name, columns: cols, isFts: false, sourceKey: key };
+                dbCache[key] = info;
+                console.log(`[searchSqlite] ${key} (${filename}) loaded as regular table "${regularTable.name}" [${cols.join(", ")}]`);
+              } else {
+                fallbackDb.close();
+                failedDbs.add(key);
+                keysToRemove.push(key);
+              }
+            } catch (fallbackErr: any) {
+              console.warn(`[searchSqlite] ${key}: All attempts failed:`, fallbackErr?.message);
+              failedDbs.add(key);
+              delete dbCache[key];
+              keysToRemove.push(key);
+            }
+          }
+        } else {
+          failedDbs.add(key);
+          delete dbCache[key];
+          keysToRemove.push(key);
+        }
       }
     } else {
       console.log(`[searchSqlite] ${key} (${filename}) not found — skipping`);
