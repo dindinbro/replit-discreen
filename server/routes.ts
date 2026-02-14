@@ -2769,10 +2769,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "URL manquante." });
       }
 
+      const dMatch = docUrl.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+      const eMatch = docUrl.match(/\/e\/([a-zA-Z0-9_-]{20,})/);
+      const foldersMatch = docUrl.match(/\/folders\/([a-zA-Z0-9_-]{20,})/);
+      const idMatch = docUrl.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
       const urlParts = docUrl.split("?")[0].split("/");
-      const docId = urlParts.find((part: string) => part.length === 33 || part.length === 44);
+      const lengthMatch = urlParts.find((part: string) => /^[a-zA-Z0-9_-]+$/.test(part) && (part.length === 33 || part.length === 44));
+      const docId = dMatch?.[1] || eMatch?.[1] || foldersMatch?.[1] || idMatch?.[1] || lengthMatch;
       if (!docId) {
-        return res.status(400).json({ message: "ID du document introuvable. Vérifiez que le lien est un Google Docs, Slides, Sheets ou Drive valide." });
+        return res.status(400).json({ message: "ID du document introuvable. Vérifiez que le lien est un Google Docs, Slides, Sheets, Forms ou Drive valide." });
       }
 
       const fields = [

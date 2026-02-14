@@ -987,7 +987,7 @@ export default function SearchPage() {
   const isFivemMode = searchMode === "fivem";
   const isXeuledocMode = searchMode === "xeuledoc";
 
-  const GOOGLE_DOC_REGEX = /^https:\/\/(docs|drive|slides|sheets|jamboard|script)\.google\.com\/.+/i;
+  const GOOGLE_DOC_REGEX = /^https:\/\/(docs|drive|slides|sheets|jamboard|script|forms)\.google\.com\/.+/i;
 
   const handleXeuledocSearch = async () => {
     const url = xeuledocUrl.trim();
@@ -1741,7 +1741,7 @@ export default function SearchPage() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <Input
                     data-testid="input-xeuledoc-url"
-                    placeholder="https://docs.google.com/document/d/... ou https://docs.google.com/presentation/d/..."
+                    placeholder="https://docs.google.com/document/d/... ou /forms/d/e/... ou /presentation/d/..."
                     value={xeuledocUrl}
                     onChange={(e) => setXeuledocUrl(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleXeuledocSearch()}
@@ -1768,7 +1768,7 @@ export default function SearchPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Formats acceptes : Google Docs, Slides, Sheets, Drive, Drawings, Apps Script, Jamboard
+                  Formats acceptes : Google Docs, Slides, Sheets, Forms, Drive, Drawings, Apps Script, Jamboard
                 </p>
               </div>
 
