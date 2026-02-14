@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,6 +146,7 @@ const cardVariants = {
 };
 
 export default function PricingPage() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState<string | null>(null);
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
   const [redeemOpen, setRedeemOpen] = useState(false);
@@ -168,8 +170,8 @@ export default function PricingPage() {
     const token = getAccessToken();
     if (!token) {
       toast({
-        title: "Erreur",
-        description: "Vous devez être connecté pour échanger une clé.",
+        title: t("pricing.errors.error"),
+        description: t("pricing.errors.mustBeLoggedInRedeem"),
         variant: "destructive",
       });
       return;
@@ -187,10 +189,10 @@ export default function PricingPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || "Erreur lors de l'echange");
+        throw new Error(data.message || t("pricing.errors.redeemError"));
       }
       toast({
-        title: "Cle activee",
+        title: t("pricing.errors.keyActivated"),
         description: data.message,
       });
       await refreshRole();
@@ -198,8 +200,8 @@ export default function PricingPage() {
       setRedeemKey("");
     } catch (err) {
       toast({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Cle invalide",
+        title: t("pricing.errors.error"),
+        description: err instanceof Error ? err.message : t("pricing.errors.invalidKey"),
         variant: "destructive",
       });
     } finally {
@@ -210,8 +212,8 @@ export default function PricingPage() {
   async function handleSubscribe(plan: typeof PLANS[number]) {
     if (plan.price === 0) {
       toast({
-        title: "Plan gratuit",
-        description: "Vous utilisez deja le plan gratuit par defaut.",
+        title: t("pricing.free"),
+        description: t("pricing.errors.freePlan"),
       });
       return;
     }
@@ -219,8 +221,8 @@ export default function PricingPage() {
     const token = getAccessToken();
     if (!token) {
       toast({
-        title: "Erreur",
-        description: "Vous devez être connecté pour vous abonner.",
+        title: t("pricing.errors.error"),
+        description: t("pricing.errors.mustBeLoggedIn"),
         variant: "destructive",
       });
       return;
@@ -239,7 +241,7 @@ export default function PricingPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Erreur lors de la creation de la facture");
+        throw new Error(data.message || t("pricing.errors.invoiceError"));
       }
 
       const data = await res.json();
@@ -249,8 +251,8 @@ export default function PricingPage() {
     } catch (err) {
       console.error("Payment error:", err);
       toast({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Erreur inconnue",
+        title: t("pricing.errors.error"),
+        description: err instanceof Error ? err.message : t("pricing.errors.error"),
         variant: "destructive",
       });
     } finally {
@@ -271,16 +273,15 @@ export default function PricingPage() {
         >
           <Badge variant="outline" className="px-4 py-1.5 text-sm font-medium border-primary/30 text-primary gap-2">
             <CreditCard className="w-3.5 h-3.5" />
-            Tarification
+            {t("pricing.badge")}
           </Badge>
 
           <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight">
-            Choisissez votre <span className="text-primary">Plan</span>
+            {t("pricing.title")} <span className="text-primary">{t("pricing.titleHighlight")}</span>
           </h1>
 
           <p className="text-muted-foreground max-w-xl mx-auto text-sm md:text-base leading-relaxed">
-            Debloquez des outils puissants d'intelligence de donnees avec nos abonnements flexibles.
-            Tous les plans incluent un renouvellement quotidien de credits.
+            {t("pricing.subtitle")}
           </p>
 
           <motion.div
@@ -332,7 +333,7 @@ export default function PricingPage() {
                     <Badge
                       className="absolute -top-2.5 right-4 bg-primary text-primary-foreground text-xs no-default-hover-elevate no-default-active-elevate"
                     >
-                      Populaire
+                      {t("pricing.popular")}
                     </Badge>
                   )}
 
@@ -348,10 +349,10 @@ export default function PricingPage() {
 
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-display font-bold text-primary">
-                        {plan.price === 0 ? "Gratuit" : `€${plan.price.toFixed(2)}`}
+                        {plan.price === 0 ? t("pricing.free") : `€${plan.price.toFixed(2)}`}
                       </span>
                       {plan.price > 0 && (
-                        <span className="text-xs text-muted-foreground">/mois</span>
+                        <span className="text-xs text-muted-foreground">{t("pricing.perMonth")}</span>
                       )}
                     </div>
                   </div>
@@ -374,7 +375,7 @@ export default function PricingPage() {
                           className="w-full justify-center py-2 bg-primary/10 text-primary border-primary/20 no-default-hover-elevate no-default-active-elevate"
                         >
                           <Clock className="w-3.5 h-3.5 mr-1.5" />
-                          {daysLeft} jour{daysLeft > 1 ? "s" : ""} restant{daysLeft > 1 ? "s" : ""}
+                          {t("pricing.daysRemaining", { count: daysLeft })}
                         </Badge>
                       );
                     }
@@ -390,16 +391,16 @@ export default function PricingPage() {
                         {isLoading ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Chargement...
+                            {t("pricing.loading")}
                           </>
                         ) : plan.price === 0 ? (
                           <>
-                            Commencer
+                            {t("pricing.startNow")}
                             <ArrowRight className="w-3.5 h-3.5" />
                           </>
                         ) : (
                           <>
-                            S'abonner
+                            {t("pricing.subscribe")}
                             <ArrowRight className="w-3.5 h-3.5" />
                           </>
                         )}
@@ -423,9 +424,9 @@ export default function PricingPage() {
                 <Key className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="font-semibold text-sm">Vous avez deja une cle ?</p>
+                <p className="font-semibold text-sm">{t("pricing.redeem.title")}</p>
                 <p className="text-xs text-muted-foreground">
-                  Echangez-la dans vos parametres d'abonnement
+                  {t("pricing.redeem.subtitle")}
                 </p>
               </div>
             </div>
@@ -436,7 +437,7 @@ export default function PricingPage() {
               data-testid="button-redeem"
               onClick={() => setRedeemOpen(true)}
             >
-              Echanger
+              {t("pricing.redeem.button")}
               <ArrowRight className="w-3.5 h-3.5" />
             </Button>
           </Card>
@@ -448,10 +449,10 @@ export default function PricingPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Key className="w-5 h-5 text-primary" />
-              Echanger une cle
+              {t("pricing.redeem.dialogTitle")}
             </DialogTitle>
             <DialogDescription>
-              Entrez votre cle de licence pour activer votre abonnement.
+              {t("pricing.redeem.dialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -469,7 +470,7 @@ export default function PricingPage() {
                 size="sm"
                 onClick={() => { setRedeemOpen(false); setRedeemKey(""); }}
               >
-                Annuler
+                {t("pricing.redeem.cancel")}
               </Button>
               <Button
                 data-testid="button-confirm-redeem"
@@ -483,7 +484,7 @@ export default function PricingPage() {
                 ) : (
                   <Check className="w-4 h-4" />
                 )}
-                Activer
+                {t("pricing.redeem.activate")}
               </Button>
             </div>
           </div>

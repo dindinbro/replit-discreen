@@ -252,8 +252,8 @@ export async function startDiscordBot() {
     .setDescription("Recreer le salon actuel (memes permissions, meme position)")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
-  const linkCommand = new SlashCommandBuilder()
-    .setName("link")
+  const linksCommand = new SlashCommandBuilder()
+    .setName("links")
     .setDescription("Afficher les liens officiels de Discreen")
     .addChannelOption((option) =>
       option
@@ -261,6 +261,16 @@ export async function startDiscordBot() {
         .setDescription("Salon ou envoyer les liens")
         .setRequired(true)
         .addChannelTypes(ChannelType.GuildText)
+    );
+
+  const linkCommand = new SlashCommandBuilder()
+    .setName("link")
+    .setDescription("Lier ton compte Discord a ton compte Discreen")
+    .addStringOption((option) =>
+      option
+        .setName("code")
+        .setDescription("Le code de verification genere depuis ton profil Discreen")
+        .setRequired(true)
     );
 
   const wantedCommand = new SlashCommandBuilder()
@@ -298,6 +308,7 @@ export async function startDiscordBot() {
         statusCommand.toJSON(),
         soutienCommand.toJSON(),
         renewCommand.toJSON(),
+        linksCommand.toJSON(),
         linkCommand.toJSON(),
         wantedCommand.toJSON(),
         wantedPreviewCommand.toJSON(),
@@ -328,6 +339,7 @@ export async function startDiscordBot() {
       statusCommand.toJSON(),
       soutienCommand.toJSON(),
       renewCommand.toJSON(),
+      linksCommand.toJSON(),
       linkCommand.toJSON(),
       wantedCommand.toJSON(),
       wantedPreviewCommand.toJSON(),
@@ -964,6 +976,32 @@ export async function startDiscordBot() {
 
         await storage.upsertSubscription(sub.userId, plan as PlanTier);
 
+        const CUSTOMER_ROLE_ID = "1469798856937177278";
+        const PAID_TIERS = ["vip", "pro", "business", "api"];
+        if (sub.discordId) {
+          try {
+            const guild = client.guilds.cache.get(DISCREEN_GUILD_ID);
+            if (guild) {
+              const member = await guild.members.fetch(sub.discordId).catch(() => null);
+              if (member) {
+                if (PAID_TIERS.includes(plan)) {
+                  if (!member.roles.cache.has(CUSTOMER_ROLE_ID)) {
+                    await member.roles.add(CUSTOMER_ROLE_ID);
+                    log(`Customer role added to ${sub.discordId} (plan: ${plan})`, "discord");
+                  }
+                } else {
+                  if (member.roles.cache.has(CUSTOMER_ROLE_ID)) {
+                    await member.roles.remove(CUSTOMER_ROLE_ID);
+                    log(`Customer role removed from ${sub.discordId} (plan: ${plan})`, "discord");
+                  }
+                }
+              }
+            }
+          } catch (roleErr) {
+            log(`/setplan: Error managing customer role: ${roleErr}`, "discord");
+          }
+        }
+
         let email = "Inconnu";
         try {
           const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -1261,7 +1299,7 @@ export async function startDiscordBot() {
       }
     }
 
-    if (interaction.commandName === "link") {
+    if (interaction.commandName === "links") {
       try {
         const targetChannel = interaction.options.getChannel("channel", true);
         const channel = await client.channels.fetch(targetChannel.id);
@@ -1283,13 +1321,73 @@ export async function startDiscordBot() {
 
         await (channel as any).send({ embeds: [embed] });
         await interaction.reply({ content: `Liens envoyes dans <#${targetChannel.id}>.`, ephemeral: true });
-        webhookBotGeneric(interaction.user.tag, "link", `**Salon** : <#${targetChannel.id}>`);
+        webhookBotGeneric(interaction.user.tag, "links", `**Salon** : <#${targetChannel.id}>`);
       } catch (err) {
-        log(`Error in link command: ${err}`, "discord");
+        log(`Error in links command: ${err}`, "discord");
         if (interaction.deferred) {
           await interaction.editReply({ content: "Erreur lors de l'affichage des liens." });
         } else {
           await interaction.reply({ content: "Erreur lors de l'affichage des liens.", ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.commandName === "link") {
+      try {
+        const code = interaction.options.getString("code", true).trim().toUpperCase();
+        const discordId = interaction.user.id;
+
+        const existingSub = await storage.getSubscriptionByDiscordId(discordId);
+        if (existingSub) {
+          await interaction.reply({ content: "Ce compte Discord est deja lie a un compte Discreen.", ephemeral: true });
+          return;
+        }
+
+        const result = await storage.consumeDiscordLinkCode(code);
+        if (!result) {
+          await interaction.reply({ content: "Code invalide ou expire. Generez un nouveau code depuis votre profil Discreen.", ephemeral: true });
+          return;
+        }
+
+        await storage.setDiscordId(result.userId, discordId);
+
+        const sub = await storage.getSubscription(result.userId);
+        const CUSTOMER_ROLE_ID = "1469798856937177278";
+        const PAID_TIERS = ["vip", "pro", "business", "api"];
+
+        const guild = client.guilds.cache.get(DISCREEN_GUILD_ID);
+        if (guild) {
+          try {
+            const member = await guild.members.fetch(discordId).catch(() => null);
+            if (member) {
+              if (sub && PAID_TIERS.includes(sub.tier)) {
+                if (!member.roles.cache.has(CUSTOMER_ROLE_ID)) {
+                  await member.roles.add(CUSTOMER_ROLE_ID);
+                  log(`Assigned customer role to ${discordId} (tier: ${sub.tier})`, "discord");
+                }
+              }
+              if (!member.roles.cache.has(SOUTIEN_ROLE_ID)) {
+                await member.roles.add(SOUTIEN_ROLE_ID);
+              }
+            }
+          } catch (roleErr) {
+            log(`Error assigning roles during link: ${roleErr}`, "discord");
+          }
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0x10b981)
+          .setTitle("Compte lie avec succes !")
+          .setDescription(`Ton compte Discord a ete lie a ton compte Discreen.${sub && PAID_TIERS.includes(sub.tier) ? "\nLe role Client t'a ete attribue." : ""}`)
+          .setFooter({ text: "Discreen" })
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        log(`Discord account ${discordId} linked to user ${result.userId} via code`, "discord");
+      } catch (err) {
+        log(`Error in link command: ${err}`, "discord");
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Une erreur est survenue lors de la liaison.", ephemeral: true });
         }
       }
     }
@@ -2212,6 +2310,31 @@ export async function sendFreezeAlert(userId: string, username: string, uniqueId
 }
 
 const DISCREEN_GUILD_ID = "1130682847749996564";
+const CUSTOMER_ROLE_ID_GLOBAL = "1469798856937177278";
+const PAID_TIERS_GLOBAL = ["vip", "pro", "business", "api"];
+
+export async function syncCustomerRole(discordId: string, tier: string): Promise<void> {
+  if (!client) return;
+  try {
+    const guild = client.guilds.cache.get(DISCREEN_GUILD_ID);
+    if (!guild) return;
+    const member = await guild.members.fetch(discordId).catch(() => null);
+    if (!member) return;
+    if (PAID_TIERS_GLOBAL.includes(tier)) {
+      if (!member.roles.cache.has(CUSTOMER_ROLE_ID_GLOBAL)) {
+        await member.roles.add(CUSTOMER_ROLE_ID_GLOBAL);
+        log(`Customer role synced (added) for ${discordId} (tier: ${tier})`, "discord");
+      }
+    } else {
+      if (member.roles.cache.has(CUSTOMER_ROLE_ID_GLOBAL)) {
+        await member.roles.remove(CUSTOMER_ROLE_ID_GLOBAL);
+        log(`Customer role synced (removed) for ${discordId} (tier: ${tier})`, "discord");
+      }
+    }
+  } catch (err) {
+    log(`Error syncing customer role for ${discordId}: ${err}`, "discord");
+  }
+}
 
 export async function checkDiscordMemberStatus(discordId: string): Promise<{ inGuild: boolean; isSupporter: boolean }> {
   if (!client) return { inGuild: false, isSupporter: false };

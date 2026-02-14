@@ -46,10 +46,12 @@ import {
   FileSearch,
   Eye,
   ExternalLink,
+  Upload,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 
 const FILTER_ICONS: Record<string, typeof User> = {
   username: User,
@@ -417,6 +419,7 @@ function ResultCard({
 let nextCriterionId = 1;
 
 export default function SearchPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const { getAccessToken } = useAuth();
   const searchMutation = usePerformSearch(getAccessToken);
@@ -425,7 +428,7 @@ export default function SearchPage() {
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">("internal");
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "exiftool" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">("internal");
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
@@ -497,6 +500,10 @@ export default function SearchPage() {
 
   const [sherlockUsername, setSherlockUsername] = useState("");
   const [sherlockLoading, setSherlockLoading] = useState(false);
+
+  const [exifFile, setExifFile] = useState<File | null>(null);
+  const [exifLoading, setExifLoading] = useState(false);
+  const [exifResult, setExifResult] = useState<any>(null);
   const [sherlockResult, setSherlockResult] = useState<{
     username?: string;
     found?: number;
@@ -650,7 +657,7 @@ export default function SearchPage() {
     const filledCriteria = criteria.filter((c) => c.value.trim() !== "");
     if (filledCriteria.length === 0) {
       toast({
-        title: "Criteres manquants",
+        title: t("search.missingCriteria"),
         description: "Veuillez entrer au moins un critere de recherche.",
         variant: "destructive",
       });
@@ -839,7 +846,7 @@ export default function SearchPage() {
     const filledCriteria = criteria.filter((c) => c.value.trim());
     if (filledCriteria.length === 0) {
       toast({
-        title: "Criteres manquants",
+        title: t("search.missingCriteria"),
         description: "Veuillez remplir au moins un critere de recherche.",
         variant: "destructive",
       });
@@ -1134,13 +1141,13 @@ export default function SearchPage() {
             Recherche par Critères
           </Button>
           <Button
-            variant={searchMode === "other" ? "default" : "outline"}
-            onClick={() => { setSearchMode("other"); setCriteria([]); }}
+            variant={searchMode === "exiftool" ? "default" : "outline"}
+            onClick={() => { setSearchMode("exiftool"); setCriteria([]); }}
             className="min-w-[180px] gap-2"
-            data-testid="button-mode-other"
+            data-testid="button-mode-exiftool"
           >
-            <Database className="w-4 h-4" />
-            Autres Sources
+            <FileSearch className="w-4 h-4" />
+            ExifTool
           </Button>
           <Button
             variant={searchMode === "phone" ? "default" : "outline"}
@@ -1262,7 +1269,7 @@ export default function SearchPage() {
                   >
                     <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-criterion">
                       <Plus className="w-4 h-4" />
-                      <SelectValue placeholder="Ajouter un filtre" />
+                      <SelectValue placeholder={t("search.addFilter")} />
                     </SelectTrigger>
                     <SelectContent>
                       {getAvailableFilters().map((ft) => {
@@ -1428,7 +1435,7 @@ export default function SearchPage() {
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    {searchCooldown > 0 ? `Patientez ${searchCooldown}s` : advancedSearch ? "Recherche Avancee" : "Rechercher"}
+                    {searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : advancedSearch ? t("search.advancedSearch") : t("search.searchButton")}
                   </Button>
                   <Button
                     data-testid="button-reset-internal"
@@ -1465,7 +1472,7 @@ export default function SearchPage() {
                   >
                     <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-fivem-criterion">
                       <Plus className="w-4 h-4" />
-                      <SelectValue placeholder="Ajouter un filtre" />
+                      <SelectValue placeholder={t("search.addFilter")} />
                     </SelectTrigger>
                     <SelectContent>
                       {getAvailableFilters().map((ft) => {
@@ -1564,7 +1571,7 @@ export default function SearchPage() {
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    {searchCooldown > 0 ? `Patientez ${searchCooldown}s` : "Rechercher"}
+                    {searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : t("search.searchButton")}
                   </Button>
                   <Button
                     data-testid="button-reset-fivem"
@@ -1581,23 +1588,148 @@ export default function SearchPage() {
             </motion.div>
           )}
 
-          {searchMode === "other" && (
+          {searchMode === "exiftool" && (
             <motion.div
-              key="other"
+              key="exiftool"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
             >
               <div className="flex items-center gap-2">
-                <Database className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold">Autres Sources</h2>
+                <FileSearch className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-semibold" data-testid="text-exiftool-title">{t("search.exiftool.title")}</h2>
               </div>
-              <div className="text-center py-8">
-                <p className="text-muted-foreground max-w-md mx-auto text-sm">
-                  Les resultats de sources externes sont automatiquement integres dans la recherche principale par criteres. Utilisez l'onglet "Interne" pour rechercher dans toutes les sources simultanement.
-                </p>
+              <p className="text-sm text-muted-foreground">{t("search.exiftool.description")}</p>
+
+              <div className="space-y-4">
+                <div
+                  className="border-2 border-dashed border-border/60 rounded-xl p-8 text-center cursor-pointer transition-colors hover:border-primary/40"
+                  onClick={() => document.getElementById("exif-file-input")?.click()}
+                  data-testid="dropzone-exiftool"
+                >
+                  <input
+                    id="exif-file-input"
+                    type="file"
+                    className="hidden"
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) setExifFile(e.target.files[0]);
+                    }}
+                    data-testid="input-exif-file"
+                  />
+                  {exifFile ? (
+                    <div className="space-y-2">
+                      <FileText className="w-10 h-10 text-primary mx-auto" />
+                      <p className="text-sm font-medium">{exifFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{(exifFile.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Upload className="w-10 h-10 text-muted-foreground mx-auto" />
+                      <p className="text-sm text-muted-foreground">{t("search.exiftool.dropzone")}</p>
+                      <p className="text-xs text-muted-foreground">{t("search.exiftool.supportedFormats")}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    data-testid="button-extract-metadata"
+                    onClick={async () => {
+                      if (!exifFile) return;
+                      setExifLoading(true);
+                      setExifResult(null);
+                      try {
+                        const token = getAccessToken();
+                        const formData = new FormData();
+                        formData.append("file", exifFile);
+                        const res = await fetch("/api/exiftool", {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}` },
+                          body: formData,
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setExifResult(data);
+                        } else {
+                          toast({ title: data.message || t("common.error"), variant: "destructive" });
+                        }
+                      } catch {
+                        toast({ title: t("search.exiftool.error"), variant: "destructive" });
+                      } finally {
+                        setExifLoading(false);
+                      }
+                    }}
+                    disabled={exifLoading || !exifFile}
+                    className="gap-2"
+                  >
+                    {exifLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    {t("search.exiftool.extract")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setExifFile(null); setExifResult(null); }}
+                    disabled={exifLoading}
+                    className="gap-2"
+                    data-testid="button-reset-exiftool"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    {t("search.reset")}
+                  </Button>
+                </div>
               </div>
+
+              {exifResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h3 className="text-lg font-semibold" data-testid="text-exif-results-title">{t("search.exiftool.results")}</h3>
+                    <Badge variant="outline" data-testid="badge-metadata-count">
+                      {exifResult.metadataCount} {t("search.exiftool.fieldsFound")}
+                    </Badge>
+                  </div>
+
+                  <Card className="p-4 space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">{t("search.exiftool.fileName")}:</span>{" "}
+                        <span className="font-medium">{exifResult.fileName}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t("search.exiftool.fileSize")}:</span>{" "}
+                        <span className="font-medium">{(exifResult.fileSize / 1024).toFixed(1)} KB</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{t("search.exiftool.mimeType")}:</span>{" "}
+                        <span className="font-medium">{exifResult.mimeType}</span>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" data-testid="table-exif-metadata">
+                      <thead>
+                        <tr className="border-b border-border/50">
+                          <th className="text-left py-2 px-3 text-muted-foreground font-medium w-1/3">{t("search.exiftool.property")}</th>
+                          <th className="text-left py-2 px-3 text-muted-foreground font-medium">{t("search.exiftool.value")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(exifResult.metadata).map(([key, value]) => (
+                          <tr key={key} className="border-b border-border/30">
+                            <td className="py-2 px-3 font-medium text-foreground/80">{key}</td>
+                            <td className="py-2 px-3 text-foreground/70 break-all font-mono text-xs">{String(value)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           )}
 
@@ -1985,7 +2117,7 @@ export default function SearchPage() {
                     className="bg-purple-600 hover:bg-purple-700 text-white border-purple-600"
                   >
                     {sherlockLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    <span className="ml-1.5">{sherlockLoading ? "Recherche en cours..." : "Rechercher"}</span>
+                    <span className="ml-1.5">{sherlockLoading ? t("search.searching") : t("search.searchButton")}</span>
                   </Button>
                   <Button
                     data-testid="button-reset-sherlock"
@@ -2086,7 +2218,7 @@ export default function SearchPage() {
                     >
                       <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-wanted-criterion" tabIndex={canAccessWanted ? 0 : -1}>
                         <Plus className="w-4 h-4" />
-                        <SelectValue placeholder="Ajouter un filtre" />
+                        <SelectValue placeholder={t("search.addFilter")} />
                       </SelectTrigger>
                       <SelectContent>
                         {getAvailableFilters().map((ft) => (
@@ -2374,7 +2506,7 @@ export default function SearchPage() {
           </div>
         )}
 
-        {searchMode !== "other" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
+        {searchMode !== "exiftool" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
             const baseResults = searchMode === "external"
@@ -2518,8 +2650,8 @@ export default function SearchPage() {
                       <Search className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <div className="text-center">
-                      <p className="text-lg font-medium text-foreground">Aucun resultat a afficher</p>
-                      <p className="text-sm text-muted-foreground">Lancez une recherche pour voir les donnees</p>
+                      <p className="text-lg font-medium text-foreground">{t("search.noResults")}</p>
+                      <p className="text-sm text-muted-foreground">{t("search.startSearchHint")}</p>
                     </div>
                   </div>
                 )}

@@ -1,13 +1,14 @@
 import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
-  wantedProfiles, siteSettings,
+  wantedProfiles, siteSettings, discordLinkCodes,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
   type BlacklistEntry, type InsertBlacklistEntry,
   type InfoRequest, type InsertInfoRequest, type PendingServiceRequest,
   type WantedProfile, type InsertWantedProfile,
+  type DiscordLinkCode,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -76,6 +77,9 @@ export interface IStorage {
   deleteUserData(userId: string): Promise<void>;
   getSiteSetting(key: string): Promise<string | null>;
   setSiteSetting(key: string, value: string): Promise<void>;
+  createDiscordLinkCode(userId: string): Promise<string>;
+  consumeDiscordLinkCode(code: string): Promise<{ userId: string } | null>;
+  getSubscriptionByDiscordId(discordId: string): Promise<Subscription | undefined>;
 }
 
 function hashKey(key: string): string {
@@ -695,6 +699,36 @@ export class DatabaseStorage implements IStorage {
     await db.insert(siteSettings)
       .values({ key, value })
       .onConflictDoUpdate({ target: siteSettings.key, set: { value } });
+  }
+
+  async createDiscordLinkCode(userId: string): Promise<string> {
+    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await db.delete(discordLinkCodes).where(
+      and(eq(discordLinkCodes.userId, userId), eq(discordLinkCodes.used, false))
+    );
+    await db.insert(discordLinkCodes).values({ userId, code, expiresAt });
+    return code;
+  }
+
+  async consumeDiscordLinkCode(code: string): Promise<{ userId: string } | null> {
+    const [row] = await db.select().from(discordLinkCodes).where(
+      and(
+        eq(discordLinkCodes.code, code.toUpperCase()),
+        eq(discordLinkCodes.used, false)
+      )
+    );
+    if (!row) return null;
+    if (new Date() > row.expiresAt) return null;
+    await db.update(discordLinkCodes)
+      .set({ used: true })
+      .where(eq(discordLinkCodes.id, row.id));
+    return { userId: row.userId };
+  }
+
+  async getSubscriptionByDiscordId(discordId: string): Promise<Subscription | undefined> {
+    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.discordId, discordId));
+    return sub;
   }
 }
 

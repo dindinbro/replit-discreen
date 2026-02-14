@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   ShieldCheck,
@@ -20,6 +21,7 @@ import {
   Users,
   User,
   ChevronDown,
+  Languages,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -72,20 +74,26 @@ const ROLE_DISPLAY: Record<string, { label: string; variant: "default" | "second
 };
 
 const NAV_ITEMS = [
-  { label: "Home", href: "/", icon: Home },
-  { label: "Recherche", href: "/search", icon: Search },
-  { label: "Avis", href: "/avis", icon: Star },
-  { label: "D.O.F", href: "/users", icon: Users },
-  { label: "Prix", href: "/pricing", icon: CreditCard },
-  { label: "Contact", href: "/contact", icon: MessageSquare },
+  { labelKey: "nav.home", href: "/", icon: Home },
+  { labelKey: "nav.search", href: "/search", icon: Search },
+  { labelKey: "nav.reviews", href: "/avis", icon: Star },
+  { labelKey: "nav.dof", href: "/users", icon: Users },
+  { labelKey: "nav.pricing", href: "/pricing", icon: CreditCard },
+  { labelKey: "nav.contact", href: "/contact", icon: MessageSquare },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, role, frozen, signOut, displayName, avatarUrl } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { t, i18n } = useTranslation();
   const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const onlineCount = useOnlineCount();
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === "fr" ? "en" : "fr";
+    i18n.changeLanguage(newLang);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -106,7 +114,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div
                 className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary/50 px-2 py-1 rounded-full border border-border/50"
                 data-testid="status-online-count"
-                title={`${onlineCount} utilisateur${onlineCount > 1 ? "s" : ""} en ligne`}
+                title={t("header.onlineUsers", { count: onlineCount })}
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <Users className="w-3.5 h-3.5" />
@@ -120,16 +128,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               const pathname = location.split("?")[0].split("#")[0];
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               const Icon = item.icon;
+              const label = t(item.labelKey);
               return (
                 <Link key={item.href} href={item.href}>
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
                     size="sm"
                     className="gap-1.5"
-                    data-testid={`nav-${item.label.toLowerCase()}`}
+                    data-testid={`nav-${label.toLowerCase()}`}
                   >
                     <Icon className="w-4 h-4" />
-                    {item.label}
+                    {label}
                   </Button>
                 </Link>
               );
@@ -138,11 +147,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
+              data-testid="button-lang-toggle"
+              variant="ghost"
+              size="icon"
+              onClick={toggleLanguage}
+              title={i18n.language === "fr" ? "Switch to English" : "Passer en Francais"}
+            >
+              <span className="text-xs font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
+            </Button>
+            <Button
               data-testid="button-theme-toggle"
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              title={theme === "light" ? "Mode sombre" : "Mode clair"}
+              title={theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}
             >
               {theme === "light" ? (
                 <Moon className="w-4 h-4" />
@@ -153,12 +171,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {user && frozen ? (
               <div className="hidden xl:flex items-center text-xs font-medium text-red-500 dark:text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/30" data-testid="status-frozen">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5" />
-                Compte gele
+                {t("header.frozen")}
               </div>
             ) : (
               <div className="hidden xl:flex items-center text-xs font-medium text-muted-foreground bg-secondary/50 px-2.5 py-1 rounded-full border border-border/50" data-testid="status-operational">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-                Operationnel
+                {t("header.operational")}
               </div>
             )}
             {user && (
@@ -194,26 +212,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
                       <User className="w-4 h-4 mr-2" />
-                      Mon compte
+                      {t("header.myAccount")}
                     </DropdownMenuItem>
                     <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
                       <Key className="w-4 h-4 mr-2" />
-                      Cles API
+                      {t("header.apiKeys")}
                     </DropdownMenuItem>
                     <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
                       <FileText className="w-4 h-4 mr-2" />
-                      Documentation
+                      {t("header.documentation")}
                     </DropdownMenuItem>
                     {role === "admin" && (
                       <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
                         <Settings className="w-4 h-4 mr-2" />
-                        Administration
+                        {t("header.admin")}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem data-testid="menu-item-sign-out" onClick={() => signOut()} className="text-destructive focus:text-destructive">
                       <LogOut className="w-4 h-4 mr-2" />
-                      Se deconnecter
+                      {t("header.signOut")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -239,16 +257,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 const pathname = location.split("?")[0].split("#")[0];
                 const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                 const Icon = item.icon;
+                const label = t(item.labelKey);
                 return (
                   <Link key={item.href} href={item.href}>
                     <Button
                       variant={isActive ? "secondary" : "ghost"}
                       className="w-full justify-start gap-2"
-                      data-testid={`nav-mobile-${item.label.toLowerCase()}`}
+                      data-testid={`nav-mobile-${label.toLowerCase()}`}
                       onClick={() => setMobileOpen(false)}
                     >
                       <Icon className="w-4 h-4" />
-                      {item.label}
+                      {label}
                     </Button>
                   </Link>
                 );

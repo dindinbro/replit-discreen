@@ -392,4 +392,15 @@ export const siteSettings = pgTable("site_settings", {
 
 export type SiteSetting = typeof siteSettings.$inferSelect;
 
+export const discordLinkCodes = pgTable("discord_link_codes", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  code: text("code").notNull().unique(),
+  used: boolean("used").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type DiscordLinkCode = typeof discordLinkCodes.$inferSelect;
+
 export * from "./models/chat";

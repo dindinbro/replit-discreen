@@ -33,6 +33,7 @@ import {
   Heart,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 
 const ROLE_CONFIG: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
   admin: { variant: "destructive", label: "Admin" },
@@ -58,6 +59,7 @@ interface ProfileData {
 }
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const { user, role, loading: authLoading, getAccessToken, refreshRole } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -83,7 +85,8 @@ export default function ProfilePage() {
   const [disabling, setDisabling] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const [discordIdInput, setDiscordIdInput] = useState("");
+  const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
   const [savingDiscord, setSavingDiscord] = useState(false);
 
   const canChangeName = role === "admin";
@@ -151,15 +154,15 @@ export default function ProfilePage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast({ title: "Photo de profil mise a jour" });
+        toast({ title: t("profile.avatarUpdated") });
         setAvatarDialogOpen(false);
         setProfile((p) => p ? { ...p, avatar_url: data.avatar_url } : p);
         await refreshRole();
       } else {
-        toast({ title: "Erreur", description: data.message, variant: "destructive" });
+        toast({ title: t("common.error"), description: data.message, variant: "destructive" });
       }
     } catch {
-      toast({ title: "Erreur", description: "Impossible de mettre a jour la photo.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("profile.avatarUpdateError"), variant: "destructive" });
     } finally {
       setSavingAvatar(false);
     }
@@ -180,14 +183,14 @@ export default function ProfilePage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast({ title: "Pseudo mis a jour" });
+        toast({ title: t("profile.usernameUpdated") });
         setProfile((p) => p ? { ...p, display_name: data.display_name } : p);
         await refreshRole();
       } else {
-        toast({ title: "Erreur", description: data.message, variant: "destructive" });
+        toast({ title: t("common.error"), description: data.message, variant: "destructive" });
       }
     } catch {
-      toast({ title: "Erreur", description: "Impossible de mettre a jour le pseudo.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("profile.usernameUpdateError"), variant: "destructive" });
     } finally {
       setSavingName(false);
     }
@@ -201,7 +204,7 @@ export default function ProfilePage() {
         friendlyName: "Discreen A2F",
       });
       if (error) {
-        toast({ title: "Erreur", description: error.message, variant: "destructive" });
+        toast({ title: t("common.error"), description: error.message, variant: "destructive" });
         return;
       }
       if (data) {
@@ -210,7 +213,7 @@ export default function ProfilePage() {
         setFactorId(data.id);
       }
     } catch (err) {
-      toast({ title: "Erreur", description: "Impossible de demarrer l'inscription A2F.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("profile.twoFaEnrollError"), variant: "destructive" });
     } finally {
       setEnrolling(false);
     }
@@ -222,7 +225,7 @@ export default function ProfilePage() {
     try {
       const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
       if (challengeError) {
-        toast({ title: "Erreur", description: challengeError.message, variant: "destructive" });
+        toast({ title: t("common.error"), description: challengeError.message, variant: "destructive" });
         return;
       }
       const { error: verifyError } = await supabase.auth.mfa.verify({
@@ -231,17 +234,17 @@ export default function ProfilePage() {
         code: verifyCode,
       });
       if (verifyError) {
-        toast({ title: "Erreur", description: "Code invalide. Verifiez et reessayez.", variant: "destructive" });
+        toast({ title: t("common.error"), description: t("profile.invalidCode"), variant: "destructive" });
         return;
       }
-      toast({ title: "A2F active avec succes" });
+      toast({ title: t("profile.twoFaActivatedSuccess") });
       setTwoFaEnabled(true);
       setTotpUri(null);
       setTotpSecret(null);
       setFactorId(null);
       setVerifyCode("");
     } catch {
-      toast({ title: "Erreur", description: "Verification echouee.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("profile.verificationFailed"), variant: "destructive" });
     } finally {
       setVerifying(false);
     }
@@ -257,14 +260,14 @@ export default function ProfilePage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        toast({ title: "A2F desactivee" });
+        toast({ title: t("profile.twoFaDeactivated") });
         setTwoFaEnabled(false);
       } else {
         const data = await res.json();
-        toast({ title: "Erreur", description: data.message, variant: "destructive" });
+        toast({ title: t("common.error"), description: data.message, variant: "destructive" });
       }
     } catch {
-      toast({ title: "Erreur", description: "Impossible de desactiver l'A2F.", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("profile.twoFaDisableError"), variant: "destructive" });
     } finally {
       setDisabling(false);
     }
@@ -291,11 +294,11 @@ export default function ProfilePage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="p-8 max-w-md text-center space-y-4">
           <AlertTriangle className="w-12 h-12 text-destructive mx-auto" />
-          <h2 className="text-xl font-semibold">Non connecte</h2>
-          <p className="text-muted-foreground text-sm">Connectez-vous pour acceder a votre profil.</p>
+          <h2 className="text-xl font-semibold">{t("profile.notLoggedIn")}</h2>
+          <p className="text-muted-foreground text-sm">{t("profile.notLoggedInDesc")}</p>
           <Button onClick={() => navigate("/login")} data-testid="button-go-login">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Se connecter
+            {t("profile.goLogin")}
           </Button>
         </Card>
       </div>
@@ -315,11 +318,11 @@ export default function ProfilePage() {
             <span className="font-display font-bold text-2xl tracking-tight">
               Di<span className="text-primary">screen</span>
             </span>
-            <Badge variant="outline" className="ml-2">Mon Compte</Badge>
+            <Badge variant="outline" className="ml-2">{t("profile.title")}</Badge>
           </div>
           <Button variant="ghost" onClick={() => navigate("/")} data-testid="button-back-home">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour
+            {t("profile.back")}
           </Button>
         </div>
       </header>
@@ -328,7 +331,7 @@ export default function ProfilePage() {
         <section className="space-y-4">
           <div className="flex items-center gap-3">
             <User className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-display font-bold">Informations du compte</h1>
+            <h1 className="text-2xl font-display font-bold">{t("profile.accountInfo")}</h1>
           </div>
           <Card className="p-6 space-y-6">
             <div className="flex items-center gap-4">
@@ -365,7 +368,7 @@ export default function ProfilePage() {
                   {profile.is_supporter && (
                     <Badge variant="outline" className="border-pink-500/30 text-pink-500" data-testid="badge-supporter">
                       <Heart className="w-3 h-3 mr-1" />
-                      Soutien
+                      {t("profile.supporter")}
                     </Badge>
                   )}
                 </div>
@@ -376,11 +379,11 @@ export default function ProfilePage() {
 
             <div className="grid gap-4">
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Adresse e-mail</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("profile.emailLabel")}</p>
                 <p className="text-sm">{profile.email}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Membre depuis</p>
+                <p className="text-xs font-medium text-muted-foreground">{t("profile.memberSince")}</p>
                 <p className="text-sm">{new Date(profile.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
               </div>
             </div>
@@ -390,18 +393,18 @@ export default function ProfilePage() {
         <section className="space-y-4">
           <div className="flex items-center gap-3">
             <Pencil className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">Modifier le pseudo</h2>
+            <h2 className="text-2xl font-display font-bold">{t("profile.editUsername")}</h2>
           </div>
           <Card className="p-6 space-y-4">
             {canChangeName ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="display-name">Pseudo</Label>
+                  <Label htmlFor="display-name">{t("profile.usernameLabel")}</Label>
                   <div className="flex gap-2">
                     <Input
                       id="display-name"
                       data-testid="input-display-name"
-                      placeholder="Votre pseudo (2-30 caracteres)"
+                      placeholder={t("profile.usernamePlaceholder")}
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
                       maxLength={30}
@@ -415,15 +418,15 @@ export default function ProfilePage() {
                     </Button>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Ce pseudo sera affiche a la place de votre e-mail.</p>
+                <p className="text-xs text-muted-foreground">{t("profile.usernameHint")}</p>
               </>
             ) : (
               <div className="flex items-center gap-3 text-sm">
                 <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <div>
-                  <p className="font-medium">Fonctionnalite reservee aux administrateurs</p>
+                  <p className="font-medium">{t("profile.adminOnly")}</p>
                   <p className="text-muted-foreground text-xs mt-0.5">
-                    Seuls les administrateurs peuvent modifier leur pseudo.
+                    {t("profile.adminOnlyDesc")}
                   </p>
                 </div>
               </div>
@@ -434,7 +437,7 @@ export default function ProfilePage() {
         <section className="space-y-4">
           <div className="flex items-center gap-3">
             <Link className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">Lier Discord</h2>
+            <h2 className="text-2xl font-display font-bold">{t("profile.linkDiscord")}</h2>
           </div>
           <Card className="p-6 space-y-4">
             {profile.discord_id ? (
@@ -444,13 +447,13 @@ export default function ProfilePage() {
                     <Check className="w-5 h-5 text-indigo-500" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">Discord lie</p>
+                    <p className="font-medium text-sm">{t("profile.discordLinked")}</p>
                     <p className="text-xs text-muted-foreground">ID: {profile.discord_id}</p>
                   </div>
                   {profile.is_supporter && (
                     <Badge variant="outline" className="border-pink-500/30 text-pink-500 ml-auto" data-testid="badge-supporter-discord">
                       <Heart className="w-3 h-3 mr-1" />
-                      Soutien
+                      {t("profile.supporter")}
                     </Badge>
                   )}
                 </div>
@@ -467,66 +470,78 @@ export default function ProfilePage() {
                       });
                       if (res.ok) {
                         setProfile((p) => p ? { ...p, discord_id: null, is_supporter: false } : p);
-                        toast({ title: "Discord delie avec succes." });
+                        toast({ title: t("profile.discordUnlinkedSuccess") });
                       }
                     } catch {
-                      toast({ title: "Erreur lors de la suppression.", variant: "destructive" });
+                      toast({ title: t("profile.discordUnlinkError"), variant: "destructive" });
                     }
                   }}
                 >
                   <Unlink className="w-4 h-4 mr-1" />
-                  Delier Discord
+                  {t("profile.unlinkDiscord")}
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Lie ton compte Discord pour obtenir le badge Soutien si tu es membre du serveur Discreen.
+                  {t("profile.discord.description")}
                 </p>
-                <div className="flex gap-2">
-                  <Input
-                    data-testid="input-discord-id"
-                    placeholder="Ton Discord ID (ex: 123456789012345678)"
-                    value={discordIdInput}
-                    onChange={(e) => setDiscordIdInput(e.target.value)}
-                    maxLength={20}
-                  />
+                {linkCode ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-lg border border-border/50">
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">{t("profile.discord.codeLabel")}</p>
+                        <p className="text-2xl font-mono font-bold tracking-widest text-primary" data-testid="text-link-code">{linkCode}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        data-testid="button-copy-code"
+                        onClick={() => {
+                          navigator.clipboard.writeText(linkCode);
+                          toast({ title: t("profile.discord.codeCopied") });
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p>{t("profile.discord.codeInstructions")}</p>
+                      <code className="text-xs bg-secondary/50 px-2 py-1 rounded">/link {linkCode}</code>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("profile.discord.codeExpiry")}</p>
+                  </div>
+                ) : (
                   <Button
-                    data-testid="button-link-discord"
-                    disabled={savingDiscord || !discordIdInput.trim()}
+                    data-testid="button-generate-code"
+                    disabled={generatingCode}
                     onClick={async () => {
-                      setSavingDiscord(true);
+                      setGeneratingCode(true);
                       try {
                         const token = getAccessToken();
-                        const res = await fetch("/api/profile/discord", {
-                          method: "PATCH",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${token}`,
-                          },
-                          body: JSON.stringify({ discord_id: discordIdInput.trim() }),
+                        const res = await fetch("/api/profile/discord/generate-code", {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}` },
                         });
                         const data = await res.json();
                         if (res.ok) {
-                          setProfile((p) => p ? { ...p, discord_id: data.discord_id, is_supporter: data.is_supporter } : p);
-                          setDiscordIdInput("");
-                          toast({ title: "Discord lie avec succes !" });
+                          setLinkCode(data.code);
+                          toast({ title: t("profile.discord.codeGenerated") });
                         } else {
-                          toast({ title: data.message || "Erreur", variant: "destructive" });
+                          toast({ title: data.message || t("common.error"), variant: "destructive" });
                         }
                       } catch {
-                        toast({ title: "Erreur lors de la liaison.", variant: "destructive" });
+                        toast({ title: t("profile.discord.linkError"), variant: "destructive" });
                       } finally {
-                        setSavingDiscord(false);
+                        setGeneratingCode(false);
                       }
                     }}
+                    className="gap-2"
                   >
-                    {savingDiscord ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
+                    {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
+                    {t("profile.discord.generateCode")}
                   </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Tu dois etre membre du serveur Discord Discreen. Ton Discord ID se trouve dans les parametres Discord (Mode developpeur).
-                </p>
+                )}
               </div>
             )}
           </Card>
@@ -535,7 +550,7 @@ export default function ProfilePage() {
         <section className="space-y-4">
           <div className="flex items-center gap-3">
             <ShieldCheck className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">Authentification a deux facteurs (A2F)</h2>
+            <h2 className="text-2xl font-display font-bold">{t("profile.twoFa")}</h2>
           </div>
           <Card className="p-6 space-y-4">
             {loadingTwoFa ? (
@@ -549,8 +564,8 @@ export default function ProfilePage() {
                     <Shield className="w-5 h-5 text-emerald-500" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">A2F activee</p>
-                    <p className="text-xs text-muted-foreground">Votre compte est protege par l'authentification a deux facteurs.</p>
+                    <p className="font-medium text-sm">{t("profile.twoFaEnabled")}</p>
+                    <p className="text-xs text-muted-foreground">{t("profile.twoFaEnabledDesc")}</p>
                   </div>
                 </div>
                 <Button
@@ -561,12 +576,12 @@ export default function ProfilePage() {
                   data-testid="button-disable-2fa"
                 >
                   {disabling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
-                  Desactiver l'A2F
+                  {t("profile.disableTwoFa")}
                 </Button>
               </div>
             ) : totpUri ? (
               <div className="space-y-4">
-                <p className="text-sm">Scannez ce QR code avec Google Authenticator ou une application compatible :</p>
+                <p className="text-sm">{t("profile.scanQrCode")}</p>
                 <div className="flex justify-center p-4 bg-white rounded-lg">
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`}
@@ -577,7 +592,7 @@ export default function ProfilePage() {
                 </div>
                 {totpSecret && (
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Ou entrez ce code manuellement :</p>
+                    <p className="text-xs text-muted-foreground">{t("profile.manualCode")}</p>
                     <div className="flex items-center gap-2">
                       <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all select-all">{totpSecret}</code>
                       <Button variant="ghost" size="icon" onClick={copySecret} data-testid="button-copy-secret">
@@ -587,7 +602,7 @@ export default function ProfilePage() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="verify-code">Code de verification (6 chiffres)</Label>
+                  <Label htmlFor="verify-code">{t("profile.verifyCodeLabel")}</Label>
                   <div className="flex gap-2">
                     <Input
                       id="verify-code"
@@ -603,7 +618,7 @@ export default function ProfilePage() {
                       onClick={verifyEnroll}
                       disabled={verifying || verifyCode.length !== 6}
                     >
-                      {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verifier"}
+                      {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : t("profile.verify")}
                     </Button>
                   </div>
                 </div>
@@ -615,8 +630,8 @@ export default function ProfilePage() {
                     <Shield className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">A2F desactivee</p>
-                    <p className="text-xs text-muted-foreground">Activez l'authentification a deux facteurs pour securiser votre compte.</p>
+                    <p className="font-medium text-sm">{t("profile.twoFaDisabled")}</p>
+                    <p className="text-xs text-muted-foreground">{t("profile.twoFaDisabledDesc")}</p>
                   </div>
                 </div>
                 <Button
@@ -625,7 +640,7 @@ export default function ProfilePage() {
                   data-testid="button-enable-2fa"
                 >
                   {enrolling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-                  Activer l'A2F
+                  {t("profile.enableTwoFa")}
                 </Button>
               </div>
             )}
@@ -636,9 +651,9 @@ export default function ProfilePage() {
       <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modifier la photo de profil</DialogTitle>
+            <DialogTitle>{t("profile.editAvatar")}</DialogTitle>
             <DialogDescription>
-              Entrez l'URL de votre nouvelle photo de profil.
+              {t("profile.editAvatarDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -657,7 +672,7 @@ export default function ProfilePage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="avatar-url">URL de l'image</Label>
+              <Label htmlFor="avatar-url">{t("profile.imageUrl")}</Label>
               <Input
                 id="avatar-url"
                 data-testid="input-avatar-url"
@@ -668,11 +683,11 @@ export default function ProfilePage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setAvatarDialogOpen(false)} data-testid="button-cancel-avatar">
-                Annuler
+                {t("common.cancel")}
               </Button>
               <Button onClick={saveAvatar} disabled={savingAvatar} data-testid="button-save-avatar">
                 {savingAvatar ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                Enregistrer
+                {t("common.save")}
               </Button>
             </div>
           </div>

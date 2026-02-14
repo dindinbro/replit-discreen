@@ -7,8 +7,10 @@ import { Card } from "@/components/ui/card";
 import { ShieldCheck, Mail, Lock, Loader2, AlertCircle, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { SiDiscord } from "react-icons/si";
+import { useTranslation } from "react-i18next";
 
 export default function AuthPage() {
+  const { t } = useTranslation();
   const { signInWithEmail, signUpWithEmail, signInWithDiscord, loading, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [, navigate] = useLocation();
@@ -57,7 +59,7 @@ export default function AuthPage() {
           variant="ghost"
           size="icon"
           onClick={toggleTheme}
-          title={theme === "light" ? "Mode sombre" : "Mode clair"}
+          title={theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}
         >
           {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
         </Button>
@@ -73,7 +75,7 @@ export default function AuthPage() {
             Di<span className="text-primary">screen</span>
           </h1>
           <p className="text-muted-foreground text-sm">
-            {mode === "login" ? "Connectez-vous pour accéder à la recherche" : "Créez un compte pour commencer"}
+            {mode === "login" ? t("auth.loginTitle") : t("auth.registerTitle")}
           </p>
         </div>
 
@@ -85,7 +87,7 @@ export default function AuthPage() {
                 <Input
                   data-testid="input-email"
                   type="email"
-                  placeholder="Adresse email"
+                  placeholder={t("auth.email")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -99,7 +101,7 @@ export default function AuthPage() {
                 <Input
                   data-testid="input-password"
                   type="password"
-                  placeholder="Mot de passe"
+                  placeholder={t("auth.password")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -125,7 +127,7 @@ export default function AuthPage() {
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
-              {mode === "login" ? "Se connecter" : "Créer un compte"}
+              {mode === "login" ? t("auth.login") : t("auth.register")}
             </Button>
           </form>
 
@@ -134,7 +136,7 @@ export default function AuthPage() {
               <span className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">ou</span>
+              <span className="bg-card px-2 text-muted-foreground">{t("auth.or")}</span>
             </div>
           </div>
 
@@ -145,32 +147,32 @@ export default function AuthPage() {
             onClick={() => signInWithDiscord()}
           >
             <SiDiscord className="w-4 h-4" />
-            Se connecter avec Discord
+            {t("auth.discordLogin")}
           </Button>
 
           <div className="text-center text-sm text-muted-foreground">
             {mode === "login" ? (
               <span>
-                Pas encore de compte ?{" "}
+                {t("auth.noAccount")}{" "}
                 <button
                   data-testid="button-switch-to-register"
                   type="button"
                   onClick={() => { setMode("register"); setError(null); }}
                   className="text-primary font-medium underline-offset-4 hover:underline"
                 >
-                  Créer un compte
+                  {t("auth.createAccount")}
                 </button>
               </span>
             ) : (
               <span>
-                Déjà un compte ?{" "}
+                {t("auth.hasAccount")}{" "}
                 <button
                   data-testid="button-switch-to-login"
                   type="button"
                   onClick={() => { setMode("login"); setError(null); }}
                   className="text-primary font-medium underline-offset-4 hover:underline"
                 >
-                  Se connecter
+                  {t("auth.signIn")}
                 </button>
               </span>
             )}

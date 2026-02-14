@@ -10,6 +10,8 @@ import { registerChatRoutes } from "./replit_integrations/chat";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
+import multer from "multer";
+import { exiftool } from "exiftool-vendored";
 import {
   webhookSearch, webhookBreachSearch, webhookExternalProxySearch, webhookLeakosintSearch, webhookDaltonSearch, webhookApiSearch,
   webhookRoleChange, webhookFreeze, webhookInvoiceCreated, webhookPaymentCompleted,
@@ -19,7 +21,7 @@ import {
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
   webhookBotKeyRedeemed,
 } from "./webhook";
-import { sendFreezeAlert, checkDiscordMemberStatus } from "./discord-bot";
+import { sendFreezeAlert, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 
 const ORDER_TOKEN_SECRET = process.env.PLISIO_API_KEY || crypto.randomBytes(32).toString("hex");
 
@@ -342,29 +344,13 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/profile/discord", requireAuth, async (req, res) => {
+  app.post("/api/profile/discord/generate-code", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
-      const { discord_id } = req.body;
-
-      if (!discord_id || typeof discord_id !== "string") {
-        return res.status(400).json({ message: "Discord ID requis." });
-      }
-
-      const cleaned = discord_id.trim();
-      if (!/^\d{17,20}$/.test(cleaned)) {
-        return res.status(400).json({ message: "Discord ID invalide. Il doit contenir entre 17 et 20 chiffres." });
-      }
-
-      const status = await checkDiscordMemberStatus(cleaned);
-      if (!status.inGuild) {
-        return res.status(400).json({ message: "Cet utilisateur n'est pas membre du serveur Discord Discreen." });
-      }
-
-      await storage.setDiscordId(user.id, cleaned);
-      res.json({ success: true, discord_id: cleaned, is_supporter: status.isSupporter });
+      const code = await storage.createDiscordLinkCode(user.id);
+      res.json({ success: true, code, expiresIn: 600 });
     } catch (err) {
-      console.error("PATCH /api/profile/discord error:", err);
+      console.error("POST /api/profile/discord/generate-code error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -1647,6 +1633,10 @@ export async function registerRoutes(
       try { userDiscordId = await storage.getDiscordId(userId); } catch {}
       webhookKeyRedeemed(wUser, result.tier || "unknown", key.trim(), userDiscordId, undefined);
       webhookBotKeyRedeemed(wUser.username || wUser.email, wUser.uniqueId, userDiscordId, result.tier || "unknown", key.trim(), null);
+
+      if (userDiscordId && result.tier) {
+        syncCustomerRole(userDiscordId, result.tier).catch(() => {});
+      }
 
       res.json({ message: result.message, tier: result.tier });
     } catch (err) {
@@ -3014,6 +3004,56 @@ export async function registerRoutes(
     } catch (err) {
       console.error("POST /api/sherlock error:", err);
       res.status(500).json({ message: "Erreur interne." });
+    }
+  });
+
+  const exifUpload = multer({
+    dest: "/tmp/exif-uploads",
+    limits: { fileSize: 25 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = [
+        "image/jpeg", "image/png", "image/gif", "image/webp", "image/tiff", "image/bmp", "image/svg+xml",
+        "application/pdf", "video/mp4", "video/quicktime", "video/x-msvideo", "audio/mpeg", "audio/wav",
+        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (allowed.includes(file.mimetype) || file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/") || file.mimetype.startsWith("audio/")) {
+        cb(null, true);
+      } else {
+        cb(new Error("Type de fichier non supporte."));
+      }
+    },
+  });
+
+  app.post("/api/exiftool", requireAuth, exifUpload.single("file"), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "Aucun fichier envoye." });
+      }
+      const filePath = req.file.path;
+      try {
+        const tags = await exiftool.read(filePath);
+        const metadata: Record<string, string> = {};
+        const skipKeys = new Set(["SourceFile", "errors", "Warning"]);
+        for (const [key, value] of Object.entries(tags)) {
+          if (skipKeys.has(key) || value === undefined || value === null || value === "") continue;
+          const strVal = typeof value === "object" ? JSON.stringify(value) : String(value);
+          if (strVal && strVal !== "undefined" && strVal !== "null") {
+            metadata[key] = strVal;
+          }
+        }
+        res.json({
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+          metadata,
+          metadataCount: Object.keys(metadata).length,
+        });
+      } finally {
+        fs.unlink(filePath, () => {});
+      }
+    } catch (err) {
+      console.error("POST /api/exiftool error:", err);
+      res.status(500).json({ message: "Erreur lors de l'extraction des metadonnees." });
     }
   });
 

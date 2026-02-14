@@ -11,22 +11,15 @@ import { Search, CreditCard, Sparkles, Database, Shield, Zap, Lock, Mail, User, 
 import { SiDiscord } from "react-icons/si";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
+import { useTranslation } from "react-i18next";
 
-const QUICK_FILTERS = [
-  { key: "email", label: "Email", icon: Mail },
-  { key: "username", label: "Pseudo", icon: User },
-  { key: "phone", label: "Telephone", icon: Phone },
-  { key: "ipAddress", label: "Adresse IP", icon: Globe },
-  { key: "discordId", label: "Discord ID", icon: Hash },
+const QUICK_FILTER_KEYS = [
+  { key: "email", labelKey: "landing.filters.email", icon: Mail },
+  { key: "username", labelKey: "landing.filters.username", icon: User },
+  { key: "phone", labelKey: "landing.filters.phone", icon: Phone },
+  { key: "ipAddress", labelKey: "landing.filters.ip", icon: Globe },
+  { key: "discordId", labelKey: "landing.filters.discord", icon: Hash },
 ] as const;
-
-const FILTER_PLACEHOLDERS: Record<string, string> = {
-  email: "Entrez un email...",
-  username: "Entrez un pseudo...",
-  phone: "Entrez un telephone...",
-  ipAddress: "Entrez une adresse IP...",
-  discordId: "Entrez un Discord ID...",
-};
 
 function AnimatedCounter({ target, duration = 2000, suffix = "" }: { target: number; duration?: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -62,12 +55,21 @@ function AnimatedCounter({ target, duration = 2000, suffix = "" }: { target: num
 }
 
 export default function LandingPage() {
+  const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState("email");
   const [searchValue, setSearchValue] = useState("");
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const isLoggedIn = !!user;
+
+  const FILTER_PLACEHOLDERS: Record<string, string> = {
+    email: t("landing.placeholders.email"),
+    username: t("landing.placeholders.username"),
+    phone: t("landing.placeholders.phone"),
+    ipAddress: t("landing.placeholders.ip"),
+    discordId: t("landing.placeholders.discord"),
+  };
 
   const handleSearch = () => {
     setAuthDialogOpen(true);
@@ -103,7 +105,7 @@ export default function LandingPage() {
             data-testid="badge-platform"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Plateforme d'Intelligence de Donnees
+            {t("landing.badge")}
             <Search className="w-3.5 h-3.5" />
           </Badge>
         </motion.div>
@@ -114,10 +116,10 @@ export default function LandingPage() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="text-5xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[1.05]"
         >
-          Explorez la Puissance de{" "}
+          {t("landing.title1")}{" "}
           <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">
-            Discreen
+            {t("landing.title2")}
           </span>
         </motion.h1>
 
@@ -127,9 +129,7 @@ export default function LandingPage() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
         >
-          Accedez a des bases de donnees completes, des outils de recherche puissants
-          et des analyses avancees pour decouvrir des informations a travers Discord,
-          FiveM et d'autres plateformes dans un hub centralise.
+          {t("landing.subtitle")}
         </motion.p>
 
         {isLoggedIn ? (
@@ -141,15 +141,15 @@ export default function LandingPage() {
               className="flex items-center justify-center"
             >
               <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-secondary/60 dark:bg-secondary/40 px-5 py-2.5 rounded-full border border-border/50">
-                <span>Rejoignez</span>
+                <span>{t("landing.joinPrefix")}</span>
                 <span className="font-bold text-primary" data-testid="text-counter-users">
                   <AnimatedCounter target={1247} duration={2200} />
                 </span>
-                <span>utilisateurs recherchant a travers</span>
+                <span>{t("landing.usersSuffix")}</span>
                 <span className="font-bold text-primary" data-testid="text-counter-data">
                   <AnimatedCounter target={18} duration={1800} suffix=".7+ To" />
                 </span>
-                <span>de donnees</span>
+                <span>{t("landing.dataSuffix")}</span>
               </div>
             </motion.div>
 
@@ -162,13 +162,13 @@ export default function LandingPage() {
               <Link href="/search">
                 <Button size="lg" className="gap-2 shadow-lg shadow-primary/25 px-8" data-testid="button-start-searching">
                   <Search className="w-5 h-5" />
-                  Commencer la Recherche
+                  {t("landing.startSearch")}
                 </Button>
               </Link>
               <Link href="/pricing">
                 <Button size="lg" variant="outline" className="gap-2 px-8" data-testid="button-view-pricing">
                   <CreditCard className="w-5 h-5" />
-                  Voir les Prix
+                  {t("landing.viewPricing")}
                 </Button>
               </Link>
             </motion.div>
@@ -180,7 +180,7 @@ export default function LandingPage() {
               className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
             >
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Besoin d'aide ?</span>
+              <span>{t("landing.needHelp")}</span>
               <a
                 href="https://discord.gg/discreen"
                 target="_blank"
@@ -188,7 +188,7 @@ export default function LandingPage() {
                 className="inline-flex items-center gap-1.5 font-medium text-primary"
                 data-testid="link-discord-support"
               >
-                Rejoignez notre Discord officiel
+                {t("landing.joinDiscord")}
                 <SiDiscord className="w-4 h-4" />
               </a>
             </motion.div>
@@ -204,7 +204,7 @@ export default function LandingPage() {
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
-                  placeholder={FILTER_PLACEHOLDERS[activeFilter] || "Rechercher..."}
+                  placeholder={FILTER_PLACEHOLDERS[activeFilter] || t("landing.searchPlaceholder")}
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -222,7 +222,7 @@ export default function LandingPage() {
               </div>
 
               <div className="flex items-center justify-center gap-2 flex-wrap">
-                {QUICK_FILTERS.map((filter) => {
+                {QUICK_FILTER_KEYS.map((filter) => {
                   const isActive = activeFilter === filter.key;
                   return (
                     <Button
@@ -234,7 +234,7 @@ export default function LandingPage() {
                       data-testid={`button-filter-${filter.key}`}
                     >
                       <filter.icon className="w-3.5 h-3.5" />
-                      {filter.label}
+                      {t(filter.labelKey)}
                     </Button>
                   );
                 })}
@@ -248,15 +248,15 @@ export default function LandingPage() {
               className="flex items-center justify-center"
             >
               <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-secondary/60 dark:bg-secondary/40 px-5 py-2.5 rounded-full border border-border/50">
-                <span>Rejoignez</span>
+                <span>{t("landing.joinPrefix")}</span>
                 <span className="font-bold text-primary" data-testid="text-counter-users">
                   <AnimatedCounter target={1247} duration={2200} />
                 </span>
-                <span>utilisateurs recherchant a travers</span>
+                <span>{t("landing.usersSuffix")}</span>
                 <span className="font-bold text-primary" data-testid="text-counter-data">
                   <AnimatedCounter target={18} duration={1800} suffix=".7+ To" />
                 </span>
-                <span>de donnees</span>
+                <span>{t("landing.dataSuffix")}</span>
               </div>
             </motion.div>
 
@@ -267,10 +267,10 @@ export default function LandingPage() {
               className="flex items-center justify-center gap-4 flex-wrap"
             >
               <p className="text-sm text-muted-foreground">
-                Accedez a plus de 15 milliards de dossiers publics. En utilisant ce service, vous acceptez nos{" "}
-                <Link href="/documentation" className="text-primary hover:underline">Conditions d'utilisation</Link>
-                {" "}et{" "}
-                <Link href="/documentation" className="text-primary hover:underline">Politique de confidentialite</Link>.
+                {t("landing.disclaimer")}{" "}
+                <Link href="/documentation" className="text-primary hover:underline">{t("landing.terms")}</Link>
+                {" "}{t("landing.and")}{" "}
+                <Link href="/documentation" className="text-primary hover:underline">{t("landing.privacy")}</Link>.
               </p>
             </motion.div>
 
@@ -281,7 +281,7 @@ export default function LandingPage() {
               className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
             >
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Besoin d'aide ?</span>
+              <span>{t("landing.needHelp")}</span>
               <a
                 href="https://discord.gg/discreen"
                 target="_blank"
@@ -289,7 +289,7 @@ export default function LandingPage() {
                 className="inline-flex items-center gap-1.5 font-medium text-primary"
                 data-testid="link-discord-support"
               >
-                Rejoignez notre Discord officiel
+                {t("landing.joinDiscord")}
                 <SiDiscord className="w-4 h-4" />
               </a>
             </motion.div>
@@ -307,23 +307,23 @@ export default function LandingPage() {
           {[
             {
               icon: Database,
-              title: "Bases de Donnees",
-              desc: "Acces a des millions d'enregistrements indexes et mis a jour regulierement.",
+              titleKey: "landing.features.databases",
+              descKey: "landing.features.databasesDesc",
             },
             {
               icon: Search,
-              title: "Recherche Avancee",
-              desc: "Filtres multi-criteres pour une recherche precise et rapide.",
+              titleKey: "landing.features.advancedSearch",
+              descKey: "landing.features.advancedSearchDesc",
             },
             {
               icon: Shield,
-              title: "Securise",
-              desc: "Authentification robuste et controle d'acces par roles.",
+              titleKey: "landing.features.secure",
+              descKey: "landing.features.secureDesc",
             },
             {
               icon: Zap,
-              title: "Rapide",
-              desc: "Moteur de recherche FTS5 optimise pour des resultats instantanes.",
+              titleKey: "landing.features.fast",
+              descKey: "landing.features.fastDesc",
             },
           ].map((item, i) => (
             <div
@@ -334,8 +334,8 @@ export default function LandingPage() {
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <item.icon className="w-5 h-5 text-primary" />
               </div>
-              <h3 className="font-display font-semibold text-foreground">{item.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
+              <h3 className="font-display font-semibold text-foreground">{t(item.titleKey)}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{t(item.descKey)}</p>
             </div>
           ))}
         </motion.div>
@@ -348,9 +348,9 @@ export default function LandingPage() {
               <Lock className="w-7 h-7 text-primary" />
             </div>
             <div className="space-y-2">
-              <h2 className="text-xl font-display font-bold">Authentification requise</h2>
+              <h2 className="text-xl font-display font-bold">{t("landing.authRequired")}</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                L'acces aux outils de recherche est restreint. Veuillez vous connecter ou creer un compte pour consulter les donnees en temps reel.
+                {t("landing.authDesc")}
               </p>
             </div>
             <Button
@@ -362,7 +362,7 @@ export default function LandingPage() {
               }}
               data-testid="button-auth-redirect"
             >
-              S'inscrire
+              {t("landing.signUp")}
             </Button>
           </div>
         </DialogContent>

@@ -5,8 +5,10 @@ import { MessageSquare, ExternalLink, ShieldBan, Search } from "lucide-react";
 import { SiDiscord, SiTelegram } from "react-icons/si";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 
 export default function ContactPage() {
+  const { t } = useTranslation();
   return (
     <main className="relative">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background pointer-events-none" />
@@ -19,15 +21,15 @@ export default function ContactPage() {
         >
           <Badge variant="outline" className="px-4 py-1.5 text-sm font-medium border-primary/30 text-primary gap-2">
             <MessageSquare className="w-3.5 h-3.5" />
-            Contact
+            {t("contact.badge")}
           </Badge>
 
           <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight">
-            Nous <span className="text-primary">Contacter</span>
+            {t("contact.title")} <span className="text-primary">{t("contact.titleHighlight")}</span>
           </h1>
 
           <p className="text-muted-foreground max-w-lg mx-auto">
-            Pour toute question, suggestion ou demande de support, rejoignez notre serveur Discord ou notre Telegram.
+            {t("contact.subtitle")}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-8">
@@ -36,12 +38,12 @@ export default function ContactPage() {
                 <SiDiscord className="w-8 h-8 text-[#5865F2]" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold" data-testid="text-discord-contact">Discord</h2>
-                <p className="text-sm text-muted-foreground">Support rapide et communaute</p>
+                <h2 className="text-lg font-semibold" data-testid="text-discord-contact">{t("contact.discord")}</h2>
+                <p className="text-sm text-muted-foreground">{t("contact.discordDesc")}</p>
               </div>
               <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer">
                 <Button className="w-full gap-2" data-testid="button-discord-join">
-                  Rejoindre
+                  {t("contact.join")}
                   <ExternalLink className="w-3.5 h-3.5" />
                 </Button>
               </a>
@@ -52,11 +54,11 @@ export default function ContactPage() {
                 <SiTelegram className="w-8 h-8 text-[#0088cc]" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold" data-testid="text-telegram-contact">Telegram</h2>
-                <p className="text-sm text-muted-foreground">Bientot disponible</p>
+                <h2 className="text-lg font-semibold" data-testid="text-telegram-contact">{t("contact.telegram")}</h2>
+                <p className="text-sm text-muted-foreground">{t("contact.telegramDesc")}</p>
               </div>
               <Button variant="outline" className="w-full gap-2" disabled data-testid="button-telegram-soon">
-                Soon
+                {t("contact.soon")}
               </Button>
             </Card>
 
@@ -65,12 +67,12 @@ export default function ContactPage() {
                 <ShieldBan className="w-8 h-8 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold" data-testid="text-blacklist-contact">Demande de Blacklist</h2>
-                <p className="text-sm text-muted-foreground">Vous souhaitez faire retirer vos donnees ? Soumettez une demande.</p>
+                <h2 className="text-lg font-semibold" data-testid="text-blacklist-contact">{t("contact.blacklist")}</h2>
+                <p className="text-sm text-muted-foreground">{t("contact.blacklistDesc")}</p>
               </div>
               <Link href="/blacklist-request">
                 <Button variant="outline" className="w-full gap-2" data-testid="button-blacklist-request">
-                  Faire une demande
+                  {t("contact.makeRequest")}
                 </Button>
               </Link>
             </Card>
@@ -80,12 +82,12 @@ export default function ContactPage() {
                 <Search className="w-8 h-8 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold" data-testid="text-info-contact">Demande d'Information</h2>
-                <p className="text-sm text-muted-foreground">Vous souhaitez obtenir des informations ? Soumettez une demande.</p>
+                <h2 className="text-lg font-semibold" data-testid="text-info-contact">{t("contact.infoRequest")}</h2>
+                <p className="text-sm text-muted-foreground">{t("contact.infoRequestDesc")}</p>
               </div>
               <Link href="/info-request">
                 <Button variant="outline" className="w-full gap-2" data-testid="button-info-request">
-                  Faire une demande
+                  {t("contact.makeRequest")}
                 </Button>
               </Link>
             </Card>
