@@ -43,6 +43,7 @@ import {
   Gamepad2,
   RotateCcw,
   Zap,
+  FileSearch,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -422,7 +423,7 @@ export default function SearchPage() {
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted" | "fivem">("internal");
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc">("internal");
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
@@ -490,6 +491,22 @@ export default function SearchPage() {
     as?: string;
     proxy?: boolean;
     hosting?: boolean;
+  } | null>(null);
+
+  const [xeuledocUrl, setXeuledocUrl] = useState("");
+  const [xeuledocLoading, setXeuledocLoading] = useState(false);
+  const [xeuledocResult, setXeuledocResult] = useState<{
+    documentId?: string;
+    createdDate?: string;
+    modifiedDate?: string;
+    publicPermissions?: string[];
+    owner?: {
+      name?: string;
+      email?: string;
+      googleId?: string;
+      photoLink?: string;
+    };
+    error?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -968,15 +985,53 @@ export default function SearchPage() {
 
   const isWantedMode = searchMode === "wanted";
   const isFivemMode = searchMode === "fivem";
+  const isXeuledocMode = searchMode === "xeuledoc";
+
+  const GOOGLE_DOC_REGEX = /^https:\/\/(docs|drive|slides|sheets|jamboard|script)\.google\.com\/.+/i;
+
+  const handleXeuledocSearch = async () => {
+    const url = xeuledocUrl.trim();
+    if (!url) return;
+    if (!GOOGLE_DOC_REGEX.test(url)) {
+      toast({
+        title: "Lien invalide",
+        description: "Veuillez entrer un lien Google Docs, Slides, Sheets ou Drive valide.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setXeuledocLoading(true);
+    setXeuledocResult(null);
+    try {
+      const token = getAccessToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const resp = await fetch("/api/xeuledoc", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ url }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setXeuledocResult({ error: data.message || "Erreur inconnue." });
+      } else {
+        setXeuledocResult(data);
+      }
+    } catch {
+      setXeuledocResult({ error: "Erreur de connexion au serveur." });
+    } finally {
+      setXeuledocLoading(false);
+    }
+  };
 
   return (
-    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""}`}>
-      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
+    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""} ${isXeuledocMode ? "xeuledoc-atmosphere" : ""}`}>
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode || isXeuledocMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
 
       <div className="relative container max-w-5xl mx-auto px-4 py-12 space-y-12">
         <section className="text-center space-y-4 max-w-2xl mx-auto mb-8">
           <motion.h1
-            key={isWantedMode ? "wanted-title" : isFivemMode ? "fivem-title" : "normal-title"}
+            key={isWantedMode ? "wanted-title" : isFivemMode ? "fivem-title" : isXeuledocMode ? "xeuledoc-title" : "normal-title"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-[1.1]"
@@ -993,6 +1048,13 @@ export default function SearchPage() {
                 Recherche <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">
                   FiveM
+                </span>
+              </>
+            ) : isXeuledocMode ? (
+              <>
+                Google Docs <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-400">
+                  OSINT
                 </span>
               </>
             ) : (
@@ -1051,6 +1113,20 @@ export default function SearchPage() {
           >
             <Hash className="w-4 h-4" />
             Decodeur NIR
+          </Button>
+          <Button
+            variant={searchMode === "xeuledoc" ? "default" : "outline"}
+            onClick={() => {
+              setSearchMode("xeuledoc");
+              setCriteria([]);
+              setXeuledocUrl("");
+              setXeuledocResult(null);
+            }}
+            className={`min-w-[180px] gap-2 ${searchMode === "xeuledoc" ? "bg-blue-600 text-white border-blue-600" : ""}`}
+            data-testid="button-mode-xeuledoc"
+          >
+            <FileSearch className="w-4 h-4" />
+            Google OSINT
           </Button>
           <Button
             variant={searchMode === "fivem" ? "default" : "outline"}
@@ -1631,6 +1707,160 @@ export default function SearchPage() {
                     <p className="text-sm text-destructive" data-testid="text-geoip-error">{geoipResult.message}</p>
                   )}
                 </div>
+              )}
+            </motion.div>
+          )}
+
+          {searchMode === "xeuledoc" && (
+            <motion.div
+              key="xeuledoc"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="glass-panel-xeuledoc rounded-2xl p-6 md:p-8 space-y-6"
+            >
+              <div className="flex items-center gap-2">
+                <FileSearch className="w-5 h-5 text-blue-500" />
+                <h2 className="text-xl font-semibold">Google Docs OSINT</h2>
+              </div>
+
+              <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 p-4 text-sm text-muted-foreground space-y-2">
+                <p>
+                  Cet outil permet d'extraire les <span className="text-blue-400 font-medium">metadonnees</span> d'un document Google public (Docs, Slides, Sheets, Drive).
+                </p>
+                <p>
+                  Il revele l'<span className="text-blue-400 font-medium">adresse e-mail</span>, le <span className="text-blue-400 font-medium">nom</span> et l'<span className="text-blue-400 font-medium">identifiant Google</span> du proprietaire du document, ainsi que les dates de creation et de derniere modification.
+                </p>
+                <p className="text-xs opacity-70">
+                  Fonctionne uniquement sur les documents partages publiquement (accessible a toute personne disposant du lien).
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Lien Google Document</Label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Input
+                    data-testid="input-xeuledoc-url"
+                    placeholder="https://docs.google.com/document/d/... ou https://docs.google.com/presentation/d/..."
+                    value={xeuledocUrl}
+                    onChange={(e) => setXeuledocUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleXeuledocSearch()}
+                    className="flex-1 min-w-[300px]"
+                  />
+                  <Button
+                    data-testid="button-xeuledoc-search"
+                    onClick={handleXeuledocSearch}
+                    disabled={xeuledocLoading || !xeuledocUrl.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                  >
+                    {xeuledocLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span className="ml-1.5">Analyser</span>
+                  </Button>
+                  <Button
+                    data-testid="button-reset-xeuledoc"
+                    variant="outline"
+                    onClick={() => { setXeuledocUrl(""); setXeuledocResult(null); }}
+                    disabled={xeuledocLoading}
+                    className="gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reinitialiser
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Formats acceptes : Google Docs, Slides, Sheets, Drive, Drawings, Apps Script, Jamboard
+                </p>
+              </div>
+
+              {xeuledocResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4"
+                >
+                  {xeuledocResult.error ? (
+                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                      <p className="text-sm text-destructive" data-testid="text-xeuledoc-error">{xeuledocResult.error}</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 p-6 space-y-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Check className="w-5 h-5 text-blue-500" />
+                        <h3 className="font-semibold text-blue-400">Resultats</h3>
+                      </div>
+
+                      {xeuledocResult.owner && (
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Proprietaire</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {xeuledocResult.owner.name && (
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Nom</p>
+                                <p className="text-sm font-medium" data-testid="text-xeuledoc-name">{xeuledocResult.owner.name}</p>
+                              </div>
+                            )}
+                            {xeuledocResult.owner.email && (
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">E-mail</p>
+                                <p className="text-sm font-mono font-medium text-blue-400" data-testid="text-xeuledoc-email">{xeuledocResult.owner.email}</p>
+                              </div>
+                            )}
+                            {xeuledocResult.owner.googleId && (
+                              <div className="space-y-1">
+                                <p className="text-xs text-muted-foreground">Google ID</p>
+                                <p className="text-sm font-mono font-medium" data-testid="text-xeuledoc-gid">{xeuledocResult.owner.googleId}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Document</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                          {xeuledocResult.documentId && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">ID Document</p>
+                              <p className="text-sm font-mono font-medium break-all" data-testid="text-xeuledoc-docid">{xeuledocResult.documentId}</p>
+                            </div>
+                          )}
+                          {xeuledocResult.createdDate && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">Date de creation</p>
+                              <p className="text-sm font-medium" data-testid="text-xeuledoc-created">
+                                {new Date(xeuledocResult.createdDate).toLocaleString("fr-FR")}
+                              </p>
+                            </div>
+                          )}
+                          {xeuledocResult.modifiedDate && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">Derniere modification</p>
+                              <p className="text-sm font-medium" data-testid="text-xeuledoc-modified">
+                                {new Date(xeuledocResult.modifiedDate).toLocaleString("fr-FR")}
+                              </p>
+                            </div>
+                          )}
+                          {xeuledocResult.publicPermissions && xeuledocResult.publicPermissions.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground">Permissions publiques</p>
+                              <div className="flex gap-1 flex-wrap" data-testid="text-xeuledoc-perms">
+                                {xeuledocResult.publicPermissions.map((p, i) => (
+                                  <Badge key={i} variant="secondary" className="text-xs">{p}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {!xeuledocResult.owner && (
+                        <div className="text-center py-4 text-muted-foreground">
+                          <p className="text-sm">Aucun proprietaire trouve. Le document est peut-etre anonyme ou les permissions ne permettent pas l'extraction.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
               )}
             </motion.div>
           )}

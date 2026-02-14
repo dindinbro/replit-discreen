@@ -2762,5 +2762,96 @@ export async function registerRoutes(
     res.send(fs.readFileSync(filePath, "utf-8"));
   });
 
+  app.post("/api/xeuledoc", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { url: docUrl } = req.body;
+      if (!docUrl || typeof docUrl !== "string") {
+        return res.status(400).json({ message: "URL manquante." });
+      }
+
+      const urlParts = docUrl.split("?")[0].split("/");
+      const docId = urlParts.find((part: string) => part.length === 33 || part.length === 44);
+      if (!docId) {
+        return res.status(400).json({ message: "ID du document introuvable. Vérifiez que le lien est un Google Docs, Slides, Sheets ou Drive valide." });
+      }
+
+      const fields = [
+        "alternateLink", "createdDate", "modifiedDate",
+        "permissions(id,name,emailAddress,domain,role,additionalRoles,photoLink,type,withLink)",
+        "userPermission(id,name,emailAddress,domain,role,additionalRoles,photoLink,type,withLink)",
+      ].join(",");
+      const apiUrl = `https://clients6.google.com/drive/v2beta/files/${docId}?fields=${encodeURIComponent(fields)}&supportsTeamDrives=true&enforceSingleParent=true&key=AIzaSyC1eQ1xj69IdTMeii5r7brs3R90eck-m7k`;
+
+      let data: any = null;
+      const maxRetries = 5;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const resp = await fetch(apiUrl, {
+          headers: { "X-Origin": "https://drive.google.com" },
+        });
+        const text = await resp.text();
+
+        if (text.includes("File not found")) {
+          return res.status(404).json({ message: "Ce fichier n'existe pas ou n'est pas public." });
+        }
+        if (text.includes("rateLimitExceeded")) {
+          if (attempt < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+          return res.status(429).json({ message: "Rate limit Google dépassé. Réessayez dans quelques instants." });
+        }
+
+        try {
+          data = JSON.parse(text);
+        } catch {
+          return res.status(500).json({ message: "Réponse invalide de l'API Google." });
+        }
+        break;
+      }
+
+      if (!data) {
+        return res.status(500).json({ message: "Impossible de récupérer les informations du document." });
+      }
+
+      const owner = data.permissions?.find((p: any) => p.role === "owner");
+      const createdDate = data.createdDate || null;
+      const modifiedDate = data.modifiedDate || null;
+
+      const publicPerms: string[] = [];
+      for (const perm of data.permissions || []) {
+        if (perm.id === "anyoneWithLink" || perm.id === "anyone") {
+          publicPerms.push(perm.role);
+          if (perm.additionalRoles) publicPerms.push(...perm.additionalRoles);
+        }
+      }
+
+      const result: Record<string, any> = {
+        documentId: docId,
+        createdDate,
+        modifiedDate,
+        publicPermissions: publicPerms,
+      };
+
+      if (owner) {
+        result.owner = {
+          name: owner.name || null,
+          email: owner.emailAddress || null,
+          googleId: owner.id || null,
+          photoLink: owner.photoLink || null,
+        };
+      }
+
+      const userId = (req as any).user.id;
+      const wUser = await storage.getUserBySupabaseId(userId);
+      const username = wUser?.username || wUser?.email?.split("@")[0] || "inconnu";
+      console.log(`[xeuledoc] User ${username} (${userId}) searched: ${docUrl} => owner: ${result.owner?.email || "not found"}`);
+
+      res.json(result);
+    } catch (err) {
+      console.error("POST /api/xeuledoc error:", err);
+      res.status(500).json({ message: "Erreur interne." });
+    }
+  });
+
   return httpServer;
 }
