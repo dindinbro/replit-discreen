@@ -50,21 +50,44 @@ function getDataDir(): string {
   return fallback;
 }
 
-function detectMainTable(db: Database.Database): { tableName: string; columns: string[]; isFts: boolean } {
+function detectMainTable(db: Database.Database, skipFts5 = false): { tableName: string; columns: string[]; isFts: boolean } {
   const tables = db
     .prepare(
       "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE '%_data' AND name NOT LIKE '%_idx' AND name NOT LIKE '%_content' AND name NOT LIKE '%_docsize' AND name NOT LIKE '%_config' AND name NOT LIKE 'sqlite_%'"
     )
     .all() as { name: string; sql: string }[];
 
-  for (const t of tables) {
-    if (t.sql && t.sql.toUpperCase().includes("USING FTS5")) {
-      const colMatch = t.sql.match(/fts5\(([^)]+)\)/i);
-      if (colMatch) {
-        const cols = colMatch[1].split(",").map((c) => c.trim().split(/\s+/)[0]);
-        console.log(`[searchSqlite] FTS5 table detected: "${t.name}" columns: [${cols.join(", ")}]`);
-        return { tableName: t.name, columns: cols, isFts: true };
+  if (!skipFts5) {
+    for (const t of tables) {
+      if (t.sql && t.sql.toUpperCase().includes("USING FTS5")) {
+        const colMatch = t.sql.match(/fts5\(([^)]+)\)/i);
+        if (colMatch) {
+          const cols = colMatch[1].split(",").map((c) => c.trim().split(/\s+/)[0]);
+          console.log(`[searchSqlite] FTS5 table detected: "${t.name}" columns: [${cols.join(", ")}]`);
+          return { tableName: t.name, columns: cols, isFts: true };
+        }
       }
+    }
+  }
+
+  const contentTables = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_content'"
+    )
+    .all() as { name: string }[];
+
+  if (contentTables.length > 0) {
+    const ct = contentTables[0];
+    const pragma = db.prepare(`PRAGMA table_info("${ct.name}")`).all() as { name: string }[];
+    const cols = pragma.map((p) => p.name).filter(c => c !== "id" && !c.startsWith("c"));
+    const realCols: string[] = [];
+    for (const p of pragma.map((p) => p.name)) {
+      if (p === "id") continue;
+      realCols.push(p);
+    }
+    if (realCols.length > 0) {
+      console.log(`[searchSqlite] FTS5 content table detected: "${ct.name}" columns: [${realCols.join(", ")}]`);
+      return { tableName: ct.name, columns: realCols, isFts: false };
     }
   }
 
