@@ -196,6 +196,7 @@
     "requiresPro": "Requires PRO minimum",
     "dailyQuota": "Daily quota",
     "unlimited": "Unlimited",
+    "reset": "Reset",
     "exiftool": {
       "title": "Metadata Extraction",
       "description": "Extract hidden metadata from your files (images, PDF, documents). Discover information like camera model, GPS coordinates, creation date, software used and more.",
