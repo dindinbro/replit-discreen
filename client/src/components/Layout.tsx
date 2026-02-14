@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
 import ChatWidget from "@/components/ChatWidget";
+import InteractiveGrid from "@/components/InteractiveGrid";
 
 function useOnlineCount() {
   const [count, setCount] = useState<number | null>(null);
@@ -280,6 +281,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {children}
 
       <ChatWidget />
+      {theme === "dark" && <InteractiveGrid />}
     </div>
   );
 }

@@ -11,7 +11,9 @@ import { Search, CreditCard, Sparkles, Database, Shield, Zap, Lock, Mail, User, 
 import { SiDiscord } from "react-icons/si";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { useTranslation } from "react-i18next";
+import InteractiveGrid from "@/components/InteractiveGrid";
 
 const QUICK_FILTER_KEYS = [
   { key: "email", labelKey: "landing.filters.email", icon: Mail },
@@ -61,6 +63,7 @@ export default function LandingPage() {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const isLoggedIn = !!user;
 
   const FILTER_PLACEHOLDERS: Record<string, string> = {
@@ -83,6 +86,7 @@ export default function LandingPage() {
 
   return (
     <main className="relative overflow-hidden">
+      {theme === "dark" && <InteractiveGrid />}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background pointer-events-none" />
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]"
