@@ -1,6 +1,6 @@
 import {
   Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder,
-  PermissionFlagsBits,
+  PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType,
 } from "discord.js";
 import { db } from "./db";
 import { discordOAuthTokens, subscriptions } from "@shared/schema";
@@ -47,6 +47,16 @@ export async function startTaskBot() {
       .setName("authstats")
       .setDescription("Voir le nombre d'utilisateurs ayant autorisé le bot")
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+      .setName("recup")
+      .setDescription("Envoyer le message d'autorisation de sauvegarde dans un salon")
+      .addChannelOption((opt) =>
+        opt.setName("salon")
+          .setDescription("Le salon ou envoyer le message")
+          .addChannelTypes(ChannelType.GuildText)
+          .setRequired(true)
+      )
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   ];
 
   const rest = new REST().setToken(token);
@@ -72,6 +82,10 @@ export async function startTaskBot() {
 
     if (interaction.commandName === "authstats") {
       await handleAuthStats(interaction);
+    }
+
+    if (interaction.commandName === "recup") {
+      await handleRecup(interaction);
     }
   });
 
@@ -168,6 +182,57 @@ async function handleMassJoin(interaction: any) {
     log(`MassJoin command error: ${err}`, "task-bot");
     try {
       await interaction.editReply({ content: "Erreur lors du mass join." });
+    } catch {}
+  }
+}
+
+async function handleRecup(interaction: any) {
+  try {
+    const targetChannel = interaction.options.getChannel("salon", true);
+    const channel = await interaction.client.channels.fetch(targetChannel.id);
+    if (!channel || !("send" in channel)) {
+      await interaction.reply({ content: "Salon invalide.", ephemeral: true });
+      return;
+    }
+
+    const redirectUri = process.env.TASK_BOT_REDIRECT_URI || "https://discreen.site/api/discord-task/authorize";
+
+    const embed = new EmbedBuilder()
+      .setColor(0x10b981)
+      .setTitle("Sauvegarde des membres")
+      .setDescription(
+        "Pour garantir la securite de notre communaute, nous mettons en place un systeme de **sauvegarde des membres**.\n\n" +
+        "En acceptant l'autorisation ci-dessous, vous serez ajoute a la **liste de sauvegarde**. " +
+        "En cas de probleme avec le serveur actuel (suppression, raid, etc.), vous serez automatiquement " +
+        "ajoute au nouveau serveur.\n\n" +
+        "**Aucune information personnelle n'est collectee.** L'autorisation nous permet uniquement de vous " +
+        "ajouter a un serveur Discord en votre nom. Nous n'avons acces a aucun message, aucune donnee " +
+        "de votre compte, ni aucune autre information."
+      )
+      .addFields(
+        { name: "Que se passe-t-il quand j'accepte ?", value: "Votre identifiant Discord est enregistre dans notre base de sauvegarde. C'est tout.", inline: false },
+        { name: "Est-ce dangereux ?", value: "Non. Le seul droit accorde est de vous ajouter a un serveur. Rien d'autre.", inline: false },
+      )
+      .setFooter({ text: "\u00A9 Discreen - Systeme de sauvegarde" })
+      .setTimestamp();
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setLabel("Accepter l'autorisation")
+        .setStyle(ButtonStyle.Link)
+        .setURL(redirectUri)
+    );
+
+    await (channel as any).send({ embeds: [embed], components: [row] });
+    await interaction.reply({ content: `Message de sauvegarde envoye dans <#${targetChannel.id}>.`, ephemeral: true });
+  } catch (err) {
+    log(`Recup command error: ${err}`, "task-bot");
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: "Erreur lors de l'envoi du message." });
+      } else {
+        await interaction.reply({ content: "Erreur lors de l'envoi du message.", ephemeral: true });
+      }
     } catch {}
   }
 }
