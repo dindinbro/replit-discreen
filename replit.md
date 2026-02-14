@@ -15,6 +15,7 @@ The search system supports three modes (checked in this order):
 Preferred communication style: Simple, everyday language.
 **Important**: When the user reports issues or asks about the app, they are ALWAYS referring to the VPS production deployment (the real site), NOT Replit. All debugging and testing feedback comes from the VPS. After code changes here, the user does `git pull origin`, `npm run build`, and `pm2 restart ecosystem.config.cjs` on the VPS. Git commands use `git push origin` and `git pull origin`.
 **API Rate Limiting**: LeakOSINT and DaltonAPI both enforce ~30s cooldown per token. A global server-side queue (`waitForApiSlot`/`releaseApiSlot`) ensures requests are spaced 30s apart per API token to avoid rate limit errors.
+**VPS Disk Space**: The VPS disk is nearly full (~336 GB used by discreen.db). Cannot download a new copy without deleting the existing one first. The current discreen.db is corrupted (FTS5 index broken by aria2c multi-segment download). File on R2 (`r2:discreen/Discreen.db`, capital D) is confirmed valid. Need to either: (1) free space and re-download with `rclone copy --transfers=1 --multi-thread-streams=0`, or (2) find a way to repair the existing file in-place. Never use aria2c for SQLite database downloads.
 
 ## System Architecture
 
