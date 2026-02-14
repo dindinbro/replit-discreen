@@ -665,6 +665,9 @@ export default function SearchPage() {
   const leakosintUnlimited = leakosintLimit === -1;
   const leakosintAtLimit = !leakosintUnlimited && leakosintUsed >= leakosintLimit;
 
+  const TIER_ORDER: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4, admin: 5 };
+  const tierLevel = TIER_ORDER[internalTier] ?? 0;
+
   const displayUsed = internalUsed;
   const displayLimit = internalLimit;
   const displayTier = internalTier;
@@ -1052,26 +1055,36 @@ export default function SearchPage() {
           <Button
             variant={searchMode === "fivem" ? "default" : "outline"}
             onClick={() => {
-              setSearchMode("fivem");
-              setCriteria([]);
+              if (tierLevel >= 1) {
+                setSearchMode("fivem");
+                setCriteria([]);
+              }
             }}
-            className={`min-w-[180px] gap-2 ${searchMode === "fivem" ? "bg-orange-600 text-white border-orange-600" : ""}`}
+            disabled={tierLevel < 1}
+            title={tierLevel < 1 ? "Abonnement VIP minimum requis" : undefined}
+            className={`min-w-[180px] gap-2 ${searchMode === "fivem" ? "bg-orange-600 text-white border-orange-600" : ""} ${tierLevel < 1 ? "opacity-50 cursor-not-allowed" : ""}`}
             data-testid="button-mode-fivem"
           >
             <Gamepad2 className="w-4 h-4" />
             FiveM
+            {tierLevel < 1 && <span className="text-[10px] ml-1 opacity-70">(VIP+)</span>}
           </Button>
           <Button
             variant={searchMode === "wanted" ? "default" : "outline"}
             onClick={() => {
-              setSearchMode("wanted");
-              setCriteria([]);
+              if (tierLevel >= 2) {
+                setSearchMode("wanted");
+                setCriteria([]);
+              }
             }}
-            className={`min-w-[180px] gap-2 ${searchMode === "wanted" ? "bg-red-600 hover:bg-red-700 text-white border-red-600" : ""}`}
+            disabled={tierLevel < 2}
+            title={tierLevel < 2 ? "Abonnement PRO minimum requis" : undefined}
+            className={`min-w-[180px] gap-2 ${searchMode === "wanted" ? "bg-red-600 hover:bg-red-700 text-white border-red-600" : ""} ${tierLevel < 2 ? "opacity-50 cursor-not-allowed" : ""}`}
             data-testid="button-mode-wanted"
           >
             <ShieldAlert className="w-4 h-4" />
             Wanted
+            {tierLevel < 2 && <span className="text-[10px] ml-1 opacity-70">(PRO+)</span>}
           </Button>
         </div>
 

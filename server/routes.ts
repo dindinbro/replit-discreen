@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier } from "@shared/schema";
+import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes } from "@shared/schema";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { searchAllIndexes, initSearchDatabases } from "./searchSqlite";
@@ -1255,6 +1255,21 @@ export async function registerRoutes(
         }
       }
 
+      const request = api.search.perform.input.parse(req.body);
+
+      const FIVEM_FILTER_SET = new Set<string>(FivemFilterTypes as unknown as string[]);
+      const hasFivemFilter = request.criteria.some((c: { type: string }) => FIVEM_FILTER_SET.has(c.type));
+      const TIER_ORDER: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
+      const tierLevel = TIER_ORDER[tier] ?? 0;
+
+      if (hasFivemFilter && tierLevel < TIER_ORDER.vip) {
+        return res.status(403).json({
+          message: "La recherche FiveM nécessite un abonnement VIP minimum.",
+          requiredTier: "vip",
+          tier,
+        });
+      }
+
       const newCount = await storage.incrementDailyUsage(userId, today);
 
       if (!isUnlimited && newCount > planInfo.dailySearches) {
@@ -1265,8 +1280,6 @@ export async function registerRoutes(
           tier,
         });
       }
-
-      const request = api.search.perform.input.parse(req.body);
       console.log(`[search] Incoming criteria: ${JSON.stringify(request.criteria)}, limit: ${request.limit}, offset: ${request.offset}`);
       const searchStart = Date.now();
       const searchPromise = Promise.resolve(searchAllIndexes(request.criteria, request.limit, request.offset));
