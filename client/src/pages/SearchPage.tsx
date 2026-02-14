@@ -1172,30 +1172,38 @@ export default function SearchPage() {
           <Button
             variant={searchMode === "xeuledoc" ? "default" : "outline"}
             onClick={() => {
-              setSearchMode("xeuledoc");
-              setCriteria([]);
-              setXeuledocUrl("");
-              setXeuledocResult(null);
+              if (tierLevel >= 1) {
+                setSearchMode("xeuledoc");
+                setCriteria([]);
+                setXeuledocUrl("");
+                setXeuledocResult(null);
+              }
             }}
-            className={`min-w-[180px] gap-2 ${searchMode === "xeuledoc" ? "bg-blue-600 text-white border-blue-600" : ""}`}
+            disabled={tierLevel < 1}
+            className={`min-w-[180px] gap-2 ${searchMode === "xeuledoc" ? "bg-blue-600 text-white border-blue-600" : ""} ${tierLevel < 1 ? "opacity-50 cursor-not-allowed" : ""}`}
             data-testid="button-mode-xeuledoc"
           >
             <FileSearch className="w-4 h-4" />
             Google OSINT
+            {tierLevel < 1 && <span className="text-[10px] opacity-70">VIP+</span>}
           </Button>
           <Button
             variant={searchMode === "sherlock" ? "default" : "outline"}
             onClick={() => {
-              setSearchMode("sherlock");
-              setCriteria([]);
-              setSherlockUsername("");
-              setSherlockResult(null);
+              if (tierLevel >= 1) {
+                setSearchMode("sherlock");
+                setCriteria([]);
+                setSherlockUsername("");
+                setSherlockResult(null);
+              }
             }}
-            className={`min-w-[180px] gap-2 ${searchMode === "sherlock" ? "bg-purple-600 text-white border-purple-600" : ""}`}
+            disabled={tierLevel < 1}
+            className={`min-w-[180px] gap-2 ${searchMode === "sherlock" ? "bg-purple-600 text-white border-purple-600" : ""} ${tierLevel < 1 ? "opacity-50 cursor-not-allowed" : ""}`}
             data-testid="button-mode-sherlock"
           >
             <Eye className="w-4 h-4" />
             Sherlock
+            {tierLevel < 1 && <span className="text-[10px] opacity-70">VIP+</span>}
           </Button>
           <Button
             variant={searchMode === "fivem" ? "default" : "outline"}

@@ -2764,6 +2764,16 @@ export async function registerRoutes(
 
   app.post("/api/xeuledoc", requireAuth, async (req: Request, res: Response) => {
     try {
+      const userId = (req as any).user.id;
+      const sub = await storage.getSubscription(userId);
+      const tier = (sub?.tier as string) || "free";
+      const TIER_ORDER_X: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
+      const tierLevel = TIER_ORDER_X[tier] ?? 0;
+      const isAdmin = (req as any).user?.role === "admin";
+      if (!isAdmin && tierLevel < 1) {
+        return res.status(403).json({ message: "Google OSINT necessite un abonnement VIP minimum." });
+      }
+
       const { url: docUrl } = req.body;
       if (!docUrl || typeof docUrl !== "string") {
         return res.status(400).json({ message: "URL manquante." });
@@ -2846,7 +2856,6 @@ export async function registerRoutes(
         };
       }
 
-      const userId = (req as any).user.id;
       const userEmail = (req as any).user?.email || "inconnu";
       console.log(`[xeuledoc] User ${userEmail} (${userId}) searched: ${docUrl} => owner: ${result.owner?.email || "not found"}`);
 
@@ -2932,19 +2941,12 @@ export async function registerRoutes(
 
       const sub = await storage.getSubscription(userId);
       const tier = (sub?.tier as string) || "free";
-      const planInfo = PLAN_LIMITS[tier as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+      const TIER_ORDER_S: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
+      const tierLevel = TIER_ORDER_S[tier] ?? 0;
       const isAdmin = (req as any).user?.role === "admin";
-      const isUnlimited = isAdmin || planInfo.dailySearches === -1;
-      const today = new Date().toISOString().split("T")[0];
-      const newCount = await storage.incrementDailyUsage(userId, today);
 
-      if (!isUnlimited && newCount > planInfo.dailySearches) {
-        return res.status(429).json({
-          message: "Nombre de recherches limite atteint. Veuillez acceder a l'abonnement superieur.",
-          used: newCount,
-          limit: planInfo.dailySearches,
-          tier,
-        });
+      if (!isAdmin && tierLevel < 1) {
+        return res.status(403).json({ message: "Sherlock necessite un abonnement VIP minimum." });
       }
 
       console.log(`[sherlock] User ${userEmail} (${userId}) searching username: ${cleaned}`);
