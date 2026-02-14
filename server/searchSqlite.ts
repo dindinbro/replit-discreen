@@ -431,30 +431,21 @@ const sourceHeaderCache: Record<string, string[]> = {};
 
 function buildHeaderCache(db: Database.Database, tableName: string, isFts: boolean): void {
   try {
-    const sourceCol = isFts ? "source" : "source";
-    const lineCol = isFts ? "line" : "line";
-    const sources = db.prepare(
-      `SELECT DISTINCT "${sourceCol}" FROM "${tableName}" WHERE "${sourceCol}" IS NOT NULL LIMIT 500`
-    ).all() as Record<string, string>[];
+    const rows = db.prepare(
+      `SELECT source, line FROM "${tableName}" WHERE rownum = 1 LIMIT 200`
+    ).all() as { source: string; line: string }[];
 
-    for (const row of sources) {
-      const src = row[sourceCol] || row["Source"];
-      if (!src || sourceHeaderCache[src]) continue;
-      try {
-        const firstRow = db.prepare(
-          `SELECT "${lineCol}" FROM "${tableName}" WHERE "${sourceCol}" = ? AND rownum = 1 LIMIT 1`
-        ).get(src) as Record<string, string> | undefined;
-        if (firstRow) {
-          const headerLine = firstRow[lineCol] || firstRow["Line"] || firstRow["data"] || "";
-          if (headerLine && headerLine.includes("|")) {
-            const headers = headerLine.split("|").map(h => h.trim().toLowerCase());
-            const looksLikeHeader = headers.every(h => /^[a-z_\s]+$/.test(h) && h.length < 40);
-            if (looksLikeHeader && headers.length >= 2) {
-              sourceHeaderCache[src] = headers;
-            }
-          }
+    for (const row of rows) {
+      const src = row.source;
+      const headerLine = row.line;
+      if (!src || !headerLine || sourceHeaderCache[src]) continue;
+      if (headerLine.includes("|")) {
+        const headers = headerLine.split("|").map(h => h.trim().toLowerCase());
+        const looksLikeHeader = headers.every(h => /^[a-z_\s]+$/.test(h) && h.length < 40);
+        if (looksLikeHeader && headers.length >= 2) {
+          sourceHeaderCache[src] = headers;
         }
-      } catch {}
+      }
     }
     console.log(`[searchSqlite] Header cache built: ${Object.keys(sourceHeaderCache).length} sources with headers`);
   } catch (err: any) {
@@ -973,11 +964,13 @@ export async function initSearchDatabases(): Promise<void> {
   }
   console.log(`[searchSqlite] Active databases: ${Object.keys(SOURCE_MAP).join(", ") || "none"}`);
 
-  for (const [key, info] of Object.entries(dbCache)) {
-    try {
-      buildHeaderCache(info.db, info.tableName, info.isFts);
-    } catch (err: any) {
-      console.warn(`[searchSqlite] Header cache build failed for ${key}:`, err?.message);
+  setTimeout(() => {
+    for (const [key, info] of Object.entries(dbCache)) {
+      try {
+        buildHeaderCache(info.db, info.tableName, info.isFts);
+      } catch (err: any) {
+        console.warn(`[searchSqlite] Header cache build failed for ${key}:`, err?.message);
+      }
     }
-  }
+  }, 5000);
 }
