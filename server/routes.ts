@@ -2714,6 +2714,94 @@ export async function registerRoutes(
   });
 
   // Public API v1 - search via API key (for API tier users)
+  async function callLeakosintInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
+    const leakosintToken = process.env.LEAK_OSINT_API_KEY || process.env.LEAKOSINT_API_KEY;
+    if (!leakosintToken) return [];
+    try {
+      await waitForApiSlot("leakosint");
+      const response = await fetch("https://leakosintapi.com/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: leakosintToken, request: searchTerm, limit: 100, lang: "en", type: "json" }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (!response.ok) { releaseApiSlot("leakosint"); return []; }
+      const data = await response.json() as Record<string, unknown>;
+      releaseApiSlot("leakosint");
+      if (data["Error code"] || data["error"]) return [];
+      const listData = data["List"] as Record<string, { Data?: Record<string, unknown>[] }> | undefined;
+      const results: Record<string, unknown>[] = [];
+      if (listData) {
+        for (const [dbName, dbInfo] of Object.entries(listData)) {
+          if (dbName === "No results found") continue;
+          if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
+            for (const row of dbInfo.Data) results.push({ _source: `leakosint:${dbName}`, ...row });
+          }
+        }
+      }
+      return results;
+    } catch (err) {
+      releaseApiSlot("leakosint");
+      console.error("[api/v1] LeakOSINT error:", err);
+      return [];
+    }
+  }
+
+  async function callDaltonInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
+    const daltonToken = process.env.DALTON_API_KEY;
+    if (!daltonToken) return [];
+    try {
+      await waitForApiSlot("dalton");
+      const response = await fetch("https://leakosintapi.com/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: daltonToken, request: searchTerm, limit: 100, lang: "en", type: "json" }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (!response.ok) { releaseApiSlot("dalton"); return []; }
+      const data = await response.json() as Record<string, unknown>;
+      releaseApiSlot("dalton");
+      if (data["Error code"] || data["error"]) return [];
+      const listData = data["List"] as Record<string, { Data?: Record<string, unknown>[] }> | undefined;
+      const results: Record<string, unknown>[] = [];
+      if (listData) {
+        for (const [dbName, dbInfo] of Object.entries(listData)) {
+          if (dbName === "No results found") continue;
+          if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
+            for (const row of dbInfo.Data) results.push({ _source: `dalton:${dbName}`, ...row });
+          }
+        }
+      }
+      return results;
+    } catch (err) {
+      releaseApiSlot("dalton");
+      console.error("[api/v1] DaltonAPI error:", err);
+      return [];
+    }
+  }
+
+  async function callBreachInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
+    const breachApiKey = process.env.BREACH_API_KEY;
+    if (!breachApiKey) return [];
+    try {
+      const response = await fetch("https://breach.vip/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Api-Key": breachApiKey },
+        body: JSON.stringify({ term: searchTerm, fields: ["email", "username", "password", "hash", "name", "phone", "ip"], wildcard: true, case_sensitive: false, categories: null }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) return [];
+      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("application/json")) return [];
+      const data = await response.json();
+      if (!data.results || !Array.isArray(data.results)) return [];
+      return data.results.map((r: Record<string, unknown>) => ({ _source: "breach.vip", ...r }));
+    } catch (err) {
+      console.error("[api/v1] Breach.vip error:", err);
+      return [];
+    }
+  }
+
   app.post("/api/v1/search", async (req: Request, res: Response) => {
     try {
       const authHeader = req.headers["x-api-key"] || req.headers.authorization?.replace("Bearer ", "");
@@ -2734,15 +2822,51 @@ export async function registerRoutes(
       }
 
       const request = api.search.perform.input.parse(req.body);
-      const { results, total } = await searchAllIndexes(request.criteria, request.limit, request.offset);
+
+      const searchTerm = request.criteria.map((c: any) => c.value).join(" ");
+
+      const searchStart = Date.now();
+
+      const [internalResult, externalResults, leakosintResults, daltonResults, breachResults] = await Promise.all([
+        searchAllIndexes(request.criteria, request.limit, request.offset).catch(err => {
+          console.error("[api/v1] Internal search error:", err);
+          return { results: [] as Record<string, unknown>[], total: 0 as number | null };
+        }),
+        callExternalSearchApi(request.criteria).catch(() => [] as Record<string, unknown>[]),
+        callLeakosintInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
+        callDaltonInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
+        callBreachInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
+      ]);
+
+      const allResults = [
+        ...internalResult.results,
+        ...externalResults,
+        ...leakosintResults,
+        ...daltonResults,
+        ...breachResults,
+      ];
+
+      const total = allResults.length;
 
       const today = new Date().toISOString().split("T")[0];
       await storage.incrementDailyUsage(validation.userId, today);
 
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
-      webhookApiSearch(validation.userId, criteriaStr, total ?? 0);
+      webhookApiSearch(validation.userId, criteriaStr, total);
 
-      res.json({ results, total });
+      console.log(`[api/v1] Search done in ${Date.now() - searchStart}ms — internal: ${internalResult.results.length}, external: ${externalResults.length}, leakosint: ${leakosintResults.length}, dalton: ${daltonResults.length}, breach: ${breachResults.length}, total: ${total}`);
+
+      res.json({
+        results: allResults,
+        total,
+        sources: {
+          internal: internalResult.results.length,
+          external_proxy: externalResults.length,
+          leakosint: leakosintResults.length,
+          dalton: daltonResults.length,
+          breach: breachResults.length,
+        },
+      });
     } catch (error: any) {
       console.error("API v1 Search error:", error);
       if (error instanceof z.ZodError) {

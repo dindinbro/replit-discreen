@@ -273,7 +273,7 @@ export default function ApiKeysPage() {
               Documentation API
             </h2>
             <div className="space-y-3 text-sm text-muted-foreground">
-              <p>Utilisez vos cles API pour effectuer des recherches programmatiques via l'endpoint:</p>
+              <p>Utilisez vos cles API pour effectuer des recherches sur toutes les sources disponibles via l'endpoint:</p>
               <div className="bg-secondary rounded-md p-3 font-mono text-xs" data-testid="text-api-endpoint">
                 <span className="text-primary">POST</span> /api/v1/search
               </div>
@@ -289,7 +289,29 @@ export default function ApiKeysPage() {
                 <div className="pl-4">{"}"}</div>
                 <div>{"}"}</div>
               </div>
-              <p>Recherches illimitees avec l'abonnement API.</p>
+              <p className="font-medium text-foreground">Sources interrogees en parallele:</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Bases internes (Discreen.db, index, incoming)</li>
+                <li>Proxy externe</li>
+                <li>LeakOSINT</li>
+                <li>DaltonAPI</li>
+                <li>Breach.vip</li>
+              </ul>
+              <p className="font-medium text-foreground">Exemple de reponse:</p>
+              <div className="bg-secondary rounded-md p-3 font-mono text-xs space-y-1">
+                <div>{"{"}</div>
+                <div className="pl-4">"results": [...],</div>
+                <div className="pl-4">"total": 150,</div>
+                <div className="pl-4">"sources": {"{"}</div>
+                <div className="pl-8">"internal": 50,</div>
+                <div className="pl-8">"external_proxy": 30,</div>
+                <div className="pl-8">"leakosint": 40,</div>
+                <div className="pl-8">"dalton": 20,</div>
+                <div className="pl-8">"breach": 10</div>
+                <div className="pl-4">{"}"}</div>
+                <div>{"}"}</div>
+              </div>
+              <p>Recherches illimitees avec l'abonnement API. Toutes les sources sont interrogees simultanement.</p>
             </div>
           </Card>
         </motion.div>
