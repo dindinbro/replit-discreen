@@ -2949,6 +2949,15 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Sherlock necessite un abonnement VIP minimum." });
       }
 
+      const blEntries = await storage.getBlacklistEntries();
+      const isBlacklisted = blEntries.some((entry) => {
+        const blPseudo = (entry.pseudo || "").trim().toLowerCase();
+        return blPseudo && blPseudo === cleaned.toLowerCase();
+      });
+      if (isBlacklisted) {
+        return res.status(403).json({ message: "Ce pseudo est protege et ne peut pas etre recherche." });
+      }
+
       console.log(`[sherlock] User ${userEmail} (${userId}) searching username: ${cleaned}`);
 
       const results: Array<{ name: string; url: string; found: boolean; category: string }> = [];
