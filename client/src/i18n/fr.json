@@ -406,7 +406,8 @@
     "platine": "Disques de Platine",
     "labels": "Labels",
     "empty": "Aucun profil pour le moment.",
-    "profilesCounted": "profil(s) recenses"
+    "profilesCounted": "profil(s) recenses",
+    "error": "Impossible de charger les profils."
   },
   "blacklistRequest": {
     "title": "Demande de Blacklist",

@@ -186,12 +186,19 @@ export default function UsersPage() {
   const { t } = useTranslation();
   const [profiles, setProfiles] = useState<DofProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     fetch("/api/dof-profiles")
-      .then((res) => res.json())
-      .then((data) => setProfiles(data))
-      .catch(() => {})
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed");
+        return res.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) setProfiles(data);
+        else setProfiles([]);
+      })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -204,6 +211,15 @@ export default function UsersPage() {
     return (
       <div className="container max-w-5xl mx-auto px-4 py-12 flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container max-w-5xl mx-auto px-4 py-12 text-center min-h-[400px] flex flex-col items-center justify-center">
+        <Disc3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+        <p className="text-muted-foreground">{t("dof.error", "Impossible de charger les profils.")}</p>
       </div>
     );
   }

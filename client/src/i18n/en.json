@@ -406,7 +406,8 @@
     "platine": "Platinum Discs",
     "labels": "Labels",
     "empty": "No profiles yet.",
-    "profilesCounted": "profile(s) recorded"
+    "profilesCounted": "profile(s) recorded",
+    "error": "Unable to load profiles."
   },
   "blacklistRequest": {
     "title": "Blacklist Request",
