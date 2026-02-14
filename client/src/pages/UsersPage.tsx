@@ -27,6 +27,12 @@ const MAIN_PROFILES: WantedProfile[] = [
 
 const SECONDARY_PROFILES: WantedProfile[] = [
   {
+    pseudo: "KAKASHI",
+    disc: "Disque de Diamant",
+    description: "LI7WAMOK",
+    images: ["https://cdn.discordapp.com/avatars/573823237591400469/016eabaabe3c1e93c40acca0d10352ce.webp?size=1024"],
+  },
+  {
     pseudo: "POINTU",
     disc: "Disque de Platine",
     description: "Humain multi-taches",
