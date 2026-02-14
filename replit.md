@@ -37,7 +37,7 @@ The project is organized as a monorepo containing a React frontend (`client/`), 
 - **Authentication**: Supabase Auth for user management, JWT validation, and role-based access control.
 - **Role System**: Supports roles like `free`, `vip`, `pro`, `business`, `api`, and `admin`, enforcing access permissions across the application.
 - **Unique ID System**: Assigns unique, auto-incrementing IDs to users, used for internal tracking and integration with external systems.
-- **Security Measures**: CORS with origin whitelist (`FRONTEND_URL` + Replit domains), dedicated rate limiters (heartbeat 10/min, invoice 5/min, search 30/min, global 120/min), Plisio webhook signature validation (HMAC-SHA1 with timing-safe comparison), all payment/sensitive routes require authentication.
+- **Security Measures**: CORS with origin whitelist (`FRONTEND_URL` + Replit domains), dedicated rate limiters (heartbeat 10/min, invoice 5/min, search 30/min, global 120/min), NOWPayments IPN signature validation (HMAC-SHA512 with sorted body), all payment/sensitive routes require authentication.
 
 ### Data Storage
 - **PostgreSQL (via Drizzle ORM)**: Used for core application data such as users, subscriptions, and vouches.

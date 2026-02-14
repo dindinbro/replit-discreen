@@ -47,7 +47,7 @@ const TOPIC_TREE: TopicNode[] = [
     children: [
       {
         label: "Comment payer ?",
-        response: "Les paiements sont traites via Plisio en crypto-monnaie. Rends-toi sur la page Tarifs (/pricing), choisis ton plan et suis le processus de paiement. Ton abonnement sera active automatiquement apres confirmation.",
+        response: "Les paiements sont traites via NOWPayments en crypto-monnaie. Rends-toi sur la page Tarifs (/pricing), choisis ton plan et suis le processus de paiement. Ton abonnement sera active automatiquement apres confirmation.",
       },
       {
         label: "Cle de licence",

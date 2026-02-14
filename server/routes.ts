@@ -23,7 +23,16 @@ import {
 } from "./webhook";
 import { sendFreezeAlert, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 
-const ORDER_TOKEN_SECRET = process.env.PLISIO_API_KEY || crypto.randomBytes(32).toString("hex");
+const ORDER_TOKEN_SECRET = process.env.NOWPAYMENTS_API_KEY || crypto.randomBytes(32).toString("hex");
+
+function sortObject(obj: any): any {
+  if (typeof obj !== "object" || obj === null) return obj;
+  if (Array.isArray(obj)) return obj.map(sortObject);
+  return Object.keys(obj).sort().reduce((result: any, key: string) => {
+    result[key] = sortObject(obj[key]);
+    return result;
+  }, {});
+}
 
 const abnormalAlertsSent = new Set<string>();
 function resetAbnormalAlerts() {
@@ -636,7 +645,6 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/create-service-invoice - create a Plisio invoice for blacklist or info request (50€)
   app.post("/api/create-service-invoice", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user.id;
@@ -646,52 +654,47 @@ export async function registerRoutes(
       });
       const parsed = bodySchema.parse(req.body);
 
-      const plisioKey = process.env.PLISIO_API_KEY;
-      if (!plisioKey) {
-        return res.status(500).json({ message: "Plisio not configured" });
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Payment service not configured" });
       }
 
       const orderId = `service_${parsed.type}_${Date.now()}`;
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const callbackUrl = `${baseUrl}/api/plisio-callback?json=true`;
+      const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
       const orderToken = signOrderId(orderId);
       const successUrl = `${baseUrl}/payment-success?order=${orderId}&token=${orderToken}&service=${parsed.type}`;
+      const cancelUrl = `${baseUrl}/pricing`;
+      const ipnUrl = `${baseUrl}/api/nowpayments-ipn`;
 
       await storage.createPendingServiceRequest(orderId, parsed.type, userId, JSON.stringify(parsed.formData));
 
       const label = parsed.type === "blacklist" ? "Demande de Blacklist" : "Demande d'Information";
 
-      const params = new URLSearchParams({
-        api_key: plisioKey,
-        order_name: label,
-        order_number: orderId,
-        source_amount: "50",
-        source_currency: "EUR",
-        currency: "BTC",
-        callback_url: callbackUrl,
-        success_callback_url: successUrl,
+      const response = await fetch("https://api.nowpayments.io/v1/invoice", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          price_amount: 50,
+          price_currency: "eur",
+          order_id: orderId,
+          order_description: label,
+          ipn_callback_url: ipnUrl,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+        }),
       });
-
-      const response = await fetch(
-        `https://api.plisio.net/api/v1/invoices/new?${params.toString()}`,
-        { method: "GET" }
-      );
-
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Plisio non-JSON response:", text.slice(0, 300));
-        return res.status(502).json({ message: "Payment service unavailable" });
-      }
 
       const data = await response.json();
 
-      if (!data.data?.invoice_url) {
-        console.error("Plisio error:", data);
+      if (!data.invoice_url) {
+        console.error("NOWPayments error:", data);
         return res.status(502).json({ message: "Failed to create invoice" });
       }
 
-      res.json({ invoice_url: data.data.invoice_url, orderId });
+      res.json({ invoice_url: data.invoice_url, orderId });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: "Donnees invalides", errors: err.errors });
@@ -702,7 +705,7 @@ export async function registerRoutes(
   });
 
   // POST /api/blacklist-request and /api/info-request are no longer directly accessible.
-  // Requests are created exclusively by the Plisio callback after successful payment.
+  // Requests are created exclusively by the NOWPayments IPN callback after successful payment.
   // These endpoints require auth and return 403 to prevent unpaid submissions.
   app.post("/api/blacklist-request", requireAuth, (_req, res) => {
     res.status(403).json({ message: "Les demandes de blacklist necessitent un paiement. Utilisez le formulaire prevu a cet effet." });
@@ -1430,7 +1433,6 @@ export async function registerRoutes(
     }
   });
 
-  // Plisio payment - create invoice (server-side price enforcement, auth required)
   app.post("/api/create-invoice", requireAuth, async (req: Request, res: Response) => {
     try {
       const { plan } = req.body;
@@ -1439,91 +1441,84 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Plan invalide" });
       }
 
-      const plisioKey = process.env.PLISIO_API_KEY;
-      if (!plisioKey) {
-        return res.status(500).json({ message: "Plisio not configured" });
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "Payment service not configured" });
       }
 
       const orderId = `order_${plan}_${Date.now()}`;
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const callbackUrl = `${baseUrl}/api/plisio-callback?json=true`;
+      const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
       const orderToken = signOrderId(orderId);
       const successUrl = `${baseUrl}/payment-success?order=${orderId}&token=${orderToken}`;
+      const cancelUrl = `${baseUrl}/pricing`;
+      const ipnUrl = `${baseUrl}/api/nowpayments-ipn`;
 
-      const params = new URLSearchParams({
-        api_key: plisioKey,
-        order_name: `Abonnement ${planInfo.label}`,
-        order_number: orderId,
-        source_amount: String(planInfo.price),
-        source_currency: "EUR",
-        currency: "BTC",
-        callback_url: callbackUrl,
-        success_callback_url: successUrl,
-        "plugin_data[tier]": plan,
+      const response = await fetch("https://api.nowpayments.io/v1/invoice", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          price_amount: planInfo.price,
+          price_currency: "eur",
+          order_id: orderId,
+          order_description: `Abonnement ${planInfo.label}`,
+          ipn_callback_url: ipnUrl,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+        }),
       });
-
-      const response = await fetch(
-        `https://api.plisio.net/api/v1/invoices/new?${params.toString()}`,
-        { method: "GET" }
-      );
-
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Plisio non-JSON response:", text.slice(0, 300));
-        return res.status(502).json({ message: "Payment service unavailable" });
-      }
 
       const data = await response.json();
 
-      if (!data.data?.invoice_url) {
-        console.error("Plisio error:", data);
+      if (!data.invoice_url) {
+        console.error("NOWPayments error:", data);
         return res.status(502).json({ message: "Failed to create invoice" });
       }
 
       webhookInvoiceCreated(plan, orderId, planInfo.price);
 
-      res.json({ invoice_url: data.data.invoice_url });
+      res.json({ invoice_url: data.invoice_url });
     } catch (err) {
       console.error("POST /api/create-invoice error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  // Plisio webhook callback - auto-generate license key on completed payment
-  // Plisio sends callbacks as GET with query params; also support POST
-  const plisioCallbackHandler = async (req: Request, res: Response) => {
+  app.post("/api/nowpayments-ipn", async (req: Request, res: Response) => {
     try {
-      const params = req.method === "POST" ? req.body : req.query;
-      const { status, order_number, verify_hash, source_amount, currency } = params;
-      console.log("Plisio callback:", { status, order_number, source_amount, currency });
-
-      const plisioKey = process.env.PLISIO_API_KEY;
-      if (!plisioKey) {
-        console.error("Plisio callback: PLISIO_API_KEY not configured");
+      const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+      if (!ipnSecret) {
+        console.error("NOWPayments IPN: IPN_SECRET not configured");
         return res.status(500).json({ status: "server misconfigured" });
       }
 
-      if (!verify_hash) {
-        if (req.method === "GET") {
-          console.warn("Plisio callback (GET): missing verify_hash — allowing for browser redirect compatibility");
-        } else {
-          console.error("Plisio callback (POST): missing verify_hash — rejecting unsigned request");
-          return res.status(403).json({ status: "signature required" });
-        }
+      const receivedSig = req.headers["x-nowpayments-sig"] as string;
+      if (!receivedSig) {
+        console.error("NOWPayments IPN: missing signature header");
+        return res.status(403).json({ status: "signature required" });
       }
 
-      if (verify_hash) {
-        const sortedKeys = Object.keys(params).filter(k => k !== "verify_hash").sort();
-        const message = sortedKeys.map(k => `${k}=${params[k]}`).join("&");
-        const expected = crypto.createHmac("sha1", plisioKey).update(message).digest("hex");
-        if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(String(verify_hash)))) {
-          console.error("Plisio callback: invalid verify_hash");
-          return res.status(403).json({ status: "invalid signature" });
-        }
+      const sortedBody = sortObject(req.body);
+      const hmac = crypto.createHmac("sha512", ipnSecret);
+      hmac.update(JSON.stringify(sortedBody));
+      const calculatedSig = hmac.digest("hex");
+
+      if (receivedSig !== calculatedSig) {
+        console.error("NOWPayments IPN: invalid signature");
+        return res.status(403).json({ status: "invalid signature" });
       }
 
-      if (status === "completed" || status === "mismatch") {
+      const { payment_status, order_id, price_amount, pay_currency } = req.body;
+      console.log("NOWPayments IPN:", { payment_status, order_id, price_amount, pay_currency });
+
+      const status = payment_status;
+      const order_number = order_id;
+      const source_amount = price_amount;
+      const currency = pay_currency;
+
+      if (status === "finished" || status === "partially_paid" || status === "confirmed") {
         const orderStr = String(order_number || "");
 
         const serviceMatch = orderStr.match(/^service_(blacklist|info)_/);
@@ -1575,12 +1570,10 @@ export async function registerRoutes(
 
       res.json({ status: "ok" });
     } catch (err) {
-      console.error("Plisio callback error:", err);
+      console.error("NOWPayments IPN error:", err);
       res.json({ status: "ok" });
     }
-  };
-  app.get("/api/plisio-callback", plisioCallbackHandler);
-  app.post("/api/plisio-callback", plisioCallbackHandler);
+  });
 
   // GET /api/license-by-order/:orderId - fetch license key by order (secured with signed token)
   app.get("/api/license-by-order/:orderId", async (req: Request, res: Response) => {

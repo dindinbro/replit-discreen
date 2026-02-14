@@ -286,8 +286,8 @@ export function webhookKeyRedeemed(user: UserInfo, tier: string, key?: string, d
   if (discordId) lines.push(`**Discord** : <@${discordId}> (\`${discordId}\`)`);
 
   if (createdBy) {
-    if (createdBy === "plisio") {
-      lines.push(`**Cree par** : Plisio (paiement auto)`);
+    if (createdBy === "nowpayments") {
+      lines.push(`**Cree par** : NOWPayments (paiement auto)`);
     } else if (createdBy.startsWith("discord:")) {
       const cid = createdBy.replace("discord:", "");
       lines.push(`**Cree par** : <@${cid}> (Bot Discord)`);
@@ -654,8 +654,8 @@ export function webhookBotKeyRedeemed(username: string, uniqueId: number | undef
   lines.push(`**Cle** : ||\`${key}\`||`);
 
   if (createdBy) {
-    if (createdBy === "plisio") {
-      lines.push(`**Cree par** : Plisio (paiement auto)`);
+    if (createdBy === "nowpayments") {
+      lines.push(`**Cree par** : NOWPayments (paiement auto)`);
     } else if (createdBy.startsWith("discord:")) {
       const cid = createdBy.replace("discord:", "");
       lines.push(`**Cree par** : <@${cid}> (Bot Discord)`);

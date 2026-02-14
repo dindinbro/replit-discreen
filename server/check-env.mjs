@@ -10,7 +10,8 @@ const REQUIRED = [
 ];
 
 const OPTIONAL = [
-  { key: "PLISIO_API_KEY", label: "Plisio (paiements)" },
+  { key: "NOWPAYMENTS_API_KEY", label: "NOWPayments (paiements)" },
+  { key: "NOWPAYMENTS_IPN_SECRET", label: "NOWPayments IPN secret" },
   { key: "LEAK_OSINT_API_KEY", label: "LeakOSINT", alt: "LEAKOSINT_API_KEY" },
   { key: "BREACH_API_KEY", label: "Breach.vip" },
   { key: "S3_ENDPOINT", label: "Cloudflare R2 endpoint" },

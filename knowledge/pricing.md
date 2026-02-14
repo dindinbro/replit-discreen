@@ -34,14 +34,14 @@
 
 ## Informations generales
 - Les credits de recherche se renouvellent chaque jour
-- Les paiements sont traites via Plisio (crypto-monnaie)
+- Les paiements sont traites via NOWPayments (crypto-monnaie)
 - Les abonnements payants sont renouveles mensuellement (30 jours)
 - Il est possible d'activer un abonnement avec une cle de licence
 
 ## Comment s'abonner ?
 1. Rendez-vous sur la page Tarifs (/pricing)
 2. Choisissez votre plan
-3. Suivez le processus de paiement via Plisio
+3. Suivez le processus de paiement via NOWPayments
 4. Votre abonnement sera active automatiquement apres confirmation du paiement
 
 ## Cles de licence
