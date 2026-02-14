@@ -44,6 +44,8 @@ import {
   RotateCcw,
   Zap,
   FileSearch,
+  Eye,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -423,7 +425,7 @@ export default function SearchPage() {
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc">("internal");
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "other" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">("internal");
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
@@ -491,6 +493,16 @@ export default function SearchPage() {
     as?: string;
     proxy?: boolean;
     hosting?: boolean;
+  } | null>(null);
+
+  const [sherlockUsername, setSherlockUsername] = useState("");
+  const [sherlockLoading, setSherlockLoading] = useState(false);
+  const [sherlockResult, setSherlockResult] = useState<{
+    username?: string;
+    found?: number;
+    total?: number;
+    results?: Array<{ name: string; url: string; found: boolean; category: string }>;
+    error?: string;
   } | null>(null);
 
   const [xeuledocUrl, setXeuledocUrl] = useState("");
@@ -986,6 +998,42 @@ export default function SearchPage() {
   const isWantedMode = searchMode === "wanted";
   const isFivemMode = searchMode === "fivem";
   const isXeuledocMode = searchMode === "xeuledoc";
+  const isSherlockMode = searchMode === "sherlock";
+
+  const handleSherlockSearch = async () => {
+    const u = sherlockUsername.trim().replace(/^@/, "");
+    if (!u) return;
+    if (!/^[a-zA-Z0-9_.-]{1,40}$/.test(u)) {
+      toast({
+        title: "Pseudo invalide",
+        description: "Utilisez uniquement lettres, chiffres, tirets, points et underscores.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSherlockLoading(true);
+    setSherlockResult(null);
+    try {
+      const token = getAccessToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const resp = await fetch("/api/sherlock", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ username: u }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setSherlockResult({ error: data.message || "Erreur inconnue." });
+      } else {
+        setSherlockResult(data);
+      }
+    } catch {
+      setSherlockResult({ error: "Erreur de connexion au serveur." });
+    } finally {
+      setSherlockLoading(false);
+    }
+  };
 
   const GOOGLE_DOC_REGEX = /^https:\/\/(docs|drive|slides|sheets|jamboard|script|forms)\.google\.com\/.+/i;
 
@@ -1025,13 +1073,13 @@ export default function SearchPage() {
   };
 
   return (
-    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""} ${isXeuledocMode ? "xeuledoc-atmosphere" : ""}`}>
-      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode || isXeuledocMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
+    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""} ${isXeuledocMode ? "xeuledoc-atmosphere" : ""} ${isSherlockMode ? "sherlock-atmosphere" : ""}`}>
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode || isXeuledocMode || isSherlockMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
 
       <div className="relative container max-w-5xl mx-auto px-4 py-12 space-y-12">
         <section className="text-center space-y-4 max-w-2xl mx-auto mb-8">
           <motion.h1
-            key={isWantedMode ? "wanted-title" : isFivemMode ? "fivem-title" : isXeuledocMode ? "xeuledoc-title" : "normal-title"}
+            key={isWantedMode ? "wanted-title" : isFivemMode ? "fivem-title" : isXeuledocMode ? "xeuledoc-title" : isSherlockMode ? "sherlock-title" : "normal-title"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-[1.1]"
@@ -1055,6 +1103,13 @@ export default function SearchPage() {
                 Google Docs <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-400">
                   OSINT
+                </span>
+              </>
+            ) : isSherlockMode ? (
+              <>
+                Username <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-violet-400">
+                  Sherlock
                 </span>
               </>
             ) : (
@@ -1127,6 +1182,20 @@ export default function SearchPage() {
           >
             <FileSearch className="w-4 h-4" />
             Google OSINT
+          </Button>
+          <Button
+            variant={searchMode === "sherlock" ? "default" : "outline"}
+            onClick={() => {
+              setSearchMode("sherlock");
+              setCriteria([]);
+              setSherlockUsername("");
+              setSherlockResult(null);
+            }}
+            className={`min-w-[180px] gap-2 ${searchMode === "sherlock" ? "bg-purple-600 text-white border-purple-600" : ""}`}
+            data-testid="button-mode-sherlock"
+          >
+            <Eye className="w-4 h-4" />
+            Sherlock
           </Button>
           <Button
             variant={searchMode === "fivem" ? "default" : "outline"}
@@ -1856,6 +1925,127 @@ export default function SearchPage() {
                       {!xeuledocResult.owner && (
                         <div className="text-center py-4 text-muted-foreground">
                           <p className="text-sm">Aucun proprietaire trouve. Le document est peut-etre anonyme ou les permissions ne permettent pas l'extraction.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+
+          {searchMode === "sherlock" && (
+            <motion.div
+              key="sherlock"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="glass-panel-sherlock rounded-2xl p-6 md:p-8 space-y-6"
+            >
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-purple-500" />
+                <h2 className="text-xl font-semibold">Sherlock — Username OSINT</h2>
+              </div>
+
+              <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-4 text-sm text-muted-foreground space-y-2">
+                <p>
+                  Cet outil recherche un <span className="text-purple-400 font-medium">pseudo</span> sur plus de 40 reseaux sociaux et plateformes populaires.
+                </p>
+                <p>
+                  Il identifie sur quels sites le pseudo est <span className="text-purple-400 font-medium">enregistre</span>, avec un lien direct vers chaque profil trouve.
+                </p>
+                <p className="text-xs opacity-70">
+                  Base sur le projet open-source Sherlock. La recherche peut prendre 15-30 secondes.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Nom d'utilisateur</Label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Input
+                    data-testid="input-sherlock-username"
+                    placeholder="ex: john_doe"
+                    value={sherlockUsername}
+                    onChange={(e) => setSherlockUsername(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSherlockSearch()}
+                    className="max-w-xs"
+                  />
+                  <Button
+                    data-testid="button-sherlock-search"
+                    onClick={handleSherlockSearch}
+                    disabled={sherlockLoading || !sherlockUsername.trim()}
+                    className="bg-purple-600 hover:bg-purple-700 text-white border-purple-600"
+                  >
+                    {sherlockLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span className="ml-1.5">{sherlockLoading ? "Recherche en cours..." : "Rechercher"}</span>
+                  </Button>
+                  <Button
+                    data-testid="button-reset-sherlock"
+                    variant="outline"
+                    onClick={() => { setSherlockUsername(""); setSherlockResult(null); }}
+                    disabled={sherlockLoading}
+                    className="gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reinitialiser
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Lettres, chiffres, tirets, points et underscores uniquement. 40 caracteres max.
+                </p>
+              </div>
+
+              {sherlockLoading && (
+                <div className="flex items-center justify-center gap-3 py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                  <p className="text-sm text-muted-foreground">Analyse de plus de 40 plateformes en cours...</p>
+                </div>
+              )}
+
+              {sherlockResult && !sherlockLoading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4"
+                >
+                  {sherlockResult.error ? (
+                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                      <p className="text-sm text-destructive" data-testid="text-sherlock-error">{sherlockResult.error}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-purple-600 text-white" data-testid="text-sherlock-count">
+                          {sherlockResult.found} / {sherlockResult.total} plateformes
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          Pseudo <span className="font-mono font-medium text-purple-400">@{sherlockResult.username}</span> trouve sur {sherlockResult.found} site{(sherlockResult.found || 0) > 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      {sherlockResult.results && sherlockResult.results.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {sherlockResult.results.map((site, i) => (
+                            <a
+                              key={i}
+                              href={site.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-colors group"
+                              data-testid={`link-sherlock-result-${i}`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{site.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{site.category}</p>
+                              </div>
+                              <ExternalLink className="w-4 h-4 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Eye className="w-10 h-10 mx-auto mb-3 opacity-40 text-purple-500" />
+                          <p className="text-sm">Aucun profil trouve pour ce pseudo.</p>
                         </div>
                       )}
                     </div>

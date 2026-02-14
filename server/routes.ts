@@ -2857,5 +2857,154 @@ export async function registerRoutes(
     }
   });
 
+  const SHERLOCK_SITES: Array<{
+    name: string;
+    url: string;
+    errorType: "status_code" | "message";
+    errorMsg?: string | string[];
+    urlProbe?: string;
+    category: string;
+  }> = [
+    { name: "Instagram", url: "https://www.instagram.com/{}/", errorType: "status_code", category: "Social" },
+    { name: "Twitter/X", url: "https://x.com/{}", errorType: "status_code", category: "Social" },
+    { name: "TikTok", url: "https://tiktok.com/@{}", errorType: "status_code", category: "Social" },
+    { name: "GitHub", url: "https://www.github.com/{}", errorType: "status_code", category: "Dev" },
+    { name: "Reddit", url: "https://www.reddit.com/user/{}", errorType: "status_code", category: "Social" },
+    { name: "YouTube", url: "https://www.youtube.com/@{}", errorType: "status_code", category: "Social" },
+    { name: "Twitch", url: "https://www.twitch.tv/{}", errorType: "status_code", category: "Gaming" },
+    { name: "Steam", url: "https://steamcommunity.com/id/{}", errorType: "message", errorMsg: "The specified profile could not be found.", category: "Gaming" },
+    { name: "Spotify", url: "https://open.spotify.com/user/{}", errorType: "status_code", category: "Music" },
+    { name: "Pinterest", url: "https://www.pinterest.com/{}/", errorType: "status_code", category: "Social" },
+    { name: "Snapchat", url: "https://www.snapchat.com/add/{}", errorType: "status_code", category: "Social" },
+    { name: "SoundCloud", url: "https://soundcloud.com/{}", errorType: "status_code", category: "Music" },
+    { name: "GitLab", url: "https://gitlab.com/{}", errorType: "status_code", category: "Dev" },
+    { name: "Medium", url: "https://medium.com/@{}", errorType: "status_code", category: "Blog" },
+    { name: "Behance", url: "https://www.behance.net/{}", errorType: "status_code", category: "Design" },
+    { name: "DeviantArt", url: "https://www.deviantart.com/{}", errorType: "status_code", category: "Design" },
+    { name: "Flickr", url: "https://www.flickr.com/people/{}", errorType: "status_code", category: "Photo" },
+    { name: "Roblox", url: "https://www.roblox.com/user.aspx?username={}", errorType: "status_code", category: "Gaming" },
+    { name: "9GAG", url: "https://www.9gag.com/u/{}", errorType: "status_code", category: "Social" },
+    { name: "About.me", url: "https://about.me/{}", errorType: "status_code", category: "Social" },
+    { name: "BuyMeACoffee", url: "https://www.buymeacoffee.com/{}", errorType: "status_code", category: "Social" },
+    { name: "CashApp", url: "https://cash.app/{}", errorType: "status_code", category: "Finance" },
+    { name: "Chess.com", url: "https://www.chess.com/member/{}", errorType: "message", errorMsg: "Username is valid", urlProbe: "https://www.chess.com/callback/user/valid?username={}", category: "Gaming" },
+    { name: "Codecademy", url: "https://www.codecademy.com/profiles/{}", errorType: "status_code", category: "Dev" },
+    { name: "DailyMotion", url: "https://www.dailymotion.com/{}", errorType: "status_code", category: "Video" },
+    { name: "Dribbble", url: "https://dribbble.com/{}", errorType: "status_code", category: "Design" },
+    { name: "Duolingo", url: "https://www.duolingo.com/profile/{}", errorType: "status_code", category: "Education" },
+    { name: "Fiverr", url: "https://www.fiverr.com/{}", errorType: "status_code", category: "Freelance" },
+    { name: "HackerRank", url: "https://hackerrank.com/{}", errorType: "status_code", category: "Dev" },
+    { name: "Imgur", url: "https://imgur.com/user/{}", errorType: "status_code", category: "Photo" },
+    { name: "Keybase", url: "https://keybase.io/{}", errorType: "status_code", category: "Security" },
+    { name: "Kick", url: "https://kick.com/{}", errorType: "status_code", category: "Streaming" },
+    { name: "Letterboxd", url: "https://letterboxd.com/{}", errorType: "status_code", category: "Film" },
+    { name: "Lichess", url: "https://lichess.org/@/{}", errorType: "status_code", category: "Gaming" },
+    { name: "Linktree", url: "https://linktr.ee/{}", errorType: "status_code", category: "Social" },
+    { name: "Mastodon", url: "https://mastodon.social/@{}", errorType: "status_code", category: "Social" },
+    { name: "MyAnimeList", url: "https://myanimelist.net/profile/{}", errorType: "status_code", category: "Anime" },
+    { name: "NPM", url: "https://www.npmjs.com/~{}", errorType: "status_code", category: "Dev" },
+    { name: "Patreon", url: "https://www.patreon.com/{}", errorType: "status_code", category: "Social" },
+    { name: "Replit", url: "https://replit.com/@{}", errorType: "status_code", category: "Dev" },
+    { name: "Telegram", url: "https://t.me/{}", errorType: "message", errorMsg: "If you have <strong>Telegram</strong>, you can contact", category: "Messaging" },
+    { name: "Trello", url: "https://trello.com/{}", errorType: "status_code", category: "Productivity" },
+    { name: "Tumblr", url: "https://{}.tumblr.com", errorType: "status_code", category: "Blog" },
+    { name: "VK", url: "https://vk.com/{}", errorType: "status_code", category: "Social" },
+    { name: "VSCO", url: "https://vsco.co/{}/gallery", errorType: "status_code", category: "Photo" },
+    { name: "Wikipedia", url: "https://en.wikipedia.org/wiki/User:{}", errorType: "status_code", category: "Encyclopedia" },
+    { name: "Xbox Gamertag", url: "https://xboxgamertag.com/search/{}", errorType: "status_code", category: "Gaming" },
+    { name: "Bluesky", url: "https://bsky.app/profile/{}.bsky.social", errorType: "status_code", urlProbe: "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={}.bsky.social", category: "Social" },
+  ];
+
+  app.post("/api/sherlock", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { username } = req.body;
+      if (!username || typeof username !== "string") {
+        return res.status(400).json({ message: "Nom d'utilisateur manquant." });
+      }
+
+      const cleaned = username.trim().replace(/^@/, "");
+      if (!/^[a-zA-Z0-9_.-]{1,40}$/.test(cleaned)) {
+        return res.status(400).json({ message: "Nom d'utilisateur invalide. Utilisez uniquement lettres, chiffres, tirets, points et underscores." });
+      }
+
+      const userId = (req as any).user.id;
+      const userEmail = (req as any).user?.email || "inconnu";
+
+      const sub = await storage.getSubscription(userId);
+      const tier = (sub?.tier as string) || "free";
+      const planInfo = PLAN_LIMITS[tier as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+      const isAdmin = (req as any).user?.role === "admin";
+      const isUnlimited = isAdmin || planInfo.dailySearches === -1;
+      const today = new Date().toISOString().split("T")[0];
+      const newCount = await storage.incrementDailyUsage(userId, today);
+
+      if (!isUnlimited && newCount > planInfo.dailySearches) {
+        return res.status(429).json({
+          message: "Nombre de recherches limite atteint. Veuillez acceder a l'abonnement superieur.",
+          used: newCount,
+          limit: planInfo.dailySearches,
+          tier,
+        });
+      }
+
+      console.log(`[sherlock] User ${userEmail} (${userId}) searching username: ${cleaned}`);
+
+      const results: Array<{ name: string; url: string; found: boolean; category: string }> = [];
+      const TIMEOUT_MS = 8000;
+      const CONCURRENCY = 15;
+
+      const checkSite = async (site: typeof SHERLOCK_SITES[number]) => {
+        const profileUrl = site.url.replace("{}", cleaned);
+        const probeUrl = (site.urlProbe || site.url).replace("{}", cleaned);
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+          const resp = await fetch(probeUrl, {
+            signal: controller.signal,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "en-US,en;q=0.5",
+            },
+            redirect: "follow",
+          });
+          clearTimeout(timer);
+
+          if (site.errorType === "status_code") {
+            if (resp.status >= 200 && resp.status < 400) {
+              results.push({ name: site.name, url: profileUrl, found: true, category: site.category });
+            }
+          } else if (site.errorType === "message" && site.errorMsg) {
+            const text = await resp.text();
+            const msgs = Array.isArray(site.errorMsg) ? site.errorMsg : [site.errorMsg];
+            const hasError = msgs.some(m => text.includes(m));
+            if (!hasError && resp.status < 400) {
+              results.push({ name: site.name, url: profileUrl, found: true, category: site.category });
+            }
+          }
+        } catch {
+        }
+      };
+
+      for (let i = 0; i < SHERLOCK_SITES.length; i += CONCURRENCY) {
+        const batch = SHERLOCK_SITES.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(checkSite));
+      }
+
+      results.sort((a, b) => a.name.localeCompare(b.name));
+      console.log(`[sherlock] Username "${cleaned}" found on ${results.length} sites`);
+
+      res.json({
+        username: cleaned,
+        found: results.length,
+        total: SHERLOCK_SITES.length,
+        results,
+      });
+    } catch (err) {
+      console.error("POST /api/sherlock error:", err);
+      res.status(500).json({ message: "Erreur interne." });
+    }
+  });
+
   return httpServer;
 }
