@@ -2847,9 +2847,8 @@ export async function registerRoutes(
       }
 
       const userId = (req as any).user.id;
-      const wUser = await storage.getUserBySupabaseId(userId);
-      const username = wUser?.username || wUser?.email?.split("@")[0] || "inconnu";
-      console.log(`[xeuledoc] User ${username} (${userId}) searched: ${docUrl} => owner: ${result.owner?.email || "not found"}`);
+      const userEmail = (req as any).user?.email || "inconnu";
+      console.log(`[xeuledoc] User ${userEmail} (${userId}) searched: ${docUrl} => owner: ${result.owner?.email || "not found"}`);
 
       res.json(result);
     } catch (err) {
