@@ -30,6 +30,7 @@ export interface IStorage {
   upsertSubscription(userId: string, tier: PlanTier): Promise<Subscription>;
   getDailyUsage(userId: string, date: string): Promise<number>;
   incrementDailyUsage(userId: string, date: string): Promise<number>;
+  resetDailyUsage(userId: string): Promise<void>;
   getLeakosintDailyUsage(userId: string, date: string): Promise<number>;
   incrementLeakosintDailyUsage(userId: string, date: string): Promise<number>;
   checkSearchAllowed(userId: string, isAdmin?: boolean): Promise<{ allowed: boolean; used: number; limit: number; tier: PlanTier }>;
@@ -194,6 +195,14 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return result.searchCount;
+  }
+
+  async resetDailyUsage(userId: string): Promise<void> {
+    const today = new Date().toISOString().split("T")[0];
+    await db
+      .update(dailyUsage)
+      .set({ searchCount: 0, leakosintCount: 0 })
+      .where(and(eq(dailyUsage.userId, userId), eq(dailyUsage.usageDate, today)));
   }
 
   async getLeakosintDailyUsage(userId: string, date: string): Promise<number> {

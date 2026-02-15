@@ -605,6 +605,24 @@ export function webhookBotSetplan(adminTag: string, uniqueId: number, email: str
   });
 }
 
+export function webhookBotResetR(adminTag: string, adminDiscordId: string, uniqueId: number, email: string, username: string, tier: string) {
+  const desc = [
+    `>>> **Commande Bot**`,
+    `**Reset par** : <@${adminDiscordId}> (\`${adminTag}\`)`,
+    sep(),
+    `**ID Unique** : \`#${uniqueId}\``,
+    `**Email** : \`${email}\``,
+    `**Nom d'utilisateur** : \`${username}\``,
+    `**Abonnement** : \`${tier.toUpperCase()}\``,
+  ].join("\n");
+
+  sendBotLogsWebhook({
+    title: "\u{1F504} /resetr - Recherches Reinitialisees",
+    description: desc,
+    color: COLORS.role,
+  });
+}
+
 export function webhookBotWantedlist(adminTag: string, count: number) {
   const desc = [
     `>>> **Commande Bot**`,

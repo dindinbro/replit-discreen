@@ -11,7 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { PlanTier } from "@shared/schema";
 import {
   webhookBotGkey, webhookBotRkey, webhookBotIkey, webhookBotIuser,
-  webhookBotSetplan, webhookBotWantedlist, webhookBotGeneric
+  webhookBotSetplan, webhookBotWantedlist, webhookBotGeneric, webhookBotResetR
 } from "./webhook";
 
 let client: Client | null = null;
@@ -287,6 +287,16 @@ export async function startDiscordBot() {
     .setDescription("Actualiser la liste Wanted et voir les ajouts recents")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
+  const resetRCommand = new SlashCommandBuilder()
+    .setName("resetr")
+    .setDescription("Reinitialiser les recherches quotidiennes d'un utilisateur")
+    .addIntegerOption((opt) =>
+      opt
+        .setName("idunique")
+        .setDescription("ID unique de l'utilisateur")
+        .setRequired(true)
+    );
+
   const rest = new REST({ version: "10" }).setToken(token);
 
   try {
@@ -312,7 +322,8 @@ export async function startDiscordBot() {
         linkCommand.toJSON(),
         wantedCommand.toJSON(),
         wantedPreviewCommand.toJSON(),
-        wrefreshCommand.toJSON()
+        wrefreshCommand.toJSON(),
+        resetRCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -343,7 +354,8 @@ export async function startDiscordBot() {
       linkCommand.toJSON(),
       wantedCommand.toJSON(),
       wantedPreviewCommand.toJSON(),
-      wrefreshCommand.toJSON()
+      wrefreshCommand.toJSON(),
+      resetRCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1036,6 +1048,63 @@ export async function startDiscordBot() {
           await interaction.editReply({ content: "Erreur lors de la modification de l'abonnement." });
         } else if (!interaction.replied) {
           await interaction.reply({ content: "Erreur lors de la modification de l'abonnement.", ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.commandName === "resetr") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const uniqueId = interaction.options.getInteger("idunique", true);
+        const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+
+        if (!sub) {
+          await interaction.editReply({ content: `Aucun utilisateur trouve avec l'ID unique \`${uniqueId}\`.` });
+          return;
+        }
+
+        await storage.resetDailyUsage(sub.userId);
+
+        let email = "Inconnu";
+        let username = "Inconnu";
+        try {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseKey) {
+            const supaAdmin = createClient(supabaseUrl, supabaseKey);
+            const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+            if (data?.user) {
+              email = data.user.email || "Inconnu";
+              username = data.user.user_metadata?.display_name || data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Inconnu";
+            }
+          }
+        } catch (supaErr) {
+          log(`/resetr: Supabase lookup failed: ${supaErr}`, "discord");
+        }
+
+        const tier = sub.tier || "free";
+
+        const embed = new EmbedBuilder()
+          .setColor(0x10b981)
+          .setTitle("Recherches Reinitialisees")
+          .addFields(
+            { name: "Reset par", value: `<@${interaction.user.id}>`, inline: true },
+            { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
+            { name: "Email", value: email, inline: true },
+            { name: "Nom d'utilisateur", value: username, inline: true },
+            { name: "Abonnement", value: tier.toUpperCase(), inline: true }
+          )
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        webhookBotResetR(interaction.user.tag, interaction.user.id, uniqueId, email, username, tier);
+        log(`/resetr: User #${uniqueId} searches reset by ${interaction.user.username}`, "discord");
+      } catch (err) {
+        log(`Error in /resetr: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de la reinitialisation des recherches." });
+        } else if (!interaction.replied) {
+          await interaction.reply({ content: "Erreur lors de la reinitialisation des recherches.", ephemeral: true });
         }
       }
     }
