@@ -115,6 +115,11 @@ function openDb(sourceKey: string): DbInfo | null {
   if (!fs.existsSync(filePath)) return null;
 
   try {
+    if (isDbTooLargeForLocalSearch(sourceKey)) {
+      console.log(`[searchSqlite] ${sourceKey} (${filename}): large file detected, skipping local open (use bridge)`);
+      return null;
+    }
+
     const db = new Database(filePath, { readonly: true });
     const { tableName, columns, isFts } = detectMainTable(db);
 
@@ -445,6 +450,11 @@ function isDbTooLargeForLocalSearch(sourceKey: string): boolean {
 
 function buildHeaderCache(db: Database.Database, tableName: string, isFts: boolean, sourceKey?: string): void {
   try {
+    if (sourceKey && isDbTooLargeForLocalSearch(sourceKey)) {
+      console.log(`[searchSqlite] Skipping header cache for ${sourceKey}: file too large, headers will be inferred from data`);
+      return;
+    }
+
     const rows = db.prepare(
       `SELECT source, line FROM "${tableName}" WHERE rownum = 1 LIMIT 200`
     ).all() as { source: string; line: string }[];
