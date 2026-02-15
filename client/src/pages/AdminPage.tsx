@@ -2471,7 +2471,7 @@ function MaintenanceToggle({ getAccessToken }: { getAccessToken: () => string | 
 }
 
 interface BlockedIpEntry {
-  id: number;
+  id: string;
   ipAddress: string;
   reason: string;
   blockedBy: string;

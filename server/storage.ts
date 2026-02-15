@@ -100,7 +100,7 @@ export interface IStorage {
   getBlockedIps(): Promise<BlockedIp[]>;
   isIpBlocked(ip: string): Promise<boolean>;
   blockIp(ipAddress: string, reason: string, blockedBy: string): Promise<BlockedIp>;
-  unblockIp(id: number): Promise<void>;
+  unblockIp(id: string): Promise<void>;
 }
 
 function hashKey(key: string): string {
@@ -859,14 +859,15 @@ export class DatabaseStorage implements IStorage {
   async blockIp(ipAddress: string, reason: string, blockedBy: string): Promise<BlockedIp> {
     const existing = await db.select().from(blockedIps).where(eq(blockedIps.ipAddress, ipAddress));
     if (existing.length > 0) return existing[0];
+    const id = `ip_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const [entry] = await db
       .insert(blockedIps)
-      .values({ ipAddress, reason, blockedBy })
+      .values({ id, ipAddress, reason, blockedBy })
       .returning();
     return entry;
   }
 
-  async unblockIp(id: number): Promise<void> {
+  async unblockIp(id: string): Promise<void> {
     await db.delete(blockedIps).where(eq(blockedIps.id, id));
   }
 }

@@ -1188,7 +1188,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/blocked-ips/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = req.params.id;
       const ips = await storage.getBlockedIps();
       const entry = ips.find(e => e.id === id);
       if (entry) blockedIpCache.delete(entry.ipAddress);
