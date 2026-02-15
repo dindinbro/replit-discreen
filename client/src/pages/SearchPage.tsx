@@ -1491,7 +1491,7 @@ export default function SearchPage() {
                   <Button
                     data-testid="button-search"
                     onClick={() => handleSearch(0)}
-                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || atLimit || searchCooldown > 0}
+                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || searchCooldown > 0}
                     className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${
                       searchCooldown > 0
                         ? "bg-muted text-muted-foreground cursor-not-allowed"
@@ -1635,7 +1635,7 @@ export default function SearchPage() {
                   <Button
                     data-testid="button-fivem-search"
                     onClick={() => handleSearch(0)}
-                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || atLimit || searchCooldown > 0}
+                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || searchCooldown > 0}
                     className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${searchCooldown > 0 ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-orange-600 text-white shadow-orange-500/25 border-orange-600"}`}
                   >
                     {searchMutation.isPending ? (
