@@ -188,22 +188,25 @@ app.post("/search", (req, res) => {
       const queryMs = Date.now() - queryStart;
 
       console.log(`[bridge] Query on ${key}: ${rows.length} rows in ${queryMs}ms (${entry.ftsWorking ? "FTS" : "LIKE"})`);
-
-      const colMap: Record<string, string> = {};
-      for (const col of entry.columns) {
-        const lower = col.toLowerCase();
-        if (lower === "c0" || lower === "source") colMap[col] = "source";
-        else if (lower === "c1" || lower === "line" || lower === "content") colMap[col] = "line";
-        else if (lower === "c2" || lower === "rownum") colMap[col] = "rownum";
-        else colMap[col] = col;
+      if (rows.length > 0) {
+        console.log(`[bridge] Row keys from query: ${Object.keys(rows[0]).join(", ")}`);
       }
 
       for (const row of rows) {
+        const rowKeys = Object.keys(row);
         const mapped: Record<string, unknown> = {};
-        for (const [origCol, mappedName] of Object.entries(colMap)) {
-          mapped[mappedName] = row[origCol];
+
+        for (const col of rowKeys) {
+          const lower = col.toLowerCase();
+          if (lower === "c0" || lower === "source") mapped["source"] = row[col];
+          else if (lower === "c1" || lower === "line" || lower === "content") mapped["line"] = row[col];
+          else if (lower === "c2" || lower === "rownum") mapped["rownum"] = row[col];
+          else mapped[col] = row[col];
         }
-        allResults.push(mapped);
+
+        if (Object.values(mapped).some(v => v !== null && v !== undefined && String(v).length > 0)) {
+          allResults.push(mapped);
+        }
       }
       totalCount += rows.length;
     } catch (err: any) {
