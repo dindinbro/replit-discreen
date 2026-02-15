@@ -42,10 +42,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const sessionRegisteredRef = useRef(false);
 
-  const registerSession = useCallback(async (accessToken: string) => {
+  const registerSession = useCallback(async (accessToken: string): Promise<boolean> => {
     try {
       const sessionToken = getOrCreateSessionToken();
-      await fetch("/api/session/register", {
+      const res = await fetch("/api/session/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -53,7 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         body: JSON.stringify({ sessionToken }),
       });
-    } catch {}
+      if (!res.ok) {
+        console.error("Session register failed:", res.status);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error("Session register error:", err);
+      return false;
+    }
   }, []);
 
   const fetchRole = useCallback(async (accessToken: string) => {
@@ -70,8 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setExpiresAt(data.expires_at || null);
 
         if (!sessionRegisteredRef.current) {
-          sessionRegisteredRef.current = true;
-          registerSession(accessToken);
+          const ok = await registerSession(accessToken);
+          if (ok) sessionRegisteredRef.current = true;
         }
       } else {
         setRole("user");
