@@ -5,7 +5,7 @@ import { api } from "@shared/routes";
 import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes } from "@shared/schema";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { searchAllIndexes, initSearchDatabases } from "./searchSqlite";
+import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria } from "./searchSqlite";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import crypto from "crypto";
 import path from "path";
@@ -1422,11 +1422,26 @@ export async function registerRoutes(
       }
 
       if (externalResults.length > 0) {
-        results = [...results, ...externalResults];
-        total = (total ?? 0) + externalResults.length;
+        const filteredExternal = request.criteria.length > 1
+          ? filterResultsByCriteria(externalResults, request.criteria)
+          : externalResults;
+        results = [...results, ...filteredExternal];
+        total = (total ?? 0) + filteredExternal.length;
+        if (filteredExternal.length !== externalResults.length) {
+          console.log(`[search] External filtered: ${externalResults.length} -> ${filteredExternal.length}`);
+        }
       }
 
-      console.log(`[search] Done in ${Date.now() - searchStart}ms — internal: ${results.length - externalResults.length}, external: ${externalResults.length}, total: ${total}`);
+      if (request.criteria.length > 1) {
+        const beforeCount = results.length;
+        results = filterResultsByCriteria(results, request.criteria);
+        total = results.length;
+        if (results.length !== beforeCount) {
+          console.log(`[search] Final multi-criteria filter: ${beforeCount} -> ${results.length}`);
+        }
+      }
+
+      console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}`);
 
       const wUser = await buildUserInfo(req);
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
@@ -2838,13 +2853,21 @@ export async function registerRoutes(
         callBreachInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
       ]);
 
-      const allResults = [
+      let allResults = [
         ...internalResult.results,
         ...externalResults,
         ...leakosintResults,
         ...daltonResults,
         ...breachResults,
       ];
+
+      if (request.criteria.length > 1) {
+        const beforeCount = allResults.length;
+        allResults = filterResultsByCriteria(allResults, request.criteria);
+        if (allResults.length !== beforeCount) {
+          console.log(`[api/v1] Multi-criteria filter: ${beforeCount} -> ${allResults.length}`);
+        }
+      }
 
       const total = allResults.length;
 

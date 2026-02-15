@@ -584,24 +584,44 @@ export function filterResultsByCriteria(
   criteria: SearchCriterion[]
 ): Record<string, unknown>[] {
   if (criteria.length === 0) return results;
+  if (criteria.length === 1) return results;
 
   return results.filter((row) => {
     for (const criterion of criteria) {
       const allowedFields = CRITERION_TO_PARSED_FIELDS[criterion.type];
-      if (!allowedFields) continue;
       const searchVal = criterion.value.trim().toLowerCase();
       if (!searchVal) continue;
 
       let foundInAllowedField = false;
-      for (const [key, val] of Object.entries(row)) {
-        if (key.startsWith("_")) continue;
-        const keyLower = key.toLowerCase();
-        if (allowedFields.includes(keyLower)) {
-          const strVal = String(val ?? "").toLowerCase();
-          if (strVal.includes(searchVal)) {
-            foundInAllowedField = true;
-            break;
+
+      if (allowedFields) {
+        for (const [key, val] of Object.entries(row)) {
+          if (key.startsWith("_")) continue;
+          const keyLower = key.toLowerCase();
+          if (allowedFields.includes(keyLower)) {
+            const strVal = String(val ?? "").toLowerCase();
+            if (strVal.includes(searchVal)) {
+              foundInAllowedField = true;
+              break;
+            }
           }
+        }
+      }
+
+      if (!foundInAllowedField) {
+        const raw = row._raw;
+        if (typeof raw === "string" && raw.toLowerCase().includes(searchVal)) {
+          foundInAllowedField = true;
+        }
+      }
+
+      if (!foundInAllowedField) {
+        const anyFieldMatch = Object.entries(row).some(([key, val]) => {
+          if (key.startsWith("_")) return false;
+          return String(val ?? "").toLowerCase().includes(searchVal);
+        });
+        if (anyFieldMatch) {
+          foundInAllowedField = true;
         }
       }
 
