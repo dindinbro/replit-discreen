@@ -231,6 +231,18 @@ export const dailyUsage = pgTable("daily_usage", {
 
 export type DailyUsage = typeof dailyUsage.$inferSelect;
 
+export const activeSessions = pgTable("active_sessions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  sessionToken: text("session_token").notNull().unique(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  lastActiveAt: timestamp("last_active_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type ActiveSession = typeof activeSessions.$inferSelect;
+
 export const apiKeys = pgTable("api_keys", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
