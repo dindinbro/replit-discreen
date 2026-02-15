@@ -331,6 +331,27 @@ export async function startDiscordBot() {
         )
     );
 
+  const openticketCommand = new SlashCommandBuilder()
+    .setName("openticket")
+    .setDescription("Ouvrir un ticket pour un utilisateur")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((opt) =>
+      opt.setName("iduser").setDescription("ID Discord de l'utilisateur").setRequired(true)
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("categorie")
+        .setDescription("Categorie du ticket")
+        .setRequired(true)
+        .addChoices(
+          { name: "Aide", value: "aide" },
+          { name: "Suggestion", value: "suggestion" },
+          { name: "Autre", value: "autre" },
+          { name: "Demande ajout de DB", value: "demande-db" },
+          { name: "Paiement", value: "paiement" },
+        )
+    );
+
   const abypassCommand = new SlashCommandBuilder()
     .setName("abypass")
     .setDescription("Gerer la whitelist de comptes sans restrictions")
@@ -385,7 +406,8 @@ export async function startDiscordBot() {
         wrefreshCommand.toJSON(),
         resetRCommand.toJSON(),
         abypassCommand.toJSON(),
-        setstatusCommand.toJSON()
+        setstatusCommand.toJSON(),
+        openticketCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -419,7 +441,8 @@ export async function startDiscordBot() {
       wrefreshCommand.toJSON(),
       resetRCommand.toJSON(),
       abypassCommand.toJSON(),
-      setstatusCommand.toJSON()
+      setstatusCommand.toJSON(),
+      openticketCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1855,6 +1878,113 @@ export async function startDiscordBot() {
         } else {
           await interaction.reply({ content: "Erreur lors de l'actualisation Wanted.", ephemeral: true });
         }
+      }
+    }
+
+    if (interaction.commandName === "openticket") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const guild = interaction.guild;
+        if (!guild) {
+          await interaction.editReply({ content: "Cette commande doit etre utilisee dans un serveur." });
+          return;
+        }
+
+        const targetUserId = interaction.options.getString("iduser", true).trim();
+        const categorie = interaction.options.getString("categorie", true);
+
+        let targetMember;
+        try {
+          targetMember = await guild.members.fetch(targetUserId);
+        } catch {
+          await interaction.editReply({ content: `Utilisateur introuvable avec l'ID \`${targetUserId}\`. Verifiez l'ID Discord.` });
+          return;
+        }
+
+        const category = guild.channels.cache.get(TICKET_CATEGORY_ID);
+        if (!category) {
+          await interaction.editReply({ content: "La categorie de tickets est introuvable. Contactez un administrateur." });
+          return;
+        }
+
+        const existingTicket = guild.channels.cache.find((ch) => {
+          if (ch.parentId !== TICKET_CATEGORY_ID || !ch.isTextBased()) return false;
+          return ch.topic === targetUserId;
+        });
+        if (existingTicket) {
+          await interaction.editReply({ content: `Cet utilisateur a deja un ticket ouvert: <#${existingTicket.id}>` });
+          return;
+        }
+
+        const sanitizedName = targetMember.user.username.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20) || targetUserId;
+        const channelName = `${categorie}-${sanitizedName}`;
+
+        const permissionOverwrites = [
+          {
+            id: guild.id,
+            deny: [PermissionFlagsBits.ViewChannel],
+            type: OverwriteType.Role as number,
+          },
+          {
+            id: targetUserId,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles],
+            type: OverwriteType.Member as number,
+          },
+        ];
+
+        for (const roleId of STAFF_ROLE_IDS) {
+          permissionOverwrites.push({
+            id: roleId,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages],
+            type: OverwriteType.Role as number,
+          });
+        }
+
+        const ticketChannel = await guild.channels.create({
+          name: channelName,
+          type: ChannelType.GuildText,
+          topic: targetUserId,
+          parent: TICKET_CATEGORY_ID,
+          permissionOverwrites: permissionOverwrites as any,
+        });
+
+        const ticketEmbed = new EmbedBuilder()
+          .setColor(0x10b981)
+          .setTitle("Support Discreen")
+          .setDescription(
+            `Un ticket a ete ouvert pour vous, <@${targetUserId}> !\n\n` +
+            `**Categorie :** ${categorie.charAt(0).toUpperCase() + categorie.slice(1)}\n` +
+            `**Ouvert par :** <@${interaction.user.id}>\n\n` +
+            "Un membre du staff va prendre en charge votre demande.\n" +
+            "Decrivez votre probleme ou votre demande en detail."
+          )
+          .setFooter({ text: "Discreen Support" })
+          .setTimestamp();
+
+        const claimRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`ticket_claim_${ticketChannel.id}`)
+            .setLabel("Prendre en charge")
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`ticket_close_${ticketChannel.id}`)
+            .setLabel("Fermer le ticket")
+            .setStyle(ButtonStyle.Danger),
+        );
+
+        const staffMentions = STAFF_ROLE_IDS.map((id) => `<@&${id}>`).join(" ");
+        await ticketChannel.send({ content: `<@${targetUserId}> ${staffMentions}`, embeds: [ticketEmbed], components: [claimRow] });
+
+        await interaction.editReply({ content: `Ticket cree pour <@${targetUserId}> : <#${ticketChannel.id}>` });
+        webhookBotGeneric(interaction.user.tag, "openticket", `**Utilisateur** : <@${targetUserId}>\n**Categorie** : ${categorie}`);
+        log(`Ticket opened for ${targetMember.user.username} (${targetUserId}) by ${interaction.user.tag} - category: ${categorie}`, "discord");
+      } catch (err) {
+        log(`Error in openticket command: ${err}`, "discord");
+        try {
+          if (interaction.deferred) {
+            await interaction.editReply({ content: "Erreur lors de la creation du ticket." });
+          }
+        } catch {}
       }
     }
 
