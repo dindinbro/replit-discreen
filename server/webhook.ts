@@ -29,6 +29,8 @@ interface UserInfo {
   email: string;
   username?: string;
   uniqueId?: number;
+  discordId?: string | null;
+  bypassed?: boolean;
 }
 
 function userBlock(u: UserInfo): string {
@@ -38,6 +40,9 @@ function userBlock(u: UserInfo): string {
     `**Email** : \`${u.email}\``,
     `**ID Unique** : \`#${u.uniqueId ?? "N/A"}\``,
   ];
+  if (u.discordId) {
+    lines.push(`**Discord** : <@${u.discordId}> (\`${u.discordId}\`)`);
+  }
   return lines.join("\n");
 }
 

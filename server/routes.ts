@@ -43,17 +43,23 @@ setInterval(resetAbnormalAlerts, 24 * 60 * 60 * 1000);
 const ABNORMAL_THRESHOLD_RATIO = 0.8;
 const ABNORMAL_UNLIMITED_THRESHOLD = 500;
 
-async function buildUserInfo(req: Request): Promise<{ id: string; email: string; username?: string; uniqueId?: number }> {
+async function buildUserInfo(req: Request): Promise<{ id: string; email: string; username?: string; uniqueId?: number; discordId?: string | null; bypassed?: boolean }> {
   const user = (req as any).user;
   const userId = user?.id || "";
   const email = user?.email || "inconnu";
   const username = user?.user_metadata?.username || user?.user_metadata?.display_name || user?.user_metadata?.full_name || email.split("@")[0] || undefined;
   let uniqueId: number | undefined;
+  let discordId: string | null = null;
+  let bypassed = false;
   try {
     const sub = await storage.getSubscription(userId);
-    if (sub) uniqueId = sub.id;
+    if (sub) {
+      uniqueId = sub.id;
+      discordId = sub.discordId || null;
+      bypassed = await isUserBypassed(sub.id);
+    }
   } catch {}
-  return { id: userId, email, username, uniqueId };
+  return { id: userId, email, username, uniqueId, discordId, bypassed };
 }
 
 function signOrderId(orderId: string): string {
@@ -1604,10 +1610,12 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
-      webhookSearch(wUser, "interne", criteriaStr, total ?? 0);
+      if (!wUser.bypassed) {
+        webhookSearch(wUser, "interne", criteriaStr, total ?? 0);
 
-      if (externalResults.length > 0) {
-        webhookExternalProxySearch(wUser, criteriaStr, externalResults.length);
+        if (externalResults.length > 0) {
+          webhookExternalProxySearch(wUser, criteriaStr, externalResults.length);
+        }
       }
 
       if (!userBypassed) {
@@ -2153,7 +2161,9 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       const resultCount = Array.isArray(data.results) ? data.results.length : 0;
-      webhookBreachSearch(wUser, term, fields, resultCount);
+      if (!wUser.bypassed) {
+        webhookBreachSearch(wUser, term, fields, resultCount);
+      }
 
       res.json({
         results: data.results || [],
@@ -2363,7 +2373,9 @@ export async function registerRoutes(
       });
 
       const wUser = await buildUserInfo(req);
-      webhookPhoneLookup(wUser, normalized);
+      if (!wUser.bypassed) {
+        webhookPhoneLookup(wUser, normalized);
+      }
     } catch (err) {
       console.error("POST /api/phone/lookup error:", err);
       res.status(500).json({ ok: false, message: "Erreur interne" });
@@ -2395,7 +2407,7 @@ export async function registerRoutes(
       }
 
       const wUser = await buildUserInfo(req);
-      webhookGeoIP(wUser, trimmed);
+      if (!wUser.bypassed) webhookGeoIP(wUser, trimmed);
 
       res.json({
         ok: true,
@@ -2652,7 +2664,7 @@ export async function registerRoutes(
         releaseApiSlot("leakosint");
         console.error("LeakOSINT API fetch error:", fetchErr);
         const wUser = await buildUserInfo(req);
-        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
+        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
         return res.status(502).json({ message: "Impossible de joindre le service LeakOSINT." });
       }
 
@@ -2662,7 +2674,7 @@ export async function registerRoutes(
         console.error("LeakOSINT API error:", response.status, errText.slice(0, 300));
         const wUser = await buildUserInfo(req);
         if (response.status === 429) {
-          webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
+          if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
           return res.status(429).json({ message: "Limite de requetes LeakOSINT atteinte. Reessayez plus tard." });
         }
         let errMsg = "Erreur du service LeakOSINT.";
@@ -2671,7 +2683,7 @@ export async function registerRoutes(
           const errData = JSON.parse(errText);
           if (errData.error) { errMsg = `LeakOSINT: ${errData.error}`; errReason = errData.error; }
         } catch {}
-        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", errReason);
+        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", errReason);
         return res.status(502).json({ message: errMsg });
       }
 
@@ -2682,7 +2694,7 @@ export async function registerRoutes(
         releaseApiSlot("leakosint");
         console.error("LeakOSINT API error code:", data["Error code"]);
         const wUser = await buildUserInfo(req);
-        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
+        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
         return res.status(502).json({ message: `Erreur LeakOSINT: ${data["Error code"]}` });
       }
 
@@ -2690,7 +2702,7 @@ export async function registerRoutes(
         releaseApiSlot("leakosint");
         console.error("LeakOSINT API error:", data["error"]);
         const wUser = await buildUserInfo(req);
-        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
+        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
         return res.status(502).json({ message: `Erreur LeakOSINT: ${data["error"]}` });
       }
 
@@ -2701,7 +2713,7 @@ export async function registerRoutes(
         releaseApiSlot("leakosint");
         console.warn("[leakosint] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
         const wUser = await buildUserInfo(req);
-        webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
+        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
         return res.status(502).json({ message: "Reponse inattendue du service LeakOSINT. Contactez un administrateur." });
       } else if (listData) {
         for (const [dbName, dbInfo] of Object.entries(listData)) {
@@ -2716,7 +2728,7 @@ export async function registerRoutes(
       }
 
       const wUser = await buildUserInfo(req);
-      webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
+      if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
 
       releaseApiSlot("leakosint");
 
@@ -2815,7 +2827,7 @@ export async function registerRoutes(
         releaseApiSlot("dalton");
         console.error("DaltonAPI fetch error:", fetchErr);
         const wUser = await buildUserInfo(req);
-        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
+        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
         return res.status(502).json({ message: "Impossible de joindre le service DaltonAPI." });
       }
 
@@ -2825,7 +2837,7 @@ export async function registerRoutes(
         console.error("DaltonAPI error:", response.status, errText.slice(0, 300));
         const wUser = await buildUserInfo(req);
         if (response.status === 429) {
-          webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
+          if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
           return res.status(429).json({ message: "Limite de requetes DaltonAPI atteinte. Reessayez plus tard." });
         }
         let errMsg = "Erreur du service DaltonAPI.";
@@ -2834,7 +2846,7 @@ export async function registerRoutes(
           const errData = JSON.parse(errText);
           if (errData.error) { errMsg = `DaltonAPI: ${errData.error}`; errReason = errData.error; }
         } catch {}
-        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", errReason);
+        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", errReason);
         return res.status(502).json({ message: errMsg });
       }
 
@@ -2845,7 +2857,7 @@ export async function registerRoutes(
         releaseApiSlot("dalton");
         console.error("DaltonAPI error code:", data["Error code"]);
         const wUser = await buildUserInfo(req);
-        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
+        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
         return res.status(502).json({ message: `Erreur DaltonAPI: ${data["Error code"]}` });
       }
 
@@ -2853,7 +2865,7 @@ export async function registerRoutes(
         releaseApiSlot("dalton");
         console.error("DaltonAPI error:", data["error"]);
         const wUser = await buildUserInfo(req);
-        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
+        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
         return res.status(502).json({ message: `Erreur DaltonAPI: ${data["error"]}` });
       }
 
@@ -2864,7 +2876,7 @@ export async function registerRoutes(
         releaseApiSlot("dalton");
         console.warn("[dalton] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
         const wUser = await buildUserInfo(req);
-        webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
+        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
         return res.status(502).json({ message: "Reponse inattendue du service DaltonAPI. Contactez un administrateur." });
       } else if (listData) {
         for (const [dbName, dbInfo] of Object.entries(listData)) {
@@ -2881,7 +2893,7 @@ export async function registerRoutes(
       releaseApiSlot("dalton");
 
       const wUser = await buildUserInfo(req);
-      webhookDaltonSearch(wUser, String(searchRequest), results.length, "ok");
+      if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), results.length, "ok");
 
       res.json({
         results,
