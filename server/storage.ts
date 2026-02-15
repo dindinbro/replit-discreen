@@ -685,6 +685,8 @@ export class DatabaseStorage implements IStorage {
         conditions.push(ilike(wantedProfiles.bic, `%${val}%`));
       } else if (key === "plaque") {
         conditions.push(ilike(wantedProfiles.plaque, `%${val}%`));
+      } else if (key === "nir") {
+        conditions.push(ilike(wantedProfiles.nir, `%${val}%`));
       }
     }
 

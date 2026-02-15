@@ -113,6 +113,7 @@ export const WantedFilterTypes = [
   "iban",
   "bic",
   "plaque",
+  "nir",
   "notes",
 ] as const;
 
@@ -132,6 +133,7 @@ export const WantedFilterLabels: Record<WantedFilterType, string> = {
   iban: "IBAN",
   bic: "BIC",
   plaque: "Plaque d'immatriculation",
+  nir: "NIR (Sécurité Sociale)",
   notes: "Notes / Signalement",
 };
 
@@ -149,6 +151,7 @@ export const WantedFilterToApiParam: Record<WantedFilterType, string> = {
   iban: "iban",
   bic: "bic",
   plaque: "plaque",
+  nir: "nir",
   notes: "notes",
 };
 
@@ -359,6 +362,7 @@ export const wantedProfiles = pgTable("wanted_profiles", {
   iban: text("iban"),
   bic: text("bic"),
   plaque: text("plaque"),
+  nir: text("nir"),
   notes: text("notes"),
   emails: text("emails").array(), // Added multiple emails
   phones: text("phones").array(), // Added multiple phones

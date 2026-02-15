@@ -124,6 +124,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
     iban: "",
     bic: "",
     plaque: "",
+    nir: "",
     notes: ""
   });
 
@@ -146,6 +147,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
         iban: editProfile.iban || "",
         bic: editProfile.bic || "",
         plaque: editProfile.plaque || "",
+        nir: editProfile.nir || "",
         notes: editProfile.notes || "",
       });
       setEmails(editProfile.emails?.length ? editProfile.emails : [editProfile.email || ""]);
@@ -164,7 +166,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
     setForm({
       nom: "", prenom: "", adresse: "",
       ville: "", codePostal: "", civilite: "M.", dateNaissance: "",
-      pseudo: "", discord: "", discordId: "", password: "", iban: "", bic: "", plaque: "", notes: ""
+      pseudo: "", discord: "", discordId: "", password: "", iban: "", bic: "", plaque: "", nir: "", notes: ""
     });
     setEmails([""]);
     setPhones([""]);
@@ -340,6 +342,10 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
             <label className="text-sm font-medium">Plaque d'immatriculation</label>
             <Input value={form.plaque || ""} onChange={e => setForm(p => ({ ...p, plaque: e.target.value.toUpperCase() }))} placeholder="AA-123-BB" data-testid="input-plaque" />
           </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">NIR (Securite Sociale)</label>
+            <Input value={form.nir || ""} onChange={e => setForm(p => ({ ...p, nir: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="1850175123456" maxLength={15} data-testid="input-nir" />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -416,7 +422,8 @@ function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () =
       ((p as any).addresses || []).some((a: string) => a.toLowerCase().includes(q)) ||
       (p.iban || "").toLowerCase().includes(q) ||
       (p.bic || "").toLowerCase().includes(q) ||
-      (p.plaque || "").toLowerCase().includes(q)
+      (p.plaque || "").toLowerCase().includes(q) ||
+      (p.nir || "").toLowerCase().includes(q)
     );
   });
 
@@ -484,6 +491,7 @@ function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () =
                     {profile.iban && <div><span className="text-muted-foreground">IBAN:</span> {profile.iban}</div>}
                     {profile.bic && <div><span className="text-muted-foreground">BIC:</span> {profile.bic}</div>}
                     {profile.plaque && <div><span className="text-muted-foreground">Plaque:</span> {profile.plaque}</div>}
+                    {profile.nir && <div><span className="text-muted-foreground">NIR:</span> {profile.nir}</div>}
                     {profile.password && <div><span className="text-muted-foreground">MDP:</span> {profile.password}</div>}
                     {profile.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {profile.notes}</div>}
                   </div>
