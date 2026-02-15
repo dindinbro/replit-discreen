@@ -361,12 +361,15 @@ export async function registerRoutes(
       try {
         const sub = await storage.getOrCreateSubscription(user.id);
         const meta = user.user_metadata || {};
-        webhookSessionLogin(
-          { id: user.id, email: user.email || "", username: meta.display_name || meta.full_name || user.email?.split("@")[0], uniqueId: sub.id },
-          ip,
-          userAgent,
-          sub.discordId,
-        );
+        const isBypassed = sub.id ? await isUserBypassed(sub.id) : false;
+        if (!isBypassed) {
+          webhookSessionLogin(
+            { id: user.id, email: user.email || "", username: meta.display_name || meta.full_name || user.email?.split("@")[0], uniqueId: sub.id },
+            ip,
+            userAgent,
+            sub.discordId,
+          );
+        }
       } catch (webhookErr) {
         console.error("Session login webhook error:", webhookErr);
       }
@@ -380,11 +383,14 @@ export async function registerRoutes(
           sessionSharingAlertsSent.add(alertKey);
           const sub = await storage.getOrCreateSubscription(user.id);
           const meta = user.user_metadata || {};
-          webhookSuspiciousSession(
-            { id: user.id, email: user.email || "", username: meta.display_name || meta.full_name || user.email?.split("@")[0], uniqueId: sub.id },
-            ips,
-            sessions.length,
-          );
+          const isBypassed = sub.id ? await isUserBypassed(sub.id) : false;
+          if (!isBypassed) {
+            webhookSuspiciousSession(
+              { id: user.id, email: user.email || "", username: meta.display_name || meta.full_name || user.email?.split("@")[0], uniqueId: sub.id },
+              ips,
+              sessions.length,
+            );
+          }
           setTimeout(() => sessionSharingAlertsSent.delete(alertKey), 24 * 60 * 60 * 1000);
         }
       }
