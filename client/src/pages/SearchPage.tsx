@@ -341,16 +341,16 @@ function BlurredResultCards({ tier }: { tier: string }) {
             <Lock className="w-7 h-7 text-primary" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-xl font-bold text-foreground" data-testid="text-quota-exceeded-title">Limite quotidienne atteinte</h3>
+            <h3 className="text-xl font-bold text-foreground" data-testid="text-quota-exceeded-title">Contenu verrouille</h3>
             <p className="text-sm text-muted-foreground" data-testid="text-quota-exceeded-description">
-              Votre plan <span className="font-semibold text-foreground">{tier.toUpperCase()}</span> a atteint sa limite de recherches pour aujourd'hui.
-              Passez au plan superieur pour debloquer plus de recherches.
+              Vous avez utilise toutes vos recherches quotidiennes sur le plan <span className="font-semibold text-foreground">{tier.toUpperCase()}</span>.
+              Passez a l'abonnement superieur pour profiter de recherches supplementaires et acceder a plus de resultats.
             </p>
           </div>
           <Link href="/pricing">
             <Button className="gap-2 mt-2" data-testid="button-upgrade-plan">
               <Zap className="w-4 h-4" />
-              Voir les abonnements
+              Passer au plan superieur
             </Button>
           </Link>
         </Card>
