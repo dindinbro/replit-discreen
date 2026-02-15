@@ -285,6 +285,8 @@ function cleanFieldValue(val: unknown): string {
   if (mdLink) return mdLink[1];
   const cleaned = s.replace(/\[([^\]]*)\]\(https?:\/\/[^)]*\)/g, "$1");
   const trimmed = cleaned.replace(/^['"]|['"]$/g, "").trim();
+  const discordMention = trimmed.match(/^<@!?(\d{15,20})>$/);
+  if (discordMention) return discordMention[1];
   return trimmed;
 }
 
