@@ -546,13 +546,18 @@ function processResults(rows: Record<string, string>[], sourceKey: string): Reco
 
       const cleaned: Record<string, string> = {};
       for (const [k, v] of Object.entries(r)) {
-        if (k.toLowerCase() !== "rownum") {
+        const kl = k.toLowerCase();
+        if (kl !== "rownum" && v && String(v).trim().length > 0) {
           cleaned[k] = v;
         }
       }
       return { _source: sourceKey, ...cleaned };
     })
-    .filter((r) => r !== null) as Record<string, unknown>[];
+    .filter((r) => {
+      if (r === null) return false;
+      const dataKeys = Object.keys(r).filter(k => !k.startsWith("_") && k !== "source" && k !== "rownum");
+      return dataKeys.length > 0;
+    }) as Record<string, unknown>[];
 }
 
 const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {

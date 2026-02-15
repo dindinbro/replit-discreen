@@ -1441,6 +1441,17 @@ export async function registerRoutes(
         }
       }
 
+      results = results.filter((r) => {
+        const dataKeys = Object.keys(r).filter(k => !k.startsWith("_") && k !== "source" && k !== "rownum" && k !== "_source" && k !== "_raw");
+        if (dataKeys.length === 0) return false;
+        const hasContent = dataKeys.some(k => {
+          const v = r[k];
+          return v !== null && v !== undefined && String(v).trim().length > 0;
+        });
+        return hasContent;
+      });
+      total = results.length;
+
       console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}`);
 
       const wUser = await buildUserInfo(req);
