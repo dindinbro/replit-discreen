@@ -39,7 +39,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && npm run dev"
+args = "cd /home/runner/workspace && npx tsx server/index.ts"
 waitForPort = 5000
 
 [agent]
