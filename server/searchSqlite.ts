@@ -706,7 +706,7 @@ async function searchRemoteBridge(
         "X-Bridge-Secret": remoteBridgeSecret,
       },
       body: JSON.stringify({ criteria, limit: limit * 5, offset }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(120000),
     });
 
     if (!res.ok) {
