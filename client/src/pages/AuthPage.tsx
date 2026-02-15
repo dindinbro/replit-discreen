@@ -4,21 +4,24 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { ShieldCheck, Mail, Lock, Loader2, AlertCircle, Moon, Sun } from "lucide-react";
+import { ShieldCheck, Mail, Lock, Loader2, AlertCircle, Moon, Sun, CheckCircle2 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { SiDiscord } from "react-icons/si";
 import { useTranslation } from "react-i18next";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const { t } = useTranslation();
   const { signInWithEmail, signUpWithEmail, signInWithDiscord, loading, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   if (user) {
     navigate("/");
@@ -35,9 +38,14 @@ export default function AuthPage() {
 
     if (result.error) {
       setError(result.error);
+      setEmailSent(false);
     } else if (mode === "register") {
       setError(null);
-      setMode("login");
+      setEmailSent(true);
+      toast({
+        title: "Email de confirmation envoye",
+        description: `Un email a ete envoye a ${email}. Verifiez votre boite de reception (et vos spams) pour confirmer votre compte.`,
+      });
     }
 
     setSubmitting(false);
@@ -112,9 +120,16 @@ export default function AuthPage() {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+              <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md" data-testid="text-auth-error">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
+              </div>
+            )}
+
+            {emailSent && !error && (
+              <div className="flex items-center gap-2 text-sm text-primary bg-primary/10 p-3 rounded-md" data-testid="text-email-sent">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Un email de confirmation a ete envoye a <strong>{email}</strong>. Verifiez votre boite de reception et vos spams.</span>
               </div>
             )}
 
