@@ -429,25 +429,22 @@ function getFieldCI(r: Record<string, string>, ...keys: string[]): string {
 
 const sourceHeaderCache: Record<string, string[]> = {};
 
-const MAX_DB_SIZE_FOR_HEADER_CACHE = 5 * 1024 * 1024 * 1024;
+const MAX_DB_SIZE_FOR_LOCAL_SEARCH = 5 * 1024 * 1024 * 1024;
+
+function isDbTooLargeForLocalSearch(sourceKey: string): boolean {
+  const filename = SOURCE_MAP[sourceKey];
+  if (!filename) return false;
+  try {
+    const filePath = path.join(getDataDir(), filename);
+    const stat = fs.statSync(filePath);
+    return stat.size > MAX_DB_SIZE_FOR_LOCAL_SEARCH;
+  } catch {
+    return false;
+  }
+}
 
 function buildHeaderCache(db: Database.Database, tableName: string, isFts: boolean, sourceKey?: string): void {
   try {
-    if (sourceKey) {
-      const dataDir = getDataDir();
-      const filename = SOURCE_MAP[sourceKey];
-      if (filename) {
-        const filePath = path.join(dataDir, filename);
-        try {
-          const stat = fs.statSync(filePath);
-          if (stat.size > MAX_DB_SIZE_FOR_HEADER_CACHE) {
-            console.log(`[searchSqlite] Skipping header cache for ${sourceKey}: file too large (${(stat.size / 1e9).toFixed(1)} GB)`);
-            return;
-          }
-        } catch {}
-      }
-    }
-
     const rows = db.prepare(
       `SELECT source, line FROM "${tableName}" WHERE rownum = 1 LIMIT 200`
     ).all() as { source: string; line: string }[];
@@ -553,7 +550,7 @@ const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   username: ["identifiant", "username", "pseudo", "nom", "login", "user", "nickname", "nick", "name", "utilisateur", "user_name", "screenname", "screen_name", "handle"],
   displayName: ["identifiant", "username", "pseudo", "nom", "name", "prenom", "displayname", "display_name", "fullname", "full_name", "nickname", "nick"],
   lastName: ["nom", "name", "last_name", "lastname", "surname", "identifiant", "family_name", "familyname", "nom_de_famille"],
-  firstName: ["prenom", "first_name", "firstname", "identifiant", "nom", "given_name", "givenname"],
+  firstName: ["prenom", "first_name", "firstname", "given_name", "givenname"],
   phone: ["telephone", "phone", "tel", "mobile", "numero", "phone_number", "phonenumber", "cell", "cellphone", "portable", "gsm", "num_tel"],
   ipAddress: ["ip", "ip_address", "ipaddress", "adresse_ip", "ip_addr", "ipv4", "ipv6", "host", "remote_addr"],
   address: ["adresse", "address", "rue", "street", "ville", "city", "code_postal", "zipcode", "zip", "postal", "location", "lieu", "domicile", "residence", "addr"],
@@ -710,6 +707,12 @@ async function searchRemoteBridge(
           total: data.total,
         };
       }
+
+      const filtered = filterResultsByCriteria(data.results, criteria);
+      return {
+        results: filtered.slice(0, limit) as SearchResult["results"],
+        total: data.total,
+      };
     }
 
     return data;
@@ -800,6 +803,10 @@ function searchLocal(
 
   for (const dbInfo of dbs) {
     if (needed <= 0) break;
+    if (isDbTooLargeForLocalSearch(dbInfo.sourceKey)) {
+      console.log(`[searchLocal] Skipping ${dbInfo.sourceKey}: too large for local search (use bridge instead)`);
+      continue;
+    }
     try {
       const result = searchOneDb(dbInfo, criteria, needed, offset);
       allResults.push(...result.results);
