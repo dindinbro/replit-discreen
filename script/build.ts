@@ -67,6 +67,24 @@ async function buildAll() {
     "dist/vite.mjs",
     'export function setupVite() { throw new Error("Vite is not available in production"); }'
   );
+
+  console.log("building bridge...");
+  await esbuild({
+    entryPoints: ["server/bridge.ts"],
+    platform: "node",
+    bundle: true,
+    format: "esm",
+    outfile: "dist/bridge.mjs",
+    banner: {
+      js: `import { createRequire } from "module"; const require = createRequire(import.meta.url); import { fileURLToPath } from "url"; import { dirname } from "path"; const __filename = fileURLToPath(import.meta.url); const __dirname = dirname(__filename);`,
+    },
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: true,
+    external: externals,
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {
