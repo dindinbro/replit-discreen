@@ -10,6 +10,7 @@ export interface SearchQuota {
 
 export interface SearchResponseWithQuota extends SearchResponse {
   quota?: SearchQuota;
+  quotaExceeded?: boolean;
 }
 
 export class SearchLimitError extends Error {

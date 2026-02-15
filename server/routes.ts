@@ -1385,11 +1385,15 @@ export async function registerRoutes(
       const newCount = await storage.incrementDailyUsage(userId, today);
 
       if (!isUnlimited && newCount > planInfo.dailySearches) {
-        return res.status(429).json({
-          message: "Nombre de recherches limite atteint. Veuillez acceder a l'abonnement superieur.",
-          used: newCount,
-          limit: planInfo.dailySearches,
-          tier,
+        return res.json({
+          results: [],
+          total: 0,
+          quotaExceeded: true,
+          quota: {
+            used: newCount,
+            limit: planInfo.dailySearches,
+            tier,
+          },
         });
       }
       console.log(`[search] Incoming criteria: ${JSON.stringify(request.criteria)}, limit: ${request.limit}, offset: ${request.offset}`);
