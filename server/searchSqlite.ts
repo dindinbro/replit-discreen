@@ -114,12 +114,6 @@ function openDb(sourceKey: string): DbInfo | null {
   const filePath = path.join(getDataDir(), filename);
   if (!fs.existsSync(filePath)) return null;
 
-  if (isDbTooLargeForLocalSearch(sourceKey)) {
-    console.log(`[searchSqlite] Skipping ${sourceKey} (${filename}): too large for local use, must use bridge`);
-    failedDbs.add(sourceKey);
-    return null;
-  }
-
   try {
     const db = new Database(filePath, { readonly: true });
     const { tableName, columns, isFts } = detectMainTable(db);
