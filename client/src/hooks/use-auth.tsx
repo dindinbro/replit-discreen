@@ -104,8 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
     if (!supabase) return { error: "Auth not configured" };
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null };
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: error.message };
+    if (data.user && !data.session && data.user.identities?.length === 0) {
+      return { error: "Un compte existe deja avec cette adresse email. Essayez de vous connecter." };
+    }
+    return { error: null };
   }, []);
 
   const signInWithDiscord = useCallback(async () => {
