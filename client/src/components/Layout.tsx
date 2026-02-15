@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { useTranslation } from "react-i18next";
@@ -43,7 +44,14 @@ function useOnlineCount() {
   useEffect(() => {
     const sendHeartbeat = async () => {
       try {
-        const res = await fetch("/api/heartbeat", { method: "POST" });
+        const headers: Record<string, string> = {};
+        const sessionToken = sessionStorage.getItem("discreen_session_token");
+        if (sessionToken) headers["x-session-token"] = sessionToken;
+        if (supabase) {
+          const { data: { session: s } } = await supabase.auth.getSession();
+          if (s?.access_token) headers["Authorization"] = `Bearer ${s.access_token}`;
+        }
+        const res = await fetch("/api/heartbeat", { method: "POST", headers });
         if (res.ok) {
           await res.json();
           const drift = Math.floor(Math.random() * 15) - 7;

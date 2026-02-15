@@ -693,6 +693,25 @@ export function webhookBotKeyRedeemed(username: string, uniqueId: number | undef
   });
 }
 
+export function webhookSuspiciousSession(user: UserInfo, sessionIPs: string[], sessionCount: number) {
+  const uniqueIPs = [...new Set(sessionIPs)];
+  const desc = [
+    userBlock(user),
+    sep(),
+    `**Partage de Compte Detecte**`,
+    `**Sessions actives** : **${sessionCount}**`,
+    `**IPs differentes** : ${uniqueIPs.map(ip => `\`${ip}\``).join(", ")}`,
+    `\nPlusieurs sessions actives avec des adresses IP differentes. Possible partage de compte.`,
+  ].join("\n");
+
+  sendWebhook({
+    title: "\u{1F6A8} Partage de Compte Suspect",
+    description: desc,
+    color: COLORS.security,
+    content: `<@&${ALERT_ROLE_ID}>`,
+  });
+}
+
 export function webhookAbnormalActivity(user: UserInfo, searchCount: number, limit: number) {
   const desc = [
     userBlock(user),

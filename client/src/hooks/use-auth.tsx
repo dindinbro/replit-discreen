@@ -2,6 +2,15 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { type Session, type User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
+function getOrCreateSessionToken(): string {
+  let token = sessionStorage.getItem("discreen_session_token");
+  if (!token) {
+    token = crypto.randomUUID() + "-" + Date.now().toString(36);
+    sessionStorage.setItem("discreen_session_token", token);
+  }
+  return token;
+}
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
@@ -31,6 +40,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
+  const sessionRegisteredRef = useRef(false);
+
+  const registerSession = useCallback(async (accessToken: string) => {
+    try {
+      const sessionToken = getOrCreateSessionToken();
+      await fetch("/api/session/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ sessionToken }),
+      });
+    } catch {}
+  }, []);
+
   const fetchRole = useCallback(async (accessToken: string) => {
     try {
       const res = await fetch("/api/me", {
@@ -43,6 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setDisplayName(data.display_name || null);
         setAvatarUrl(data.avatar_url || null);
         setExpiresAt(data.expires_at || null);
+
+        if (!sessionRegisteredRef.current) {
+          sessionRegisteredRef.current = true;
+          registerSession(accessToken);
+        }
       } else {
         setRole("user");
         setFrozen(false);
@@ -57,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAvatarUrl(null);
       setExpiresAt(null);
     }
-  }, []);
+  }, [registerSession]);
 
   useEffect(() => {
     if (!supabase) {
@@ -124,10 +154,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
+    const token = session?.access_token;
+    const sessionToken = sessionStorage.getItem("discreen_session_token");
+    if (token && sessionToken) {
+      try {
+        await fetch("/api/session", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ sessionToken }),
+        });
+      } catch {}
+    }
+    sessionStorage.removeItem("discreen_session_token");
+    sessionRegisteredRef.current = false;
     await supabase.auth.signOut();
     setRole(null);
     setFrozen(false);
-  }, []);
+  }, [session]);
 
   const getAccessToken = useCallback(() => {
     return session?.access_token ?? null;

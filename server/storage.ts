@@ -1,7 +1,7 @@
 import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
-  wantedProfiles, siteSettings, discordLinkCodes, dofProfiles,
+  wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -9,6 +9,7 @@ import {
   type InfoRequest, type InsertInfoRequest, type PendingServiceRequest,
   type WantedProfile, type InsertWantedProfile,
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
+  type ActiveSession,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -86,6 +87,15 @@ export interface IStorage {
   createDofProfile(data: InsertDofProfile): Promise<DofProfile>;
   updateDofProfile(id: number, data: Partial<InsertDofProfile>): Promise<DofProfile | undefined>;
   deleteDofProfile(id: number): Promise<boolean>;
+  createSession(userId: string, sessionToken: string, ipAddress?: string, userAgent?: string): Promise<ActiveSession>;
+  getActiveSessionCount(userId: string): Promise<number>;
+  getActiveSessions(userId: string): Promise<ActiveSession[]>;
+  validateSession(userId: string, sessionToken: string): Promise<boolean>;
+  touchSession(sessionToken: string): Promise<void>;
+  removeSession(sessionToken: string): Promise<void>;
+  removeAllSessions(userId: string): Promise<void>;
+  removeOldestSession(userId: string): Promise<void>;
+  cleanupStaleSessions(maxAgeMinutes?: number): Promise<number>;
 }
 
 function hashKey(key: string): string {
@@ -769,6 +779,67 @@ export class DatabaseStorage implements IStorage {
   async deleteDofProfile(id: number): Promise<boolean> {
     const result = await db.delete(dofProfiles).where(eq(dofProfiles.id, id)).returning();
     return result.length > 0;
+  }
+
+  async createSession(userId: string, sessionToken: string, ipAddress?: string, userAgent?: string): Promise<ActiveSession> {
+    const [session] = await db.insert(activeSessions).values({
+      userId,
+      sessionToken,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+    }).returning();
+    return session;
+  }
+
+  async getActiveSessionCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(activeSessions)
+      .where(eq(activeSessions.userId, userId));
+    return result[0]?.count ?? 0;
+  }
+
+  async getActiveSessions(userId: string): Promise<ActiveSession[]> {
+    return db.select().from(activeSessions)
+      .where(eq(activeSessions.userId, userId))
+      .orderBy(asc(activeSessions.createdAt));
+  }
+
+  async validateSession(userId: string, sessionToken: string): Promise<boolean> {
+    const [session] = await db.select().from(activeSessions)
+      .where(and(eq(activeSessions.userId, userId), eq(activeSessions.sessionToken, sessionToken)));
+    return !!session;
+  }
+
+  async touchSession(sessionToken: string): Promise<void> {
+    await db.update(activeSessions)
+      .set({ lastActiveAt: new Date() })
+      .where(eq(activeSessions.sessionToken, sessionToken));
+  }
+
+  async removeSession(sessionToken: string): Promise<void> {
+    await db.delete(activeSessions).where(eq(activeSessions.sessionToken, sessionToken));
+  }
+
+  async removeAllSessions(userId: string): Promise<void> {
+    await db.delete(activeSessions).where(eq(activeSessions.userId, userId));
+  }
+
+  async removeOldestSession(userId: string): Promise<void> {
+    const oldest = await db.select().from(activeSessions)
+      .where(eq(activeSessions.userId, userId))
+      .orderBy(asc(activeSessions.lastActiveAt))
+      .limit(1);
+    if (oldest.length > 0) {
+      await db.delete(activeSessions).where(eq(activeSessions.id, oldest[0].id));
+    }
+  }
+
+  async cleanupStaleSessions(maxAgeMinutes: number = 30): Promise<number> {
+    const cutoff = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    const result = await db.delete(activeSessions)
+      .where(lte(activeSessions.lastActiveAt, cutoff))
+      .returning();
+    return result.length;
   }
 }
 

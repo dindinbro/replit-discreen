@@ -19,7 +19,7 @@ import {
   webhookPhoneLookup, webhookGeoIP, webhookVouchDeleted,
   webhookCategoryCreated, webhookCategoryUpdated, webhookCategoryDeleted,
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
-  webhookBotKeyRedeemed,
+  webhookBotKeyRedeemed, webhookSuspiciousSession,
 } from "./webhook";
 import { sendFreezeAlert, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 
@@ -168,11 +168,25 @@ export async function registerRoutes(
 
   await initSearchDatabases();
 
-  app.post("/api/heartbeat", (req, res) => {
+  app.post("/api/heartbeat", async (req, res) => {
     const ip = req.ip || req.socket.remoteAddress || "unknown";
     const userId = (req as any).user?.id;
     const key = userId || `anon_${ip}`;
     onlineVisitors.set(key, Date.now());
+
+    const sessionToken = req.headers["x-session-token"] as string | undefined;
+    const authHeader = req.headers.authorization;
+    if (sessionToken && authHeader?.startsWith("Bearer ") && supabaseAdmin) {
+      try {
+        const token = authHeader.split(" ")[1];
+        const { data } = await supabaseAdmin.auth.getUser(token);
+        if (data?.user) {
+          const isValid = await storage.validateSession(data.user.id, sessionToken);
+          if (isValid) await storage.touchSession(sessionToken);
+        }
+      } catch {}
+    }
+
     res.json({ online: onlineVisitors.size });
   });
 
@@ -282,6 +296,104 @@ export async function registerRoutes(
       });
     } catch (err) {
       console.error("GET /api/me error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  const MAX_SESSIONS = 2;
+  const sessionSharingAlertsSent = new Set<string>();
+
+  setInterval(async () => {
+    try {
+      const cleaned = await storage.cleanupStaleSessions(30);
+      if (cleaned > 0) console.log(`[sessions] Cleaned up ${cleaned} stale sessions`);
+    } catch (err) {
+      console.error("[sessions] Cleanup error:", err);
+    }
+  }, 5 * 60 * 1000);
+
+  app.post("/api/session/register", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { sessionToken } = req.body;
+      if (!sessionToken || typeof sessionToken !== "string") {
+        return res.status(400).json({ message: "Session token required" });
+      }
+
+      const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
+      const userAgent = req.headers["user-agent"] || "unknown";
+
+      const existing = await storage.validateSession(user.id, sessionToken);
+      if (existing) {
+        await storage.touchSession(sessionToken);
+        return res.json({ ok: true, status: "existing" });
+      }
+
+      const currentSessions = await storage.getActiveSessions(user.id);
+      if (currentSessions.length >= MAX_SESSIONS) {
+        await storage.removeOldestSession(user.id);
+      }
+
+      await storage.createSession(user.id, sessionToken, ip, userAgent);
+
+      const sessions = await storage.getActiveSessions(user.id);
+      const ips = sessions.map(s => s.ipAddress).filter(Boolean) as string[];
+      const uniqueIPs = [...new Set(ips)];
+      if (uniqueIPs.length > 1) {
+        const alertKey = `${user.id}_session_sharing`;
+        if (!sessionSharingAlertsSent.has(alertKey)) {
+          sessionSharingAlertsSent.add(alertKey);
+          const sub = await storage.getOrCreateSubscription(user.id);
+          const meta = user.user_metadata || {};
+          webhookSuspiciousSession(
+            { id: user.id, email: user.email || "", username: meta.display_name || meta.full_name || user.email?.split("@")[0], uniqueId: sub.id },
+            ips,
+            sessions.length,
+          );
+          setTimeout(() => sessionSharingAlertsSent.delete(alertKey), 24 * 60 * 60 * 1000);
+        }
+      }
+
+      res.json({ ok: true, status: "created", activeSessions: sessions.length });
+    } catch (err) {
+      console.error("POST /api/session/register error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/session", requireAuth, async (req, res) => {
+    try {
+      const { sessionToken } = req.body;
+      if (sessionToken) {
+        await storage.removeSession(sessionToken);
+      } else {
+        const user = (req as any).user;
+        await storage.removeAllSessions(user.id);
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("DELETE /api/session error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/session/active", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const sessions = await storage.getActiveSessions(user.id);
+      res.json({
+        count: sessions.length,
+        max: MAX_SESSIONS,
+        sessions: sessions.map(s => ({
+          id: s.id,
+          ipAddress: s.ipAddress,
+          userAgent: s.userAgent,
+          lastActiveAt: s.lastActiveAt,
+          createdAt: s.createdAt,
+        })),
+      });
+    } catch (err) {
+      console.error("GET /api/session/active error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
