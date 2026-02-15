@@ -21,7 +21,7 @@ import {
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
   webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin, webhookBlockedIpAttempt,
 } from "./webhook";
-import { sendFreezeAlert, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
+import { sendFreezeAlert, sendSharedIpAlert, setOnIpBlacklisted, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 
 const ORDER_TOKEN_SECRET = process.env.NOWPAYMENTS_API_KEY || crypto.randomBytes(32).toString("hex");
 
@@ -201,6 +201,10 @@ export async function registerRoutes(
     }
   }
   await loadBlockedIps();
+
+  setOnIpBlacklisted((ip: string) => {
+    blockedIpCache.add(ip);
+  });
 
   function normalizeIp(raw: string): string {
     let ip = raw.trim();
@@ -392,7 +396,8 @@ export async function registerRoutes(
         await storage.removeOldestSession(user.id);
       }
 
-      await storage.createSession(user.id, sessionToken, ip, userAgent);
+      const normalizedSessionIp = normalizeIp(ip);
+      await storage.createSession(user.id, sessionToken, normalizedSessionIp, userAgent);
 
       try {
         const sub = await storage.getOrCreateSubscription(user.id);
@@ -429,6 +434,44 @@ export async function registerRoutes(
           }
           setTimeout(() => sessionSharingAlertsSent.delete(alertKey), 24 * 60 * 60 * 1000);
         }
+      }
+
+      try {
+        const allSessionsForIp = await storage.getSessionsByIp(normalizedSessionIp);
+        const uniqueUserIds = [...new Set(allSessionsForIp.map(s => s.userId))];
+        if (uniqueUserIds.length >= 2) {
+          const sharedIpAlertKey = `shared_ip_${normalizedSessionIp}`;
+          if (!sessionSharingAlertsSent.has(sharedIpAlertKey)) {
+            sessionSharingAlertsSent.add(sharedIpAlertKey);
+
+            const accountInfos: Array<{ userId: string; username: string; email: string; uniqueId: number | null }> = [];
+            for (const uid of uniqueUserIds) {
+              try {
+                const subInfo = await storage.getOrCreateSubscription(uid);
+                const isBypassed = subInfo.id ? await isUserBypassed(subInfo.id) : false;
+                if (isBypassed) continue;
+                let uEmail = "Inconnu";
+                let uName = "Inconnu";
+                if (supabaseAdmin) {
+                  const { data } = await supabaseAdmin.auth.admin.getUserById(uid);
+                  if (data?.user) {
+                    uEmail = data.user.email || "Inconnu";
+                    uName = data.user.user_metadata?.display_name || data.user.user_metadata?.username || data.user.user_metadata?.full_name || uEmail.split("@")[0];
+                  }
+                }
+                accountInfos.push({ userId: uid, username: uName, email: uEmail, uniqueId: subInfo.id });
+              } catch {}
+            }
+
+            if (accountInfos.length >= 2) {
+              sendSharedIpAlert(normalizedSessionIp, accountInfos);
+            }
+
+            setTimeout(() => sessionSharingAlertsSent.delete(sharedIpAlertKey), 24 * 60 * 60 * 1000);
+          }
+        }
+      } catch (sharedIpErr) {
+        console.error("Shared IP detection error:", sharedIpErr);
       }
 
       res.json({ ok: true, status: "created", activeSessions: sessions.length });

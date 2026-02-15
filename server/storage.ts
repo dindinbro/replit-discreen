@@ -97,6 +97,7 @@ export interface IStorage {
   removeAllSessions(userId: string): Promise<void>;
   removeOldestSession(userId: string): Promise<void>;
   cleanupStaleSessions(maxAgeMinutes?: number): Promise<number>;
+  getSessionsByIp(ipAddress: string): Promise<ActiveSession[]>;
   getBlockedIps(): Promise<BlockedIp[]>;
   isIpBlocked(ip: string): Promise<boolean>;
   blockIp(ipAddress: string, reason: string, blockedBy: string): Promise<BlockedIp>;
@@ -845,6 +846,10 @@ export class DatabaseStorage implements IStorage {
       .where(lte(activeSessions.lastActiveAt, cutoff))
       .returning();
     return result.length;
+  }
+
+  async getSessionsByIp(ipAddress: string): Promise<ActiveSession[]> {
+    return db.select().from(activeSessions).where(eq(activeSessions.ipAddress, ipAddress));
   }
 
   async getBlockedIps(): Promise<BlockedIp[]> {

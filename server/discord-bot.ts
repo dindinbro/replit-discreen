@@ -17,6 +17,11 @@ import {
 let client: Client | null = null;
 const SOUTIEN_ROLE_ID = "1469926673582653648";
 
+let onIpBlacklistedCallback: ((ip: string) => void) | null = null;
+export function setOnIpBlacklisted(cb: (ip: string) => void) {
+  onIpBlacklistedCallback = cb;
+}
+
 export async function startDiscordBot() {
   if (client) {
     log("Discord bot already running, destroying old client...", "discord");
@@ -2558,6 +2563,11 @@ function handleTicketInteractions(client: Client) {
       return;
     }
 
+    if (customId.startsWith("blacklist_ip_")) {
+      await handleBlacklistIpButton(interaction, customId);
+      return;
+    }
+
     if (customId.startsWith("ticket_claim_")) {
       await handleTicketClaim(interaction);
       return;
@@ -2748,6 +2758,58 @@ async function handleTicketClose(interaction: ButtonInteraction) {
   }
 }
 
+async function handleBlacklistIpButton(interaction: ButtonInteraction, customId: string) {
+  const encodedIp = customId.replace("blacklist_ip_", "");
+  let ip: string;
+  try {
+    ip = Buffer.from(encodedIp, "base64").toString("utf-8");
+  } catch {
+    await interaction.reply({ content: "IP invalide.", ephemeral: true });
+    return;
+  }
+
+  try {
+    const alreadyBlocked = await storage.isIpBlocked(ip);
+    if (alreadyBlocked) {
+      await interaction.reply({ content: `L'IP \`${ip}\` est deja dans la blacklist.`, ephemeral: true });
+      return;
+    }
+
+    await storage.blockIp(ip, "IP partagee entre plusieurs comptes (Discord)", interaction.user.tag);
+    if (onIpBlacklistedCallback) onIpBlacklistedCallback(ip);
+
+    const embed = new EmbedBuilder()
+      .setColor(0xe74c3c)
+      .setTitle("\u{1F6AB} IP Blacklistee")
+      .setDescription(`L'adresse IP \`${ip}\` a ete ajoutee a la blacklist par <@${interaction.user.id}>.`)
+      .setTimestamp();
+
+    const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`blacklist_done_${encodedIp}`)
+        .setLabel("IP blacklistee")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(true),
+      new ButtonBuilder()
+        .setLabel("Voir sur le site")
+        .setStyle(ButtonStyle.Link)
+        .setURL("https://discreen.site/admin")
+        .setEmoji("\u{1F310}")
+    );
+
+    await interaction.update({ components: [disabledRow] });
+    await interaction.followUp({ embeds: [embed] });
+
+    webhookBotGeneric(interaction.user.tag, "blacklist_ip", `**IP** : \`${ip}\`\n**Raison** : IP partagee entre plusieurs comptes`);
+    log(`IP ${ip} blacklisted via alert button by ${interaction.user.username}`, "discord");
+  } catch (err) {
+    log(`Error handling blacklist IP button: ${err}`, "discord");
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: "Erreur lors du blacklist de l'IP.", ephemeral: true });
+    }
+  }
+}
+
 async function handleFreezeAlertButton(interaction: ButtonInteraction, customId: string) {
   const userId = customId.replace("freeze_alert_", "");
   if (!userId) {
@@ -2839,6 +2901,68 @@ export async function sendFreezeAlert(userId: string, username: string, uniqueId
     });
   } catch (err) {
     log(`Error sending freeze alert: ${err}`, "discord");
+  }
+}
+
+export async function sendSharedIpAlert(
+  ip: string,
+  accounts: Array<{ userId: string; username: string; email: string; uniqueId: number | null }>
+) {
+  if (!client) return;
+
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const match = webhookUrl.match(/\/api\/webhooks\/(\d+)\//);
+  if (!match) return;
+
+  try {
+    const webhookResp = await fetch(webhookUrl);
+    if (!webhookResp.ok) return;
+    const webhookData = await webhookResp.json();
+    const channelId = webhookData.channel_id;
+    if (!channelId) return;
+
+    const channel = await client.channels.fetch(channelId);
+    if (!channel || !("send" in channel)) return;
+
+    const accountLines = accounts.map((a, i) =>
+      `**${i + 1}.** \`${a.username}\` (#${a.uniqueId ?? "N/A"}) — \`${a.email}\``
+    ).join("\n");
+
+    const embed = new EmbedBuilder()
+      .setColor(0xe74c3c)
+      .setTitle("\u{1F6A8} IP Partagee Detectee")
+      .setDescription([
+        `**Adresse IP** : \`${ip}\``,
+        `**Nombre de comptes** : **${accounts.length}**`,
+        `\n**Comptes concernes :**`,
+        accountLines,
+        `\nPlusieurs comptes utilisent la meme adresse IP.`,
+      ].join("\n"))
+      .setTimestamp();
+
+    const safeIp = Buffer.from(ip).toString("base64");
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`blacklist_ip_${safeIp}`)
+        .setLabel("Blacklister cette IP")
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji("\u{1F6AB}"),
+      new ButtonBuilder()
+        .setLabel("Voir sur le site")
+        .setStyle(ButtonStyle.Link)
+        .setURL("https://discreen.site/admin")
+        .setEmoji("\u{1F310}")
+    );
+
+    await (channel as any).send({
+      content: `<@&1469798855099945172>`,
+      embeds: [embed],
+      components: [row],
+    });
+  } catch (err) {
+    log(`Error sending shared IP alert: ${err}`, "discord");
   }
 }
 
