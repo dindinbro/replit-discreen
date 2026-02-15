@@ -142,6 +142,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
     if (!supabase) return { error: "Auth not configured" };
+
+    const blockedDomains = [
+      "yopmail.com", "yopmail.fr", "yopmail.net",
+      "tempmail.com", "tempmail.net", "temp-mail.org",
+      "guerrillamail.com", "guerrillamail.net", "guerrillamail.org", "guerrillamailblock.com", "grr.la", "guerrillamail.de",
+      "mailinator.com", "mailinator.net",
+      "throwaway.email", "throwaway.com",
+      "trashmail.com", "trashmail.net", "trashmail.me", "trashmail.org",
+      "10minutemail.com", "10minute.email",
+      "sharklasers.com", "guerrillamail.info", "spam4.me", "grr.la",
+      "dispostable.com",
+      "mailnesia.com",
+      "maildrop.cc",
+      "fakeinbox.com",
+      "tempinbox.com",
+      "discard.email",
+      "mailcatch.com",
+      "tempr.email",
+      "mohmal.com",
+      "burnermail.io",
+      "jetable.org", "jetable.com", "jetable.net",
+      "crazymailing.com",
+      "nada.email",
+      "getnada.com",
+      "tmpmail.net", "tmpmail.org",
+      "emailondeck.com",
+      "incognitomail.com", "incognitomail.org",
+      "mailsac.com",
+      "harakirimail.com",
+      "mytemp.email",
+      "tempail.com",
+      "guerrillamail.biz",
+    ];
+
+    const domain = email.split("@")[1]?.toLowerCase();
+    if (domain && blockedDomains.includes(domain)) {
+      return { error: "Les adresses email temporaires ne sont pas autorisees. Veuillez utiliser une adresse email valide." };
+    }
+
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
     if (data.user && !data.session && data.user.identities?.length === 0) {
