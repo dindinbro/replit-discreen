@@ -149,6 +149,22 @@ function requireRole(...roles: string[]) {
   };
 }
 
+let bypassCache: { ids: Set<number>; loadedAt: number } = { ids: new Set(), loadedAt: 0 };
+const BYPASS_CACHE_TTL = 60_000;
+
+async function isUserBypassed(uniqueId: number): Promise<boolean> {
+  if (Date.now() - bypassCache.loadedAt > BYPASS_CACHE_TTL) {
+    try {
+      const raw = await storage.getSiteSetting("bypass_whitelist");
+      const list: number[] = raw ? JSON.parse(raw) : [];
+      bypassCache = { ids: new Set(list), loadedAt: Date.now() };
+    } catch {
+      return false;
+    }
+  }
+  return bypassCache.ids.has(uniqueId);
+}
+
 const onlineVisitors = new Map<string, number>();
 const VISITOR_TIMEOUT = 90_000;
 
@@ -1450,7 +1466,10 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
 
-      if (await storage.isFrozen(userId)) {
+      const sub = await storage.getSubscription(userId);
+      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
+
+      if (!userBypassed && await storage.isFrozen(userId)) {
         return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
       }
 
@@ -1459,12 +1478,11 @@ export async function registerRoutes(
       const effectiveRole = await getEffectiveRole(userId);
       const isAdmin = effectiveRole === "admin";
 
-      const sub = await storage.getSubscription(userId);
       const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const isUnlimited = isAdmin || planInfo.dailySearches === -1;
+      const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
 
-      if (!COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
+      if (!userBypassed && !COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
         const lastSearch = userSearchCooldowns.get(userId);
         if (lastSearch) {
           const elapsed = Date.now() - lastSearch;
@@ -1580,20 +1598,22 @@ export async function registerRoutes(
         webhookExternalProxySearch(wUser, criteriaStr, externalResults.length);
       }
 
-      const alertKey = `${userId}_${today}`;
-      if (!abnormalAlertsSent.has(alertKey)) {
-        const threshold = isUnlimited
-          ? ABNORMAL_UNLIMITED_THRESHOLD
-          : Math.floor(planInfo.dailySearches * ABNORMAL_THRESHOLD_RATIO);
-        if (newCount >= threshold) {
-          abnormalAlertsSent.add(alertKey);
-          webhookAbnormalActivity(wUser, newCount, isUnlimited ? ABNORMAL_UNLIMITED_THRESHOLD : planInfo.dailySearches);
-          const username = wUser.username || wUser.email?.split("@")[0] || "inconnu";
-          sendFreezeAlert(userId, username, wUser.uniqueId || 0, newCount, isUnlimited ? ABNORMAL_UNLIMITED_THRESHOLD : planInfo.dailySearches);
+      if (!userBypassed) {
+        const alertKey = `${userId}_${today}`;
+        if (!abnormalAlertsSent.has(alertKey)) {
+          const threshold = isUnlimited
+            ? ABNORMAL_UNLIMITED_THRESHOLD
+            : Math.floor(planInfo.dailySearches * ABNORMAL_THRESHOLD_RATIO);
+          if (newCount >= threshold) {
+            abnormalAlertsSent.add(alertKey);
+            webhookAbnormalActivity(wUser, newCount, isUnlimited ? ABNORMAL_UNLIMITED_THRESHOLD : planInfo.dailySearches);
+            const username = wUser.username || wUser.email?.split("@")[0] || "inconnu";
+            sendFreezeAlert(userId, username, wUser.uniqueId || 0, newCount, isUnlimited ? ABNORMAL_UNLIMITED_THRESHOLD : planInfo.dailySearches);
+          }
         }
       }
 
-      if (!COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
+      if (!userBypassed && !COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
         userSearchCooldowns.set(userId, Date.now());
       }
 
@@ -2040,7 +2060,10 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
 
-      if (await storage.isFrozen(userId)) {
+      const sub = await storage.getSubscription(userId);
+      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
+
+      if (!userBypassed && await storage.isFrozen(userId)) {
         return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
       }
 
@@ -2049,10 +2072,9 @@ export async function registerRoutes(
       const effectiveRole = await getEffectiveRole(userId);
       const isAdmin = effectiveRole === "admin";
 
-      const sub = await storage.getSubscription(userId);
       const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const isUnlimited = isAdmin || planInfo.dailySearches === -1;
+      const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
 
       const newCount = await storage.incrementDailyUsage(userId, today);
 
@@ -2540,7 +2562,10 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
 
-      if (await storage.isFrozen(userId)) {
+      const sub = await storage.getSubscription(userId);
+      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
+
+      if (!userBypassed && await storage.isFrozen(userId)) {
         return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
       }
 
@@ -2549,12 +2574,11 @@ export async function registerRoutes(
       const effectiveRole = await getEffectiveRole(userId);
       const isAdmin = effectiveRole === "admin";
 
-      const sub = await storage.getSubscription(userId);
       const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
       const leakosintLimit = planInfo.dailyLeakosintSearches;
 
-      if (!isAdmin && leakosintLimit === 0) {
+      if (!userBypassed && !isAdmin && leakosintLimit === 0) {
         return res.status(403).json({
           message: "Votre abonnement ne permet pas d'utiliser cette source. Passez a un plan superieur.",
           used: 0,
@@ -2565,7 +2589,7 @@ export async function registerRoutes(
 
       const newCount = await storage.incrementLeakosintDailyUsage(userId, today);
 
-      if (!isAdmin && newCount > leakosintLimit) {
+      if (!userBypassed && !isAdmin && newCount > leakosintLimit) {
         return res.status(429).json({
           message: "Limite de recherches Autre Source atteinte pour aujourd'hui.",
           used: newCount,
@@ -2708,7 +2732,10 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
 
-      if (await storage.isFrozen(userId)) {
+      const sub = await storage.getSubscription(userId);
+      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
+
+      if (!userBypassed && await storage.isFrozen(userId)) {
         return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
       }
 
@@ -2717,12 +2744,11 @@ export async function registerRoutes(
       const effectiveRole = await getEffectiveRole(userId);
       const isAdmin = effectiveRole === "admin";
 
-      const sub = await storage.getSubscription(userId);
       const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
       const leakosintLimit = planInfo.dailyLeakosintSearches;
 
-      if (!isAdmin && leakosintLimit === 0) {
+      if (!userBypassed && !isAdmin && leakosintLimit === 0) {
         return res.status(403).json({
           message: "Votre abonnement ne permet pas d'utiliser cette source. Passez a un plan superieur.",
           used: 0,
@@ -2732,7 +2758,7 @@ export async function registerRoutes(
       }
 
       const currentUsage = await storage.getLeakosintDailyUsage(userId, today);
-      if (!isAdmin && currentUsage >= leakosintLimit) {
+      if (!userBypassed && !isAdmin && currentUsage >= leakosintLimit) {
         return res.status(429).json({
           message: "Limite de recherches Autre Source atteinte pour aujourd'hui.",
           used: currentUsage,
@@ -2966,7 +2992,10 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Invalid or revoked API key. API tier subscription required." });
       }
 
-      if (await storage.isFrozen(validation.userId)) {
+      const apiSub = await storage.getSubscription(validation.userId);
+      const apiUserBypassed = apiSub ? await isUserBypassed(apiSub.id) : false;
+
+      if (!apiUserBypassed && await storage.isFrozen(validation.userId)) {
         return res.status(403).json({ error: "Account frozen. Contact an administrator." });
       }
 

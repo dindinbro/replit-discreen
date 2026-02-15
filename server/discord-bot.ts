@@ -297,6 +297,32 @@ export async function startDiscordBot() {
         .setRequired(true)
     );
 
+  const abypassCommand = new SlashCommandBuilder()
+    .setName("abypass")
+    .setDescription("Gerer la whitelist de comptes sans restrictions")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand((sub) =>
+      sub
+        .setName("add")
+        .setDescription("Ajouter un compte a la whitelist")
+        .addIntegerOption((opt) =>
+          opt.setName("idunique").setDescription("ID unique de l'utilisateur").setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("remove")
+        .setDescription("Retirer un compte de la whitelist")
+        .addIntegerOption((opt) =>
+          opt.setName("idunique").setDescription("ID unique de l'utilisateur").setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("list")
+        .setDescription("Afficher la whitelist actuelle")
+    );
+
   const rest = new REST({ version: "10" }).setToken(token);
 
   try {
@@ -323,7 +349,8 @@ export async function startDiscordBot() {
         wantedCommand.toJSON(),
         wantedPreviewCommand.toJSON(),
         wrefreshCommand.toJSON(),
-        resetRCommand.toJSON()
+        resetRCommand.toJSON(),
+        abypassCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -355,7 +382,8 @@ export async function startDiscordBot() {
       wantedCommand.toJSON(),
       wantedPreviewCommand.toJSON(),
       wrefreshCommand.toJSON(),
-      resetRCommand.toJSON()
+      resetRCommand.toJSON(),
+      abypassCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1105,6 +1133,125 @@ export async function startDiscordBot() {
           await interaction.editReply({ content: "Erreur lors de la reinitialisation des recherches." });
         } else if (!interaction.replied) {
           await interaction.reply({ content: "Erreur lors de la reinitialisation des recherches.", ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.commandName === "abypass") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const subcommand = interaction.options.getSubcommand();
+
+        const raw = await storage.getSiteSetting("bypass_whitelist");
+        const bypassList: number[] = raw ? JSON.parse(raw) : [];
+
+        if (subcommand === "add") {
+          const uniqueId = interaction.options.getInteger("idunique", true);
+          const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+          if (!sub) {
+            await interaction.editReply({ content: `Aucun utilisateur trouve avec l'ID unique \`${uniqueId}\`.` });
+            return;
+          }
+          if (bypassList.includes(uniqueId)) {
+            await interaction.editReply({ content: `L'utilisateur \`#${uniqueId}\` est deja dans la whitelist.` });
+            return;
+          }
+          bypassList.push(uniqueId);
+          await storage.setSiteSetting("bypass_whitelist", JSON.stringify(bypassList));
+
+          let email = "Inconnu";
+          let username = "Inconnu";
+          try {
+            const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+            const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+            if (supabaseUrl && supabaseKey) {
+              const supaAdmin = createClient(supabaseUrl, supabaseKey);
+              const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+              if (data?.user) {
+                email = data.user.email || "Inconnu";
+                username = data.user.user_metadata?.display_name || data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Inconnu";
+              }
+            }
+          } catch {}
+
+          const embed = new EmbedBuilder()
+            .setColor(0x10b981)
+            .setTitle("Whitelist Bypass - Ajout")
+            .addFields(
+              { name: "Action par", value: `<@${interaction.user.id}>`, inline: true },
+              { name: "ID Unique", value: `\`#${uniqueId}\``, inline: true },
+              { name: "Email", value: email, inline: true },
+              { name: "Nom d'utilisateur", value: username, inline: true },
+              { name: "Abonnement", value: (sub.tier || "free").toUpperCase(), inline: true }
+            )
+            .setTimestamp();
+          await interaction.editReply({ embeds: [embed] });
+          log(`/abypass add: User #${uniqueId} added to bypass whitelist by ${interaction.user.username}`, "discord");
+
+        } else if (subcommand === "remove") {
+          const uniqueId = interaction.options.getInteger("idunique", true);
+          const idx = bypassList.indexOf(uniqueId);
+          if (idx === -1) {
+            await interaction.editReply({ content: `L'utilisateur \`#${uniqueId}\` n'est pas dans la whitelist.` });
+            return;
+          }
+          bypassList.splice(idx, 1);
+          await storage.setSiteSetting("bypass_whitelist", JSON.stringify(bypassList));
+
+          const embed = new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setTitle("Whitelist Bypass - Retrait")
+            .addFields(
+              { name: "Action par", value: `<@${interaction.user.id}>`, inline: true },
+              { name: "ID Unique", value: `\`#${uniqueId}\``, inline: true }
+            )
+            .setTimestamp();
+          await interaction.editReply({ embeds: [embed] });
+          log(`/abypass remove: User #${uniqueId} removed from bypass whitelist by ${interaction.user.username}`, "discord");
+
+        } else if (subcommand === "list") {
+          if (bypassList.length === 0) {
+            await interaction.editReply({ content: "La whitelist est vide. Aucun compte n'a de bypass actif." });
+            return;
+          }
+
+          const lines: string[] = [];
+          for (const uid of bypassList) {
+            const sub = await storage.getSubscriptionByUniqueId(uid);
+            let label = `\`#${uid}\``;
+            if (sub) {
+              try {
+                const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+                const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+                if (supabaseUrl && supabaseKey) {
+                  const supaAdmin = createClient(supabaseUrl, supabaseKey);
+                  const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+                  if (data?.user) {
+                    const name = data.user.user_metadata?.display_name || data.user.email?.split("@")[0] || "Inconnu";
+                    label += ` — ${name} (${(sub.tier || "free").toUpperCase()})`;
+                  }
+                }
+              } catch {}
+            } else {
+              label += " — Utilisateur introuvable";
+            }
+            lines.push(label);
+          }
+
+          const embed = new EmbedBuilder()
+            .setColor(0x3b82f6)
+            .setTitle("Whitelist Bypass")
+            .setDescription(lines.join("\n"))
+            .setFooter({ text: `${bypassList.length} compte(s) en whitelist` })
+            .setTimestamp();
+          await interaction.editReply({ embeds: [embed] });
+        }
+      } catch (err) {
+        log(`Error in /abypass: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de la gestion de la whitelist." });
+        } else if (!interaction.replied) {
+          await interaction.reply({ content: "Erreur lors de la gestion de la whitelist.", ephemeral: true });
         }
       }
     }

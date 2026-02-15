@@ -39,6 +39,7 @@ The project is organized as a monorepo containing a React frontend (`client/`), 
 - **Unique ID System**: Assigns unique, auto-incrementing IDs to users, used for internal tracking and integration with external systems.
 - **Security Measures**: CORS with origin whitelist (`FRONTEND_URL` + Replit domains), dedicated rate limiters (heartbeat 10/min, invoice 5/min, search 30/min, global 120/min), NOWPayments IPN signature validation (HMAC-SHA512 with sorted body), all payment/sensitive routes require authentication.
 - **Session Limiting**: Max 2 active sessions per account (`active_sessions` table). Frontend generates unique session tokens (stored in `sessionStorage`), registers them on login via `POST /api/session/register`. When a 3rd session registers, the oldest is evicted. Heartbeat sends session token + auth header to keep sessions alive. Stale sessions (>30min inactive) are cleaned every 5 minutes. Multi-IP detection: if active sessions have different IPs, a Discord alert pings the security role for suspected account sharing.
+- **Bypass Whitelist**: Accounts added via Discord `/abypass add <idunique>` are exempt from all restrictions (freeze, daily quotas, cooldowns, abnormal activity alerts). Stored in `site_settings` as `bypass_whitelist` (JSON array of unique IDs). Cached for 60s. Managed with `/abypass add`, `/abypass remove`, `/abypass list` (admin-only).
 
 ### Data Storage
 - **PostgreSQL (via Drizzle ORM)**: Used for core application data such as users, subscriptions, and vouches.
