@@ -297,6 +297,40 @@ export async function startDiscordBot() {
         .setRequired(true)
     );
 
+  const setstatusCommand = new SlashCommandBuilder()
+    .setName("setstatus")
+    .setDescription("Forcer le statut d'un service")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((opt) =>
+      opt
+        .setName("service")
+        .setDescription("Le service a modifier")
+        .setRequired(true)
+        .addChoices(
+          { name: "Site", value: "Site" },
+          { name: "Bot", value: "Bot" },
+          { name: "API", value: "API" },
+          { name: "GeoIP", value: "GeoIP" },
+          { name: "Lookup Numero", value: "Lookup Numero" },
+          { name: "Recherche par critere", value: "Recherche par critere" },
+          { name: "Recherche Globale", value: "Recherche Globale" },
+          { name: "Autres sources", value: "Autres sources" },
+          { name: "Decodeur NIR", value: "Decodeur NIR" }
+        )
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("statut")
+        .setDescription("Le statut a forcer")
+        .setRequired(true)
+        .addChoices(
+          { name: "Operationnel (vert)", value: "operational" },
+          { name: "Degrade (orange)", value: "degraded" },
+          { name: "Hors ligne (rouge)", value: "down" },
+          { name: "Automatique (detection auto)", value: "auto" }
+        )
+    );
+
   const abypassCommand = new SlashCommandBuilder()
     .setName("abypass")
     .setDescription("Gerer la whitelist de comptes sans restrictions")
@@ -350,7 +384,8 @@ export async function startDiscordBot() {
         wantedPreviewCommand.toJSON(),
         wrefreshCommand.toJSON(),
         resetRCommand.toJSON(),
-        abypassCommand.toJSON()
+        abypassCommand.toJSON(),
+        setstatusCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -383,7 +418,8 @@ export async function startDiscordBot() {
       wantedPreviewCommand.toJSON(),
       wrefreshCommand.toJSON(),
       resetRCommand.toJSON(),
-      abypassCommand.toJSON()
+      abypassCommand.toJSON(),
+      setstatusCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1344,6 +1380,18 @@ export async function startDiscordBot() {
         type ServiceStatus = "operational" | "degraded" | "down";
         const services: { name: string; status: ServiceStatus }[] = [];
 
+        let statusOverrides: Record<string, string> = {};
+        try {
+          const raw = await storage.getSiteSetting("status_overrides");
+          if (raw) statusOverrides = JSON.parse(raw);
+        } catch {}
+
+        function resolveStatus(name: string, autoStatus: ServiceStatus): ServiceStatus {
+          const override = statusOverrides[name];
+          if (override === "operational" || override === "degraded" || override === "down") return override;
+          return autoStatus;
+        }
+
         const siteOk = !!(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
         let dbOk = false;
         try {
@@ -1352,13 +1400,13 @@ export async function startDiscordBot() {
         } catch {}
         services.push({
           name: "Site",
-          status: siteOk && dbOk ? "operational" : (siteOk || dbOk ? "degraded" : "down")
+          status: resolveStatus("Site", siteOk && dbOk ? "operational" : (siteOk || dbOk ? "degraded" : "down"))
         });
 
         const botOk = !!client?.isReady();
         services.push({
           name: "Bot",
-          status: botOk ? "operational" : "down"
+          status: resolveStatus("Bot", botOk ? "operational" : "down")
         });
 
         const breachOk = !!process.env.BREACH_API_KEY;
@@ -1366,41 +1414,41 @@ export async function startDiscordBot() {
         const paymentsOk = !!process.env.NOWPAYMENTS_API_KEY;
         services.push({
           name: "API",
-          status: breachOk && leakOk && paymentsOk ? "operational" : (breachOk || leakOk ? "degraded" : "down")
+          status: resolveStatus("API", breachOk && leakOk && paymentsOk ? "operational" : (breachOk || leakOk ? "degraded" : "down"))
         });
 
         services.push({
           name: "GeoIP",
-          status: "operational"
+          status: resolveStatus("GeoIP", "operational")
         });
 
         services.push({
           name: "Lookup Numero",
-          status: "operational"
+          status: resolveStatus("Lookup Numero", "operational")
         });
 
         const indexPath = pathModule.join(dataDir, "index.db");
         const indexExists = fs.existsSync(indexPath);
         services.push({
           name: "Recherche par critere",
-          status: indexExists ? "operational" : "down"
+          status: resolveStatus("Recherche par critere", indexExists ? "operational" : "down")
         });
 
         const incomingPath = pathModule.join(dataDir, "incoming.db");
         const bothDb = indexExists && fs.existsSync(incomingPath);
         services.push({
           name: "Recherche Globale",
-          status: bothDb ? "operational" : (indexExists ? "degraded" : "down")
+          status: resolveStatus("Recherche Globale", bothDb ? "operational" : (indexExists ? "degraded" : "down"))
         });
 
         services.push({
           name: "Autres sources",
-          status: breachOk && leakOk ? "operational" : (breachOk || leakOk ? "degraded" : "down")
+          status: resolveStatus("Autres sources", breachOk && leakOk ? "operational" : (breachOk || leakOk ? "degraded" : "down"))
         });
 
         services.push({
           name: "Decodeur NIR",
-          status: "operational"
+          status: resolveStatus("Decodeur NIR", "operational")
         });
 
         const dot = (s: ServiceStatus) =>
@@ -1474,6 +1522,47 @@ export async function startDiscordBot() {
         } else {
           await interaction.reply({ content: "Erreur lors de la verification du statut.", ephemeral: true });
         }
+      }
+    }
+
+    if (interaction.commandName === "setstatus") {
+      try {
+        const serviceName = interaction.options.getString("service", true);
+        const statut = interaction.options.getString("statut", true);
+
+        let overrides: Record<string, string> = {};
+        try {
+          const raw = await storage.getSiteSetting("status_overrides");
+          if (raw) overrides = JSON.parse(raw);
+        } catch {}
+
+        if (statut === "auto") {
+          delete overrides[serviceName];
+        } else {
+          overrides[serviceName] = statut;
+        }
+
+        await storage.setSiteSetting("status_overrides", JSON.stringify(overrides));
+
+        const statusLabel = statut === "operational" ? "Operationnel" : statut === "degraded" ? "Degrade" : statut === "down" ? "Hors ligne" : "Automatique";
+        const statusDot = statut === "operational" ? "\uD83D\uDFE2" : statut === "degraded" ? "\uD83D\uDFE0" : statut === "down" ? "\uD83D\uDD34" : "\u2699\uFE0F";
+
+        const embed = new EmbedBuilder()
+          .setColor(statut === "operational" ? 0x10b981 : statut === "degraded" ? 0xf59e0b : statut === "down" ? 0xef4444 : 0x6366f1)
+          .setTitle("Statut de service modifie")
+          .addFields(
+            { name: "Service", value: serviceName, inline: true },
+            { name: "Statut", value: `${statusDot} ${statusLabel}`, inline: true }
+          )
+          .setFooter({ text: `Modifie par ${interaction.user.username}` })
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        webhookBotGeneric(interaction.user.tag, "setstatus", `**Service** : ${serviceName}\n**Statut** : ${statusDot} ${statusLabel}`);
+        log(`Service "${serviceName}" status set to "${statut}" by ${interaction.user.tag}`, "discord");
+      } catch (err) {
+        log(`Error in setstatus command: ${err}`, "discord");
+        await interaction.reply({ content: "Erreur lors de la modification du statut.", ephemeral: true });
       }
     }
 
