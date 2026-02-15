@@ -292,6 +292,73 @@ function cleanFieldName(name: string): string {
   return name.replace(/^['"]|['"]$/g, "").trim();
 }
 
+const FAKE_BLURRED_ROWS = [
+  { email: "j••••@g•••l.com", username: "j••n_d•••nt", password: "••••••••", ip: "8•.2•.1••.••" },
+  { email: "m••••@y•••o.fr", nom: "D•••nt", prenom: "M•••e", telephone: "06••••••••" },
+  { email: "a••••@h•••l.com", username: "a••x_••3", address: "•• rue de ••••••", city: "P•••s" },
+  { email: "s••••@p•••n.net", password: "••••••••", ip: "19•.1••.•.••", nom: "M•••in" },
+  { email: "l••••@o•••k.com", username: "l•••_42", nom: "B•••rd", telephone: "07••••••••" },
+];
+
+function BlurredResultCards({ tier }: { tier: string }) {
+  return (
+    <div className="relative">
+      <div className="space-y-4 select-none pointer-events-none" aria-hidden="true">
+        {FAKE_BLURRED_ROWS.map((row, i) => (
+          <Card key={i} className="overflow-visible opacity-60">
+            <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b border-border/50">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground blur-[3px]">
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground truncate blur-[4px]">
+                    {row.email || row.username || `Resultat ${i + 1}`}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5 blur-[3px]">Discreen</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+              {Object.entries(row).map(([col, val]) => (
+                <div key={col} className="flex items-start gap-3 blur-[4px]">
+                  <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Database className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{col}</p>
+                    <p className="text-sm font-medium text-foreground break-all">{val}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg" data-testid="overlay-quota-exceeded">
+        <Card className="p-8 text-center space-y-4 max-w-md shadow-lg border-primary/20">
+          <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <Lock className="w-7 h-7 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-bold text-foreground" data-testid="text-quota-exceeded-title">Limite quotidienne atteinte</h3>
+            <p className="text-sm text-muted-foreground" data-testid="text-quota-exceeded-description">
+              Votre plan <span className="font-semibold text-foreground">{tier.toUpperCase()}</span> a atteint sa limite de recherches pour aujourd'hui.
+              Passez au plan superieur pour debloquer plus de recherches.
+            </p>
+          </div>
+          <Link href="/pricing">
+            <Button className="gap-2 mt-2" data-testid="button-upgrade-plan">
+              <Zap className="w-4 h-4" />
+              Voir les abonnements
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function ResultCard({
   row,
   index,
@@ -677,8 +744,11 @@ export default function SearchPage() {
         offset: newPage * pageSize,
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
+          if (data.quotaExceeded) {
+            setLimitReached(true);
+          }
         },
         onError: (err) => {
           if (err instanceof SearchLimitError) {
@@ -2629,25 +2699,7 @@ export default function SearchPage() {
                     </div>
                   </div>
                 ) : limitReached ? (
-                  <Card className="p-12 text-center space-y-6 border-destructive/20 bg-destructive/5">
-                    <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
-                      <ShieldAlert className="w-8 h-8 text-destructive" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-bold text-destructive">Limite Atteinte</h3>
-                      <p className="text-muted-foreground max-w-md mx-auto">
-                        Vous avez atteint votre quota de recherche quotidien pour le plan {displayTier.toUpperCase()}.
-                        Passez au plan superieur pour continuer vos recherches sans limites.
-                      </p>
-                    </div>
-                    <div className="flex justify-center gap-4">
-                      <Link href="/pricing">
-                        <Button className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                          Voir les abonnements
-                        </Button>
-                      </Link>
-                    </div>
-                  </Card>
+                  <BlurredResultCards tier={displayTier} />
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 space-y-4 border-2 border-dashed border-border rounded-2xl bg-muted/30">
                     <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center">
