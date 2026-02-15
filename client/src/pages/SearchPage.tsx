@@ -1477,7 +1477,7 @@ export default function SearchPage() {
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="h-7 bg-primary/5 text-primary border-primary/20 gap-1.5 font-medium">
                     <Search className="w-3.5 h-3.5" />
-                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
+                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${Math.max(0, displayLimit - displayUsed)} recherches restantes`}
                   </Badge>
                   {advancedSearch && (
                     <Badge variant="outline" className="h-7 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 gap-1.5 font-medium">
@@ -1491,9 +1491,9 @@ export default function SearchPage() {
                   <Button
                     data-testid="button-search"
                     onClick={() => handleSearch(0)}
-                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || searchCooldown > 0}
+                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || searchCooldown > 0 || atLimit}
                     className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${
-                      searchCooldown > 0
+                      searchCooldown > 0 || atLimit
                         ? "bg-muted text-muted-foreground cursor-not-allowed"
                         : advancedSearch
                         ? "bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground hover:from-primary/90 hover:to-emerald-500/90 shadow-primary/25"
@@ -1509,7 +1509,7 @@ export default function SearchPage() {
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    {searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : advancedSearch ? t("search.advancedSearch") : t("search.searchButton")}
+                    {atLimit ? "Limite atteinte" : searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : advancedSearch ? t("search.advancedSearch") : t("search.searchButton")}
                   </Button>
                   <Button
                     data-testid="button-reset-internal"
@@ -1627,7 +1627,7 @@ export default function SearchPage() {
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="h-7 bg-orange-500/5 text-orange-500 border-orange-500/20 gap-1.5 font-medium">
                     <Search className="w-3.5 h-3.5" />
-                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${displayLimit - displayUsed} recherches restantes`}
+                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${Math.max(0, displayLimit - displayUsed)} recherches restantes`}
                   </Badge>
                 </div>
 
@@ -1635,8 +1635,8 @@ export default function SearchPage() {
                   <Button
                     data-testid="button-fivem-search"
                     onClick={() => handleSearch(0)}
-                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || searchCooldown > 0}
-                    className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${searchCooldown > 0 ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-orange-600 text-white shadow-orange-500/25 border-orange-600"}`}
+                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || searchCooldown > 0 || atLimit}
+                    className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${searchCooldown > 0 || atLimit ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-orange-600 text-white shadow-orange-500/25 border-orange-600"}`}
                   >
                     {searchMutation.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1645,7 +1645,7 @@ export default function SearchPage() {
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    {searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : t("search.searchButton")}
+                    {atLimit ? "Limite atteinte" : searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : t("search.searchButton")}
                   </Button>
                   <Button
                     data-testid="button-reset-fivem"
