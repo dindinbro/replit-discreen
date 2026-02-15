@@ -745,6 +745,26 @@ export function webhookSessionLogin(user: UserInfo, ip: string, userAgent: strin
   });
 }
 
+export function webhookBlockedIpAttempt(ip: string, path: string, userAgent: string) {
+  const desc = [
+    `**IP Bloquee Detectee**`,
+    sep(),
+    `**Adresse IP** : \`${ip}\``,
+    `**Page demandee** : \`${path}\``,
+    `**User-Agent** : \`${userAgent.slice(0, 150)}\``,
+    `**Date** : <t:${Math.floor(Date.now() / 1000)}:F>`,
+    sep(),
+    `Cette IP fait partie de la blacklist et a tente d'acceder au site.`,
+  ].join("\n");
+
+  sendWebhook({
+    title: "\u{1F6AB} Tentative IP Blacklistee",
+    description: desc,
+    color: COLORS.security,
+    content: `<@&${ALERT_ROLE_ID}>`,
+  });
+}
+
 export function webhookAbnormalActivity(user: UserInfo, searchCount: number, limit: number) {
   const desc = [
     userBlock(user),

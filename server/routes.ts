@@ -19,7 +19,7 @@ import {
   webhookPhoneLookup, webhookGeoIP, webhookVouchDeleted,
   webhookCategoryCreated, webhookCategoryUpdated, webhookCategoryDeleted,
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
-  webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin,
+  webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin, webhookBlockedIpAttempt,
 } from "./webhook";
 import { sendFreezeAlert, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 
@@ -208,10 +208,19 @@ export async function registerRoutes(
     return ip;
   }
 
+  const blockedIpAlertCooldown = new Map<string, number>();
+  const BLOCKED_IP_ALERT_INTERVAL = 5 * 60 * 1000;
+
   app.use((req, res, next) => {
     const rawIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "";
     const clientIp = normalizeIp(rawIp);
     if (blockedIpCache.has(clientIp)) {
+      const now = Date.now();
+      const lastAlert = blockedIpAlertCooldown.get(clientIp) || 0;
+      if (now - lastAlert > BLOCKED_IP_ALERT_INTERVAL) {
+        blockedIpAlertCooldown.set(clientIp, now);
+        webhookBlockedIpAttempt(clientIp, req.path, req.headers["user-agent"] || "unknown");
+      }
       return res.status(403).json({ message: "Acces refuse." });
     }
     next();
