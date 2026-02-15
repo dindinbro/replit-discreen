@@ -764,19 +764,27 @@ async function searchRemoteBridge(
 
     if (data.results && data.results.length > 0) {
       const firstRow = data.results[0];
+      console.log(`[searchRemoteBridge] First row keys: ${Object.keys(firstRow).join(", ")}`);
+      console.log(`[searchRemoteBridge] First row sample: ${JSON.stringify(firstRow).slice(0, 300)}`);
       const hasRawFields = Object.keys(firstRow).some(k => 
         ["Line", "line", "Content", "content", "Rownum", "rownum", "Source", "source"].includes(k)
       );
       const hasParsedFields = Object.keys(firstRow).some(k => 
         ["_source", "_raw", "email", "identifiant", "password", "telephone"].includes(k)
       );
+      console.log(`[searchRemoteBridge] hasRaw=${hasRawFields} hasParsed=${hasParsedFields}`);
 
       if (hasRawFields && !hasParsedFields) {
         const processed = processResults(
           data.results as unknown as Record<string, string>[],
           "discreen"
         );
+        console.log(`[searchRemoteBridge] After processResults: ${processed.length} (from ${data.results.length})`);
+        if (processed.length > 0) {
+          console.log(`[searchRemoteBridge] Processed first row keys: ${Object.keys(processed[0]).join(", ")}`);
+        }
         const filtered = filterResultsByCriteria(processed, criteria);
+        console.log(`[searchRemoteBridge] After filter: ${filtered.length} (from ${processed.length})`);
         return {
           results: filtered.slice(0, limit) as SearchResult["results"],
           total: data.total,
@@ -784,6 +792,7 @@ async function searchRemoteBridge(
       }
 
       const filtered = filterResultsByCriteria(data.results, criteria);
+      console.log(`[searchRemoteBridge] After filter (direct): ${filtered.length}`);
       return {
         results: filtered.slice(0, limit) as SearchResult["results"],
         total: data.total,
