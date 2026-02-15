@@ -638,6 +638,46 @@ export function filterResultsByCriteria(
   });
 }
 
+export function scoreResultRelevance(
+  row: Record<string, unknown>,
+  criteria: SearchCriterion[]
+): number {
+  let score = 0;
+  for (const criterion of criteria) {
+    const allowedFields = CRITERION_TO_PARSED_FIELDS[criterion.type];
+    const searchVal = criterion.value.trim().toLowerCase();
+    if (!searchVal || !allowedFields) continue;
+
+    for (const [key, val] of Object.entries(row)) {
+      if (key.startsWith("_")) continue;
+      const keyLower = key.toLowerCase();
+      const strVal = String(val ?? "").toLowerCase();
+      if (!strVal.includes(searchVal)) continue;
+
+      if (allowedFields.includes(keyLower)) {
+        if (strVal === searchVal) {
+          score += 100;
+        } else {
+          score += 50;
+        }
+      } else {
+        score += 5;
+      }
+    }
+  }
+  return score;
+}
+
+export function sortByRelevance(
+  results: Record<string, unknown>[],
+  criteria: SearchCriterion[]
+): Record<string, unknown>[] {
+  return results
+    .map(r => ({ row: r, score: scoreResultRelevance(r, criteria) }))
+    .sort((a, b) => b.score - a.score)
+    .map(r => r.row);
+}
+
 function searchOneDb(
   info: DbInfo,
   criteria: SearchCriterion[],

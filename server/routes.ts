@@ -5,7 +5,7 @@ import { api } from "@shared/routes";
 import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes } from "@shared/schema";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria } from "./searchSqlite";
+import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria, sortByRelevance } from "./searchSqlite";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import crypto from "crypto";
 import path from "path";
@@ -1455,6 +1455,8 @@ export async function registerRoutes(
         return hasContent;
       });
       total = results.length;
+
+      results = sortByRelevance(results, request.criteria);
 
       console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}`);
 
