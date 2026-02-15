@@ -857,10 +857,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async blockIp(ipAddress: string, reason: string, blockedBy: string): Promise<BlockedIp> {
+    const existing = await db.select().from(blockedIps).where(eq(blockedIps.ipAddress, ipAddress));
+    if (existing.length > 0) return existing[0];
     const [entry] = await db
       .insert(blockedIps)
       .values({ ipAddress, reason, blockedBy })
-      .onConflictDoNothing()
       .returning();
     return entry;
   }
