@@ -1174,11 +1174,14 @@ export async function registerRoutes(
       }
       const ipTrimmed = normalizeIp(ipAddress);
       const adminEmail = (req as any).user?.email || "admin";
+      console.log("[ip-blacklist] Blocking IP:", ipTrimmed, "reason:", reason, "by:", adminEmail);
       const entry = await storage.blockIp(ipTrimmed, reason || "", adminEmail);
       blockedIpCache.add(ipTrimmed);
+      console.log("[ip-blacklist] IP blocked successfully:", ipTrimmed);
       res.json(entry);
-    } catch (err) {
-      console.error("POST /api/admin/blocked-ips error:", err);
+    } catch (err: any) {
+      console.error("POST /api/admin/blocked-ips error:", err?.message || err);
+      console.error("POST /api/admin/blocked-ips stack:", err?.stack);
       res.status(500).json({ message: "Internal server error" });
     }
   });
