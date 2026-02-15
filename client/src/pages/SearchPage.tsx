@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
 import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, SearchLimitError } from "@/hooks/use-search";
+import SearchLoader from "@/components/SearchLoader";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -2470,13 +2471,7 @@ export default function SearchPage() {
             </div>
 
             {loadingWanted ? (
-              <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-red-500/20 blur-xl rounded-full animate-pulse" />
-                  <Loader2 className="w-12 h-12 animate-spin text-red-500 relative" />
-                </div>
-                <p className="text-muted-foreground animate-pulse">Recherche en cours...</p>
-              </div>
+              <SearchLoader variant="red" />
             ) : wantedResults.length > 0 ? (
               <div className="grid grid-cols-1 gap-4">
                 {wantedResults.map((profile, i) => (
@@ -2569,13 +2564,7 @@ export default function SearchPage() {
                 )}
 
                 {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
-                      <Loader2 className="w-12 h-12 animate-spin text-primary relative" />
-                    </div>
-                    <p className="text-muted-foreground animate-pulse">Recherche en cours...</p>
-                  </div>
+                  <SearchLoader variant="primary" />
                 ) : blacklistMatch?.blacklisted && (!activeResults || activeResults.length === 0) ? (
                   <Card className="p-12 text-center space-y-6 border-destructive/20 bg-destructive/5">
                     <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
