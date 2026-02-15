@@ -1536,6 +1536,23 @@ export async function registerRoutes(
         });
       }
 
+      if (!isUnlimited && tier === "free") {
+        const clientIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
+        const ipUsage = getIpFreeUsage(clientIp);
+        if (ipUsage >= IP_FREE_SEARCH_LIMIT) {
+          return res.json({
+            results: [],
+            total: 0,
+            quotaExceeded: true,
+            quota: {
+              used: ipUsage,
+              limit: IP_FREE_SEARCH_LIMIT,
+              tier,
+            },
+          });
+        }
+      }
+
       const newCount = await storage.incrementDailyUsage(userId, today);
 
       if (!isUnlimited && newCount > planInfo.dailySearches) {
@@ -1549,6 +1566,11 @@ export async function registerRoutes(
             tier,
           },
         });
+      }
+
+      if (!isUnlimited && tier === "free") {
+        const clientIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
+        incrementIpFreeUsage(clientIp);
       }
       console.log(`[search] Incoming criteria: ${JSON.stringify(request.criteria)}, limit: ${request.limit}, offset: ${request.offset}`);
       const searchStart = Date.now();
@@ -2544,6 +2566,27 @@ export async function registerRoutes(
   const userSearchCooldowns = new Map<string, number>();
   const USER_SEARCH_COOLDOWN_MS = 10_000;
   const COOLDOWN_EXEMPT_ROLES = new Set(["api", "admin"]);
+
+  const ipDailyFreeSearches = new Map<string, { date: string; count: number }>();
+  const IP_FREE_SEARCH_LIMIT = 5;
+
+  function getIpFreeUsage(ip: string): number {
+    const today = new Date().toISOString().split("T")[0];
+    const entry = ipDailyFreeSearches.get(ip);
+    if (!entry || entry.date !== today) return 0;
+    return entry.count;
+  }
+
+  function incrementIpFreeUsage(ip: string): number {
+    const today = new Date().toISOString().split("T")[0];
+    const entry = ipDailyFreeSearches.get(ip);
+    if (!entry || entry.date !== today) {
+      ipDailyFreeSearches.set(ip, { date: today, count: 1 });
+      return 1;
+    }
+    entry.count++;
+    return entry.count;
+  }
 
   const API_TOKEN_COOLDOWN_MS = 30_000;
 
