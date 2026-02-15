@@ -2382,39 +2382,44 @@ export async function registerRoutes(
   const COOLDOWN_EXEMPT_ROLES = new Set(["api", "admin"]);
 
   const API_TOKEN_COOLDOWN_MS = 30_000;
-  let leakosintEndpointLastUsed = 0;
-  const leakosintEndpointQueue: Array<() => void> = [];
 
-  function waitForApiSlot(_apiName: "leakosint" | "dalton"): Promise<void> {
+  const apiSlots: Record<string, { lastUsed: number; queue: Array<() => void> }> = {
+    leakosint: { lastUsed: 0, queue: [] },
+    dalton: { lastUsed: 0, queue: [] },
+  };
+
+  function waitForApiSlot(apiName: "leakosint" | "dalton"): Promise<void> {
+    const slot = apiSlots[apiName];
     return new Promise((resolve) => {
       const tryExecute = () => {
         const now = Date.now();
-        const elapsed = now - leakosintEndpointLastUsed;
+        const elapsed = now - slot.lastUsed;
         if (elapsed >= API_TOKEN_COOLDOWN_MS) {
-          leakosintEndpointLastUsed = now;
+          slot.lastUsed = now;
           resolve();
         } else {
           const waitTime = API_TOKEN_COOLDOWN_MS - elapsed;
           setTimeout(() => {
-            leakosintEndpointLastUsed = Date.now();
+            slot.lastUsed = Date.now();
             resolve();
           }, waitTime);
         }
       };
 
-      if (leakosintEndpointQueue.length === 0) {
-        leakosintEndpointQueue.push(tryExecute);
+      if (slot.queue.length === 0) {
+        slot.queue.push(tryExecute);
         tryExecute();
       } else {
-        leakosintEndpointQueue.push(tryExecute);
+        slot.queue.push(tryExecute);
       }
     });
   }
 
-  function releaseApiSlot(_apiName: "leakosint" | "dalton") {
-    leakosintEndpointQueue.shift();
-    if (leakosintEndpointQueue.length > 0) {
-      leakosintEndpointQueue[0]();
+  function releaseApiSlot(apiName: "leakosint" | "dalton") {
+    const slot = apiSlots[apiName];
+    slot.queue.shift();
+    if (slot.queue.length > 0) {
+      slot.queue[0]();
     }
   }
 
