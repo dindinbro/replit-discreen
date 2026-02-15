@@ -462,4 +462,16 @@ export const discordOAuthTokens = pgTable("discord_oauth_tokens", {
 
 export type DiscordOAuthToken = typeof discordOAuthTokens.$inferSelect;
 
+export const blockedIps = pgTable("blocked_ips", {
+  id: serial("id").primaryKey(),
+  ipAddress: text("ip_address").notNull().unique(),
+  reason: text("reason").notNull().default(""),
+  blockedBy: text("blocked_by").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type BlockedIp = typeof blockedIps.$inferSelect;
+export const insertBlockedIpSchema = createInsertSchema(blockedIps).omit({ id: true, createdAt: true });
+export type InsertBlockedIp = z.infer<typeof insertBlockedIpSchema>;
+
 export * from "./models/chat";

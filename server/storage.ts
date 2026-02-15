@@ -2,6 +2,7 @@ import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
+  blockedIps,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -9,7 +10,7 @@ import {
   type InfoRequest, type InsertInfoRequest, type PendingServiceRequest,
   type WantedProfile, type InsertWantedProfile,
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
-  type ActiveSession,
+  type ActiveSession, type BlockedIp,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -96,6 +97,10 @@ export interface IStorage {
   removeAllSessions(userId: string): Promise<void>;
   removeOldestSession(userId: string): Promise<void>;
   cleanupStaleSessions(maxAgeMinutes?: number): Promise<number>;
+  getBlockedIps(): Promise<BlockedIp[]>;
+  isIpBlocked(ip: string): Promise<boolean>;
+  blockIp(ipAddress: string, reason: string, blockedBy: string): Promise<BlockedIp>;
+  unblockIp(id: number): Promise<void>;
 }
 
 function hashKey(key: string): string {
@@ -840,6 +845,28 @@ export class DatabaseStorage implements IStorage {
       .where(lte(activeSessions.lastActiveAt, cutoff))
       .returning();
     return result.length;
+  }
+
+  async getBlockedIps(): Promise<BlockedIp[]> {
+    return db.select().from(blockedIps).orderBy(desc(blockedIps.createdAt));
+  }
+
+  async isIpBlocked(ip: string): Promise<boolean> {
+    const [entry] = await db.select().from(blockedIps).where(eq(blockedIps.ipAddress, ip));
+    return !!entry;
+  }
+
+  async blockIp(ipAddress: string, reason: string, blockedBy: string): Promise<BlockedIp> {
+    const [entry] = await db
+      .insert(blockedIps)
+      .values({ ipAddress, reason, blockedBy })
+      .onConflictDoNothing()
+      .returning();
+    return entry;
+  }
+
+  async unblockIp(id: number): Promise<void> {
+    await db.delete(blockedIps).where(eq(blockedIps.id, id));
   }
 }
 

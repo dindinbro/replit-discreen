@@ -190,6 +190,33 @@ export async function registerRoutes(
 
   await initSearchDatabases();
 
+  const blockedIpCache = new Set<string>();
+  async function loadBlockedIps() {
+    try {
+      const ips = await storage.getBlockedIps();
+      blockedIpCache.clear();
+      for (const entry of ips) blockedIpCache.add(entry.ipAddress);
+    } catch (err) {
+      console.error("[ip-blacklist] Failed to load blocked IPs:", err);
+    }
+  }
+  await loadBlockedIps();
+
+  function normalizeIp(raw: string): string {
+    let ip = raw.trim();
+    if (ip.startsWith("::ffff:")) ip = ip.slice(7);
+    return ip;
+  }
+
+  app.use((req, res, next) => {
+    const rawIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "";
+    const clientIp = normalizeIp(rawIp);
+    if (blockedIpCache.has(clientIp)) {
+      return res.status(403).json({ message: "Acces refuse." });
+    }
+    next();
+  });
+
   app.post("/api/heartbeat", async (req, res) => {
     const ip = req.ip || req.socket.remoteAddress || "unknown";
     const userId = (req as any).user?.id;
@@ -1125,6 +1152,47 @@ export async function registerRoutes(
       res.json({ blacklisted: matches.length > 0 });
     } catch (err) {
       console.error("POST /api/blacklist/check error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/blocked-ips", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const ips = await storage.getBlockedIps();
+      res.json(ips);
+    } catch (err) {
+      console.error("GET /api/admin/blocked-ips error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/admin/blocked-ips", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { ipAddress, reason } = req.body;
+      if (!ipAddress || typeof ipAddress !== "string") {
+        return res.status(400).json({ message: "IP address required" });
+      }
+      const ipTrimmed = normalizeIp(ipAddress);
+      const adminEmail = (req as any).user?.email || "admin";
+      const entry = await storage.blockIp(ipTrimmed, reason || "", adminEmail);
+      blockedIpCache.add(ipTrimmed);
+      res.json(entry);
+    } catch (err) {
+      console.error("POST /api/admin/blocked-ips error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/admin/blocked-ips/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const ips = await storage.getBlockedIps();
+      const entry = ips.find(e => e.id === id);
+      if (entry) blockedIpCache.delete(entry.ipAddress);
+      await storage.unblockIp(id);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("DELETE /api/admin/blocked-ips error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

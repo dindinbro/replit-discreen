@@ -79,7 +79,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -88,6 +88,7 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "info", label: "Demandes d'information", icon: FileText },
   { key: "wanted", label: "Wanted", icon: Crosshair },
   { key: "dof", label: "D.O.F - Disques", icon: Disc3 },
+  { key: "ipblock", label: "IP Blacklist", icon: Ban },
 ];
 
 interface CategoryFormData {
@@ -2469,6 +2470,138 @@ function MaintenanceToggle({ getAccessToken }: { getAccessToken: () => string | 
   );
 }
 
+interface BlockedIpEntry {
+  id: number;
+  ipAddress: string;
+  reason: string;
+  blockedBy: string;
+  createdAt: string;
+}
+
+function IpBlacklistSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [newIp, setNewIp] = useState("");
+  const [newReason, setNewReason] = useState("");
+
+  const { data: blockedIps = [], isLoading } = useQuery<BlockedIpEntry[]>({
+    queryKey: ["/api/admin/blocked-ips"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/blocked-ips", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch blocked IPs");
+      return res.json();
+    },
+  });
+
+  const blockMutation = useMutation({
+    mutationFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/blocked-ips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ipAddress: newIp, reason: newReason }),
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Erreur");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blocked-ips"] });
+      setNewIp("");
+      setNewReason("");
+      toast({ title: "IP bloquee avec succes" });
+    },
+    onError: (err: any) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/blocked-ips/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erreur");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blocked-ips"] });
+      toast({ title: "IP debloquee" });
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4">
+        <h3 className="text-sm font-semibold mb-3">Bloquer une IP</h3>
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[180px]">
+            <Label className="text-xs text-muted-foreground">Adresse IP</Label>
+            <Input
+              data-testid="input-block-ip"
+              placeholder="ex: 192.168.1.1"
+              value={newIp}
+              onChange={(e) => setNewIp(e.target.value)}
+            />
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <Label className="text-xs text-muted-foreground">Raison</Label>
+            <Input
+              data-testid="input-block-reason"
+              placeholder="Raison du blocage"
+              value={newReason}
+              onChange={(e) => setNewReason(e.target.value)}
+            />
+          </div>
+          <Button
+            data-testid="button-block-ip"
+            onClick={() => blockMutation.mutate()}
+            disabled={!newIp.trim() || blockMutation.isPending}
+          >
+            {blockMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            <span className="ml-1">Bloquer</span>
+          </Button>
+        </div>
+      </Card>
+
+      <Card className="p-4">
+        <h3 className="text-sm font-semibold mb-3">IPs bloquees ({blockedIps.length})</h3>
+        {isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        ) : blockedIps.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Aucune IP bloquee</p>
+        ) : (
+          <div className="space-y-2">
+            {blockedIps.map((entry) => (
+              <div key={entry.id} data-testid={`row-blocked-ip-${entry.id}`} className="flex flex-wrap items-center gap-2 justify-between p-2 rounded-md border">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge variant="destructive" className="font-mono text-xs">{entry.ipAddress}</Badge>
+                  {entry.reason && <span className="text-xs text-muted-foreground truncate">{entry.reason}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleDateString("fr-FR")}</span>
+                  <Button
+                    data-testid={`button-unblock-ip-${entry.id}`}
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => unblockMutation.mutate(entry.id)}
+                    disabled={unblockMutation.isPending}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user, role, loading: authLoading, getAccessToken } = useAuth();
   const [, navigate] = useLocation();
@@ -2579,6 +2712,10 @@ export default function AdminPage() {
 
             {activeTab === "dof" && (
               <DofSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "ipblock" && (
+              <IpBlacklistSection getAccessToken={getAccessToken} />
             )}
           </main>
         </div>
