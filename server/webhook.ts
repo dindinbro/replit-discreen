@@ -712,6 +712,34 @@ export function webhookSuspiciousSession(user: UserInfo, sessionIPs: string[], s
   });
 }
 
+function getSessionWebhookUrl(): string | undefined {
+  return process.env.DISCORD_SESSION_WEBHOOK_URL;
+}
+
+async function sendSessionWebhook(options: WebhookOptions): Promise<void> {
+  const url = getSessionWebhookUrl();
+  if (!url) return;
+  await sendToWebhook(url, options, "session");
+}
+
+export function webhookSessionLogin(user: UserInfo, ip: string, userAgent: string, discordId?: string | null) {
+  const lines = [
+    userBlock(user),
+    sep(),
+    `**Connexion Detectee**`,
+    `**IP** : \`${ip}\``,
+    `**Navigateur** : \`${userAgent}\``,
+  ];
+  if (discordId) {
+    lines.push(`**Discord** : <@${discordId}> (\`${discordId}\`)`);
+  }
+  sendSessionWebhook({
+    title: "\u{1F511} Connexion Session",
+    description: lines.join("\n"),
+    color: COLORS.info,
+  });
+}
+
 export function webhookAbnormalActivity(user: UserInfo, searchCount: number, limit: number) {
   const desc = [
     userBlock(user),

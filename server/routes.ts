@@ -19,7 +19,7 @@ import {
   webhookPhoneLookup, webhookGeoIP, webhookVouchDeleted,
   webhookCategoryCreated, webhookCategoryUpdated, webhookCategoryDeleted,
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
-  webhookBotKeyRedeemed, webhookSuspiciousSession,
+  webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin,
 } from "./webhook";
 import { sendFreezeAlert, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 
@@ -352,6 +352,15 @@ export async function registerRoutes(
 
       await storage.createSession(user.id, sessionToken, ip, userAgent);
 
+      const sub = await storage.getOrCreateSubscription(user.id);
+      const meta = user.user_metadata || {};
+      webhookSessionLogin(
+        { id: user.id, email: user.email || "", username: meta.display_name || meta.full_name || user.email?.split("@")[0], uniqueId: sub.id },
+        ip,
+        userAgent,
+        sub.discordId,
+      );
+
       const sessions = await storage.getActiveSessions(user.id);
       const ips = sessions.map(s => s.ipAddress).filter(Boolean) as string[];
       const uniqueIPs = [...new Set(ips)];
@@ -402,7 +411,6 @@ export async function registerRoutes(
         max: MAX_SESSIONS,
         sessions: sessions.map(s => ({
           id: s.id,
-          ipAddress: s.ipAddress,
           userAgent: s.userAgent,
           lastActiveAt: s.lastActiveAt,
           createdAt: s.createdAt,

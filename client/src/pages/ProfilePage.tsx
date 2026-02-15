@@ -31,6 +31,10 @@ import {
   Link,
   Unlink,
   Heart,
+  Monitor,
+  Smartphone,
+  Globe,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
@@ -89,6 +93,16 @@ export default function ProfilePage() {
   const [generatingCode, setGeneratingCode] = useState(false);
   const [savingDiscord, setSavingDiscord] = useState(false);
 
+  interface SessionInfo {
+    id: number;
+    userAgent: string;
+    lastActiveAt: string;
+    createdAt: string;
+  }
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [removingSessionId, setRemovingSessionId] = useState<number | null>(null);
+
   const canChangeName = role === "admin";
 
   useEffect(() => {
@@ -99,6 +113,7 @@ export default function ProfilePage() {
     }
     fetchProfile();
     fetchTwoFaStatus();
+    fetchSessions();
   }, [authLoading, user]);
 
   async function fetchProfile() {
@@ -136,6 +151,78 @@ export default function ProfilePage() {
       console.error("fetchTwoFaStatus error:", err);
     } finally {
       setLoadingTwoFa(false);
+    }
+  }
+
+  async function fetchSessions() {
+    try {
+      const token = getAccessToken();
+      if (!token) return;
+      const res = await fetch("/api/session/active", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data.sessions || []);
+      }
+    } catch (err) {
+      console.error("fetchSessions error:", err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  }
+
+  function parseUserAgent(ua: string): { browser: string; os: string; isMobile: boolean } {
+    const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua);
+    let browser = "Navigateur inconnu";
+    let os = "OS inconnu";
+
+    if (/Edg\//i.test(ua)) browser = "Microsoft Edge";
+    else if (/OPR\//i.test(ua) || /Opera/i.test(ua)) browser = "Opera";
+    else if (/Chrome\//i.test(ua) && !/Edg/i.test(ua)) browser = "Google Chrome";
+    else if (/Firefox\//i.test(ua)) browser = "Firefox";
+    else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = "Safari";
+
+    if (/Windows/i.test(ua)) os = "Windows";
+    else if (/Mac OS/i.test(ua)) os = "macOS";
+    else if (/Linux/i.test(ua) && !isMobile) os = "Linux";
+    else if (/Android/i.test(ua)) os = "Android";
+    else if (/iPhone|iPad/i.test(ua)) os = "iOS";
+
+    return { browser, os, isMobile };
+  }
+
+  function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "A l'instant";
+    if (mins < 60) return `Il y a ${mins}min`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Il y a ${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `Il y a ${days}j`;
+  }
+
+  async function removeSession(sessionId: number) {
+    setRemovingSessionId(sessionId);
+    try {
+      const token = getAccessToken();
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) return;
+      await fetch("/api/session", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+      await fetchSessions();
+      toast({ title: "Session deconnectee" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    } finally {
+      setRemovingSessionId(null);
     }
   }
 
@@ -542,6 +629,52 @@ export default function ProfilePage() {
                     {t("profile.discord.generateCode")}
                   </Button>
                 )}
+              </div>
+            )}
+          </Card>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Monitor className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-display font-bold">Sessions Actives</h2>
+          </div>
+          <Card className="p-6 space-y-4">
+            {loadingSessions ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : sessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucune session active.</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {sessions.length} session{sessions.length > 1 ? "s" : ""} active{sessions.length > 1 ? "s" : ""} (max 2)
+                </p>
+                {sessions.map((session) => {
+                  const ua = parseUserAgent(session.userAgent || "");
+                  const DeviceIcon = ua.isMobile ? Smartphone : Monitor;
+                  return (
+                    <div
+                      key={session.id}
+                      className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-secondary/10"
+                      data-testid={`session-item-${session.id}`}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <DeviceIcon className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-sm">{ua.browser}</p>
+                          <Badge variant="secondary" className="text-xs">{ua.os}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Derniere activite : {timeAgo(session.lastActiveAt)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Card>
