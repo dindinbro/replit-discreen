@@ -352,6 +352,28 @@ export async function startDiscordBot() {
         )
     );
 
+  const freezeCommand = new SlashCommandBuilder()
+    .setName("freeze")
+    .setDescription("Geler ou degeler un compte utilisateur")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addIntegerOption((opt) =>
+      opt
+        .setName("idunique")
+        .setDescription("L'ID unique de l'utilisateur")
+        .setRequired(true)
+        .setMinValue(1)
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("action")
+        .setDescription("Geler ou degeler le compte")
+        .setRequired(true)
+        .addChoices(
+          { name: "Geler", value: "freeze" },
+          { name: "Degeler", value: "unfreeze" }
+        )
+    );
+
   const abypassCommand = new SlashCommandBuilder()
     .setName("abypass")
     .setDescription("Gerer la whitelist de comptes sans restrictions")
@@ -407,7 +429,8 @@ export async function startDiscordBot() {
         resetRCommand.toJSON(),
         abypassCommand.toJSON(),
         setstatusCommand.toJSON(),
-        openticketCommand.toJSON()
+        openticketCommand.toJSON(),
+        freezeCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -442,7 +465,8 @@ export async function startDiscordBot() {
       resetRCommand.toJSON(),
       abypassCommand.toJSON(),
       setstatusCommand.toJSON(),
-      openticketCommand.toJSON()
+      openticketCommand.toJSON(),
+      freezeCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1988,6 +2012,75 @@ export async function startDiscordBot() {
       }
     }
 
+    if (interaction.commandName === "freeze") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const uniqueId = interaction.options.getInteger("idunique", true);
+        const action = interaction.options.getString("action", true);
+        const shouldFreeze = action === "freeze";
+
+        const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+        if (!sub) {
+          await interaction.editReply({ content: `Aucun utilisateur trouve avec l'ID unique \`${uniqueId}\`.` });
+          return;
+        }
+
+        const alreadyFrozen = await storage.isFrozen(sub.userId);
+        if (shouldFreeze && alreadyFrozen) {
+          await interaction.editReply({ content: `Ce compte (#${uniqueId}) est deja gele.` });
+          return;
+        }
+        if (!shouldFreeze && !alreadyFrozen) {
+          await interaction.editReply({ content: `Ce compte (#${uniqueId}) n'est pas gele.` });
+          return;
+        }
+
+        await storage.setFrozen(sub.userId, shouldFreeze);
+
+        let email = "Inconnu";
+        let username = "Inconnu";
+        try {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseKey) {
+            const supaAdmin = createClient(supabaseUrl, supabaseKey);
+            const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+            if (data?.user) {
+              email = data.user.email || "Inconnu";
+              username = data.user.user_metadata?.username || email.split("@")[0];
+            }
+          }
+        } catch {}
+
+        const icon = shouldFreeze ? "\u{2744}\u{FE0F}" : "\u{2705}";
+        const label = shouldFreeze ? "Compte Gele" : "Compte Degele";
+        const color = shouldFreeze ? 0xe74c3c : 0x10b981;
+
+        const embed = new EmbedBuilder()
+          .setColor(color)
+          .setTitle(`${icon} ${label}`)
+          .addFields(
+            { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
+            { name: "Email", value: `\`${email}\``, inline: true },
+            { name: "Nom d'utilisateur", value: `\`${username}\``, inline: true },
+            { name: "Action", value: shouldFreeze ? "**GELE**" : "**DEGELE**", inline: true },
+            { name: "Par", value: `<@${interaction.user.id}>`, inline: true }
+          )
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        webhookBotGeneric(interaction.user.tag, "freeze", `**ID Unique** : #${uniqueId}\n**Email** : ${email}\n**Action** : ${shouldFreeze ? "Gele" : "Degele"}`);
+        log(`/freeze: User #${uniqueId} ${shouldFreeze ? "frozen" : "unfrozen"} by ${interaction.user.username}`, "discord");
+      } catch (err) {
+        log(`Error in /freeze: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors du gel/degel du compte." });
+        } else if (!interaction.replied) {
+          await interaction.reply({ content: "Erreur lors du gel/degel du compte.", ephemeral: true });
+        }
+      }
+    }
+
     if (interaction.commandName === "renew") {
       try {
         await interaction.deferReply({ ephemeral: true });
@@ -2731,7 +2824,12 @@ export async function sendFreezeAlert(userId: string, username: string, uniqueId
         .setCustomId(`freeze_alert_${userId}`)
         .setLabel("Geler le compte")
         .setStyle(ButtonStyle.Danger)
-        .setEmoji("\u{2744}\u{FE0F}")
+        .setEmoji("\u{2744}\u{FE0F}"),
+      new ButtonBuilder()
+        .setLabel("Voir sur le site")
+        .setStyle(ButtonStyle.Link)
+        .setURL("https://discreen.site/admin")
+        .setEmoji("\u{1F310}")
     );
 
     await (channel as any).send({
