@@ -22,6 +22,9 @@ import {
   webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin, webhookBlockedIpAttempt,
 } from "./webhook";
 import { sendFreezeAlert, sendSharedIpAlert, setOnIpBlacklisted, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
+import disposableDomains from "disposable-email-domains";
+
+const disposableDomainSet = new Set(disposableDomains as string[]);
 
 const ORDER_TOKEN_SECRET = process.env.NOWPAYMENTS_API_KEY || crypto.randomBytes(32).toString("hex");
 
@@ -374,12 +377,34 @@ export async function registerRoutes(
     }
   }, 5 * 60 * 1000);
 
+  app.post("/api/check-email", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string") {
+        return res.json({ blocked: false });
+      }
+      const domain = email.split("@")[1]?.toLowerCase();
+      if (domain && disposableDomainSet.has(domain)) {
+        return res.json({ blocked: true });
+      }
+      return res.json({ blocked: false });
+    } catch {
+      return res.json({ blocked: false });
+    }
+  });
+
   app.post("/api/session/register", requireAuth, async (req, res) => {
     try {
       const user = (req as any).user;
       const { sessionToken } = req.body;
       if (!sessionToken || typeof sessionToken !== "string") {
         return res.status(400).json({ message: "Session token required" });
+      }
+
+      const userEmail = user.email || "";
+      const emailDomain = userEmail.split("@")[1]?.toLowerCase();
+      if (emailDomain && disposableDomainSet.has(emailDomain)) {
+        return res.status(403).json({ message: "Les adresses email temporaires ne sont pas autorisees." });
       }
 
       const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
