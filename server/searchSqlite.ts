@@ -147,7 +147,7 @@ export interface SearchResult {
   total: number | null;
 }
 
-function normalizePhoneVariants(value: string): string[] {
+export function normalizePhoneVariants(value: string): string[] {
   const digits = value.replace(/[\s\-().]/g, "");
 
   if (/^\+33\d{9}$/.test(digits)) {
@@ -684,14 +684,19 @@ export function scoreResultRelevance(
     const searchVal = criterion.value.trim().toLowerCase();
     if (!searchVal || !allowedFields) continue;
 
+    const searchVariants = criterion.type === "phone"
+      ? normalizePhoneVariants(searchVal).map((v) => v.toLowerCase())
+      : [searchVal];
+
     for (const [key, val] of Object.entries(row)) {
       if (key.startsWith("_")) continue;
       const keyLower = key.toLowerCase();
       const strVal = String(val ?? "").toLowerCase();
-      if (!strVal.includes(searchVal)) continue;
+      const matched = searchVariants.some((sv) => strVal.includes(sv));
+      if (!matched) continue;
 
       if (allowedFields.includes(keyLower)) {
-        if (strVal === searchVal) {
+        if (searchVariants.some((sv) => strVal === sv)) {
           score += 100;
         } else {
           score += 50;

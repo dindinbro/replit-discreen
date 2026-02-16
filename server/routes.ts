@@ -5,7 +5,7 @@ import { api } from "@shared/routes";
 import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes } from "@shared/schema";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria, sortByRelevance } from "./searchSqlite";
+import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria, sortByRelevance, normalizePhoneVariants } from "./searchSqlite";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import crypto from "crypto";
 import path from "path";
@@ -1383,7 +1383,14 @@ export async function registerRoutes(
       const externalField = CRITERIA_TO_EXTERNAL_FIELD[c.type];
       if (externalField) {
         const existing = mappedFields.get(externalField) || [];
-        existing.push(c.value);
+        if (c.type === "phone") {
+          const variants = normalizePhoneVariants(c.value.trim());
+          for (const v of variants) {
+            if (!existing.includes(v)) existing.push(v);
+          }
+        } else {
+          existing.push(c.value);
+        }
         mappedFields.set(externalField, existing);
       } else {
         unmappedValues.push(c.value);
