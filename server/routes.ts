@@ -22,9 +22,16 @@ import {
   webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin, webhookBlockedIpAttempt,
 } from "./webhook";
 import { sendFreezeAlert, sendSharedIpAlert, setOnIpBlacklisted, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
-import disposableDomains from "disposable-email-domains";
-
-const disposableDomainSet = new Set(disposableDomains as string[]);
+import { createRequire } from "module";
+const _require = createRequire(import.meta.url);
+let disposableDomainSet: Set<string>;
+try {
+  const disposableDomains: string[] = _require("disposable-email-domains");
+  disposableDomainSet = new Set(disposableDomains);
+} catch {
+  console.warn("[disposable-email] Package not found, using empty blocklist");
+  disposableDomainSet = new Set();
+}
 
 const ORDER_TOKEN_SECRET = process.env.NOWPAYMENTS_API_KEY || crypto.randomBytes(32).toString("hex");
 
