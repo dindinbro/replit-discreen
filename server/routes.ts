@@ -33,6 +33,35 @@ try {
   disposableDomainSet = new Set();
 }
 
+const disposableApiCache = new Map<string, { disposable: boolean; ts: number }>();
+const DISPOSABLE_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+async function isDisposableDomain(domain: string): Promise<boolean> {
+  if (disposableDomainSet.has(domain)) return true;
+
+  const cached = disposableApiCache.get(domain);
+  if (cached && Date.now() - cached.ts < DISPOSABLE_CACHE_TTL) {
+    return cached.disposable;
+  }
+
+  try {
+    const resp = await fetch(`https://disposable.debounce.io/?email=check@${encodeURIComponent(domain)}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (resp.ok) {
+      const data = await resp.json() as { disposable: string };
+      const isDisposable = data.disposable === "true";
+      disposableApiCache.set(domain, { disposable: isDisposable, ts: Date.now() });
+      if (isDisposable) {
+        disposableDomainSet.add(domain);
+      }
+      return isDisposable;
+    }
+  } catch {}
+
+  return false;
+}
+
 const ORDER_TOKEN_SECRET = process.env.NOWPAYMENTS_API_KEY || crypto.randomBytes(32).toString("hex");
 
 function sortObject(obj: any): any {
@@ -391,7 +420,7 @@ export async function registerRoutes(
         return res.json({ blocked: false });
       }
       const domain = email.split("@")[1]?.toLowerCase();
-      if (domain && disposableDomainSet.has(domain)) {
+      if (domain && await isDisposableDomain(domain)) {
         return res.json({ blocked: true });
       }
       return res.json({ blocked: false });
@@ -410,7 +439,7 @@ export async function registerRoutes(
 
       const userEmail = user.email || "";
       const emailDomain = userEmail.split("@")[1]?.toLowerCase();
-      if (emailDomain && disposableDomainSet.has(emailDomain)) {
+      if (emailDomain && await isDisposableDomain(emailDomain)) {
         return res.status(403).json({ message: "Les adresses email temporaires ne sont pas autorisees." });
       }
 
