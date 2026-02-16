@@ -147,34 +147,6 @@ export interface SearchResult {
   total: number | null;
 }
 
-export function normalizePhoneVariants(value: string): string[] {
-  const digits = value.replace(/[\s\-().]/g, "");
-
-  if (/^\+33\d{9}$/.test(digits)) {
-    const local = "0" + digits.slice(3);
-    return [digits, local];
-  }
-
-  if (/^0033\d{9}$/.test(digits)) {
-    const local = "0" + digits.slice(4);
-    const intl = "+" + digits.slice(2);
-    return [digits, local, intl];
-  }
-
-  if (/^33\d{9}$/.test(digits) && digits.length === 11) {
-    const local = "0" + digits.slice(2);
-    const intl = "+" + digits;
-    return [digits, local, intl];
-  }
-
-  if (/^0[1-9]\d{8}$/.test(digits)) {
-    const intl = "+33" + digits.slice(1);
-    return [digits, intl];
-  }
-
-  return [value];
-}
-
 export function classifyPart(p: string): string | null {
   const trimmed = p.trim();
   if (!trimmed) return null;
@@ -625,10 +597,6 @@ export function filterResultsByCriteria(
       const searchVal = criterion.value.trim().toLowerCase();
       if (!searchVal) continue;
 
-      const searchVariants = criterion.type === "phone"
-        ? normalizePhoneVariants(searchVal).map((v) => v.toLowerCase())
-        : [searchVal];
-
       let foundInAllowedField = false;
 
       if (allowedFields) {
@@ -637,7 +605,7 @@ export function filterResultsByCriteria(
           const keyLower = key.toLowerCase();
           if (allowedFields.includes(keyLower)) {
             const strVal = String(val ?? "").toLowerCase();
-            if (searchVariants.some((sv) => strVal.includes(sv))) {
+            if (strVal.includes(searchVal)) {
               foundInAllowedField = true;
               break;
             }
@@ -649,7 +617,7 @@ export function filterResultsByCriteria(
         const raw = row._raw;
         if (typeof raw === "string") {
           const rawLower = raw.toLowerCase();
-          if (searchVariants.some((sv) => rawLower.includes(sv))) {
+          if (rawLower.includes(searchVal)) {
             foundInAllowedField = true;
           }
         }
@@ -659,7 +627,7 @@ export function filterResultsByCriteria(
         const anyFieldMatch = Object.entries(row).some(([key, val]) => {
           if (key.startsWith("_")) return false;
           const strVal = String(val ?? "").toLowerCase();
-          return searchVariants.some((sv) => strVal.includes(sv));
+          return strVal.includes(searchVal);
         });
         if (anyFieldMatch) {
           foundInAllowedField = true;
@@ -684,19 +652,14 @@ export function scoreResultRelevance(
     const searchVal = criterion.value.trim().toLowerCase();
     if (!searchVal || !allowedFields) continue;
 
-    const searchVariants = criterion.type === "phone"
-      ? normalizePhoneVariants(searchVal).map((v) => v.toLowerCase())
-      : [searchVal];
-
     for (const [key, val] of Object.entries(row)) {
       if (key.startsWith("_")) continue;
       const keyLower = key.toLowerCase();
       const strVal = String(val ?? "").toLowerCase();
-      const matched = searchVariants.some((sv) => strVal.includes(sv));
-      if (!matched) continue;
+      if (!strVal.includes(searchVal)) continue;
 
       if (allowedFields.includes(keyLower)) {
-        if (searchVariants.some((sv) => strVal === sv)) {
+        if (strVal === searchVal) {
           score += 100;
         } else {
           score += 50;
@@ -735,17 +698,7 @@ function searchOneDb(
     for (let i = 0; i < criteria.length; i++) {
       const val = values[i];
       if (!val) continue;
-      if (criteria[i].type === "phone") {
-        const variants = normalizePhoneVariants(val);
-        if (variants.length > 1) {
-          const orTerms = variants.map((v) => `"${v.replace(/"/g, '""')}"`).join(" OR ");
-          ftsTermParts.push(`(${orTerms})`);
-        } else {
-          ftsTermParts.push(`"${val.replace(/"/g, '""')}"`);
-        }
-      } else {
-        ftsTermParts.push(`"${val.replace(/"/g, '""')}"`);
-      }
+      ftsTermParts.push(`"${val.replace(/"/g, '""')}"`);
     }
     const ftsQuery = ftsTermParts.join(" ");
 
@@ -772,16 +725,11 @@ function searchOneDb(
     for (let i = 0; i < criteria.length; i++) {
       const val = values[i];
       if (!val) continue;
-      const variants = criteria[i].type === "phone" ? normalizePhoneVariants(val) : [val];
-      const variantConditions: string[] = [];
-      for (const variant of variants) {
-        const orParts = columns.map((c) => `"${c}" LIKE ?`);
-        variantConditions.push(`(${orParts.join(" OR ")})`);
-        for (const _c of columns) {
-          params.push(`%${variant}%`);
-        }
+      const orParts = columns.map((c) => `"${c}" LIKE ?`);
+      conditions.push(`(${orParts.join(" OR ")})`);
+      for (const _c of columns) {
+        params.push(`%${val}%`);
       }
-      conditions.push(variantConditions.length > 1 ? `(${variantConditions.join(" OR ")})` : variantConditions[0]);
     }
 
     const whereSQL = conditions.join(" AND ");
@@ -807,23 +755,13 @@ async function searchRemoteBridge(
   offset: number
 ): Promise<SearchResult> {
   try {
-    const expandedCriteria = criteria.flatMap((c) => {
-      if (c.type === "phone") {
-        const variants = normalizePhoneVariants(c.value.trim());
-        if (variants.length > 1) {
-          return variants.map((v) => ({ ...c, value: v }));
-        }
-      }
-      return [c];
-    });
-
     const res = await fetch(`${remoteBridgeUrl}/search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Bridge-Secret": remoteBridgeSecret,
       },
-      body: JSON.stringify({ criteria: expandedCriteria, limit: limit * 5, offset }),
+      body: JSON.stringify({ criteria, limit: limit * 5, offset }),
       signal: AbortSignal.timeout(120000),
     });
 

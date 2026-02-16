@@ -90,7 +90,7 @@ const FILTER_PLACEHOLDERS: Record<string, string> = {
   address: "ex: 12 rue de la Paix, Paris",
   ipAddress: "ex: 192.168.1.1",
   macAddress: "ex: AA:BB:CC:DD:EE:FF",
-  phone: "ex: 0612345678 ou +33612345678",
+  phone: "ex: 0612345678 — testez aussi avec +33612345678",
   ssn: "ex: 1 85 05 78 006 084 36",
   dob: "ex: 05/10/1964",
   yob: "ex: 1964",
@@ -1401,6 +1401,9 @@ export default function SearchPage() {
                                 }}
                                 className="bg-background pr-10"
                               />
+                              {criterion.type === "phone" && (
+                                <p className="text-xs text-muted-foreground mt-1">Pensez à tester les deux formats : 06... et +33...</p>
+                              )}
                             </div>
 
                             <Button
