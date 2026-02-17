@@ -2605,7 +2605,7 @@ export default function SearchPage() {
 
             return (
               <>
-                <div className="flex items-center justify-between">
+                <div id="results-section" className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Database className="w-5 h-5 text-primary" />
                     Resultats de recherche
@@ -2709,7 +2709,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={page === 0}
-                          onClick={() => { handleSearch(page - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                          onClick={() => { handleSearch(page - 1); document.getElementById("results-section")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
                         >
                           <ChevronLeft className="w-4 h-4 mr-1" />
                           Précédent
@@ -2721,7 +2721,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={(page + 1) * pageSize >= (searchMutation.data.total ?? 0)}
-                          onClick={() => { handleSearch(page + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                          onClick={() => { handleSearch(page + 1); document.getElementById("results-section")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
                         >
                           Suivant
                           <ChevronRight className="w-4 h-4 ml-1" />
