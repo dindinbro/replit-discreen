@@ -69,7 +69,8 @@ const PLANS = [
     id: "pro",
     name: "PRO",
     subtitle: "Puissance maximale",
-    price: 14.99,
+    price: 10.99,
+    originalPrice: 14.99,
     icon: Rocket,
     popular: true,
     features: [
