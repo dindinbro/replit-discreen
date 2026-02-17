@@ -131,7 +131,7 @@ const PLANS = [
 const HIGHLIGHTS = [
   { icon: RefreshCw, label: "Renouvellement quotidien" },
   { icon: Database, label: "Toutes les bases incluses" },
-  { icon: Search, label: "Recherche parametrique" },
+  { icon: Search, label: "Recherche Paramétrique" },
   { icon: Shield, label: "Paiements securises" },
 ];
 

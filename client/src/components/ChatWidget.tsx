@@ -87,7 +87,7 @@ const TOPIC_TREE: TopicNode[] = [
       },
       {
         label: "Types de recherche",
-        response: "Les types disponibles : recherche parametrique (interne), recherche globale (LeakOSINT), recherche Discord, decodeur NIR, recherche telephone, et GeoIP. Certains necessitent un plan VIP ou superieur.",
+        response: "Les types disponibles : Recherche Paramétrique (interne), recherche globale (LeakOSINT), recherche Discord, decodeur NIR, recherche telephone, et GeoIP. Certains necessitent un plan VIP ou superieur.",
       },
       {
         label: "Limite atteinte",
