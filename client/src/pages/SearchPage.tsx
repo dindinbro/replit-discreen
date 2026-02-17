@@ -920,7 +920,7 @@ export default function SearchPage() {
     );
   };
 
-  const handleSearch = (newPage = 0, scrollToResults = false) => {
+  const handleSearch = (newPage = 0) => {
     const filledCriteria = criteria.filter((c) => c.value.trim());
     if (filledCriteria.length === 0) {
       toast({
@@ -971,11 +971,6 @@ export default function SearchPage() {
           queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
           if (data.cooldownSeconds && data.cooldownSeconds > 0) {
             setSearchCooldown(data.cooldownSeconds);
-          }
-          if (scrollToResults) {
-            setTimeout(() => {
-              document.getElementById("results-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }, 100);
           }
         },
         onError: (err) => {
@@ -2679,7 +2674,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={page === 0}
-                          onClick={() => handleSearch(page - 1, true)}
+                          onClick={() => handleSearch(page - 1)}
                         >
                           <ChevronLeft className="w-4 h-4 mr-1" />
                           Précédent
@@ -2691,7 +2686,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={(page + 1) * pageSize >= (searchMutation.data.total ?? 0)}
-                          onClick={() => handleSearch(page + 1, true)}
+                          onClick={() => handleSearch(page + 1)}
                         >
                           Suivant
                           <ChevronRight className="w-4 h-4 ml-1" />
@@ -2704,7 +2699,7 @@ export default function SearchPage() {
                   key={idx}
                   row={row}
                   index={idx}
-                  globalIndex={(searchMode === "internal" ? page * pageSize : 0) + idx}
+                  globalIndex={((searchMode === "internal" || searchMode === "fivem") ? page * pageSize : 0) + idx}
                 />
               ))}
 
@@ -2714,7 +2709,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={page === 0}
-                          onClick={() => handleSearch(page - 1, true)}
+                          onClick={() => handleSearch(page - 1)}
                         >
                           <ChevronLeft className="w-4 h-4 mr-1" />
                           Précédent
@@ -2726,7 +2721,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={(page + 1) * pageSize >= (searchMutation.data.total ?? 0)}
-                          onClick={() => handleSearch(page + 1, true)}
+                          onClick={() => handleSearch(page + 1)}
                         >
                           Suivant
                           <ChevronRight className="w-4 h-4 ml-1" />
