@@ -2668,6 +2668,31 @@ export default function SearchPage() {
                         </div>
                       </div>
                     )}
+                    {(searchMode === "internal" || searchMode === "fivem") && searchMutation.data && (searchMutation.data.total ?? 0) > pageSize && (
+                      <div className="flex items-center justify-center gap-2 pb-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={page === 0}
+                          onClick={() => handleSearch(page - 1)}
+                        >
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          Précédent
+                        </Button>
+                        <span className="text-sm font-medium px-4">
+                          Page {page + 1} sur {Math.ceil((searchMutation.data.total ?? 0) / pageSize)}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={(page + 1) * pageSize >= (searchMutation.data.total ?? 0)}
+                          onClick={() => handleSearch(page + 1)}
+                        >
+                          Suivant
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      </div>
+                    )}
                     <div className={`grid grid-cols-1 gap-4 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
                     {activeResults.map((row, idx) => (
                 <ResultCard
@@ -2684,10 +2709,10 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={page === 0}
-                          onClick={() => handleSearch(page - 1)}
+                          onClick={() => { handleSearch(page - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                         >
                           <ChevronLeft className="w-4 h-4 mr-1" />
-                          Precedent
+                          Précédent
                         </Button>
                         <span className="text-sm font-medium px-4">
                           Page {page + 1} sur {Math.ceil((searchMutation.data.total ?? 0) / pageSize)}
@@ -2696,7 +2721,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={(page + 1) * pageSize >= (searchMutation.data.total ?? 0)}
-                          onClick={() => handleSearch(page + 1)}
+                          onClick={() => { handleSearch(page + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                         >
                           Suivant
                           <ChevronRight className="w-4 h-4 ml-1" />
