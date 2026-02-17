@@ -1214,7 +1214,7 @@ export default function SearchPage() {
             data-testid="button-mode-internal"
           >
             <Sparkles className="w-4 h-4" />
-            Recherche par Critères
+            Recherche parametrique
           </Button>
           <Button
             variant={searchMode === "exiftool" ? "default" : "outline"}
@@ -2288,7 +2288,7 @@ export default function SearchPage() {
                 <div className="flex items-center justify-between gap-2 flex-wrap mb-6">
                   <div className="flex items-center gap-2">
                     <ShieldAlert className="w-5 h-5 text-red-500" />
-                    <h2 className="text-xl font-bold tracking-tight">Recherche par Critères (Wanted)</h2>
+                    <h2 className="text-xl font-bold tracking-tight">Recherche parametrique (Wanted)</h2>
                   </div>
                   {getAvailableFilters().length > 0 && (
                     <Select
