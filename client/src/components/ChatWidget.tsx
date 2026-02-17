@@ -25,7 +25,7 @@ const TOPIC_TREE: TopicNode[] = [
       },
       {
         label: "VIP - 6,99\u20ac/mois",
-        response: "Le plan VIP a 6,99\u20ac/mois inclut : 50 recherches/jour, acces aux donnees FiveM, recherche par Email/IP, recherches Discord et externes, et acces a toutes les bases de donnees.",
+        response: "Le plan VIP a 6,99\u20ac/mois inclut : 50 recherches/jour, acces aux donnees Gaming, recherche par Email/IP, recherches Discord et externes, et acces a toutes les bases de donnees.",
       },
       {
         label: "PRO - 14,99\u20ac/mois",

@@ -57,7 +57,7 @@ const PLANS = [
     popular: false,
     features: [
       "50 recherches par jour",
-      "Fivem Donnees, Email/IP",
+      "Gaming, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
       { text: "Recherche avancee Discreen", excluded: true },
@@ -75,7 +75,7 @@ const PLANS = [
     popular: true,
     features: [
       "200 recherches par jour",
-      "Fivem Donnees, Email/IP",
+      "Gaming, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
       "Recherche avancee Discreen",
@@ -94,7 +94,7 @@ const PLANS = [
     popular: false,
     features: [
       "500 recherches par jour",
-      "Fivem Donnees, Email/IP",
+      "Gaming, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
       "Recherche avancee Discreen",

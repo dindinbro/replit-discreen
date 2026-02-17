@@ -25,7 +25,7 @@
     "badge": "Plateforme d'Intelligence de Donnees",
     "title1": "Explorez la Puissance de",
     "title2": "Discreen",
-    "subtitle": "Accedez a des bases de donnees completes, des outils de recherche puissants et des analyses avancees pour decouvrir des informations a travers Discord, FiveM et d'autres plateformes dans un hub centralise.",
+    "subtitle": "Accedez a des bases de donnees completes, des outils de recherche puissants et des analyses avancees pour decouvrir des informations a travers Discord, Gaming et d'autres plateformes dans un hub centralise.",
     "joinPrefix": "Rejoignez",
     "usersSuffix": "utilisateurs recherchant a travers",
     "dataSuffix": "de donnees",
@@ -103,17 +103,17 @@
       "vip": {
         "name": "VIP",
         "subtitle": "Pour les utilisateurs reguliers",
-        "features": ["50 recherches par jour", "Fivem Donnees, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite"]
+        "features": ["50 recherches par jour", "Gaming, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite"]
       },
       "pro": {
         "name": "PRO",
         "subtitle": "Puissance maximale",
-        "features": ["200 recherches par jour", "Fivem Donnees, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite", "Moteur de recherche Wanted", "Parrainage"]
+        "features": ["200 recherches par jour", "Gaming, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite", "Moteur de recherche Wanted", "Parrainage"]
       },
       "business": {
         "name": "Business",
         "subtitle": "Pour les professionnels",
-        "features": ["500 recherches par jour", "Fivem Donnees, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite", "Moteur de recherche Wanted", "Parrainage", "Support Prioritaire"]
+        "features": ["500 recherches par jour", "Gaming, Email/IP", "Recherches Discord / Externes", "Acces toutes les bases", "Google OSINT illimite", "Username Sherlock illimite", "Moteur de recherche Wanted", "Parrainage", "Support Prioritaire"]
       },
       "api": {
         "name": "API",
@@ -174,7 +174,7 @@
       "nir": "Decodeur NIR",
       "xeuledoc": "Google OSINT",
       "sherlock": "Sherlock",
-      "fivem": "FiveM",
+      "fivem": "Gaming",
       "wanted": "Wanted"
     },
     "criteria": "Criteres de recherche",

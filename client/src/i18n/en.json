@@ -25,7 +25,7 @@
     "badge": "Data Intelligence Platform",
     "title1": "Explore the Power of",
     "title2": "Discreen",
-    "subtitle": "Access comprehensive databases, powerful search tools and advanced analytics to uncover information across Discord, FiveM and other platforms in a centralized hub.",
+    "subtitle": "Access comprehensive databases, powerful search tools and advanced analytics to uncover information across Discord, Gaming and other platforms in a centralized hub.",
     "joinPrefix": "Join",
     "usersSuffix": "users searching across",
     "dataSuffix": "of data",
@@ -103,17 +103,17 @@
       "vip": {
         "name": "VIP",
         "subtitle": "For regular users",
-        "features": ["50 searches per day", "FiveM Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock"]
+        "features": ["50 searches per day", "Gaming Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock"]
       },
       "pro": {
         "name": "PRO",
         "subtitle": "Maximum power",
-        "features": ["200 searches per day", "FiveM Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock", "Wanted search engine", "Referral program"]
+        "features": ["200 searches per day", "Gaming Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock", "Wanted search engine", "Referral program"]
       },
       "business": {
         "name": "Business",
         "subtitle": "For professionals",
-        "features": ["500 searches per day", "FiveM Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock", "Wanted search engine", "Referral program", "Priority Support"]
+        "features": ["500 searches per day", "Gaming Data, Email/IP", "Discord / External searches", "Access all databases", "Unlimited Google OSINT", "Unlimited Username Sherlock", "Wanted search engine", "Referral program", "Priority Support"]
       },
       "api": {
         "name": "API",
@@ -174,7 +174,7 @@
       "nir": "NIR Decoder",
       "xeuledoc": "Google OSINT",
       "sherlock": "Sherlock",
-      "fivem": "FiveM",
+      "fivem": "Gaming",
       "wanted": "Wanted"
     },
     "criteria": "Search criteria",

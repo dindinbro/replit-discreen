@@ -582,6 +582,7 @@ const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   vin: ["vin", "vehicle", "vehicule", "immatriculation", "plaque"],
   fivemLicense: ["fivem", "fivem_license", "license", "cfx", "fivemid"],
   steamId: ["steam", "steamid", "steam_id", "steam64", "steamid64"],
+  minecraftUuid: ["minecraft", "minecraft_uuid", "mc_uuid", "uuid", "mc_id", "minecraft_id"],
 };
 
 export function filterResultsByCriteria(

@@ -75,6 +75,7 @@ const FILTER_ICONS: Record<string, typeof User> = {
   steamId: Gamepad2,
   xbox: Gamepad2,
   live: Gamepad2,
+  minecraftUuid: Gamepad2,
   gender: User,
   hashedPassword: Hash,
   password: Hash,
@@ -102,6 +103,7 @@ const FILTER_PLACEHOLDERS: Record<string, string> = {
   steamId: "ex: steam:1100001xxxxxxxx",
   xbox: "ex: Gamertag123",
   live: "ex: live:123456789",
+  minecraftUuid: "ex: 069a79f4-44e9-4726-a5be-fca90e38aaf5",
   gender: "ex: M ou F",
   hashedPassword: "ex: 5f4dcc3b5aa765d61d8327deb882cf99",
   password: "ex: motdepasse123",
@@ -1178,7 +1180,7 @@ export default function SearchPage() {
               <>
                 Recherche <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">
-                  FiveM
+                  Gaming
                 </span>
               </>
             ) : isXeuledocMode ? (
@@ -1302,7 +1304,7 @@ export default function SearchPage() {
             data-testid="button-mode-fivem"
           >
             <Gamepad2 className="w-4 h-4" />
-            FiveM
+            Gaming
             {tierLevel < 1 && <span className="text-[10px] ml-1 opacity-70">(VIP+)</span>}
           </Button>
           <Button
@@ -1542,7 +1544,7 @@ export default function SearchPage() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Gamepad2 className="w-5 h-5 text-orange-500" />
-                  <h2 className="text-xl font-bold tracking-tight">Recherche FiveM</h2>
+                  <h2 className="text-xl font-bold tracking-tight">Recherche Gaming</h2>
                 </div>
                 {getAvailableFilters().length > 0 && (
                   <Select
@@ -1624,7 +1626,7 @@ export default function SearchPage() {
               {criteria.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Gamepad2 className="w-10 h-10 mx-auto mb-3 opacity-40 text-orange-500" />
-                  <p className="text-sm">Ajoutez un filtre pour lancer une recherche FiveM</p>
+                  <p className="text-sm">Ajoutez un filtre pour lancer une recherche Gaming</p>
                 </div>
               )}
 

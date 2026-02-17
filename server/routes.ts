@@ -1714,7 +1714,7 @@ export async function registerRoutes(
 
       if (hasFivemFilter && tierLevel < TIER_ORDER.vip) {
         return res.status(403).json({
-          message: "La recherche FiveM nécessite un abonnement VIP minimum.",
+          message: "La recherche Gaming nécessite un abonnement VIP minimum.",
           requiredTier: "vip",
           tier,
         });
