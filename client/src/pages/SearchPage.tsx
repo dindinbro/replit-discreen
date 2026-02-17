@@ -920,7 +920,7 @@ export default function SearchPage() {
     );
   };
 
-  const handleSearch = (newPage = 0) => {
+  const handleSearch = (newPage = 0, scrollToResults = false) => {
     const filledCriteria = criteria.filter((c) => c.value.trim());
     if (filledCriteria.length === 0) {
       toast({
@@ -971,6 +971,11 @@ export default function SearchPage() {
           queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
           if (data.cooldownSeconds && data.cooldownSeconds > 0) {
             setSearchCooldown(data.cooldownSeconds);
+          }
+          if (scrollToResults) {
+            setTimeout(() => {
+              document.getElementById("results-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 100);
           }
         },
         onError: (err) => {
@@ -2674,7 +2679,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={page === 0}
-                          onClick={() => handleSearch(page - 1)}
+                          onClick={() => handleSearch(page - 1, true)}
                         >
                           <ChevronLeft className="w-4 h-4 mr-1" />
                           Précédent
@@ -2686,7 +2691,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={(page + 1) * pageSize >= (searchMutation.data.total ?? 0)}
-                          onClick={() => handleSearch(page + 1)}
+                          onClick={() => handleSearch(page + 1, true)}
                         >
                           Suivant
                           <ChevronRight className="w-4 h-4 ml-1" />
@@ -2709,7 +2714,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={page === 0}
-                          onClick={() => { handleSearch(page - 1); document.getElementById("results-section")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                          onClick={() => handleSearch(page - 1, true)}
                         >
                           <ChevronLeft className="w-4 h-4 mr-1" />
                           Précédent
@@ -2721,7 +2726,7 @@ export default function SearchPage() {
                           variant="outline"
                           size="sm"
                           disabled={(page + 1) * pageSize >= (searchMutation.data.total ?? 0)}
-                          onClick={() => { handleSearch(page + 1); document.getElementById("results-section")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                          onClick={() => handleSearch(page + 1, true)}
                         >
                           Suivant
                           <ChevronRight className="w-4 h-4 ml-1" />
