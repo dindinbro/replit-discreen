@@ -1402,7 +1402,7 @@ export default function SearchPage() {
                                 className="bg-background pr-10"
                               />
                               {criterion.type === "phone" && (
-                                <p className="text-xs text-muted-foreground mt-1">Pensez à tester les deux formats : 06... et +33...</p>
+                                <p className="text-xs text-muted-foreground mt-1">Pensez à tester les formats : 06..., +33... et sans le 0 (612345678)</p>
                               )}
                             </div>
 
