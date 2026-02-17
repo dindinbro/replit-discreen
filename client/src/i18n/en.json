@@ -18,7 +18,8 @@
     "apiKeys": "API Keys",
     "documentation": "Documentation",
     "admin": "Administration",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "signIn": "Log in"
   },
   "landing": {
     "badge": "Data Intelligence Platform",

@@ -24,6 +24,7 @@ import {
   ChevronDown,
   Languages,
   Zap,
+  LogIn,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -277,6 +278,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
+            )}
+            {!user && (
+              <Link href="/login">
+                <Button variant="default" size="sm" className="gap-1.5" data-testid="button-login">
+                  <LogIn className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t("header.signIn")}</span>
+                </Button>
+              </Link>
             )}
             <Button
               data-testid="button-mobile-menu"

@@ -18,7 +18,8 @@
     "apiKeys": "Cles API",
     "documentation": "Documentation",
     "admin": "Administration",
-    "signOut": "Se deconnecter"
+    "signOut": "Se deconnecter",
+    "signIn": "Se connecter"
   },
   "landing": {
     "badge": "Plateforme d'Intelligence de Donnees",
