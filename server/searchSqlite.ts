@@ -579,6 +579,8 @@ const CRITERION_TO_PARSED_FIELDS: Record<string, string[]> = {
   discordId: ["discord", "discord_id", "discordid", "discord_uid"],
   macAddress: ["mac", "mac_address", "macaddress", "mac_addr"],
   gender: ["gender", "civilite", "sexe", "sex", "genre"],
+  city: ["city", "ville", "town", "commune", "localite"],
+  zipCode: ["zip", "zipcode", "zip_code", "postal", "postal_code", "code_postal", "cp"],
   vin: ["vin", "vehicle", "vehicule", "immatriculation", "plaque"],
   fivemLicense: ["fivem", "fivem_license", "license", "cfx", "fivemid"],
   steamId: ["steam", "steamid", "steam_id", "steam64", "steamid64"],

@@ -39,6 +39,8 @@ export const SearchFilterType = z.enum([
   "gender",
   "dob",
   "yob",
+  "city",
+  "zipCode",
   "iban",
   "bic",
   "hashedPassword",
@@ -69,6 +71,8 @@ export const FilterLabels: Record<SearchFilterType, string> = {
   gender: "Genre",
   dob: "Date de naissance",
   yob: "Année de naissance",
+  city: "Ville",
+  zipCode: "Code postal",
   iban: "IBAN",
   bic: "BIC",
   hashedPassword: "Hashed Password",
@@ -99,7 +103,7 @@ export const FivemFilterLabels: Record<FivemFilterType, string> = {
 export const MainSearchFilterTypes = [
   "username", "displayName", "macAddress", "ipAddress", "email", "address",
   "lastName", "firstName", "ssn", "phone", "gender", "dob", "yob",
-  "iban", "bic", "hashedPassword", "password", "vin",
+  "city", "zipCode", "iban", "bic", "hashedPassword", "password", "vin",
 ] as const;
 
 export const WantedFilterTypes = [
