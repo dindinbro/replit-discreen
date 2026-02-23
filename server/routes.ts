@@ -251,6 +251,9 @@ export async function registerRoutes(
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    try {
+      await db.execute(sql`ALTER TABLE referral_events ADD COLUMN IF NOT EXISTS credits_awarded INTEGER NOT NULL DEFAULT 1`);
+    } catch (_) {}
     console.log("[referral] Tables ensured OK");
   } catch (err) {
     console.error("[referral] Failed to ensure referral tables:", err);
