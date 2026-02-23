@@ -2,7 +2,7 @@ import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
-  blockedIps,
+  blockedIps, referralCodes, referralEvents,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -11,6 +11,7 @@ import {
   type WantedProfile, type InsertWantedProfile,
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
   type ActiveSession, type BlockedIp,
+  type ReferralCode, type ReferralEvent,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -102,6 +103,13 @@ export interface IStorage {
   isIpBlocked(ip: string): Promise<boolean>;
   blockIp(ipAddress: string, reason: string, blockedBy: string): Promise<BlockedIp>;
   unblockIp(id: string): Promise<void>;
+  getOrCreateReferralCode(userId: string): Promise<ReferralCode>;
+  getReferralCodeByCode(code: string): Promise<ReferralCode | undefined>;
+  getReferralStats(userId: string): Promise<{ code: string; totalCredits: number; referralCount: number }>;
+  recordReferralEvent(referrerId: string, refereeId: string, orderId: string): Promise<ReferralEvent>;
+  creditReferral(orderId: string): Promise<boolean>;
+  storeReferralForOrder(orderId: string, referrerUserId: string, refereeUserId: string): Promise<void>;
+  getPendingReferral(orderId: string): Promise<{ referrerId: string; refereeId: string } | null>;
 }
 
 function hashKey(key: string): string {
@@ -874,6 +882,81 @@ export class DatabaseStorage implements IStorage {
 
   async unblockIp(id: string): Promise<void> {
     await db.delete(blockedIps).where(eq(blockedIps.id, id));
+  }
+
+  private generateReferralCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "DS-";
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  }
+
+  async getOrCreateReferralCode(userId: string): Promise<ReferralCode> {
+    const [existing] = await db.select().from(referralCodes).where(eq(referralCodes.userId, userId));
+    if (existing) return existing;
+    const code = this.generateReferralCode();
+    const [created] = await db.insert(referralCodes).values({ userId, code }).returning();
+    return created;
+  }
+
+  async getReferralCodeByCode(code: string): Promise<ReferralCode | undefined> {
+    const [ref] = await db.select().from(referralCodes).where(eq(referralCodes.code, code.toUpperCase()));
+    return ref;
+  }
+
+  async getReferralStats(userId: string): Promise<{ code: string; totalCredits: number; referralCount: number }> {
+    const refCode = await this.getOrCreateReferralCode(userId);
+    const events = await db.select().from(referralEvents).where(eq(referralEvents.referrerId, userId));
+    return {
+      code: refCode.code,
+      totalCredits: refCode.totalCredits,
+      referralCount: events.length,
+    };
+  }
+
+  async recordReferralEvent(referrerId: string, refereeId: string, orderId: string): Promise<ReferralEvent> {
+    const [event] = await db.insert(referralEvents).values({
+      referrerId,
+      refereeId,
+      orderId,
+    }).returning();
+    await db.update(referralCodes)
+      .set({ totalCredits: sql`${referralCodes.totalCredits} + 1` })
+      .where(eq(referralCodes.userId, referrerId));
+    return event;
+  }
+
+  async creditReferral(orderId: string): Promise<boolean> {
+    const pending = await this.getPendingReferral(orderId);
+    if (!pending) return false;
+    const existingEvents = await db.select().from(referralEvents).where(eq(referralEvents.orderId, orderId));
+    if (existingEvents.length > 0) return false;
+    await this.recordReferralEvent(pending.referrerId, pending.refereeId, orderId);
+    const settingKey = `referral_pending_${orderId}`;
+    await db.delete(siteSettings).where(eq(siteSettings.key, settingKey));
+    return true;
+  }
+
+  async storeReferralForOrder(orderId: string, referrerUserId: string, refereeUserId: string): Promise<void> {
+    const settingKey = `referral_pending_${orderId}`;
+    const value = JSON.stringify({ referrerId: referrerUserId, refereeId: refereeUserId });
+    await db.insert(siteSettings).values({ key: settingKey, value }).onConflictDoUpdate({
+      target: siteSettings.key,
+      set: { value },
+    });
+  }
+
+  async getPendingReferral(orderId: string): Promise<{ referrerId: string; refereeId: string } | null> {
+    const settingKey = `referral_pending_${orderId}`;
+    const [setting] = await db.select().from(siteSettings).where(eq(siteSettings.key, settingKey));
+    if (!setting) return null;
+    try {
+      return JSON.parse(setting.value);
+    } catch {
+      return null;
+    }
   }
 }
 

@@ -481,4 +481,53 @@ export type BlockedIp = typeof blockedIps.$inferSelect;
 export const insertBlockedIpSchema = createInsertSchema(blockedIps).omit({ createdAt: true });
 export type InsertBlockedIp = z.infer<typeof insertBlockedIpSchema>;
 
+export const referralCodes = pgTable("referral_codes", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  code: text("code").notNull().unique(),
+  totalCredits: integer("total_credits").notNull().default(0),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type ReferralCode = typeof referralCodes.$inferSelect;
+
+export const referralEvents = pgTable("referral_events", {
+  id: serial("id").primaryKey(),
+  referrerId: text("referrer_id").notNull(),
+  refereeId: text("referee_id").notNull(),
+  orderId: text("order_id").notNull().unique(),
+  creditsAwarded: integer("credits_awarded").notNull().default(1),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type ReferralEvent = typeof referralEvents.$inferSelect;
+
+export const REFERRAL_RANKS = [
+  { name: "Fer", threshold: 0, color: "#8B8B8B" },
+  { name: "Bronze", threshold: 2, color: "#CD7F32" },
+  { name: "Argent", threshold: 5, color: "#C0C0C0" },
+  { name: "Or", threshold: 10, color: "#FFD700" },
+  { name: "Platine", threshold: 18, color: "#E5E4E2" },
+  { name: "Diamant", threshold: 28, color: "#B9F2FF" },
+  { name: "Titane", threshold: 40, color: "#878681" },
+  { name: "Mythique", threshold: 55, color: "#FF6EC7" },
+  { name: "Légendaire", threshold: 75, color: "#FF4500" },
+  { name: "Vibranium", threshold: 100, color: "#7B2FBE" },
+] as const;
+
+export type ReferralRankInfo = { name: string; threshold: number; color: string };
+
+export function getReferralRank(credits: number): { current: ReferralRankInfo; nextRank: ReferralRankInfo | null; rankIndex: number } {
+  let current: ReferralRankInfo = REFERRAL_RANKS[0];
+  let nextRank: ReferralRankInfo | null = REFERRAL_RANKS[1] || null;
+  for (let i = REFERRAL_RANKS.length - 1; i >= 0; i--) {
+    if (credits >= REFERRAL_RANKS[i].threshold) {
+      current = REFERRAL_RANKS[i];
+      nextRank = REFERRAL_RANKS[i + 1] || null;
+      break;
+    }
+  }
+  return { current, nextRank, rankIndex: REFERRAL_RANKS.indexOf(current as any) };
+}
+
 export * from "./models/chat";

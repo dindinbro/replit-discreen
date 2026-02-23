@@ -28,6 +28,7 @@ import {
   Loader2,
   Key,
   Clock,
+  Gift,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -159,6 +160,10 @@ export default function PricingPage() {
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemKey, setRedeemKey] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
+  const [referralOpen, setReferralOpen] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  const [referralValidating, setReferralValidating] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<typeof PLANS[number] | null>(null);
   const { toast } = useToast();
   const { getAccessToken, refreshRole, role, expiresAt } = useAuth();
 
@@ -216,7 +221,7 @@ export default function PricingPage() {
     }
   }
 
-  async function handleSubscribe(plan: typeof PLANS[number]) {
+  function handleSubscribe(plan: typeof PLANS[number]) {
     if (plan.price === 0) {
       toast({
         title: t("pricing.free"),
@@ -235,15 +240,31 @@ export default function PricingPage() {
       return;
     }
 
-    setLoading(plan.id);
+    setPendingPlan(plan);
+    setReferralCode("");
+    setReferralOpen(true);
+  }
+
+  async function proceedToPayment(withReferralCode?: string) {
+    if (!pendingPlan) return;
+    const token = getAccessToken();
+    if (!token) return;
+
+    setReferralOpen(false);
+    setLoading(pendingPlan.id);
     try {
+      const body: any = { plan: pendingPlan.id };
+      if (withReferralCode && withReferralCode.trim()) {
+        body.referralCode = withReferralCode.trim().toUpperCase();
+      }
+
       const res = await fetch("/api/create-invoice", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ plan: plan.id }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -264,6 +285,33 @@ export default function PricingPage() {
       });
     } finally {
       setLoading(null);
+      setPendingPlan(null);
+    }
+  }
+
+  async function handleReferralSubmit() {
+    if (!referralCode.trim()) {
+      proceedToPayment();
+      return;
+    }
+    setReferralValidating(true);
+    try {
+      const res = await fetch("/api/referral/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: referralCode.trim().toUpperCase() }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        toast({ title: "Code de parrainage appliqué !" });
+        proceedToPayment(referralCode);
+      } else {
+        toast({ title: "Code invalide", description: "Ce code de parrainage n'existe pas.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    } finally {
+      setReferralValidating(false);
     }
   }
 
@@ -473,6 +521,59 @@ export default function PricingPage() {
           </Card>
         </motion.div>
       </div>
+
+      <Dialog open={referralOpen} onOpenChange={(open) => { if (!open) { setReferralOpen(false); setPendingPlan(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="w-5 h-5 text-primary" />
+              Code de parrainage
+            </DialogTitle>
+            <DialogDescription>
+              Avez-vous un code de parrainage ? Entrez-le ci-dessous. Sinon, cliquez sur "Continuer sans code".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              data-testid="input-referral-code"
+              placeholder="DS-XXXXXX"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === "Enter" && handleReferralSubmit()}
+              className="font-mono text-sm text-center tracking-widest"
+              maxLength={10}
+            />
+            <div className="flex flex-col gap-2">
+              <Button
+                data-testid="button-apply-referral"
+                onClick={handleReferralSubmit}
+                disabled={referralValidating}
+                className="w-full gap-2"
+              >
+                {referralValidating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : referralCode.trim() ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <ArrowRight className="w-4 h-4" />
+                )}
+                {referralCode.trim() ? "Appliquer et continuer" : "Continuer sans code"}
+              </Button>
+              {referralCode.trim() && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => proceedToPayment()}
+                  className="text-xs text-muted-foreground"
+                  data-testid="button-skip-referral"
+                >
+                  Passer sans code
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={redeemOpen} onOpenChange={setRedeemOpen}>
         <DialogContent className="sm:max-w-md">

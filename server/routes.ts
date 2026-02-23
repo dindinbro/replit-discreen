@@ -831,6 +831,34 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/referral/stats", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const stats = await storage.getReferralStats(userId);
+      res.json(stats);
+    } catch (err) {
+      console.error("GET /api/referral/stats error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/referral/validate", async (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+      if (!code || typeof code !== "string") {
+        return res.status(400).json({ valid: false, message: "Code requis" });
+      }
+      const refCode = await storage.getReferralCodeByCode(code.trim().toUpperCase());
+      if (!refCode) {
+        return res.json({ valid: false, message: "Code invalide" });
+      }
+      res.json({ valid: true });
+    } catch (err) {
+      console.error("POST /api/referral/validate error:", err);
+      res.status(500).json({ valid: false, message: "Internal server error" });
+    }
+  });
+
   app.get("/api/site-status", async (_req, res) => {
     try {
       const val = await storage.getSiteSetting("maintenance_mode");
@@ -1954,7 +1982,7 @@ export async function registerRoutes(
 
   app.post("/api/create-invoice", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { plan } = req.body;
+      const { plan, referralCode } = req.body;
       const planInfo = PLAN_LIMITS[plan as PlanTier];
       if (!planInfo || plan === "free") {
         return res.status(400).json({ message: "Plan invalide" });
@@ -1966,6 +1994,14 @@ export async function registerRoutes(
       }
 
       const orderId = `order_${plan}_${Date.now()}`;
+
+      if (referralCode && typeof referralCode === "string") {
+        const refCode = await storage.getReferralCodeByCode(referralCode.trim());
+        if (refCode && refCode.userId !== (req as any).userId) {
+          await storage.storeReferralForOrder(orderId, refCode.userId, (req as any).userId);
+          console.log(`Referral code ${referralCode} stored for order ${orderId}`);
+        }
+      }
       const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
       const orderToken = signOrderId(orderId);
       const successUrl = `${baseUrl}/payment-success?order=${orderId}&token=${orderToken}`;
@@ -2083,6 +2119,15 @@ export async function registerRoutes(
             const license = await storage.createLicenseKey(tier, orderStr);
             console.log(`License key for order ${orderStr}: ${license.key}`);
             webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"));
+
+            try {
+              const credited = await storage.creditReferral(orderStr);
+              if (credited) {
+                console.log(`Referral credit awarded for order ${orderStr}`);
+              }
+            } catch (refErr) {
+              console.error("Referral credit error:", refErr);
+            }
           }
         }
       }

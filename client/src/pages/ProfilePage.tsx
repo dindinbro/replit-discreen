@@ -35,9 +35,14 @@ import {
   Smartphone,
   Globe,
   Trash2,
+  Gift,
+  Trophy,
+  Star,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
+import { REFERRAL_RANKS, getReferralRank } from "@shared/schema";
 
 const ROLE_CONFIG: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
   admin: { variant: "destructive", label: "Admin" },
@@ -93,6 +98,11 @@ export default function ProfilePage() {
   const [generatingCode, setGeneratingCode] = useState(false);
   const [savingDiscord, setSavingDiscord] = useState(false);
 
+  const [activeTab, setActiveTab] = useState<"compte" | "securite" | "discord" | "parrainage" | "sessions">("compte");
+  const [referralStats, setReferralStats] = useState<{ code: string; totalCredits: number; referralCount: number } | null>(null);
+  const [loadingReferral, setLoadingReferral] = useState(true);
+  const [copiedReferral, setCopiedReferral] = useState(false);
+
   interface SessionInfo {
     id: number;
     userAgent: string;
@@ -114,6 +124,7 @@ export default function ProfilePage() {
     fetchProfile();
     fetchTwoFaStatus();
     fetchSessions();
+    fetchReferralStats();
   }, [authLoading, user]);
 
   async function fetchProfile() {
@@ -169,6 +180,24 @@ export default function ProfilePage() {
       console.error("fetchSessions error:", err);
     } finally {
       setLoadingSessions(false);
+    }
+  }
+
+  async function fetchReferralStats() {
+    try {
+      const token = getAccessToken();
+      if (!token) return;
+      const res = await fetch("/api/referral/stats", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReferralStats(data);
+      }
+    } catch (err) {
+      console.error("fetchReferralStats error:", err);
+    } finally {
+      setLoadingReferral(false);
     }
   }
 
@@ -414,371 +443,553 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <main className="container max-w-2xl mx-auto px-4 py-8 space-y-8">
-        <section className="space-y-4">
-          <div className="flex items-center gap-3">
-            <User className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-display font-bold">{t("profile.accountInfo")}</h1>
-          </div>
-          <Card className="p-6 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="relative group">
-                <div
-                  className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-border cursor-pointer"
-                  onClick={() => setAvatarDialogOpen(true)}
-                  data-testid="button-change-avatar"
-                >
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <User className="w-8 h-8 text-muted-foreground" />
-                  )}
-                </div>
-                <div
-                  className="absolute inset-0 w-20 h-20 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={() => setAvatarDialogOpen(true)}
-                >
-                  <Camera className="w-5 h-5 text-white" />
-                </div>
+      <main className="container max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <Card className="p-6 space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <div
+                className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-border cursor-pointer"
+                onClick={() => setAvatarDialogOpen(true)}
+                data-testid="button-change-avatar"
+              >
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <User className="w-8 h-8 text-muted-foreground" />
+                )}
               </div>
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-semibold truncate">{profile.display_name || profile.email?.split("@")[0]}</h2>
-                  <Badge variant={roleConfig.variant} data-testid="badge-profile-role">{roleConfig.label}</Badge>
-                  {profile.is_supporter && (
-                    <Badge variant="outline" className="border-pink-500/30 text-pink-500" data-testid="badge-supporter">
-                      <Heart className="w-3 h-3 mr-1" />
-                      {t("profile.supporter")}
+              <div
+                className="absolute inset-0 w-20 h-20 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={() => setAvatarDialogOpen(true)}
+              >
+                <Camera className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-semibold truncate">{profile.display_name || profile.email?.split("@")[0]}</h2>
+                <Badge variant={roleConfig.variant} data-testid="badge-profile-role">{roleConfig.label}</Badge>
+                {profile.is_supporter && (
+                  <Badge variant="outline" className="border-pink-500/30 text-pink-500" data-testid="badge-supporter">
+                    <Heart className="w-3 h-3 mr-1" />
+                    {t("profile.supporter")}
+                  </Badge>
+                )}
+                {referralStats && (() => {
+                  const rank = getReferralRank(referralStats.totalCredits);
+                  return (
+                    <Badge variant="outline" data-testid="badge-referral-rank" style={{ borderColor: rank.current.color + "50", color: rank.current.color }}>
+                      <Trophy className="w-3 h-3 mr-1" />
+                      {rank.current.name}
                     </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
-                <p className="text-xs text-muted-foreground">ID: #{profile.unique_id}</p>
+                  );
+                })()}
               </div>
+              <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
+              <p className="text-xs text-muted-foreground">ID: #{profile.unique_id}</p>
             </div>
-
-            <div className="grid gap-4">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">{t("profile.emailLabel")}</p>
-                <p className="text-sm">{profile.email}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">{t("profile.memberSince")}</p>
-                <p className="text-sm">{new Date(profile.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
-              </div>
-            </div>
-          </Card>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Pencil className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">{t("profile.editUsername")}</h2>
           </div>
-          <Card className="p-6 space-y-4">
-            {canChangeName ? (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="display-name">{t("profile.usernameLabel")}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="display-name"
-                      data-testid="input-display-name"
-                      placeholder={t("profile.usernamePlaceholder")}
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      maxLength={30}
-                    />
-                    <Button
-                      data-testid="button-save-name"
-                      onClick={saveDisplayName}
-                      disabled={savingName || displayName.trim().length < 2}
-                    >
-                      {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">{t("profile.usernameHint")}</p>
-              </>
-            ) : (
-              <div className="flex items-center gap-3 text-sm">
-                <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                <div>
-                  <p className="font-medium">{t("profile.adminOnly")}</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">
-                    {t("profile.adminOnlyDesc")}
-                  </p>
-                </div>
-              </div>
-            )}
-          </Card>
-        </section>
+        </Card>
 
-        <section className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Link className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">{t("profile.linkDiscord")}</h2>
-          </div>
-          <Card className="p-6 space-y-4">
-            {profile.discord_id ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
-                    <Check className="w-5 h-5 text-indigo-500" />
+        <div className="flex flex-wrap gap-1 overflow-x-auto pb-1">
+          {([
+            { id: "compte" as const, label: "Compte", icon: User },
+            { id: "securite" as const, label: "Sécurité", icon: ShieldCheck },
+            { id: "discord" as const, label: "Discord", icon: Link },
+            { id: "parrainage" as const, label: "Parrainage", icon: Gift },
+            { id: "sessions" as const, label: "Sessions", icon: Monitor },
+          ]).map((tab) => (
+            <button
+              key={tab.id}
+              data-testid={`tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === tab.id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "compte" && (
+          <section className="space-y-4">
+            <Card className="p-6 space-y-6">
+              <div className="flex items-center gap-3 mb-2">
+                <Pencil className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-display font-bold">{t("profile.editUsername")}</h3>
+              </div>
+              {canChangeName ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="display-name">{t("profile.usernameLabel")}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="display-name"
+                        data-testid="input-display-name"
+                        placeholder={t("profile.usernamePlaceholder")}
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        maxLength={30}
+                      />
+                      <Button
+                        data-testid="button-save-name"
+                        onClick={saveDisplayName}
+                        disabled={savingName || displayName.trim().length < 2}
+                      >
+                        {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      </Button>
+                    </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">{t("profile.usernameHint")}</p>
+                </>
+              ) : (
+                <div className="flex items-center gap-3 text-sm">
+                  <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-sm">{t("profile.discordLinked")}</p>
-                    <p className="text-xs text-muted-foreground">ID: {profile.discord_id}</p>
+                    <p className="font-medium">{t("profile.adminOnly")}</p>
+                    <p className="text-muted-foreground text-xs mt-0.5">{t("profile.adminOnlyDesc")}</p>
                   </div>
-                  {profile.is_supporter && (
-                    <Badge variant="outline" className="border-pink-500/30 text-pink-500 ml-auto" data-testid="badge-supporter-discord">
-                      <Heart className="w-3 h-3 mr-1" />
-                      {t("profile.supporter")}
-                    </Badge>
+                </div>
+              )}
+            </Card>
+
+            <Card className="p-6 space-y-4">
+              <div className="grid gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">{t("profile.emailLabel")}</p>
+                  <p className="text-sm">{profile.email}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">{t("profile.memberSince")}</p>
+                  <p className="text-sm">{new Date(profile.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
+                </div>
+              </div>
+            </Card>
+          </section>
+        )}
+
+        {activeTab === "securite" && (
+          <section className="space-y-4">
+            <Card className="p-6 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-display font-bold">{t("profile.twoFa")}</h3>
+              </div>
+              {loadingTwoFa ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : twoFaEnabled ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{t("profile.twoFaEnabled")}</p>
+                      <p className="text-xs text-muted-foreground">{t("profile.twoFaEnabledDesc")}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={disableTwoFa}
+                    disabled={disabling}
+                    data-testid="button-disable-2fa"
+                  >
+                    {disabling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
+                    {t("profile.disableTwoFa")}
+                  </Button>
+                </div>
+              ) : totpUri ? (
+                <div className="space-y-4">
+                  <p className="text-sm">{t("profile.scanQrCode")}</p>
+                  <div className="flex justify-center p-4 bg-white rounded-lg">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`}
+                      alt="QR Code A2F"
+                      className="w-48 h-48"
+                      data-testid="img-totp-qr"
+                    />
+                  </div>
+                  {totpSecret && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">{t("profile.manualCode")}</p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all select-all">{totpSecret}</code>
+                        <Button variant="ghost" size="icon" onClick={copySecret} data-testid="button-copy-secret">
+                          {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="verify-code">{t("profile.verifyCodeLabel")}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="verify-code"
+                        data-testid="input-2fa-code"
+                        placeholder="000000"
+                        value={verifyCode}
+                        onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        maxLength={6}
+                        className="font-mono text-center tracking-widest"
+                      />
+                      <Button
+                        data-testid="button-verify-2fa"
+                        onClick={verifyEnroll}
+                        disabled={verifying || verifyCode.length !== 6}
+                      >
+                        {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : t("profile.verify")}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{t("profile.twoFaDisabled")}</p>
+                      <p className="text-xs text-muted-foreground">{t("profile.twoFaDisabledDesc")}</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={startEnroll}
+                    disabled={enrolling}
+                    data-testid="button-enable-2fa"
+                  >
+                    {enrolling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+                    {t("profile.enableTwoFa")}
+                  </Button>
+                </div>
+              )}
+            </Card>
+          </section>
+        )}
+
+        {activeTab === "discord" && (
+          <section className="space-y-4">
+            <Card className="p-6 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Link className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-display font-bold">{t("profile.linkDiscord")}</h3>
+              </div>
+              {profile.discord_id ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                      <Check className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{t("profile.discordLinked")}</p>
+                      <p className="text-xs text-muted-foreground">ID: {profile.discord_id}</p>
+                    </div>
+                    {profile.is_supporter && (
+                      <Badge variant="outline" className="border-pink-500/30 text-pink-500 ml-auto" data-testid="badge-supporter-discord">
+                        <Heart className="w-3 h-3 mr-1" />
+                        {t("profile.supporter")}
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-unlink-discord"
+                    onClick={async () => {
+                      try {
+                        const token = getAccessToken();
+                        const res = await fetch("/api/profile/discord", {
+                          method: "DELETE",
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        if (res.ok) {
+                          setProfile((p) => p ? { ...p, discord_id: null, is_supporter: false } : p);
+                          toast({ title: t("profile.discordUnlinkedSuccess") });
+                        }
+                      } catch {
+                        toast({ title: t("profile.discordUnlinkError"), variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Unlink className="w-4 h-4 mr-1" />
+                    {t("profile.unlinkDiscord")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    {t("profile.discord.description")}
+                  </p>
+                  {linkCode ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-lg border border-border/50">
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground mb-1">{t("profile.discord.codeLabel")}</p>
+                          <p className="text-2xl font-mono font-bold tracking-widest text-primary" data-testid="text-link-code">{linkCode}</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          data-testid="button-copy-code"
+                          onClick={() => {
+                            navigator.clipboard.writeText(linkCode);
+                            toast({ title: t("profile.discord.codeCopied") });
+                          }}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>{t("profile.discord.codeInstructions")}</p>
+                        <code className="text-xs bg-secondary/50 px-2 py-1 rounded">/link {linkCode}</code>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{t("profile.discord.codeExpiry")}</p>
+                    </div>
+                  ) : (
+                    <Button
+                      data-testid="button-generate-code"
+                      disabled={generatingCode}
+                      onClick={async () => {
+                        setGeneratingCode(true);
+                        try {
+                          const token = getAccessToken();
+                          const res = await fetch("/api/profile/discord/generate-code", {
+                            method: "POST",
+                            headers: { Authorization: `Bearer ${token}` },
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            setLinkCode(data.code);
+                            toast({ title: t("profile.discord.codeGenerated") });
+                          } else {
+                            toast({ title: data.message || t("common.error"), variant: "destructive" });
+                          }
+                        } catch {
+                          toast({ title: t("profile.discord.linkError"), variant: "destructive" });
+                        } finally {
+                          setGeneratingCode(false);
+                        }
+                      }}
+                      className="gap-2"
+                    >
+                      {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
+                      {t("profile.discord.generateCode")}
+                    </Button>
                   )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="button-unlink-discord"
-                  onClick={async () => {
-                    try {
-                      const token = getAccessToken();
-                      const res = await fetch("/api/profile/discord", {
-                        method: "DELETE",
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
-                      if (res.ok) {
-                        setProfile((p) => p ? { ...p, discord_id: null, is_supporter: false } : p);
-                        toast({ title: t("profile.discordUnlinkedSuccess") });
-                      }
-                    } catch {
-                      toast({ title: t("profile.discordUnlinkError"), variant: "destructive" });
-                    }
-                  }}
-                >
-                  <Unlink className="w-4 h-4 mr-1" />
-                  {t("profile.unlinkDiscord")}
-                </Button>
+              )}
+            </Card>
+          </section>
+        )}
+
+        {activeTab === "parrainage" && (
+          <section className="space-y-4">
+            <Card className="p-6 space-y-6">
+              <div className="flex items-center gap-3 mb-2">
+                <Gift className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-display font-bold">Programme de Parrainage</h3>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {t("profile.discord.description")}
-                </p>
-                {linkCode ? (
-                  <div className="space-y-3">
+
+              {loadingReferral ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : !referralStats ? (
+                <div className="text-center py-8">
+                  <Gift className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Impossible de charger les données de parrainage.</p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => { setLoadingReferral(true); fetchReferralStats(); }}>
+                    Réessayer
+                  </Button>
+                </div>
+              ) : (() => {
+                const { current, nextRank, rankIndex } = getReferralRank(referralStats.totalCredits);
+                const progress = nextRank
+                  ? ((referralStats.totalCredits - current.threshold) / (nextRank.threshold - current.threshold)) * 100
+                  : 100;
+                return (
+                  <>
                     <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-lg border border-border/50">
                       <div className="flex-1">
-                        <p className="text-xs text-muted-foreground mb-1">{t("profile.discord.codeLabel")}</p>
-                        <p className="text-2xl font-mono font-bold tracking-widest text-primary" data-testid="text-link-code">{linkCode}</p>
+                        <p className="text-xs text-muted-foreground mb-1">Ton code de parrainage</p>
+                        <p className="text-2xl font-mono font-bold tracking-widest" style={{ color: current.color }} data-testid="text-referral-code">
+                          {referralStats.code}
+                        </p>
                       </div>
                       <Button
                         variant="outline"
                         size="icon"
-                        data-testid="button-copy-code"
+                        data-testid="button-copy-referral"
                         onClick={() => {
-                          navigator.clipboard.writeText(linkCode);
-                          toast({ title: t("profile.discord.codeCopied") });
+                          navigator.clipboard.writeText(referralStats.code);
+                          setCopiedReferral(true);
+                          setTimeout(() => setCopiedReferral(false), 2000);
+                          toast({ title: "Code copié !" });
                         }}
                       >
-                        <Copy className="w-4 h-4" />
+                        {copiedReferral ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                       </Button>
                     </div>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>{t("profile.discord.codeInstructions")}</p>
-                      <code className="text-xs bg-secondary/50 px-2 py-1 rounded">/link {linkCode}</code>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{t("profile.discord.codeExpiry")}</p>
-                  </div>
-                ) : (
-                  <Button
-                    data-testid="button-generate-code"
-                    disabled={generatingCode}
-                    onClick={async () => {
-                      setGeneratingCode(true);
-                      try {
-                        const token = getAccessToken();
-                        const res = await fetch("/api/profile/discord/generate-code", {
-                          method: "POST",
-                          headers: { Authorization: `Bearer ${token}` },
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          setLinkCode(data.code);
-                          toast({ title: t("profile.discord.codeGenerated") });
-                        } else {
-                          toast({ title: data.message || t("common.error"), variant: "destructive" });
-                        }
-                      } catch {
-                        toast({ title: t("profile.discord.linkError"), variant: "destructive" });
-                      } finally {
-                        setGeneratingCode(false);
-                      }
-                    }}
-                    className="gap-2"
-                  >
-                    {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
-                    {t("profile.discord.generateCode")}
-                  </Button>
-                )}
-              </div>
-            )}
-          </Card>
-        </section>
 
-        <section className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Monitor className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">Sessions Actives</h2>
-          </div>
-          <Card className="p-6 space-y-4">
-            {loadingSessions ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <div className="text-sm text-muted-foreground space-y-2">
+                      <p>Partage ton code avec d'autres utilisateurs. Quand quelqu'un s'abonne avec ton code, tu gagnes <span className="text-primary font-semibold">1 Crédit Discreen</span>.</p>
+                      <p>Plus tu accumules de crédits, plus ton grade augmente !</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
+                        <p className="text-2xl font-bold text-primary">{referralStats.totalCredits}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Crédits Discreen</p>
+                      </div>
+                      <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
+                        <p className="text-2xl font-bold text-primary">{referralStats.referralCount}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Parrainages</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="w-4 h-4" style={{ color: current.color }} />
+                          <span className="font-semibold text-sm" style={{ color: current.color }}>{current.name}</span>
+                        </div>
+                        {nextRank && (
+                          <span className="text-xs text-muted-foreground">
+                            {referralStats.totalCredits}/{nextRank.threshold} vers {nextRank.name}
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full h-3 rounded-full bg-secondary/50 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min(progress, 100)}%`,
+                            background: `linear-gradient(90deg, ${current.color}, ${nextRank?.color || current.color})`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </Card>
+
+            <Card className="p-6 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Star className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-display font-bold">Échelle des Grades</h3>
               </div>
-            ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucune session active.</p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {sessions.length} session{sessions.length > 1 ? "s" : ""} active{sessions.length > 1 ? "s" : ""} (max 2)
-                </p>
-                {sessions.map((session) => {
-                  const ua = parseUserAgent(session.userAgent || "");
-                  const DeviceIcon = ua.isMobile ? Smartphone : Monitor;
+              <div className="space-y-2">
+                {REFERRAL_RANKS.map((rank, idx) => {
+                  const isCurrentRank = referralStats && getReferralRank(referralStats.totalCredits).rankIndex === idx;
+                  const isAchieved = referralStats && referralStats.totalCredits >= rank.threshold;
                   return (
                     <div
-                      key={session.id}
-                      className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-secondary/10"
-                      data-testid={`session-item-${session.id}`}
+                      key={rank.name}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                        isCurrentRank
+                          ? "border-primary/50 bg-primary/5 shadow-sm"
+                          : isAchieved
+                          ? "border-border/50 bg-secondary/10"
+                          : "border-border/20 opacity-50"
+                      }`}
+                      data-testid={`rank-item-${rank.name}`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <DeviceIcon className="w-5 h-5 text-primary" />
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                        style={{
+                          backgroundColor: isAchieved ? rank.color + "20" : "transparent",
+                          border: `2px solid ${isAchieved ? rank.color : "hsl(var(--border))"}`,
+                          color: isAchieved ? rank.color : "hsl(var(--muted-foreground))",
+                        }}
+                      >
+                        {idx + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-sm">{ua.browser}</p>
-                          <Badge variant="secondary" className="text-xs">{ua.os}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Derniere activite : {timeAgo(session.lastActiveAt)}
+                        <p className="font-semibold text-sm" style={{ color: isAchieved ? rank.color : undefined }}>
+                          {rank.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {rank.threshold === 0 ? "Début" : `${rank.threshold} crédits requis`}
                         </p>
                       </div>
+                      {isCurrentRank && (
+                        <Badge variant="outline" className="text-xs shrink-0" style={{ borderColor: rank.color + "50", color: rank.color }}>
+                          Grade actuel
+                        </Badge>
+                      )}
+                      {isAchieved && !isCurrentRank && (
+                        <Check className="w-4 h-4 shrink-0" style={{ color: rank.color }} />
+                      )}
                     </div>
                   );
                 })}
               </div>
-            )}
-          </Card>
-        </section>
+            </Card>
+          </section>
+        )}
 
-        <section className="space-y-4">
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-bold">{t("profile.twoFa")}</h2>
-          </div>
-          <Card className="p-6 space-y-4">
-            {loadingTwoFa ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        {activeTab === "sessions" && (
+          <section className="space-y-4">
+            <Card className="p-6 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Monitor className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-display font-bold">Sessions Actives</h3>
               </div>
-            ) : twoFaEnabled ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{t("profile.twoFaEnabled")}</p>
-                    <p className="text-xs text-muted-foreground">{t("profile.twoFaEnabledDesc")}</p>
-                  </div>
+              {loadingSessions ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={disableTwoFa}
-                  disabled={disabling}
-                  data-testid="button-disable-2fa"
-                >
-                  {disabling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
-                  {t("profile.disableTwoFa")}
-                </Button>
-              </div>
-            ) : totpUri ? (
-              <div className="space-y-4">
-                <p className="text-sm">{t("profile.scanQrCode")}</p>
-                <div className="flex justify-center p-4 bg-white rounded-lg">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`}
-                    alt="QR Code A2F"
-                    className="w-48 h-48"
-                    data-testid="img-totp-qr"
-                  />
+              ) : sessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune session active.</p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {sessions.length} session{sessions.length > 1 ? "s" : ""} active{sessions.length > 1 ? "s" : ""} (max 2)
+                  </p>
+                  {sessions.map((session) => {
+                    const ua = parseUserAgent(session.userAgent || "");
+                    const DeviceIcon = ua.isMobile ? Smartphone : Monitor;
+                    return (
+                      <div
+                        key={session.id}
+                        className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-secondary/10"
+                        data-testid={`session-item-${session.id}`}
+                      >
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <DeviceIcon className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium text-sm">{ua.browser}</p>
+                            <Badge variant="secondary" className="text-xs">{ua.os}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Derniere activite : {timeAgo(session.lastActiveAt)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                {totpSecret && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">{t("profile.manualCode")}</p>
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all select-all">{totpSecret}</code>
-                      <Button variant="ghost" size="icon" onClick={copySecret} data-testid="button-copy-secret">
-                        {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="verify-code">{t("profile.verifyCodeLabel")}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="verify-code"
-                      data-testid="input-2fa-code"
-                      placeholder="000000"
-                      value={verifyCode}
-                      onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                      maxLength={6}
-                      className="font-mono text-center tracking-widest"
-                    />
-                    <Button
-                      data-testid="button-verify-2fa"
-                      onClick={verifyEnroll}
-                      disabled={verifying || verifyCode.length !== 6}
-                    >
-                      {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : t("profile.verify")}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{t("profile.twoFaDisabled")}</p>
-                    <p className="text-xs text-muted-foreground">{t("profile.twoFaDisabledDesc")}</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={startEnroll}
-                  disabled={enrolling}
-                  data-testid="button-enable-2fa"
-                >
-                  {enrolling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-                  {t("profile.enableTwoFa")}
-                </Button>
-              </div>
-            )}
-          </Card>
-        </section>
+              )}
+            </Card>
+          </section>
+        )}
       </main>
 
       <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
