@@ -1,6 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import { api } from "@shared/routes";
 import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes } from "@shared/schema";
 import { z } from "zod";
@@ -228,6 +230,29 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   await initSearchDatabases();
+
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS referral_codes (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL UNIQUE,
+        code TEXT NOT NULL UNIQUE,
+        total_credits INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS referral_events (
+        id SERIAL PRIMARY KEY,
+        referrer_id TEXT NOT NULL,
+        referee_id TEXT NOT NULL,
+        order_id TEXT NOT NULL UNIQUE,
+        credited_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  } catch (err) {
+    console.error("[referral] Failed to ensure referral tables:", err);
+  }
 
   const blockedIpCache = new Set<string>();
   async function loadBlockedIps() {

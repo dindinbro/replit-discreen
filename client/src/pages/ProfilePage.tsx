@@ -498,7 +498,7 @@ export default function ProfilePage() {
           </div>
         </Card>
 
-        <div className="flex flex-wrap gap-1 overflow-x-auto pb-1">
+        <div className="flex flex-wrap gap-2 p-1.5 rounded-xl bg-secondary/50 border border-border/50">
           {([
             { id: "compte" as const, label: "Compte", icon: User },
             { id: "securite" as const, label: "Sécurité", icon: ShieldCheck },
@@ -512,8 +512,8 @@ export default function ProfilePage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground bg-transparent hover:bg-muted/80 hover:text-foreground"
               }`}
             >
               <tab.icon className="w-4 h-4" />
