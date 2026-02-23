@@ -858,7 +858,7 @@ export async function registerRoutes(
 
   app.get("/api/referral/stats", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).userId;
+      const userId = (req as any).user.id;
       const stats = await storage.getReferralStats(userId);
       res.json(stats);
     } catch (err) {
@@ -2022,8 +2022,8 @@ export async function registerRoutes(
 
       if (referralCode && typeof referralCode === "string") {
         const refCode = await storage.getReferralCodeByCode(referralCode.trim());
-        if (refCode && refCode.userId !== (req as any).userId) {
-          await storage.storeReferralForOrder(orderId, refCode.userId, (req as any).userId);
+        if (refCode && refCode.userId !== (req as any).user.id) {
+          await storage.storeReferralForOrder(orderId, refCode.userId, (req as any).user.id);
           console.log(`Referral code ${referralCode} stored for order ${orderId}`);
         }
       }
