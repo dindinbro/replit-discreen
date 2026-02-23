@@ -39,6 +39,8 @@ import {
   Trophy,
   Star,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
@@ -103,6 +105,7 @@ export default function ProfilePage() {
   const [loadingReferral, setLoadingReferral] = useState(true);
   const [referralError, setReferralError] = useState<string | null>(null);
   const [copiedReferral, setCopiedReferral] = useState(false);
+  const [emailVisible, setEmailVisible] = useState(false);
 
   interface SessionInfo {
     id: number;
@@ -499,7 +502,16 @@ export default function ProfilePage() {
                   );
                 })()}
               </div>
-              <p className="text-sm text-muted-foreground truncate">{profile.email}</p>
+              <div className="flex items-center gap-1.5">
+                <p className={`text-sm text-muted-foreground truncate transition-all ${emailVisible ? "" : "blur-sm select-none"}`}>{profile.email}</p>
+                <button
+                  data-testid="button-toggle-email"
+                  onClick={() => setEmailVisible(!emailVisible)}
+                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                >
+                  {emailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
               <p className="text-xs text-muted-foreground">ID: #{profile.unique_id}</p>
             </div>
           </div>
@@ -575,7 +587,16 @@ export default function ProfilePage() {
               <div className="grid gap-4">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{t("profile.emailLabel")}</p>
-                  <p className="text-sm">{profile.email}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className={`text-sm transition-all ${emailVisible ? "" : "blur-sm select-none"}`}>{profile.email}</p>
+                    <button
+                      data-testid="button-toggle-email-tab"
+                      onClick={() => setEmailVisible(!emailVisible)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {emailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">{t("profile.memberSince")}</p>
