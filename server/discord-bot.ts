@@ -9,6 +9,7 @@ import { storage } from "./storage";
 import { log } from "./index";
 import { createClient } from "@supabase/supabase-js";
 import type { PlanTier } from "@shared/schema";
+import { REFERRAL_RANKS, referralCodes } from "@shared/schema";
 import {
   webhookBotGkey, webhookBotRkey, webhookBotIkey, webhookBotIuser,
   webhookBotSetplan, webhookBotWantedlist, webhookBotGeneric, webhookBotResetR
@@ -405,6 +406,27 @@ export async function startDiscordBot() {
         .setDescription("Afficher la whitelist actuelle")
     );
 
+  const setrankCommand = new SlashCommandBuilder()
+    .setName("setrank")
+    .setDescription("Definir le rang de parrainage (Eclats) d'un utilisateur")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addIntegerOption((opt) =>
+      opt
+        .setName("idunique")
+        .setDescription("L'ID unique de l'utilisateur")
+        .setRequired(true)
+        .setMinValue(1)
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("rank")
+        .setDescription("Le rang a attribuer")
+        .setRequired(true)
+        .addChoices(
+          ...REFERRAL_RANKS.map((r) => ({ name: `${r.name} (${r.threshold} Eclats)`, value: r.name }))
+        )
+    );
+
   const rest = new REST({ version: "10" }).setToken(token);
 
   try {
@@ -435,7 +457,8 @@ export async function startDiscordBot() {
         abypassCommand.toJSON(),
         setstatusCommand.toJSON(),
         openticketCommand.toJSON(),
-        freezeCommand.toJSON()
+        freezeCommand.toJSON(),
+        setrankCommand.toJSON()
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -471,7 +494,8 @@ export async function startDiscordBot() {
       abypassCommand.toJSON(),
       setstatusCommand.toJSON(),
       openticketCommand.toJSON(),
-      freezeCommand.toJSON()
+      freezeCommand.toJSON(),
+      setrankCommand.toJSON()
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1164,6 +1188,57 @@ export async function startDiscordBot() {
           await interaction.editReply({ content: "Erreur lors de la modification de l'abonnement." });
         } else if (!interaction.replied) {
           await interaction.reply({ content: "Erreur lors de la modification de l'abonnement.", ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.commandName === "setrank") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const uniqueId = interaction.options.getInteger("idunique", true);
+        const rankName = interaction.options.getString("rank", true);
+        const rank = REFERRAL_RANKS.find((r) => r.name === rankName);
+        if (!rank) {
+          await interaction.editReply({ content: `Rang invalide: \`${rankName}\`.` });
+          return;
+        }
+        const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+        if (!sub) {
+          await interaction.editReply({ content: `Aucun utilisateur trouve avec l'ID unique \`${uniqueId}\`.` });
+          return;
+        }
+        await storage.setReferralCredits(sub.userId, rank.threshold);
+
+        let email = "Inconnu";
+        try {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseKey) {
+            const supaAdmin = createClient(supabaseUrl, supabaseKey);
+            const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+            if (data?.user) email = data.user.email || "Inconnu";
+          }
+        } catch (_) {}
+
+        const embed = new EmbedBuilder()
+          .setColor(parseInt(rank.color.replace("#", ""), 16))
+          .setTitle("Rang de Parrainage Modifie")
+          .addFields(
+            { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
+            { name: "Email", value: email, inline: true },
+            { name: "Nouveau Rang", value: `${rank.name} (${rank.threshold} Eclats)`, inline: true }
+          )
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        webhookBotGeneric(interaction.user.tag, "setrank", `**ID Unique** : #${uniqueId}\n**Email** : ${email}\n**Rang** : ${rank.name} (${rank.threshold} Eclats)`);
+        log(`/setrank: User #${uniqueId} set to ${rank.name} (${rank.threshold} Eclats) by ${interaction.user.username}`, "discord");
+      } catch (err) {
+        log(`Error in /setrank: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de la modification du rang." });
+        } else if (!interaction.replied) {
+          await interaction.reply({ content: "Erreur lors de la modification du rang.", ephemeral: true });
         }
       }
     }

@@ -110,6 +110,7 @@ export interface IStorage {
   creditReferral(orderId: string): Promise<boolean>;
   storeReferralForOrder(orderId: string, referrerUserId: string, refereeUserId: string): Promise<void>;
   getPendingReferral(orderId: string): Promise<{ referrerId: string; refereeId: string } | null>;
+  setReferralCredits(userId: string, credits: number): Promise<void>;
 }
 
 function hashKey(key: string): string {
@@ -956,6 +957,16 @@ export class DatabaseStorage implements IStorage {
       return JSON.parse(setting.value);
     } catch {
       return null;
+    }
+  }
+
+  async setReferralCredits(userId: string, credits: number): Promise<void> {
+    const [existing] = await db.select().from(referralCodes).where(eq(referralCodes.userId, userId));
+    if (existing) {
+      await db.update(referralCodes).set({ totalCredits: credits }).where(eq(referralCodes.userId, userId));
+    } else {
+      const code = "DS-" + Array.from({ length: 6 }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join("");
+      await db.insert(referralCodes).values({ userId, code, totalCredits: credits });
     }
   }
 }
