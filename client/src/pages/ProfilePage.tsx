@@ -804,6 +804,20 @@ export default function ProfilePage() {
                 <h3 className="text-lg font-display font-bold">Programme de Parrainage</h3>
               </div>
 
+              <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
+                <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <Star className="w-4 h-4" />
+                  Comment ça marche ?
+                </h4>
+                <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                  <li>Copie ton <span className="font-medium text-foreground">code de parrainage</span> unique ci-dessous</li>
+                  <li>Partage-le avec tes amis ou ta communauté</li>
+                  <li>Quand quelqu'un s'abonne en utilisant ton code, tu gagnes <span className="text-primary font-semibold">1 Éclat</span></li>
+                  <li>Accumule des Éclats pour monter en grade et débloquer des titres exclusifs</li>
+                </ol>
+                <p className="text-xs text-muted-foreground italic">Les Éclats sont une monnaie de prestige Discreen — plus tu en as, plus ton grade est élevé.</p>
+              </div>
+
               {loadingReferral ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -845,15 +859,10 @@ export default function ProfilePage() {
                       </Button>
                     </div>
 
-                    <div className="text-sm text-muted-foreground space-y-2">
-                      <p>Partage ton code avec d'autres utilisateurs. Quand quelqu'un s'abonne avec ton code, tu gagnes <span className="text-primary font-semibold">1 Crédit Discreen</span>.</p>
-                      <p>Plus tu accumules de crédits, plus ton grade augmente !</p>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
                         <p className="text-2xl font-bold text-primary">{referralStats.totalCredits}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Crédits Discreen</p>
+                        <p className="text-xs text-muted-foreground mt-1">Éclats</p>
                       </div>
                       <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
                         <p className="text-2xl font-bold text-primary">{referralStats.referralCount}</p>
@@ -869,7 +878,7 @@ export default function ProfilePage() {
                         </div>
                         {nextRank && (
                           <span className="text-xs text-muted-foreground">
-                            {referralStats.totalCredits}/{nextRank.threshold} vers {nextRank.name}
+                            {referralStats.totalCredits}/{nextRank.threshold} Éclats vers {nextRank.name}
                           </span>
                         )}
                       </div>
@@ -924,7 +933,7 @@ export default function ProfilePage() {
                           {rank.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {rank.threshold === 0 ? "Début" : `${rank.threshold} crédits requis`}
+                          {rank.threshold === 0 ? "Début" : `${rank.threshold} Éclats requis`}
                         </p>
                       </div>
                       {isCurrentRank && (
