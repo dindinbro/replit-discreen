@@ -238,7 +238,7 @@ export async function registerRoutes(
         user_id TEXT NOT NULL UNIQUE,
         code TEXT NOT NULL UNIQUE,
         total_credits INTEGER NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
     await db.execute(sql`
@@ -247,9 +247,11 @@ export async function registerRoutes(
         referrer_id TEXT NOT NULL,
         referee_id TEXT NOT NULL,
         order_id TEXT NOT NULL UNIQUE,
-        credited_at TIMESTAMP DEFAULT NOW()
+        credits_awarded INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log("[referral] Tables ensured OK");
   } catch (err) {
     console.error("[referral] Failed to ensure referral tables:", err);
   }
@@ -859,11 +861,15 @@ export async function registerRoutes(
   app.get("/api/referral/stats", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).user.id;
+      if (!userId) {
+        console.error("GET /api/referral/stats: userId is undefined, user object:", JSON.stringify((req as any).user));
+        return res.status(400).json({ message: "User ID not found" });
+      }
       const stats = await storage.getReferralStats(userId);
       res.json(stats);
-    } catch (err) {
-      console.error("GET /api/referral/stats error:", err);
-      res.status(500).json({ message: "Internal server error" });
+    } catch (err: any) {
+      console.error("GET /api/referral/stats error:", err?.message || err, err?.stack);
+      res.status(500).json({ message: "Internal server error", detail: err?.message || "Unknown error" });
     }
   });
 

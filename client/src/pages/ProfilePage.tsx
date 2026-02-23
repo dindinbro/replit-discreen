@@ -101,6 +101,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<"compte" | "securite" | "discord" | "parrainage" | "sessions">("compte");
   const [referralStats, setReferralStats] = useState<{ code: string; totalCredits: number; referralCount: number } | null>(null);
   const [loadingReferral, setLoadingReferral] = useState(true);
+  const [referralError, setReferralError] = useState<string | null>(null);
   const [copiedReferral, setCopiedReferral] = useState(false);
 
   interface SessionInfo {
@@ -193,9 +194,15 @@ export default function ProfilePage() {
       if (res.ok) {
         const data = await res.json();
         setReferralStats(data);
+        setReferralError(null);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("fetchReferralStats failed:", res.status, errData);
+        setReferralError(errData.detail || errData.message || `Erreur ${res.status}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("fetchReferralStats error:", err);
+      setReferralError(err?.message || "Erreur réseau");
     } finally {
       setLoadingReferral(false);
     }
@@ -826,9 +833,14 @@ export default function ProfilePage() {
                 <div className="text-center py-8">
                   <Gift className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">Impossible de charger les données de parrainage.</p>
-                  <Button variant="outline" size="sm" className="mt-3" onClick={() => { setLoadingReferral(true); fetchReferralStats(); }}>
-                    Réessayer
-                  </Button>
+                  {referralError && (
+                    <p className="text-xs text-destructive mt-2 font-mono bg-destructive/10 px-3 py-1 rounded inline-block">{referralError}</p>
+                  )}
+                  <div className="mt-3">
+                    <Button variant="outline" size="sm" onClick={() => { setLoadingReferral(true); setReferralError(null); fetchReferralStats(); }}>
+                      Réessayer
+                    </Button>
+                  </div>
                 </div>
               ) : (() => {
                 const { current, nextRank, rankIndex } = getReferralRank(referralStats.totalCredits);
