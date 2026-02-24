@@ -16,7 +16,6 @@ import {
   Zap,
   Crown,
   Rocket,
-  Briefcase,
   Code,
   Check,
   X,
@@ -83,26 +82,6 @@ const PLANS = [
       "Username Sherlock illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
-    ],
-  },
-  {
-    id: "business",
-    name: "Business",
-    subtitle: "Pour les professionnels",
-    price: 24.99,
-    icon: Briefcase,
-    popular: false,
-    features: [
-      "500 recherches par jour",
-      "Gaming, Email/IP",
-      "Recherches Discord / Externes",
-      "Acces toutes les bases",
-      "Recherche avancee Discreen",
-      "Google OSINT illimite",
-      "Username Sherlock illimite",
-      "Moteur de recherche Wanted",
-      "Parrainage",
-      "Support Prioritaire",
     ],
   },
   {
@@ -356,7 +335,7 @@ export default function PricingPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-16"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-16"
         >
           {PLANS.map((plan) => {
             const Icon = plan.icon;
@@ -400,44 +379,55 @@ export default function PricingPage() {
                       <p className="text-xs text-muted-foreground">{plan.subtitle}</p>
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-2xl font-display font-bold text-primary">
-                          {plan.price === 0 ? t("pricing.free") : `€${plan.price.toFixed(2)}`}
-                        </span>
-                        {plan.price > 0 && (
-                          <span className="text-xs text-muted-foreground">{t("pricing.perMonth")}</span>
-                        )}
-                        {"originalPrice" in plan && (plan as any).originalPrice && (
-                          <Badge variant="secondary" className="text-[10px] font-bold text-primary">
-                            -{ Math.round((1 - plan.price / (plan as any).originalPrice) * 100) }%
-                          </Badge>
-                        )}
-                      </div>
-                      {"originalPrice" in plan && (plan as any).originalPrice && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm text-muted-foreground line-through">
-                            €{(plan as any).originalPrice.toFixed(2)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">/mois</span>
-                        </div>
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-2xl font-display font-bold text-primary">
+                        {plan.price === 0 ? t("pricing.free") : `€${plan.price.toFixed(2)}`}
+                      </span>
+                      {plan.price > 0 && (
+                        <span className="text-xs text-muted-foreground">{t("pricing.perMonth")}</span>
                       )}
                     </div>
                   </div>
 
                   <ul className="space-y-2 mb-6 flex-1">
-                    {plan.features.map((feature) => {
+                    {plan.features.map((feature, featureIdx) => {
                       const isExcluded = typeof feature === "object" && feature.excluded;
                       const featureText = typeof feature === "object" ? feature.text : feature;
                       return (
-                        <li key={featureText} className={`flex items-start gap-2 text-xs ${isExcluded ? "text-muted-foreground/50 line-through" : ""}`}>
+                        <motion.li
+                          key={featureText}
+                          initial={{ opacity: 0, x: -12 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{
+                            delay: 0.4 + featureIdx * 0.06,
+                            duration: 0.35,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                          whileHover={{
+                            x: 4,
+                            transition: { duration: 0.2 },
+                          }}
+                          className={`flex items-start gap-2 text-xs cursor-default ${isExcluded ? "text-muted-foreground/50 line-through" : ""}`}
+                        >
                           {isExcluded ? (
                             <X className="w-3.5 h-3.5 text-destructive/60 mt-0.5 shrink-0" />
                           ) : (
-                            <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{
+                                delay: 0.5 + featureIdx * 0.06,
+                                duration: 0.3,
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 15,
+                              }}
+                            >
+                              <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                            </motion.div>
                           )}
                           <span>{featureText}</span>
-                        </li>
+                        </motion.li>
                       );
                     })}
                   </ul>
