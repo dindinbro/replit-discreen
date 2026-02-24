@@ -23,7 +23,6 @@ import {
   User,
   ChevronDown,
   Languages,
-  Zap,
   LogIn,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -101,15 +100,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const onlineCount = useOnlineCount();
 
-  const [promoDismissed, setPromoDismissed] = useState(() => {
-    try { return sessionStorage.getItem("promo_dismissed") === "1"; } catch { return false; }
-  });
-
-  const dismissPromo = () => {
-    setPromoDismissed(true);
-    try { sessionStorage.setItem("promo_dismissed", "1"); } catch {}
-  };
-
   const toggleLanguage = () => {
     const newLang = i18n.language === "fr" ? "en" : "fr";
     i18n.changeLanguage(newLang);
@@ -117,28 +107,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {!promoDismissed && (
-        <div className="relative z-[1000] bg-gradient-to-r from-primary/90 to-emerald-500/90 text-white" data-testid="banner-promo">
-          <div className="container max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-3 text-sm">
-            <Zap className="w-4 h-4 shrink-0" />
-            <span className="font-medium text-center">
-              Offre limitee : Plan PRO a <span className="font-bold">10,99</span> au lieu de <span className="line-through opacity-80">14,99</span> /mois
-            </span>
-            <Link href="/pricing">
-              <span className="underline underline-offset-2 font-semibold cursor-pointer whitespace-nowrap" data-testid="link-promo-pricing">
-                Voir l'offre
-              </span>
-            </Link>
-            <button
-              onClick={dismissPromo}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/20 transition-colors"
-              data-testid="button-dismiss-promo"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
       <header className="sticky top-0 z-[999] w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container max-w-7xl mx-auto h-14 flex items-center justify-between gap-2 px-4">
           <div className="flex items-center gap-3 shrink-0">

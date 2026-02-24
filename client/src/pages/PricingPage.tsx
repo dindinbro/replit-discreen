@@ -70,8 +70,7 @@ const PLANS = [
     id: "pro",
     name: "PRO",
     subtitle: "Puissance maximale",
-    price: 10.99,
-    originalPrice: 14.99,
+    price: 14.99,
     icon: Rocket,
     popular: true,
     features: [
@@ -111,7 +110,6 @@ const PLANS = [
     name: "API",
     subtitle: "Recherche illimitee + revente",
     price: 49.99,
-    originalPrice: 99.99,
     icon: Code,
     popular: false,
     features: [
