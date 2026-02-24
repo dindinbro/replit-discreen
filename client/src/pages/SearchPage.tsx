@@ -169,7 +169,7 @@ const FIELD_ICON_MAP: Record<string, typeof User> = {
   bday: Calendar, regdate: Calendar, lastactive: Calendar,
   iban: CreditCard, credit_card: CreditCard, card: CreditCard,
   ssn: FileText, id: Hash, username: User, pseudo: User,
-  discord: Hash, discord_id: Hash, ip: Globe, mac: Hash,
+  discord: Hash, discord_id: Hash, discord_tag: User, ip: Globe, mac: Hash,
   source: Database, _source: Database,
   identifiant: User, password: ShieldAlert, hash: Hash,
   civilite: User, sexe: User, bic: CreditCard, url: Globe, vin: Hash,
@@ -203,7 +203,7 @@ function getFieldColorVar(fieldName: string): string {
     return "--field-location";
   if (["telephone", "phone", "tel", "mobile", "telephone2"].includes(key))
     return "--field-phone";
-  if (["code_postal", "zip", "zipcode", "postal", "id", "discord", "mac", "hash", "_source", "code_insee", "matricule", "id_psp", "identifiant_interne"].includes(key))
+  if (["code_postal", "zip", "zipcode", "postal", "id", "discord", "discord_id", "discord_tag", "mac", "hash", "_source", "code_insee", "matricule", "id_psp", "identifiant_interne"].includes(key))
     return "--field-id";
   if (["date_naissance", "birthday", "dob", "birth", "date", "bday", "regdate", "lastactive", "date_activation", "date_activation_ligne", "date_creation", "date_modification"].includes(key))
     return "--field-date";
@@ -232,7 +232,7 @@ function getFieldLabel(fieldName: string): string {
     identifiant: "Identifiant", password: "Mot de passe", hash: "Hash",
     civilite: "Civilite", sexe: "Sexe", bic: "BIC", url: "URL", vin: "VIN",
     telephone2: "Telephone 2", nir: "N Secu (NIR)", plaque: "Plaque immat.",
-    discord_id: "Discord ID", complement_adresse: "Complement adresse", complement_ville: "Complement ville",
+    discord_id: "Discord ID", discord_tag: "Discord Tag", complement_adresse: "Complement adresse", complement_ville: "Complement ville",
     product: "Produit", description: "Description", status: "Statut",
     license2: "License FiveM", license: "License", steam: "Steam ID", steamid: "Steam ID", steam_id: "Steam ID",
     fivem: "FiveM", xbl: "Xbox Live", live: "Live ID",

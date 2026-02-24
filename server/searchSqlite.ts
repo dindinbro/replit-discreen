@@ -168,6 +168,8 @@ export function classifyPart(p: string): string | null {
     if (trimmed.length === 17) return "vin";
   }
   if (/^[a-f0-9]{40}:[a-f0-9]+$/i.test(trimmed)) return "hash";
+  if (/^\d{17,20}$/.test(trimmed)) return "discord_id";
+  if (/^.{2,32}#\d{4}$/.test(trimmed)) return "discord_tag";
 
   return null;
 }
@@ -319,8 +321,10 @@ export function parseLineField(line: string, source: string): Record<string, str
     const semicolons = (line.match(/;/g) || []).length;
     const colons = (line.match(/:/g) || []).length;
     const pipes = (line.match(/\|/g) || []).length;
-    if (semicolons > 0 && semicolons >= colons) sep = ";";
-    else if (pipes > 0 && pipes >= colons && pipes >= semicolons) sep = "|";
+    const commas = (line.match(/,/g) || []).length;
+    if (semicolons > 0 && semicolons >= colons && semicolons >= commas) sep = ";";
+    else if (pipes > 0 && pipes >= colons && pipes >= semicolons && pipes >= commas) sep = "|";
+    else if (commas >= 2 && commas > colons) sep = ",";
     else sep = ":";
   }
 
@@ -345,11 +349,27 @@ export function parseLineField(line: string, source: string): Record<string, str
         }
       }
     }
+  } else if (sep === ",") {
+    parts = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+      } else if (ch === "," && !inQuotes) {
+        parts.push(current);
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    parts.push(current);
   } else {
     parts = line.split(sep);
   }
 
-  parts = parts.map((p) => p.trim()).filter(Boolean);
+  parts = parts.map((p) => p.trim()).filter((p) => p && p !== "None" && p !== "null" && p !== "NULL" && p !== "N/A");
 
   if (parts.length === 1) {
     parsed["donnee"] = parts[0];
