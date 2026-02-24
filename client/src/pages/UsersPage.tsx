@@ -1,8 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, Disc3, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
+
+function useTilt() {
+  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0, scale: 1 });
+
+  const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setTilt({ rotateX: (0.5 - y) * 18, rotateY: (x - 0.5) * 18, scale: 1.03 });
+  }, []);
+
+  const onMouseLeave = useCallback(() => {
+    setTilt({ rotateX: 0, rotateY: 0, scale: 1 });
+  }, []);
+
+  return { tilt, onMouseMove, onMouseLeave };
+}
 
 interface DofProfile {
   id: number;
@@ -16,6 +33,7 @@ interface DofProfile {
 function ProfileCard({ profile, index }: { profile: DofProfile; index: number }) {
   const [modalOpen, setModalOpen] = useState(false);
   const hasImage = !!profile.imageUrl;
+  const { tilt, onMouseMove, onMouseLeave } = useTilt();
 
   return (
     <>
@@ -24,9 +42,21 @@ function ProfileCard({ profile, index }: { profile: DofProfile; index: number })
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: index * 0.15 }}
         className="w-[280px] sm:w-[300px] flex-shrink-0"
+        style={{ perspective: "800px" }}
         data-testid={`card-dof-${profile.pseudo}`}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
       >
-        <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group">
+        <Card
+          className="overflow-hidden shadow-lg transition-shadow duration-300 group"
+          style={{
+            transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(${tilt.scale}, ${tilt.scale}, ${tilt.scale})`,
+            transition: "transform 0.15s ease-out, box-shadow 0.3s ease",
+            transformStyle: "preserve-3d",
+            willChange: "transform",
+            boxShadow: tilt.scale > 1 ? "0 20px 40px -12px hsl(158 64% 52% / 0.2)" : undefined,
+          }}
+        >
           <div className="relative aspect-[4/5] bg-muted/30 overflow-hidden">
             {hasImage ? (
               <img
@@ -103,6 +133,7 @@ function ProfileCard({ profile, index }: { profile: DofProfile; index: number })
 function SmallProfileCard({ profile, index }: { profile: DofProfile; index: number }) {
   const [modalOpen, setModalOpen] = useState(false);
   const hasImage = !!profile.imageUrl;
+  const { tilt, onMouseMove, onMouseLeave } = useTilt();
 
   return (
     <>
@@ -111,9 +142,21 @@ function SmallProfileCard({ profile, index }: { profile: DofProfile; index: numb
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: index * 0.1 }}
         className="w-[200px] sm:w-[220px] flex-shrink-0"
+        style={{ perspective: "800px" }}
         data-testid={`card-secondary-${profile.pseudo}`}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
       >
-        <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 group">
+        <Card
+          className="overflow-hidden shadow-md transition-shadow duration-300 group"
+          style={{
+            transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(${tilt.scale}, ${tilt.scale}, ${tilt.scale})`,
+            transition: "transform 0.15s ease-out, box-shadow 0.3s ease",
+            transformStyle: "preserve-3d",
+            willChange: "transform",
+            boxShadow: tilt.scale > 1 ? "0 16px 32px -8px hsl(158 64% 52% / 0.15)" : undefined,
+          }}
+        >
           <div className="relative aspect-square bg-muted/30 overflow-hidden">
             {hasImage ? (
               <img
