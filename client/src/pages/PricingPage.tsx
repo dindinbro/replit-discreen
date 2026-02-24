@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -133,7 +133,20 @@ const cardVariants = {
 export default function PricingPage() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState<string | null>(null);
-  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+  const [tiltStyles, setTiltStyles] = useState<Record<string, { rotateX: number; rotateY: number; scale: number }>>({});
+
+  const handleTiltMove = useCallback((planId: string, e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const rotateX = (0.5 - y) * 20;
+    const rotateY = (x - 0.5) * 20;
+    setTiltStyles(prev => ({ ...prev, [planId]: { rotateX, rotateY, scale: 1.04 } }));
+  }, []);
+
+  const handleTiltLeave = useCallback((planId: string) => {
+    setTiltStyles(prev => ({ ...prev, [planId]: { rotateX: 0, rotateY: 0, scale: 1 } }));
+  }, []);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemKey, setRedeemKey] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -340,25 +353,28 @@ export default function PricingPage() {
           {PLANS.map((plan) => {
             const Icon = plan.icon;
             const isLoading = loading === plan.id;
-            const isHovered = hoveredPlan === plan.id;
-            const isSiblingHovered = hoveredPlan !== null && hoveredPlan !== plan.id;
+            const tilt = tiltStyles[plan.id] || { rotateX: 0, rotateY: 0, scale: 1 };
+            const isTilted = tilt.scale > 1;
             return (
               <motion.div
                 key={plan.id}
                 variants={cardVariants}
-                onMouseEnter={() => setHoveredPlan(plan.id)}
-                onMouseLeave={() => setHoveredPlan(null)}
+                onMouseMove={(e) => handleTiltMove(plan.id, e)}
+                onMouseLeave={() => handleTiltLeave(plan.id)}
                 style={{
-                  transition: "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), filter 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
-                  transform: isHovered ? "scale(1.05)" : isSiblingHovered ? "scale(0.97)" : "scale(1)",
-                  filter: isSiblingHovered ? "blur(2px) opacity(0.6)" : "blur(0px) opacity(1)",
-                  zIndex: isHovered ? 10 : 1,
+                  perspective: "800px",
                 }}
               >
                 <Card
-                  className={`relative flex flex-col p-5 h-full overflow-visible ${
+                  className={`relative flex flex-col p-5 h-full overflow-visible transition-shadow duration-300 ${
                     plan.popular ? "border-primary/50 shadow-[0_0_24px_-6px] shadow-primary/15" : ""
-                  } ${isHovered ? "shadow-lg shadow-primary/20 border-primary/40" : ""}`}
+                  } ${isTilted ? "shadow-xl shadow-primary/25 border-primary/40" : ""}`}
+                  style={{
+                    transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(${tilt.scale}, ${tilt.scale}, ${tilt.scale})`,
+                    transition: "transform 0.15s ease-out",
+                    transformStyle: "preserve-3d",
+                    willChange: "transform",
+                  }}
                   data-testid={`card-plan-${plan.id}`}
                 >
                   {plan.popular && (
