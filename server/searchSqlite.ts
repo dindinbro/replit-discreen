@@ -153,6 +153,8 @@ export function classifyPart(p: string): string | null {
 
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "email";
   if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(trimmed)) return "ip";
+  if (/^\d{17,20}$/.test(trimmed)) return "discord_id";
+  if (/^.{2,32}#\d{4}$/.test(trimmed)) return "discord_tag";
   if (/^(\+?\d[\d\s\-().]{6,})$/.test(trimmed) && /\d{7,}/.test(trimmed.replace(/\D/g, ""))) return "telephone";
   if (/^[a-f0-9]{32,128}$/i.test(trimmed)) return "hash";
   if (/^https?:\/\//i.test(trimmed)) return "url";
@@ -168,8 +170,6 @@ export function classifyPart(p: string): string | null {
     if (trimmed.length === 17) return "vin";
   }
   if (/^[a-f0-9]{40}:[a-f0-9]+$/i.test(trimmed)) return "hash";
-  if (/^\d{17,20}$/.test(trimmed)) return "discord_id";
-  if (/^.{2,32}#\d{4}$/.test(trimmed)) return "discord_tag";
 
   return null;
 }
@@ -391,18 +391,22 @@ export function parseLineField(line: string, source: string): Record<string, str
 
   const unassigned = parts.filter((_, i) => !assigned.has(i)).filter(Boolean);
 
-  if (unassigned.length > 0 && !parsed["identifiant"] && !parsed["email"]) {
-    parsed["identifiant"] = unassigned.shift()!;
-  } else if (unassigned.length >= 2 && !parsed["identifiant"]) {
-    parsed["identifiant"] = unassigned.shift()!;
-  }
+  const hasDiscordData = !!parsed["discord_id"] || !!parsed["discord_tag"];
 
-  if (unassigned.length > 0 && !parsed["password"] && !parsed["hash"]) {
-    const next = unassigned[0];
-    if (next && /^[a-f0-9]{32,128}$/i.test(next)) {
-      parsed["hash"] = unassigned.shift()!;
-    } else {
-      parsed["password"] = unassigned.shift()!;
+  if (!hasDiscordData) {
+    if (unassigned.length > 0 && !parsed["identifiant"] && !parsed["email"]) {
+      parsed["identifiant"] = unassigned.shift()!;
+    } else if (unassigned.length >= 2 && !parsed["identifiant"]) {
+      parsed["identifiant"] = unassigned.shift()!;
+    }
+
+    if (unassigned.length > 0 && !parsed["password"] && !parsed["hash"]) {
+      const next = unassigned[0];
+      if (next && /^[a-f0-9]{32,128}$/i.test(next)) {
+        parsed["hash"] = unassigned.shift()!;
+      } else {
+        parsed["password"] = unassigned.shift()!;
+      }
     }
   }
 
