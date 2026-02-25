@@ -850,27 +850,6 @@ export default function ProfilePage() {
                 <p className="text-xs text-muted-foreground italic">Les Éclats sont une monnaie de prestige Discreen — plus tu en as, plus ton grade est élevé.</p>
               </div>
 
-              <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-primary/5 border border-primary/30 space-y-3">
-                <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                  <Wallet className="w-4 h-4" />
-                  Commission sur les ventes
-                </h4>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  En tant que parrain, tu touches une <span className="font-semibold text-primary">commission de 20%</span> sur chaque abonnement payé avec ton code de parrainage. Plus tu parraines, plus tu gagnes.
-                </p>
-                <div className="flex items-center gap-4 pt-1">
-                  <div className="flex items-center gap-2">
-                    <Percent className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-bold text-foreground">20% de commission</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-primary" />
-                    <span className="text-sm text-muted-foreground">
-                      <span className="font-bold text-foreground">{referralStats?.referralCount ?? 0}</span> vente{(referralStats?.referralCount ?? 0) !== 1 ? "s" : ""} via ton code
-                    </span>
-                  </div>
-                </div>
-              </div>
 
               {loadingReferral ? (
                 <div className="flex items-center justify-center py-8">
@@ -951,73 +930,105 @@ export default function ProfilePage() {
                         />
                       </div>
                     </div>
-                    <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer" className="block pt-2">
-                      <Button variant="outline" className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10" data-testid="button-withdraw-commission">
-                        <Wallet className="w-4 h-4" />
-                        Retirer ma commission
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Button>
-                    </a>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Pour retirer ta commission, ouvre un ticket sur notre Discord en precisant ton code de parrainage et le montant souhaite.
-                    </p>
                   </>
                 );
               })()}
             </Card>
 
-            <Card className="p-6 space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Star className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-display font-bold">Échelle des Grades</h3>
-              </div>
-              <div className="space-y-2">
-                {REFERRAL_RANKS.map((rank, idx) => {
-                  const isCurrentRank = referralStats && getReferralRank(referralStats.totalCredits).rankIndex === idx;
-                  const isAchieved = referralStats && referralStats.totalCredits >= rank.threshold;
-                  return (
-                    <div
-                      key={rank.name}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                        isCurrentRank
-                          ? "border-primary/50 bg-primary/5 shadow-sm"
-                          : isAchieved
-                          ? "border-border/50 bg-secondary/10"
-                          : "border-border/20 opacity-50"
-                      }`}
-                      data-testid={`rank-item-${rank.name}`}
-                    >
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card className="p-6 space-y-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <Star className="w-5 h-5 text-primary" />
+                  <h3 className="text-lg font-display font-bold">Échelle des Grades</h3>
+                </div>
+                <div className="space-y-2">
+                  {REFERRAL_RANKS.map((rank, idx) => {
+                    const isCurrentRank = referralStats && getReferralRank(referralStats.totalCredits).rankIndex === idx;
+                    const isAchieved = referralStats && referralStats.totalCredits >= rank.threshold;
+                    return (
                       <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                        style={{
-                          backgroundColor: isAchieved ? rank.color + "20" : "transparent",
-                          border: `2px solid ${isAchieved ? rank.color : "hsl(var(--border))"}`,
-                          color: isAchieved ? rank.color : "hsl(var(--muted-foreground))",
-                        }}
+                        key={rank.name}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                          isCurrentRank
+                            ? "border-primary/50 bg-primary/5 shadow-sm"
+                            : isAchieved
+                            ? "border-border/50 bg-secondary/10"
+                            : "border-border/20 opacity-50"
+                        }`}
+                        data-testid={`rank-item-${rank.name}`}
                       >
-                        {idx + 1}
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                          style={{
+                            backgroundColor: isAchieved ? rank.color + "20" : "transparent",
+                            border: `2px solid ${isAchieved ? rank.color : "hsl(var(--border))"}`,
+                            color: isAchieved ? rank.color : "hsl(var(--muted-foreground))",
+                          }}
+                        >
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm" style={{ color: isAchieved ? rank.color : undefined }}>
+                            {rank.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {rank.threshold === 0 ? "Début" : `${rank.threshold} Éclats requis`}
+                          </p>
+                        </div>
+                        {isCurrentRank && (
+                          <Badge variant="outline" className="text-xs shrink-0" style={{ borderColor: rank.color + "50", color: rank.color }}>
+                            Grade actuel
+                          </Badge>
+                        )}
+                        {isAchieved && !isCurrentRank && (
+                          <Check className="w-4 h-4 shrink-0" style={{ color: rank.color }} />
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm" style={{ color: isAchieved ? rank.color : undefined }}>
-                          {rank.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {rank.threshold === 0 ? "Début" : `${rank.threshold} Éclats requis`}
-                        </p>
-                      </div>
-                      {isCurrentRank && (
-                        <Badge variant="outline" className="text-xs shrink-0" style={{ borderColor: rank.color + "50", color: rank.color }}>
-                          Grade actuel
-                        </Badge>
-                      )}
-                      {isAchieved && !isCurrentRank && (
-                        <Check className="w-4 h-4 shrink-0" style={{ color: rank.color }} />
-                      )}
+                    );
+                  })}
+                </div>
+              </Card>
+
+              <Card className="p-6 space-y-5 flex flex-col">
+                <div className="flex items-center gap-3 mb-2">
+                  <Wallet className="w-5 h-5 text-primary" />
+                  <h3 className="text-lg font-display font-bold">Commission</h3>
+                </div>
+
+                <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-primary/5 border border-primary/30 space-y-3">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Tu touches une <span className="font-semibold text-primary">commission de 20%</span> sur chaque abonnement payé avec ton code de parrainage.
+                  </p>
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <Percent className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-sm font-bold text-foreground">20% par vente</span>
                     </div>
-                  );
-                })}
-              </div>
-            </Card>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-sm text-muted-foreground">
+                        <span className="font-bold text-foreground">{referralStats?.referralCount ?? 0}</span> vente{(referralStats?.referralCount ?? 0) !== 1 ? "s" : ""} via ton code
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1" />
+
+                <div className="space-y-2">
+                  <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer" className="block">
+                    <Button variant="outline" className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10" data-testid="button-withdraw-commission-side">
+                      <Wallet className="w-4 h-4" />
+                      Retirer ma commission
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </a>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Ouvre un ticket sur Discord en precisant ton code et le montant souhaite.
+                  </p>
+                </div>
+              </Card>
+            </div>
           </section>
         )}
 
