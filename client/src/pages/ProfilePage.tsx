@@ -41,6 +41,10 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  Wallet,
+  Percent,
+  Users,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
@@ -846,6 +850,28 @@ export default function ProfilePage() {
                 <p className="text-xs text-muted-foreground italic">Les Éclats sont une monnaie de prestige Discreen — plus tu en as, plus ton grade est élevé.</p>
               </div>
 
+              <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-primary/5 border border-primary/30 space-y-3">
+                <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <Wallet className="w-4 h-4" />
+                  Commission sur les ventes
+                </h4>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  En tant que parrain, tu touches une <span className="font-semibold text-primary">commission de 20%</span> sur chaque abonnement payé avec ton code de parrainage. Plus tu parraines, plus tu gagnes.
+                </p>
+                <div className="flex items-center gap-4 pt-1">
+                  <div className="flex items-center gap-2">
+                    <Percent className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-bold text-foreground">20% de commission</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      <span className="font-bold text-foreground">{referralStats?.referralCount ?? 0}</span> vente{(referralStats?.referralCount ?? 0) !== 1 ? "s" : ""} via ton code
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {loadingReferral ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -925,6 +951,16 @@ export default function ProfilePage() {
                         />
                       </div>
                     </div>
+                    <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer" className="block pt-2">
+                      <Button variant="outline" className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10" data-testid="button-withdraw-commission">
+                        <Wallet className="w-4 h-4" />
+                        Retirer ma commission
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
+                    </a>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Pour retirer ta commission, ouvre un ticket sur notre Discord en precisant ton code de parrainage et le montant souhaite.
+                    </p>
                   </>
                 );
               })()}
