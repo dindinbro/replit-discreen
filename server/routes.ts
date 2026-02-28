@@ -3876,6 +3876,107 @@ export async function registerRoutes(
     }
   });
 
+  let wmnSitesCache: Array<{ name: string; uri_check: string; e_code: number; e_string: string; m_string: string; m_code: number; cat: string }> | null = null;
+  let wmnCacheTime = 0;
+  const WMN_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+  async function getWmnSites() {
+    if (wmnSitesCache && Date.now() - wmnCacheTime < WMN_CACHE_TTL) return wmnSitesCache;
+    const resp = await fetch("https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json");
+    if (!resp.ok) throw new Error("Failed to fetch WMN data");
+    const data = await resp.json() as any;
+    wmnSitesCache = (data.sites || []).filter((s: any) => s.uri_check && s.e_code && s.e_string);
+    wmnCacheTime = Date.now();
+    return wmnSitesCache!;
+  }
+
+  app.post("/api/whatsmyname", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { username } = req.body;
+      if (!username || typeof username !== "string") {
+        return res.status(400).json({ message: "Nom d'utilisateur manquant." });
+      }
+
+      const cleaned = username.trim().replace(/^@/, "");
+      if (!/^[a-zA-Z0-9_.-]{1,40}$/.test(cleaned)) {
+        return res.status(400).json({ message: "Nom d'utilisateur invalide." });
+      }
+
+      const userId = (req as any).user.id;
+      const userEmail = (req as any).user?.email || "inconnu";
+
+      const sub = await storage.getSubscription(userId);
+      const tier = (sub?.tier as string) || "free";
+      const TIER_ORDER_W: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
+      const tierLevel = TIER_ORDER_W[tier] ?? 0;
+      const isAdmin = (req as any).user?.role === "admin";
+
+      if (!isAdmin && tierLevel < 1) {
+        return res.status(403).json({ message: "Username OSINT necessite un abonnement VIP minimum." });
+      }
+
+      const blEntries = await storage.getBlacklistEntries();
+      const isBlacklisted = blEntries.some((entry) => {
+        const blPseudo = (entry.pseudo || "").trim().toLowerCase();
+        return blPseudo && blPseudo === cleaned.toLowerCase();
+      });
+      if (isBlacklisted) {
+        return res.status(403).json({ message: "Ce pseudo est protege et ne peut pas etre recherche." });
+      }
+
+      console.log(`[whatsmyname] User ${userEmail} (${userId}) searching username: ${cleaned}`);
+
+      const sites = await getWmnSites();
+      const results: Array<{ name: string; url: string; found: boolean; category: string }> = [];
+      const TIMEOUT_MS = 8000;
+      const CONCURRENCY = 20;
+
+      const checkSite = async (site: typeof sites[number]) => {
+        const profileUrl = site.uri_check.replace("{account}", cleaned);
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+          const resp = await fetch(profileUrl, {
+            signal: controller.signal,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "en-US,en;q=0.5",
+            },
+            redirect: "follow",
+          });
+          clearTimeout(timer);
+
+          if (resp.status === site.e_code) {
+            const text = await resp.text();
+            if (site.e_string && text.includes(site.e_string)) {
+              results.push({ name: site.name, url: profileUrl, found: true, category: site.cat });
+            }
+          }
+        } catch {
+        }
+      };
+
+      for (let i = 0; i < sites.length; i += CONCURRENCY) {
+        const batch = sites.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(checkSite));
+      }
+
+      results.sort((a, b) => a.name.localeCompare(b.name));
+      console.log(`[whatsmyname] Username "${cleaned}" found on ${results.length}/${sites.length} sites`);
+
+      res.json({
+        username: cleaned,
+        found: results.length,
+        total: sites.length,
+        results,
+      });
+    } catch (err) {
+      console.error("POST /api/whatsmyname error:", err);
+      res.status(500).json({ message: "Erreur interne." });
+    }
+  });
+
   const exifUpload = multer({
     dest: "/tmp/exif-uploads",
     limits: { fileSize: 25 * 1024 * 1024 },

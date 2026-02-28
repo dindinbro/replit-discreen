@@ -507,7 +507,7 @@ export default function SearchPage() {
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "exiftool" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">("internal");
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">("internal");
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
@@ -580,9 +580,15 @@ export default function SearchPage() {
   const [sherlockUsername, setSherlockUsername] = useState("");
   const [sherlockLoading, setSherlockLoading] = useState(false);
 
-  const [exifFile, setExifFile] = useState<File | null>(null);
-  const [exifLoading, setExifLoading] = useState(false);
-  const [exifResult, setExifResult] = useState<any>(null);
+  const [wmnLoading, setWmnLoading] = useState(false);
+  const [wmnResult, setWmnResult] = useState<{
+    username?: string;
+    found?: number;
+    total?: number;
+    results?: Array<{ name: string; url: string; category: string }>;
+    error?: string;
+  } | null>(null);
+  const [usernameSource, setUsernameSource] = useState<"sherlock" | "whatsmyname">("sherlock");
   const [sherlockResult, setSherlockResult] = useState<{
     username?: string;
     found?: number;
@@ -1124,6 +1130,41 @@ export default function SearchPage() {
     }
   };
 
+  const handleWmnSearch = async () => {
+    const u = sherlockUsername.trim().replace(/^@/, "");
+    if (!u) return;
+    if (!/^[a-zA-Z0-9_.-]{1,40}$/.test(u)) {
+      toast({
+        title: "Pseudo invalide",
+        description: "Utilisez uniquement lettres, chiffres, tirets, points et underscores.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setWmnLoading(true);
+    setWmnResult(null);
+    try {
+      const token = getAccessToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const resp = await fetch("/api/whatsmyname", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ username: u }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setWmnResult({ error: data.message || "Erreur inconnue." });
+      } else {
+        setWmnResult(data);
+      }
+    } catch {
+      setWmnResult({ error: "Erreur de connexion au serveur." });
+    } finally {
+      setWmnLoading(false);
+    }
+  };
+
   const GOOGLE_DOC_REGEX = /^https:\/\/(docs|drive|slides|sheets|jamboard|script|forms)\.google\.com\/.+/i;
 
   const handleXeuledocSearch = async () => {
@@ -1198,7 +1239,7 @@ export default function SearchPage() {
               <>
                 Username <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-violet-400">
-                  Sherlock
+                  OSINT
                 </span>
               </>
             ) : (
@@ -1221,15 +1262,6 @@ export default function SearchPage() {
           >
             <Sparkles className="w-4 h-4" />
             Recherche Paramétrique
-          </Button>
-          <Button
-            variant={searchMode === "exiftool" ? "default" : "outline"}
-            onClick={() => { setSearchMode("exiftool"); setCriteria([]); }}
-            className="min-w-[180px] gap-2"
-            data-testid="button-mode-exiftool"
-          >
-            <FileSearch className="w-4 h-4" />
-            {t("search.tabs.exiftool")}
           </Button>
           <Button
             variant={searchMode === "phone" ? "default" : "outline"}
@@ -1284,6 +1316,7 @@ export default function SearchPage() {
                 setCriteria([]);
                 setSherlockUsername("");
                 setSherlockResult(null);
+                setWmnResult(null);
               }
             }}
             disabled={tierLevel < 1}
@@ -1291,7 +1324,7 @@ export default function SearchPage() {
             data-testid="button-mode-sherlock"
           >
             <Eye className="w-4 h-4" />
-            Sherlock
+            Username OSINT
             {tierLevel < 1 && <span className="text-[10px] opacity-70">VIP+</span>}
           </Button>
           <Button
@@ -1673,151 +1706,6 @@ export default function SearchPage() {
             </motion.div>
           )}
 
-          {searchMode === "exiftool" && (
-            <motion.div
-              key="exiftool"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
-            >
-              <div className="flex items-center gap-2">
-                <FileSearch className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold" data-testid="text-exiftool-title">{t("search.exiftool.title")}</h2>
-              </div>
-              <p className="text-sm text-muted-foreground">{t("search.exiftool.description")}</p>
-
-              <div className="space-y-4">
-                <div
-                  className="border-2 border-dashed border-border/60 rounded-xl p-8 text-center cursor-pointer transition-colors hover:border-primary/40"
-                  onClick={() => document.getElementById("exif-file-input")?.click()}
-                  data-testid="dropzone-exiftool"
-                >
-                  <input
-                    id="exif-file-input"
-                    type="file"
-                    className="hidden"
-                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) setExifFile(e.target.files[0]);
-                    }}
-                    data-testid="input-exif-file"
-                  />
-                  {exifFile ? (
-                    <div className="space-y-2">
-                      <FileText className="w-10 h-10 text-primary mx-auto" />
-                      <p className="text-sm font-medium">{exifFile.name}</p>
-                      <p className="text-xs text-muted-foreground">{(exifFile.size / 1024).toFixed(1)} KB</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Upload className="w-10 h-10 text-muted-foreground mx-auto" />
-                      <p className="text-sm text-muted-foreground">{t("search.exiftool.dropzone")}</p>
-                      <p className="text-xs text-muted-foreground">{t("search.exiftool.supportedFormats")}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    data-testid="button-extract-metadata"
-                    onClick={async () => {
-                      if (!exifFile) return;
-                      setExifLoading(true);
-                      setExifResult(null);
-                      try {
-                        const token = getAccessToken();
-                        const formData = new FormData();
-                        formData.append("file", exifFile);
-                        const res = await fetch("/api/exiftool", {
-                          method: "POST",
-                          headers: { Authorization: `Bearer ${token}` },
-                          body: formData,
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          setExifResult(data);
-                        } else {
-                          toast({ title: data.message || t("common.error"), variant: "destructive" });
-                        }
-                      } catch {
-                        toast({ title: t("search.exiftool.error"), variant: "destructive" });
-                      } finally {
-                        setExifLoading(false);
-                      }
-                    }}
-                    disabled={exifLoading || !exifFile}
-                    className="gap-2"
-                  >
-                    {exifLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    {t("search.exiftool.extract")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => { setExifFile(null); setExifResult(null); }}
-                    disabled={exifLoading}
-                    className="gap-2"
-                    data-testid="button-reset-exiftool"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    {t("search.reset")}
-                  </Button>
-                </div>
-              </div>
-
-              {exifResult && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
-                >
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-lg font-semibold" data-testid="text-exif-results-title">{t("search.exiftool.results")}</h3>
-                    <Badge variant="outline" data-testid="badge-metadata-count">
-                      {exifResult.metadataCount} {t("search.exiftool.fieldsFound")}
-                    </Badge>
-                  </div>
-
-                  <Card className="p-4 space-y-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">{t("search.exiftool.fileName")}:</span>{" "}
-                        <span className="font-medium">{exifResult.fileName}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">{t("search.exiftool.fileSize")}:</span>{" "}
-                        <span className="font-medium">{(exifResult.fileSize / 1024).toFixed(1)} KB</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">{t("search.exiftool.mimeType")}:</span>{" "}
-                        <span className="font-medium">{exifResult.mimeType}</span>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm" data-testid="table-exif-metadata">
-                      <thead>
-                        <tr className="border-b border-border/50">
-                          <th className="text-left py-2 px-3 text-muted-foreground font-medium w-1/3">{t("search.exiftool.property")}</th>
-                          <th className="text-left py-2 px-3 text-muted-foreground font-medium">{t("search.exiftool.value")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(exifResult.metadata).map(([key, value]) => (
-                          <tr key={key} className="border-b border-border/30">
-                            <td className="py-2 px-3 font-medium text-foreground/80">{key}</td>
-                            <td className="py-2 px-3 text-foreground/70 break-all font-mono text-xs">{String(value)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-
           {searchMode === "phone" && (
             <motion.div
               key="phone"
@@ -2169,18 +2057,15 @@ export default function SearchPage() {
             >
               <div className="flex items-center gap-2">
                 <Eye className="w-5 h-5 text-purple-500" />
-                <h2 className="text-xl font-semibold">Sherlock — Username OSINT</h2>
+                <h2 className="text-xl font-semibold">Username OSINT</h2>
               </div>
 
               <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-4 text-sm text-muted-foreground space-y-2">
                 <p>
-                  Cet outil recherche un <span className="text-purple-400 font-medium">pseudo</span> sur plus de 40 reseaux sociaux et plateformes populaires.
-                </p>
-                <p>
-                  Il identifie sur quels sites le pseudo est <span className="text-purple-400 font-medium">enregistre</span>, avec un lien direct vers chaque profil trouve.
+                  Recherche un <span className="text-purple-400 font-medium">pseudo</span> sur des centaines de plateformes pour identifier les comptes associes.
                 </p>
                 <p className="text-xs opacity-70">
-                  Base sur le projet open-source Sherlock. La recherche peut prendre 15-30 secondes.
+                  La recherche peut prendre 15-60 secondes selon la source selectionnee.
                 </p>
               </div>
 
@@ -2192,23 +2077,50 @@ export default function SearchPage() {
                     placeholder="ex: john_doe"
                     value={sherlockUsername}
                     onChange={(e) => setSherlockUsername(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSherlockSearch()}
-                    className="max-w-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (usernameSource === "sherlock") handleSherlockSearch();
+                        else handleWmnSearch();
+                      }
+                    }}
+                    className="flex-1 min-w-[200px] max-w-sm"
                   />
+                  <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/30 border border-border/50">
+                    <Button
+                      variant={usernameSource === "sherlock" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setUsernameSource("sherlock")}
+                      className={`text-xs ${usernameSource === "sherlock" ? "bg-purple-600 text-white" : ""}`}
+                      data-testid="button-source-sherlock"
+                    >
+                      Sherlock
+                    </Button>
+                    <Button
+                      variant={usernameSource === "whatsmyname" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setUsernameSource("whatsmyname")}
+                      className={`text-xs ${usernameSource === "whatsmyname" ? "bg-purple-600 text-white" : ""}`}
+                      data-testid="button-source-wmn"
+                    >
+                      WhatsMyName
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
                   <Button
                     data-testid="button-sherlock-search"
-                    onClick={handleSherlockSearch}
-                    disabled={sherlockLoading || !sherlockUsername.trim()}
+                    onClick={usernameSource === "sherlock" ? handleSherlockSearch : handleWmnSearch}
+                    disabled={(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) || !sherlockUsername.trim()}
                     className="bg-purple-600 hover:bg-purple-700 text-white border-purple-600"
                   >
-                    {sherlockLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    <span className="ml-1.5">{sherlockLoading ? t("search.searching") : t("search.searchButton")}</span>
+                    {(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span className="ml-1.5">{(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? t("search.searching") : t("search.searchButton")}</span>
                   </Button>
                   <Button
                     data-testid="button-reset-sherlock"
                     variant="outline"
-                    onClick={() => { setSherlockUsername(""); setSherlockResult(null); }}
-                    disabled={sherlockLoading}
+                    onClick={() => { setSherlockUsername(""); setSherlockResult(null); setWmnResult(null); }}
+                    disabled={sherlockLoading || wmnLoading}
                     className="gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -2216,18 +2128,24 @@ export default function SearchPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Lettres, chiffres, tirets, points et underscores uniquement. 40 caracteres max.
+                  {usernameSource === "sherlock"
+                    ? "Sherlock — ~50 sites populaires. Rapide et fiable."
+                    : "WhatsMyName — 700+ sites. Scan plus large, peut prendre plus de temps."}
                 </p>
               </div>
 
-              {sherlockLoading && (
+              {(sherlockLoading || wmnLoading) && (
                 <div className="flex items-center justify-center gap-3 py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-                  <p className="text-sm text-muted-foreground">Analyse de plus de 40 plateformes en cours...</p>
+                  <p className="text-sm text-muted-foreground">
+                    {usernameSource === "sherlock"
+                      ? "Analyse de plus de 40 plateformes en cours..."
+                      : "Analyse de plus de 700 plateformes en cours..."}
+                  </p>
                 </div>
               )}
 
-              {sherlockResult && !sherlockLoading && (
+              {usernameSource === "sherlock" && sherlockResult && !sherlockLoading && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -2239,7 +2157,7 @@ export default function SearchPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <Badge className="bg-purple-600 text-white" data-testid="text-sherlock-count">
                           {sherlockResult.found} / {sherlockResult.total} plateformes
                         </Badge>
@@ -2258,6 +2176,57 @@ export default function SearchPage() {
                               rel="noopener noreferrer"
                               className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-colors group"
                               data-testid={`link-sherlock-result-${i}`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{site.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{site.category}</p>
+                              </div>
+                              <ExternalLink className="w-4 h-4 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Eye className="w-10 h-10 mx-auto mb-3 opacity-40 text-purple-500" />
+                          <p className="text-sm">Aucun profil trouve pour ce pseudo.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {usernameSource === "whatsmyname" && wmnResult && !wmnLoading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4"
+                >
+                  {wmnResult.error ? (
+                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                      <p className="text-sm text-destructive" data-testid="text-wmn-error">{wmnResult.error}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Badge className="bg-purple-600 text-white" data-testid="text-wmn-count">
+                          {wmnResult.found} / {wmnResult.total} plateformes
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          Pseudo <span className="font-mono font-medium text-purple-400">@{wmnResult.username}</span> trouve sur {wmnResult.found} site{(wmnResult.found || 0) > 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      {wmnResult.results && wmnResult.results.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {wmnResult.results.map((site, i) => (
+                            <a
+                              key={i}
+                              href={site.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-colors group"
+                              data-testid={`link-wmn-result-${i}`}
                             >
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{site.name}</p>
@@ -2585,7 +2554,7 @@ export default function SearchPage() {
           </div>
         )}
 
-        {searchMode !== "exiftool" && searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
+        {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
             const baseResults = searchMode === "external"
