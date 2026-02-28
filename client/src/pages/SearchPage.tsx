@@ -588,7 +588,16 @@ export default function SearchPage() {
     results?: Array<{ name: string; url: string; category: string }>;
     error?: string;
   } | null>(null);
-  const [usernameSource, setUsernameSource] = useState<"sherlock" | "whatsmyname">("sherlock");
+  const [holehehLoading, setHolehehLoading] = useState(false);
+  const [holehehResult, setHolehehResult] = useState<{
+    email?: string;
+    found?: number;
+    total?: number;
+    results?: Array<{ name: string; category: string; registered: boolean }>;
+    error?: string;
+  } | null>(null);
+  const [holehehEmail, setHolehehEmail] = useState("");
+  const [usernameSource, setUsernameSource] = useState<"sherlock" | "whatsmyname" | "holehe">("sherlock");
   const [sherlockResult, setSherlockResult] = useState<{
     username?: string;
     found?: number;
@@ -1165,6 +1174,41 @@ export default function SearchPage() {
     }
   };
 
+  const handleHolehehSearch = async () => {
+    const e = holehehEmail.trim().toLowerCase();
+    if (!e) return;
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(e)) {
+      toast({
+        title: "Email invalide",
+        description: "Entrez une adresse e-mail valide.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setHolehehLoading(true);
+    setHolehehResult(null);
+    try {
+      const token = getAccessToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const resp = await fetch("/api/holehe", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email: e }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setHolehehResult({ error: data.message || "Erreur inconnue." });
+      } else {
+        setHolehehResult(data);
+      }
+    } catch {
+      setHolehehResult({ error: "Erreur de connexion au serveur." });
+    } finally {
+      setHolehehLoading(false);
+    }
+  };
+
   const GOOGLE_DOC_REGEX = /^https:\/\/(docs|drive|slides|sheets|jamboard|script|forms)\.google\.com\/.+/i;
 
   const handleXeuledocSearch = async () => {
@@ -1317,6 +1361,8 @@ export default function SearchPage() {
                 setSherlockUsername("");
                 setSherlockResult(null);
                 setWmnResult(null);
+                setHolehehEmail("");
+                setHolehehResult(null);
               }
             }}
             disabled={tierLevel < 1}
@@ -2060,191 +2106,278 @@ export default function SearchPage() {
                 <h2 className="text-xl font-semibold">Username OSINT</h2>
               </div>
 
-              <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-4 text-sm text-muted-foreground space-y-2">
-                <p>
-                  Recherche un <span className="text-purple-400 font-medium">pseudo</span> sur des centaines de plateformes pour identifier les comptes associes.
-                </p>
-                <p className="text-xs opacity-70">
-                  La recherche peut prendre 15-60 secondes selon la source selectionnee.
-                </p>
+              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/30 border border-border/50 w-fit">
+                <Button
+                  variant={usernameSource === "sherlock" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setUsernameSource("sherlock")}
+                  className={`text-xs ${usernameSource === "sherlock" ? "bg-purple-600 text-white" : ""}`}
+                  data-testid="button-source-sherlock"
+                >
+                  Sherlock
+                </Button>
+                <Button
+                  variant={usernameSource === "whatsmyname" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setUsernameSource("whatsmyname")}
+                  className={`text-xs ${usernameSource === "whatsmyname" ? "bg-purple-600 text-white" : ""}`}
+                  data-testid="button-source-wmn"
+                >
+                  WhatsMyName
+                </Button>
+                <Button
+                  variant={usernameSource === "holehe" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setUsernameSource("holehe")}
+                  className={`text-xs ${usernameSource === "holehe" ? "bg-teal-600 text-white" : ""}`}
+                  data-testid="button-source-holehe"
+                >
+                  Holehe
+                </Button>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Nom d'utilisateur</Label>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Input
-                    data-testid="input-sherlock-username"
-                    placeholder="ex: john_doe"
-                    value={sherlockUsername}
-                    onChange={(e) => setSherlockUsername(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        if (usernameSource === "sherlock") handleSherlockSearch();
-                        else handleWmnSearch();
-                      }
-                    }}
-                    className="flex-1 min-w-[200px] max-w-sm"
-                  />
-                  <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/30 border border-border/50">
-                    <Button
-                      variant={usernameSource === "sherlock" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setUsernameSource("sherlock")}
-                      className={`text-xs ${usernameSource === "sherlock" ? "bg-purple-600 text-white" : ""}`}
-                      data-testid="button-source-sherlock"
-                    >
-                      Sherlock
-                    </Button>
-                    <Button
-                      variant={usernameSource === "whatsmyname" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setUsernameSource("whatsmyname")}
-                      className={`text-xs ${usernameSource === "whatsmyname" ? "bg-purple-600 text-white" : ""}`}
-                      data-testid="button-source-wmn"
-                    >
-                      WhatsMyName
-                    </Button>
+              {usernameSource !== "holehe" ? (
+                <>
+                  <div className={`rounded-lg p-4 text-sm text-muted-foreground space-y-2 ${usernameSource === "sherlock" ? "bg-purple-500/5 border border-purple-500/10" : "bg-purple-500/5 border border-purple-500/10"}`}>
+                    <p>
+                      Recherche un <span className="text-purple-400 font-medium">pseudo</span> sur {usernameSource === "sherlock" ? "~50 plateformes populaires" : "700+ plateformes"}.
+                    </p>
+                    <p className="text-xs opacity-70">
+                      {usernameSource === "sherlock" ? "Rapide et fiable. ~15 secondes." : "Scan large. Peut prendre jusqu'a 60 secondes."}
+                    </p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Button
-                    data-testid="button-sherlock-search"
-                    onClick={usernameSource === "sherlock" ? handleSherlockSearch : handleWmnSearch}
-                    disabled={(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) || !sherlockUsername.trim()}
-                    className="bg-purple-600 hover:bg-purple-700 text-white border-purple-600"
-                  >
-                    {(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    <span className="ml-1.5">{(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? t("search.searching") : t("search.searchButton")}</span>
-                  </Button>
-                  <Button
-                    data-testid="button-reset-sherlock"
-                    variant="outline"
-                    onClick={() => { setSherlockUsername(""); setSherlockResult(null); setWmnResult(null); }}
-                    disabled={sherlockLoading || wmnLoading}
-                    className="gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reinitialiser
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {usernameSource === "sherlock"
-                    ? "Sherlock — ~50 sites populaires. Rapide et fiable."
-                    : "WhatsMyName — 700+ sites. Scan plus large, peut prendre plus de temps."}
-                </p>
-              </div>
 
-              {(sherlockLoading || wmnLoading) && (
-                <div className="flex items-center justify-center gap-3 py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-                  <p className="text-sm text-muted-foreground">
-                    {usernameSource === "sherlock"
-                      ? "Analyse de plus de 40 plateformes en cours..."
-                      : "Analyse de plus de 700 plateformes en cours..."}
-                  </p>
-                </div>
-              )}
-
-              {usernameSource === "sherlock" && sherlockResult && !sherlockLoading && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4"
-                >
-                  {sherlockResult.error ? (
-                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
-                      <p className="text-sm text-destructive" data-testid="text-sherlock-error">{sherlockResult.error}</p>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Nom d'utilisateur</Label>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Input
+                        data-testid="input-sherlock-username"
+                        placeholder="ex: john_doe"
+                        value={sherlockUsername}
+                        onChange={(e) => setSherlockUsername(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            if (usernameSource === "sherlock") handleSherlockSearch();
+                            else handleWmnSearch();
+                          }
+                        }}
+                        className="flex-1 min-w-[200px] max-w-sm"
+                      />
+                      <Button
+                        data-testid="button-sherlock-search"
+                        onClick={usernameSource === "sherlock" ? handleSherlockSearch : handleWmnSearch}
+                        disabled={(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) || !sherlockUsername.trim()}
+                        className="bg-purple-600 text-white border-purple-600"
+                      >
+                        {(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                        <span className="ml-1.5">{(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? t("search.searching") : t("search.searchButton")}</span>
+                      </Button>
+                      <Button
+                        data-testid="button-reset-sherlock"
+                        variant="outline"
+                        onClick={() => { setSherlockUsername(""); setSherlockResult(null); setWmnResult(null); }}
+                        disabled={sherlockLoading || wmnLoading}
+                        className="gap-2"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reinitialiser
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Badge className="bg-purple-600 text-white" data-testid="text-sherlock-count">
-                          {sherlockResult.found} / {sherlockResult.total} plateformes
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          Pseudo <span className="font-mono font-medium text-purple-400">@{sherlockResult.username}</span> trouve sur {sherlockResult.found} site{(sherlockResult.found || 0) > 1 ? "s" : ""}
-                        </span>
-                      </div>
+                  </div>
 
-                      {sherlockResult.results && sherlockResult.results.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {sherlockResult.results.map((site, i) => (
-                            <a
-                              key={i}
-                              href={site.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-colors group"
-                              data-testid={`link-sherlock-result-${i}`}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{site.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{site.category}</p>
-                              </div>
-                              <ExternalLink className="w-4 h-4 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                            </a>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-6 text-muted-foreground">
-                          <Eye className="w-10 h-10 mx-auto mb-3 opacity-40 text-purple-500" />
-                          <p className="text-sm">Aucun profil trouve pour ce pseudo.</p>
-                        </div>
-                      )}
+                  {(sherlockLoading || wmnLoading) && (
+                    <div className="flex items-center justify-center gap-3 py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                      <p className="text-sm text-muted-foreground">
+                        {usernameSource === "sherlock"
+                          ? "Analyse de plus de 40 plateformes en cours..."
+                          : "Analyse de plus de 700 plateformes en cours..."}
+                      </p>
                     </div>
                   )}
-                </motion.div>
-              )}
 
-              {usernameSource === "whatsmyname" && wmnResult && !wmnLoading && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4"
-                >
-                  {wmnResult.error ? (
-                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
-                      <p className="text-sm text-destructive" data-testid="text-wmn-error">{wmnResult.error}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Badge className="bg-purple-600 text-white" data-testid="text-wmn-count">
-                          {wmnResult.found} / {wmnResult.total} plateformes
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          Pseudo <span className="font-mono font-medium text-purple-400">@{wmnResult.username}</span> trouve sur {wmnResult.found} site{(wmnResult.found || 0) > 1 ? "s" : ""}
-                        </span>
-                      </div>
-
-                      {wmnResult.results && wmnResult.results.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {wmnResult.results.map((site, i) => (
-                            <a
-                              key={i}
-                              href={site.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-colors group"
-                              data-testid={`link-wmn-result-${i}`}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{site.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{site.category}</p>
-                              </div>
-                              <ExternalLink className="w-4 h-4 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                            </a>
-                          ))}
+                  {usernameSource === "sherlock" && sherlockResult && !sherlockLoading && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+                      {sherlockResult.error ? (
+                        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                          <p className="text-sm text-destructive" data-testid="text-sherlock-error">{sherlockResult.error}</p>
                         </div>
                       ) : (
-                        <div className="text-center py-6 text-muted-foreground">
-                          <Eye className="w-10 h-10 mx-auto mb-3 opacity-40 text-purple-500" />
-                          <p className="text-sm">Aucun profil trouve pour ce pseudo.</p>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <Badge className="bg-purple-600 text-white" data-testid="text-sherlock-count">
+                              {sherlockResult.found} / {sherlockResult.total} plateformes
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              Pseudo <span className="font-mono font-medium text-purple-400">@{sherlockResult.username}</span> trouve sur {sherlockResult.found} site{(sherlockResult.found || 0) > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          {sherlockResult.results && sherlockResult.results.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {sherlockResult.results.map((site, i) => (
+                                <a key={i} href={site.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-colors group" data-testid={`link-sherlock-result-${i}`}>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{site.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{site.category}</p>
+                                  </div>
+                                  <ExternalLink className="w-4 h-4 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6 text-muted-foreground">
+                              <Eye className="w-10 h-10 mx-auto mb-3 opacity-40 text-purple-500" />
+                              <p className="text-sm">Aucun profil trouve pour ce pseudo.</p>
+                            </div>
+                          )}
                         </div>
                       )}
+                    </motion.div>
+                  )}
+
+                  {usernameSource === "whatsmyname" && wmnResult && !wmnLoading && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+                      {wmnResult.error ? (
+                        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                          <p className="text-sm text-destructive" data-testid="text-wmn-error">{wmnResult.error}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <Badge className="bg-purple-600 text-white" data-testid="text-wmn-count">
+                              {wmnResult.found} / {wmnResult.total} plateformes
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              Pseudo <span className="font-mono font-medium text-purple-400">@{wmnResult.username}</span> trouve sur {wmnResult.found} site{(wmnResult.found || 0) > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          {wmnResult.results && wmnResult.results.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {wmnResult.results.map((site, i) => (
+                                <a key={i} href={site.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 transition-colors group" data-testid={`link-wmn-result-${i}`}>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{site.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{site.category}</p>
+                                  </div>
+                                  <ExternalLink className="w-4 h-4 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6 text-muted-foreground">
+                              <Eye className="w-10 h-10 mx-auto mb-3 opacity-40 text-purple-500" />
+                              <p className="text-sm">Aucun profil trouve pour ce pseudo.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="rounded-lg bg-teal-500/5 border border-teal-500/10 p-4 text-sm text-muted-foreground space-y-2">
+                    <p>
+                      Verifie si une <span className="text-teal-400 font-medium">adresse e-mail</span> est enregistree sur ~25 services populaires (reseaux sociaux, dev, shopping...).
+                    </p>
+                    <p className="text-xs opacity-70">
+                      Base sur le projet open-source Holehe. Analyse rapide, ~10 secondes.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Adresse e-mail</Label>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Input
+                        data-testid="input-holehe-email"
+                        placeholder="ex: user@example.com"
+                        value={holehehEmail}
+                        onChange={(e) => setHolehehEmail(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleHolehehSearch(); }}
+                        className="flex-1 min-w-[200px] max-w-sm"
+                        type="email"
+                      />
+                      <Button
+                        data-testid="button-holehe-search"
+                        onClick={handleHolehehSearch}
+                        disabled={holehehLoading || !holehehEmail.trim()}
+                        className="bg-teal-600 text-white border-teal-600"
+                      >
+                        {holehehLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                        <span className="ml-1.5">{holehehLoading ? t("search.searching") : t("search.searchButton")}</span>
+                      </Button>
+                      <Button
+                        data-testid="button-reset-holehe"
+                        variant="outline"
+                        onClick={() => { setHolehehEmail(""); setHolehehResult(null); }}
+                        disabled={holehehLoading}
+                        className="gap-2"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reinitialiser
+                      </Button>
+                    </div>
+                  </div>
+
+                  {holehehLoading && (
+                    <div className="flex items-center justify-center gap-3 py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
+                      <p className="text-sm text-muted-foreground">Verification de l'email sur ~25 plateformes...</p>
                     </div>
                   )}
-                </motion.div>
+
+                  {holehehResult && !holehehLoading && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+                      {holehehResult.error ? (
+                        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                          <p className="text-sm text-destructive" data-testid="text-holehe-error">{holehehResult.error}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <Badge className="bg-teal-600 text-white" data-testid="text-holehe-count">
+                              {holehehResult.found} / {holehehResult.total} services
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              Email <span className="font-mono font-medium text-teal-400">{holehehResult.email}</span> inscrit sur {holehehResult.found} service{(holehehResult.found || 0) > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          {holehehResult.results && holehehResult.results.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {holehehResult.results.map((site, i) => (
+                                <div
+                                  key={i}
+                                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                    site.registered
+                                      ? "bg-teal-500/5 border-teal-500/20"
+                                      : "bg-secondary/20 border-border/30 opacity-50"
+                                  }`}
+                                  data-testid={`card-holehe-result-${i}`}
+                                >
+                                  <div className={`w-2 h-2 rounded-full shrink-0 ${site.registered ? "bg-teal-500" : "bg-muted-foreground/30"}`} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{site.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{site.category}</p>
+                                  </div>
+                                  {site.registered ? (
+                                    <Badge variant="outline" className="text-[10px] border-teal-500/30 text-teal-500 shrink-0">Inscrit</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] opacity-50 shrink-0">Non trouve</Badge>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6 text-muted-foreground">
+                              <Eye className="w-10 h-10 mx-auto mb-3 opacity-40 text-teal-500" />
+                              <p className="text-sm">Aucun resultat pour cette adresse.</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </>
               )}
             </motion.div>
           )}

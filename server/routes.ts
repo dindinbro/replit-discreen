@@ -3977,6 +3977,140 @@ export async function registerRoutes(
     }
   });
 
+  const HOLEHE_SITES: Array<{
+    name: string;
+    category: string;
+    checkUrl: string;
+    method: "POST" | "GET";
+    body?: (email: string) => string;
+    contentType?: string;
+    existsWhen: "status" | "bodyContains" | "bodyNotContains";
+    existsStatus?: number;
+    existsString?: string;
+    profileUrl?: string;
+  }> = [
+    { name: "GitHub", category: "dev", checkUrl: "https://api.github.com/search/users?q={email}+in:email", method: "GET", existsWhen: "bodyContains", existsString: '"total_count":1' },
+    { name: "Spotify", category: "music", checkUrl: "https://spclient.wg.spotify.com/signup/public/v1/account/web?validate=1&email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"status":20' },
+    { name: "Twitter/X", category: "social", checkUrl: "https://api.twitter.com/i/users/email_available.json?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"taken":true' },
+    { name: "Pinterest", category: "social", checkUrl: "https://www.pinterest.com/resource/EmailExistsResource/get/?source_url=/&data={\"options\":{\"email\":\"{email}\"},\"context\":{}}", method: "GET", existsWhen: "bodyContains", existsString: '"email_found": true' },
+    { name: "Instagram", category: "social", checkUrl: "https://www.instagram.com/accounts/web_create_ajax/attempt/", method: "POST", body: (e) => `email=${encodeURIComponent(e)}`, contentType: "application/x-www-form-urlencoded", existsWhen: "bodyContains", existsString: "email_is_taken" },
+    { name: "Adobe", category: "tech", checkUrl: "https://auth.services.adobe.com/signin/v2/users/accounts?email_id={email}", method: "GET", existsWhen: "bodyNotContains", existsString: '"type":"error"' },
+    { name: "WordPress", category: "blog", checkUrl: "https://public-api.wordpress.com/rest/v1.1/users/{email}/auth-options", method: "GET", existsWhen: "bodyContains", existsString: '"email_verified"' },
+    { name: "Gravatar", category: "social", checkUrl: "https://en.gravatar.com/{email}.json", method: "GET", existsWhen: "status", existsStatus: 200 },
+    { name: "Duolingo", category: "education", checkUrl: "https://www.duolingo.com/2017-06-30/users?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"users":[{' },
+    { name: "Discord", category: "social", checkUrl: "https://discord.com/api/v9/unique-username/username-attempt-unauthed", method: "POST", body: (e) => JSON.stringify({ email: e }), contentType: "application/json", existsWhen: "status", existsStatus: 200 },
+    { name: "Flickr", category: "photo", checkUrl: "https://login.yahoo.com/account/module/create?validateField=yid&yid={email}", method: "GET", existsWhen: "bodyContains", existsString: '"IDENTIFIER_EXISTS"' },
+    { name: "Imgur", category: "photo", checkUrl: "https://imgur.com/signin/ajax_email_check?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"available":false' },
+    { name: "Lastfm", category: "music", checkUrl: "https://www.last.fm/join/partial/validate?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"email":{"valid":false' },
+    { name: "Patreon", category: "social", checkUrl: "https://www.patreon.com/api/auth/email-exists?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"email_exists":true' },
+    { name: "Evernote", category: "productivity", checkUrl: "https://www.evernote.com/Registration.action", method: "POST", body: (e) => `emailOrUsername=${encodeURIComponent(e)}&hpts=&hptsh=`, contentType: "application/x-www-form-urlencoded", existsWhen: "bodyContains", existsString: "already been registered" },
+    { name: "Firefox", category: "tech", checkUrl: "https://api.accounts.firefox.com/v1/account/status", method: "POST", body: (e) => JSON.stringify({ email: e }), contentType: "application/json", existsWhen: "bodyContains", existsString: '"exists":true' },
+    { name: "Tumblr", category: "blog", checkUrl: "https://www.tumblr.com/api/v2/user/search?q={email}", method: "GET", existsWhen: "status", existsStatus: 200 },
+    { name: "Aboutme", category: "social", checkUrl: "https://about.me/signup/validate/email/?email={email}", method: "GET", existsWhen: "bodyContains", existsString: "taken" },
+    { name: "Quora", category: "social", checkUrl: "https://www.quora.com/webnode2/server_call_POST?json={\"args\":[],\"kwargs\":{\"formkey\":\"\",\"value\":\"{email}\",\"extra\":{},\"first_name\":\"\",\"last_name\":\"\"}}", method: "POST", contentType: "application/json", existsWhen: "bodyContains", existsString: "already exists" },
+    { name: "Strava", category: "sport", checkUrl: "https://www.strava.com/athletes/email_unique?email={email}", method: "GET", existsWhen: "bodyContains", existsString: "false" },
+    { name: "MySpace", category: "social", checkUrl: "https://myspace.com/ajax/account/validateEmail?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"taken":true' },
+    { name: "Dailymotion", category: "video", checkUrl: "https://graphql.api.dailymotion.com/", method: "POST", body: (e) => JSON.stringify({ query: `{ user(email: "${e}") { id } }` }), contentType: "application/json", existsWhen: "bodyContains", existsString: '"id"' },
+    { name: "GitLab", category: "dev", checkUrl: "https://gitlab.com/users/{email}/exists", method: "GET", existsWhen: "bodyContains", existsString: '"exists":true' },
+    { name: "Hubspot", category: "business", checkUrl: "https://api.hubspot.com/login-verify/check-email?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"status":"EXISTING"' },
+    { name: "Nike", category: "shopping", checkUrl: "https://unite.nike.com/getEmailInfo?email={email}", method: "GET", existsWhen: "bodyContains", existsString: '"emailExists":true' },
+    { name: "Amazon", category: "shopping", checkUrl: "https://www.amazon.com/ap/register", method: "POST", body: (e) => `email=${encodeURIComponent(e)}&create=0`, contentType: "application/x-www-form-urlencoded", existsWhen: "bodyContains", existsString: "already exists" },
+  ];
+
+  app.post("/api/holehe", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Adresse e-mail manquante." });
+      }
+
+      const cleaned = email.trim().toLowerCase();
+      if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleaned)) {
+        return res.status(400).json({ message: "Adresse e-mail invalide." });
+      }
+
+      const userId = (req as any).user.id;
+      const userEmail = (req as any).user?.email || "inconnu";
+
+      const sub = await storage.getSubscription(userId);
+      const tier = (sub?.tier as string) || "free";
+      const TIER_ORDER_H: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
+      const tierLevel = TIER_ORDER_H[tier] ?? 0;
+      const isAdmin = (req as any).user?.role === "admin";
+
+      if (!isAdmin && tierLevel < 1) {
+        return res.status(403).json({ message: "Holehe necessite un abonnement VIP minimum." });
+      }
+
+      console.log(`[holehe] User ${userEmail} (${userId}) checking email: ${cleaned}`);
+
+      const results: Array<{ name: string; category: string; registered: boolean }> = [];
+      const TIMEOUT_MS = 8000;
+      const CONCURRENCY = 10;
+
+      const checkSite = async (site: typeof HOLEHE_SITES[number]) => {
+        const url = site.checkUrl.replace(/\{email\}/g, encodeURIComponent(cleaned));
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+          const fetchOpts: RequestInit = {
+            method: site.method,
+            signal: controller.signal,
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "en-US,en;q=0.5",
+            },
+            redirect: "follow",
+          };
+          if (site.method === "POST" && site.body) {
+            fetchOpts.body = site.body(cleaned);
+            if (site.contentType) {
+              (fetchOpts.headers as Record<string, string>)["Content-Type"] = site.contentType;
+            }
+          }
+          const resp = await fetch(url, fetchOpts);
+          clearTimeout(timer);
+
+          if (site.existsWhen === "status") {
+            results.push({ name: site.name, category: site.category, registered: resp.status === (site.existsStatus ?? 200) });
+          } else {
+            const text = await resp.text();
+            if (site.existsWhen === "bodyContains") {
+              results.push({ name: site.name, category: site.category, registered: text.includes(site.existsString!) });
+            } else if (site.existsWhen === "bodyNotContains") {
+              results.push({ name: site.name, category: site.category, registered: !text.includes(site.existsString!) });
+            }
+          }
+        } catch {
+          results.push({ name: site.name, category: site.category, registered: false });
+        }
+      };
+
+      for (let i = 0; i < HOLEHE_SITES.length; i += CONCURRENCY) {
+        const batch = HOLEHE_SITES.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(checkSite));
+      }
+
+      results.sort((a, b) => {
+        if (a.registered !== b.registered) return a.registered ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      const registered = results.filter(r => r.registered);
+      console.log(`[holehe] Email "${cleaned}" found on ${registered.length}/${HOLEHE_SITES.length} sites`);
+
+      res.json({
+        email: cleaned,
+        found: registered.length,
+        total: HOLEHE_SITES.length,
+        results,
+      });
+    } catch (err) {
+      console.error("POST /api/holehe error:", err);
+      res.status(500).json({ message: "Erreur interne." });
+    }
+  });
+
   const exifUpload = multer({
     dest: "/tmp/exif-uploads",
     limits: { fileSize: 25 * 1024 * 1024 },
