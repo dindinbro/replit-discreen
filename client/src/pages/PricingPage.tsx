@@ -39,6 +39,7 @@ const PLANS = [
     name: "Free",
     subtitle: "Pour commencer",
     price: 0,
+    lifetimePrice: 0,
     icon: Zap,
     popular: false,
     features: [
@@ -53,6 +54,7 @@ const PLANS = [
     name: "VIP",
     subtitle: "Pour les utilisateurs reguliers",
     price: 6.99,
+    lifetimePrice: 500,
     icon: Crown,
     popular: false,
     features: [
@@ -70,6 +72,7 @@ const PLANS = [
     name: "PRO",
     subtitle: "Puissance maximale",
     price: 14.99,
+    lifetimePrice: 500,
     icon: Rocket,
     popular: true,
     features: [
@@ -89,6 +92,7 @@ const PLANS = [
     name: "API",
     subtitle: "Recherche illimitee + revente",
     price: 49.99,
+    lifetimePrice: 500,
     icon: Code,
     popular: false,
     features: [
@@ -133,6 +137,7 @@ const cardVariants = {
 export default function PricingPage() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState<string | null>(null);
+  const [pricingMode, setPricingMode] = useState<"monthly" | "lifetime">("monthly");
   const [tiltStyles, setTiltStyles] = useState<Record<string, { rotateX: number; rotateY: number; scale: number }>>({});
 
   const handleTiltMove = useCallback((planId: string, e: React.MouseEvent<HTMLDivElement>) => {
@@ -345,6 +350,50 @@ export default function PricingPage() {
         </motion.div>
 
         <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+          className="flex justify-center mb-10"
+        >
+          <div className="relative flex items-center">
+            <div
+              onClick={() => setPricingMode("monthly")}
+              className={`relative z-10 px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
+                pricingMode === "monthly"
+                  ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105"
+                  : "bg-card text-muted-foreground border-border/50 -mr-3"
+              }`}
+              data-testid="button-pricing-monthly"
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                <div>
+                  <p className="text-sm font-bold">Mensuel</p>
+                  <p className="text-[10px] opacity-80">Paiement chaque mois</p>
+                </div>
+              </div>
+            </div>
+            <div
+              onClick={() => setPricingMode("lifetime")}
+              className={`relative px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
+                pricingMode === "lifetime"
+                  ? "z-10 bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105"
+                  : "z-0 bg-card text-muted-foreground border-border/50 -ml-3"
+              }`}
+              data-testid="button-pricing-lifetime"
+            >
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                <div>
+                  <p className="text-sm font-bold">Lifetime</p>
+                  <p className="text-[10px] opacity-80">Paiement unique</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -397,10 +446,16 @@ export default function PricingPage() {
 
                     <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span className="text-2xl font-display font-bold text-primary">
-                        {plan.price === 0 ? t("pricing.free") : `€${plan.price.toFixed(2)}`}
+                        {plan.price === 0
+                          ? t("pricing.free")
+                          : pricingMode === "monthly"
+                          ? `€${plan.price.toFixed(2)}`
+                          : `€${plan.lifetimePrice.toFixed(2)}`}
                       </span>
                       {plan.price > 0 && (
-                        <span className="text-xs text-muted-foreground">{t("pricing.perMonth")}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {pricingMode === "monthly" ? t("pricing.perMonth") : "unique"}
+                        </span>
                       )}
                     </div>
                   </div>
