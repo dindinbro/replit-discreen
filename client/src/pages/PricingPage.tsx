@@ -65,6 +65,8 @@ const PLANS = [
       { text: "Recherche avancee Discreen", excluded: true },
       "Google OSINT illimite",
       "Username OSINT illimite",
+      { text: "Moteur de recherche Wanted", excluded: true },
+      { text: "Parrainage", excluded: true },
     ],
   },
   {
