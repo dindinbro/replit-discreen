@@ -478,6 +478,30 @@ export default function PricingPage() {
                         </span>
                       )}
                     </div>
+
+                    {isLifetime && plan.price > 0 && (() => {
+                      const yearlyIfMonthly = plan.price * 12;
+                      const savedPerYear = yearlyIfMonthly - plan.lifetimePrice;
+                      const discountPct = Math.round((1 - plan.lifetimePrice / yearlyIfMonthly) * 100);
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground line-through">
+                              €{plan.price.toFixed(2)}/mois
+                            </span>
+                            <span className="text-xs font-bold text-amber-500">
+                              -{discountPct}%
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            €{yearlyIfMonthly.toFixed(2)}/an si mensuel
+                          </p>
+                          <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px] px-2 py-0.5 no-default-hover-elevate no-default-active-elevate">
+                            Économisez €{savedPerYear.toFixed(2)}/an
+                          </Badge>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <ul className="space-y-2 mb-6 flex-1">
