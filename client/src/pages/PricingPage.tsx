@@ -54,7 +54,7 @@ const PLANS = [
     name: "VIP",
     subtitle: "Pour les utilisateurs reguliers",
     price: 6.99,
-    lifetimePrice: 500,
+    lifetimePrice: 69.99,
     icon: Crown,
     popular: false,
     features: [
@@ -72,7 +72,7 @@ const PLANS = [
     name: "PRO",
     subtitle: "Puissance maximale",
     price: 14.99,
-    lifetimePrice: 500,
+    lifetimePrice: 124.99,
     icon: Rocket,
     popular: true,
     features: [
@@ -92,7 +92,7 @@ const PLANS = [
     name: "API",
     subtitle: "Recherche illimitee + revente",
     price: 49.99,
-    lifetimePrice: 500,
+    lifetimePrice: 399.99,
     icon: Code,
     popular: false,
     features: [
@@ -248,7 +248,7 @@ export default function PricingPage() {
     setReferralOpen(false);
     setLoading(pendingPlan.id);
     try {
-      const body: any = { plan: pendingPlan.id };
+      const body: any = { plan: pendingPlan.id, billing: pricingMode };
       if (withReferralCode && withReferralCode.trim()) {
         body.referralCode = withReferralCode.trim().toUpperCase();
       }
@@ -403,9 +403,9 @@ export default function PricingPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-16"
+          className={`grid grid-cols-1 sm:grid-cols-2 ${isLifetime ? "lg:grid-cols-3 max-w-4xl mx-auto" : "lg:grid-cols-4"} gap-5 mb-16`}
         >
-          {PLANS.map((plan) => {
+          {PLANS.filter((plan) => !(isLifetime && plan.price === 0)).map((plan) => {
             const Icon = plan.icon;
             const isLoading = loading === plan.id;
             const tilt = tiltStyles[plan.id] || { rotateX: 0, rotateY: 0, scale: 1 };

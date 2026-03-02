@@ -2022,18 +2022,24 @@ export async function registerRoutes(
 
   app.post("/api/create-invoice", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { plan, referralCode } = req.body;
+      const { plan, referralCode, billing } = req.body;
       const planInfo = PLAN_LIMITS[plan as PlanTier];
       if (!planInfo || plan === "free") {
         return res.status(400).json({ message: "Plan invalide" });
       }
+
+      const isLifetime = billing === "lifetime";
 
       const apiKey = process.env.NOWPAYMENTS_API_KEY;
       if (!apiKey) {
         return res.status(500).json({ message: "Payment service not configured" });
       }
 
-      const orderId = `order_${plan}_${Date.now()}`;
+      const orderId = isLifetime
+        ? `order_${plan}_lifetime_${Date.now()}`
+        : `order_${plan}_${Date.now()}`;
+
+      const priceAmount = isLifetime ? planInfo.lifetimePrice : planInfo.price;
 
       if (referralCode && typeof referralCode === "string") {
         const refCode = await storage.getReferralCodeByCode(referralCode.trim());
@@ -2055,10 +2061,12 @@ export async function registerRoutes(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          price_amount: planInfo.price,
+          price_amount: priceAmount,
           price_currency: "eur",
           order_id: orderId,
-          order_description: `Abonnement ${planInfo.label}`,
+          order_description: isLifetime
+            ? `Abonnement ${planInfo.label} Lifetime`
+            : `Abonnement ${planInfo.label}`,
           ipn_callback_url: ipnUrl,
           success_url: successUrl,
           cancel_url: cancelUrl,
@@ -2072,7 +2080,7 @@ export async function registerRoutes(
         return res.status(502).json({ message: "Failed to create invoice" });
       }
 
-      webhookInvoiceCreated(plan, orderId, planInfo.price);
+      webhookInvoiceCreated(plan, orderId, priceAmount);
 
       res.json({ invoice_url: data.invoice_url });
     } catch (err) {
@@ -2152,12 +2160,13 @@ export async function registerRoutes(
             webhookPaymentCompleted(orderStr, serviceType as any, String(source_amount || "50"), String(currency || "BTC"));
           }
         } else {
-          const tierMatch = orderStr.match(/^order_(vip|pro|business|api)_/);
+          const tierMatch = orderStr.match(/^order_(vip|pro|business|api)_(lifetime_)?/);
           const tier = tierMatch ? tierMatch[1] as PlanTier : null;
+          const isLifetimeOrder = orderStr.includes("_lifetime_");
 
           if (tier) {
-            const license = await storage.createLicenseKey(tier, orderStr);
-            console.log(`License key for order ${orderStr}: ${license.key}`);
+            const license = await storage.createLicenseKey(tier, orderStr, isLifetimeOrder);
+            console.log(`License key for order ${orderStr}: ${license.key} (lifetime: ${isLifetimeOrder})`);
             webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"));
 
             try {

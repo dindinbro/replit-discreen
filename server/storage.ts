@@ -47,7 +47,7 @@ export interface IStorage {
   getVouches(): Promise<Vouch[]>;
   getVouchByDiscordUser(discordUserId: string): Promise<Vouch | undefined>;
   deleteVouch(id: number): Promise<boolean>;
-  createLicenseKey(tier: PlanTier, orderId?: string): Promise<LicenseKey>;
+  createLicenseKey(tier: PlanTier, orderId?: string, isLifetime?: boolean): Promise<LicenseKey>;
   redeemLicenseKey(key: string, userId: string): Promise<{ success: boolean; tier?: PlanTier; message: string }>;
   getLicenseKeys(): Promise<LicenseKey[]>;
   getLicenseKeyByOrder(orderId: string): Promise<LicenseKey | undefined>;
@@ -400,8 +400,9 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async createLicenseKey(tier: PlanTier, orderId?: string): Promise<LicenseKey> {
-    const key = `DSC-${tier.toUpperCase()}-${crypto.randomBytes(12).toString("hex").toUpperCase()}`;
+  async createLicenseKey(tier: PlanTier, orderId?: string, isLifetime?: boolean): Promise<LicenseKey> {
+    const prefix = isLifetime ? "LFT" : "DSC";
+    const key = `${prefix}-${tier.toUpperCase()}-${crypto.randomBytes(12).toString("hex").toUpperCase()}`;
 
     const values: any = { key, tier };
     if (orderId) values.orderId = orderId;
@@ -444,6 +445,15 @@ export class DatabaseStorage implements IStorage {
     const tier = updated.tier as PlanTier;
     if (!PLAN_LIMITS[tier]) {
       return { success: false, message: "Tier invalide pour cette cle." };
+    }
+
+    const isLifetime = key.trim().startsWith("LFT-") ||
+      (updated.orderId && updated.orderId.includes("_lifetime_"));
+
+    if (isLifetime) {
+      const farFuture = new Date("2099-12-31T23:59:59Z");
+      await this.upsertSubscription(userId, tier, farFuture);
+      return { success: true, tier, message: `Abonnement ${PLAN_LIMITS[tier].label} Lifetime active a vie.` };
     }
 
     const expiresAt = new Date();
