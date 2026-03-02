@@ -18,6 +18,40 @@ import {
 let client: Client | null = null;
 const SOUTIEN_ROLE_ID = "1469926673582653648";
 
+async function safeReply(interaction: any, options: any): Promise<boolean> {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(typeof options === "string" ? { content: options } : options);
+    } else {
+      await interaction.reply(options);
+    }
+    return true;
+  } catch (err: any) {
+    if (err?.code === 10062 || err?.code === 40060) {
+      log(`Interaction expired (${err.code}), skipping reply`, "discord");
+      return false;
+    }
+    log(`Failed to reply to interaction: ${err}`, "discord");
+    return false;
+  }
+}
+
+async function safeDeferReply(interaction: any, options?: any): Promise<boolean> {
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply(options || {});
+    }
+    return true;
+  } catch (err: any) {
+    if (err?.code === 10062 || err?.code === 40060) {
+      log(`Interaction expired before defer (${err.code})`, "discord");
+      return false;
+    }
+    log(`Failed to defer interaction: ${err}`, "discord");
+    return false;
+  }
+}
+
 let onIpBlacklistedCallback: ((ip: string) => void) | null = null;
 export function setOnIpBlacklisted(cb: (ip: string) => void) {
   onIpBlacklistedCallback = cb;
@@ -467,7 +501,7 @@ export async function startDiscordBot() {
     return;
   }
 
-  client.once("ready", async () => {
+  client.once("clientReady", async () => {
     log(`Discord bot logged in as ${client?.user?.tag}`, "discord");
     const commands = [
       vouchCommand.toJSON(),
@@ -669,6 +703,8 @@ export async function startDiscordBot() {
 
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
+
+    try {
 
     if (interaction.commandName === "vouch") {
       const rating = interaction.options.getInteger("note", true);
@@ -2224,6 +2260,21 @@ export async function startDiscordBot() {
         } catch {}
       }
     }
+
+    } catch (outerErr: any) {
+      if (outerErr?.code === 10062 || outerErr?.code === 40060) {
+        log(`Interaction expired (${outerErr.code}) for /${interaction.commandName}, ignoring`, "discord");
+      } else {
+        log(`Unhandled error in interactionCreate for /${interaction.commandName}: ${outerErr}`, "discord");
+        try {
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: "Une erreur est survenue.", ephemeral: true });
+          } else if (interaction.deferred && !interaction.replied) {
+            await interaction.editReply({ content: "Une erreur est survenue." });
+          }
+        } catch {}
+      }
+    }
   });
 
   handleEmbedInteractions(client);
@@ -2401,15 +2452,23 @@ async function handleWantedPreviewButton(interaction: ButtonInteraction) {
 
 function handleEmbedInteractions(client: Client) {
   client.on("interactionCreate", async (interaction) => {
-    if (interaction.isButton()) {
-      await handleWantedPreviewButton(interaction);
-      await handleEmbedButton(interaction);
-    }
-    if (interaction.isModalSubmit()) {
-      await handleEmbedModal(interaction);
-    }
-    if (interaction.isChannelSelectMenu()) {
-      await handleEmbedChannelSelect(interaction);
+    try {
+      if (interaction.isButton()) {
+        await handleWantedPreviewButton(interaction);
+        await handleEmbedButton(interaction);
+      }
+      if (interaction.isModalSubmit()) {
+        await handleEmbedModal(interaction);
+      }
+      if (interaction.isChannelSelectMenu()) {
+        await handleEmbedChannelSelect(interaction);
+      }
+    } catch (err: any) {
+      if (err?.code === 10062 || err?.code === 40060) {
+        log(`Embed interaction expired (${err.code}), ignoring`, "discord");
+      } else {
+        log(`Error in embed interactionCreate: ${err}`, "discord");
+      }
     }
   });
 }
@@ -2631,31 +2690,39 @@ function handleTicketInteractions(client: Client) {
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
 
-    const customId = interaction.customId;
+    try {
+      const customId = interaction.customId;
 
-    if (customId.startsWith("freeze_alert_")) {
-      await handleFreezeAlertButton(interaction, customId);
-      return;
+      if (customId.startsWith("freeze_alert_")) {
+        await handleFreezeAlertButton(interaction, customId);
+        return;
+      }
+
+      if (customId.startsWith("blacklist_ip_")) {
+        await handleBlacklistIpButton(interaction, customId);
+        return;
+      }
+
+      if (customId.startsWith("ticket_claim_")) {
+        await handleTicketClaim(interaction);
+        return;
+      }
+
+      if (customId.startsWith("ticket_close_")) {
+        await handleTicketClose(interaction);
+        return;
+      }
+
+      if (!TICKET_TYPES[customId]) return;
+
+      await handleTicketCreate(interaction, customId);
+    } catch (err: any) {
+      if (err?.code === 10062 || err?.code === 40060) {
+        log(`Ticket interaction expired (${err.code}), ignoring`, "discord");
+      } else {
+        log(`Error in ticket interactionCreate: ${err}`, "discord");
+      }
     }
-
-    if (customId.startsWith("blacklist_ip_")) {
-      await handleBlacklistIpButton(interaction, customId);
-      return;
-    }
-
-    if (customId.startsWith("ticket_claim_")) {
-      await handleTicketClaim(interaction);
-      return;
-    }
-
-    if (customId.startsWith("ticket_close_")) {
-      await handleTicketClose(interaction);
-      return;
-    }
-
-    if (!TICKET_TYPES[customId]) return;
-
-    await handleTicketCreate(interaction, customId);
   });
 }
 

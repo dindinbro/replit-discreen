@@ -87,27 +87,35 @@ export async function startTaskBot() {
     log(`Task bot command registration error: ${err}`, "task-bot");
   }
 
-  taskClient.once("ready", () => {
+  taskClient.once("clientReady", () => {
     log(`Task bot ready as ${taskClient?.user?.tag}`, "task-bot");
   });
 
   taskClient.on("interactionCreate", async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.commandName === "massjoin") {
-      await handleMassJoin(interaction);
-    }
+    try {
+      if (interaction.commandName === "massjoin") {
+        await handleMassJoin(interaction);
+      }
 
-    if (interaction.commandName === "authstats") {
-      await handleAuthStats(interaction);
-    }
+      if (interaction.commandName === "authstats") {
+        await handleAuthStats(interaction);
+      }
 
-    if (interaction.commandName === "recup") {
-      await handleRecup(interaction);
-    }
+      if (interaction.commandName === "recup") {
+        await handleRecup(interaction);
+      }
 
-    if (interaction.commandName === "users") {
-      await handleUsers(interaction);
+      if (interaction.commandName === "users") {
+        await handleUsers(interaction);
+      }
+    } catch (err: any) {
+      if (err?.code === 10062 || err?.code === 40060) {
+        log(`Task bot interaction expired (${err.code}), ignoring`, "task-bot");
+      } else {
+        log(`Task bot interaction error: ${err}`, "task-bot");
+      }
     }
   });
 
