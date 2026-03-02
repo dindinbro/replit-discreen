@@ -310,9 +310,15 @@ export default function PricingPage() {
     }
   }
 
+  const isLifetime = pricingMode === "lifetime";
+
   return (
     <main className="relative">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background pointer-events-none" />
+      <div className={`absolute inset-0 pointer-events-none transition-all duration-700 ${
+        isLifetime
+          ? "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/8 via-background to-background"
+          : "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background"
+      }`} />
 
       <div className="relative container max-w-7xl mx-auto px-4 py-16 md:py-24">
         <motion.div
@@ -377,7 +383,7 @@ export default function PricingPage() {
               onClick={() => setPricingMode("lifetime")}
               className={`relative px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
                 pricingMode === "lifetime"
-                  ? "z-10 bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105"
+                  ? "z-10 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-lg shadow-amber-500/20 scale-105"
                   : "z-0 bg-card text-muted-foreground border-border/50 -ml-3"
               }`}
               data-testid="button-pricing-lifetime"
@@ -415,9 +421,13 @@ export default function PricingPage() {
                 }}
               >
                 <Card
-                  className={`relative flex flex-col p-5 h-full overflow-visible transition-shadow duration-300 ${
-                    plan.popular ? "border-primary/50 shadow-[0_0_24px_-6px] shadow-primary/15" : ""
-                  } ${isTilted ? "shadow-xl shadow-primary/25 border-primary/40" : ""}`}
+                  className={`relative flex flex-col p-5 h-full overflow-visible transition-all duration-300 ${
+                    plan.popular && isLifetime
+                      ? "border-amber-500/50 shadow-[0_0_24px_-6px] shadow-amber-500/15"
+                      : plan.popular
+                      ? "border-primary/50 shadow-[0_0_24px_-6px] shadow-primary/15"
+                      : ""
+                  } ${isTilted && isLifetime ? "shadow-xl shadow-amber-500/20 border-amber-500/40" : isTilted ? "shadow-xl shadow-primary/25 border-primary/40" : ""}`}
                   style={{
                     transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(${tilt.scale}, ${tilt.scale}, ${tilt.scale})`,
                     transition: "transform 0.15s ease-out",
@@ -428,15 +438,23 @@ export default function PricingPage() {
                 >
                   {plan.popular && (
                     <Badge
-                      className="absolute -top-2.5 right-4 bg-primary text-primary-foreground text-xs no-default-hover-elevate no-default-active-elevate"
+                      className={`absolute -top-2.5 right-4 text-xs no-default-hover-elevate no-default-active-elevate transition-colors duration-300 ${
+                        isLifetime
+                          ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0"
+                          : "bg-primary text-primary-foreground"
+                      }`}
                     >
-                      {t("pricing.popular")}
+                      {isLifetime ? "Lifetime" : t("pricing.popular")}
                     </Badge>
                   )}
 
                   <div className="space-y-3 mb-5">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Icon className="w-4.5 h-4.5 text-primary" />
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-300 ${
+                      isLifetime && plan.price > 0 ? "bg-amber-500/10" : "bg-primary/10"
+                    }`}>
+                      <Icon className={`w-4.5 h-4.5 transition-colors duration-300 ${
+                        isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"
+                      }`} />
                     </div>
 
                     <div>
@@ -445,7 +463,9 @@ export default function PricingPage() {
                     </div>
 
                     <div className="flex items-baseline gap-1.5 flex-wrap">
-                      <span className="text-2xl font-display font-bold text-primary">
+                      <span className={`text-2xl font-display font-bold transition-colors duration-300 ${
+                        isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"
+                      }`}>
                         {plan.price === 0
                           ? t("pricing.free")
                           : pricingMode === "monthly"
