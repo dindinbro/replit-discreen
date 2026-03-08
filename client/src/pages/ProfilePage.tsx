@@ -829,115 +829,173 @@ export default function ProfilePage() {
         )}
 
         {activeTab === "parrainage" && (
-          <section className="space-y-4">
-            <Card className="p-6 space-y-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Gift className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-display font-bold">Programme de Parrainage</h3>
-              </div>
-
-              <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
-                <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                  <Star className="w-4 h-4" />
-                  Comment ça marche ?
-                </h4>
-                <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                  <li>Copie ton <span className="font-medium text-foreground">code de parrainage</span> unique ci-dessous</li>
-                  <li>Partage-le avec tes amis ou ta communauté</li>
-                  <li>Quand quelqu'un s'abonne en utilisant ton code, tu gagnes <span className="text-primary font-semibold">1 Éclat</span></li>
-                  <li>Accumule des Éclats pour monter en grade et débloquer des titres exclusifs</li>
-                </ol>
-                <p className="text-xs text-muted-foreground italic">Les Éclats sont une monnaie de prestige Discreen — plus tu en as, plus ton grade est élevé.</p>
-              </div>
-
-
-              {loadingReferral ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                </div>
-              ) : !referralStats ? (
-                <div className="text-center py-8">
-                  <Gift className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">Impossible de charger les données de parrainage.</p>
-                  {referralError && (
-                    <p className="text-xs text-destructive mt-2 font-mono bg-destructive/10 px-3 py-1 rounded inline-block">{referralError}</p>
-                  )}
-                  <div className="mt-3">
-                    <Button variant="outline" size="sm" onClick={() => { setLoadingReferral(true); setReferralError(null); fetchReferralStats(); }}>
-                      Réessayer
-                    </Button>
+          <section className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Card
+                className="p-6 space-y-5 transition-all duration-200 hover:shadow-lg hover:shadow-amber-500/10 hover:border-amber-500/30"
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = (e.clientX - rect.left) / rect.width;
+                  const y = (e.clientY - rect.top) / rect.height;
+                  e.currentTarget.style.transform = `perspective(800px) rotateX(${(y - 0.5) * -8}deg) rotateY(${(x - 0.5) * 8}deg) scale3d(1.01,1.01,1.01)`;
+                }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Star className="w-4.5 h-4.5 text-amber-500" />
                   </div>
+                  <h3 className="text-lg font-display font-bold">Éclats & Grades</h3>
                 </div>
-              ) : (() => {
-                const { current, nextRank, rankIndex } = getReferralRank(referralStats.totalCredits);
-                const progress = nextRank
-                  ? ((referralStats.totalCredits - current.threshold) / (nextRank.threshold - current.threshold)) * 100
-                  : 100;
-                return (
-                  <>
-                    <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-lg border border-border/50">
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground mb-1">Ton code de parrainage</p>
-                        <p className="text-2xl font-mono font-bold tracking-widest" style={{ color: current.color }} data-testid="text-referral-code">
-                          {referralStats.code}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        data-testid="button-copy-referral"
-                        onClick={() => {
-                          navigator.clipboard.writeText(referralStats.code);
-                          setCopiedReferral(true);
-                          setTimeout(() => setCopiedReferral(false), 2000);
-                          toast({ title: "Code copié !" });
-                        }}
-                      >
-                        {copiedReferral ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+
+                {loadingReferral ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                  </div>
+                ) : !referralStats ? (
+                  <div className="text-center py-8">
+                    <Star className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">Impossible de charger les données.</p>
+                    {referralError && (
+                      <p className="text-xs text-destructive mt-2 font-mono bg-destructive/10 px-3 py-1 rounded inline-block">{referralError}</p>
+                    )}
+                    <div className="mt-3">
+                      <Button variant="outline" size="sm" onClick={() => { setLoadingReferral(true); setReferralError(null); fetchReferralStats(); }}>
+                        Réessayer
                       </Button>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
-                        <p className="text-2xl font-bold text-primary">{referralStats.totalCredits}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Éclats</p>
-                      </div>
-                      <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
-                        <p className="text-2xl font-bold text-primary">{referralStats.referralCount}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Parrainages</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Trophy className="w-4 h-4" style={{ color: current.color }} />
-                          <span className="font-semibold text-sm" style={{ color: current.color }}>{current.name}</span>
+                  </div>
+                ) : (() => {
+                  const { current, nextRank } = getReferralRank(referralStats.totalCredits);
+                  const progress = nextRank
+                    ? ((referralStats.totalCredits - current.threshold) / (nextRank.threshold - current.threshold)) * 100
+                    : 100;
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-center">
+                          <p className="text-2xl font-bold text-amber-500">{referralStats.totalCredits}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Éclats</p>
                         </div>
-                        {nextRank && (
-                          <span className="text-xs text-muted-foreground">
-                            {referralStats.totalCredits}/{nextRank.threshold} Éclats vers {nextRank.name}
-                          </span>
-                        )}
+                        <div className="p-3 rounded-lg bg-secondary/20 border border-border/50 text-center">
+                          <p className="text-2xl font-bold text-foreground">{referralStats.referralCount}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Parrainages</p>
+                        </div>
                       </div>
-                      <div className="w-full h-3 rounded-full bg-secondary/50 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.min(progress, 100)}%`,
-                            background: `linear-gradient(90deg, ${current.color}, ${nextRank?.color || current.color})`,
-                          }}
-                        />
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="w-4 h-4" style={{ color: current.color }} />
+                            <span className="font-semibold text-sm" style={{ color: current.color }}>{current.name}</span>
+                          </div>
+                          {nextRank && (
+                            <span className="text-xs text-muted-foreground">
+                              {referralStats.totalCredits}/{nextRank.threshold} → {nextRank.name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="w-full h-2.5 rounded-full bg-secondary/50 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${Math.min(progress, 100)}%`,
+                              background: `linear-gradient(90deg, ${current.color}, ${nextRank?.color || current.color})`,
+                            }}
+                          />
+                        </div>
                       </div>
+
+                      <p className="text-xs text-muted-foreground italic">
+                        Accumule des Éclats pour monter en grade et débloquer des titres exclusifs.
+                      </p>
+                    </>
+                  );
+                })()}
+              </Card>
+
+              <Card
+                className="p-6 space-y-5 transition-all duration-200 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/30"
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = (e.clientX - rect.left) / rect.width;
+                  const y = (e.clientY - rect.top) / rect.height;
+                  e.currentTarget.style.transform = `perspective(800px) rotateX(${(y - 0.5) * -8}deg) rotateY(${(x - 0.5) * 8}deg) scale3d(1.01,1.01,1.01)`;
+                }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Gift className="w-4.5 h-4.5 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-display font-bold">Commission</h3>
+                </div>
+
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
+                  <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Percent className="w-4 h-4" />
+                    Comment ça marche ?
+                  </h4>
+                  <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
+                    <li>Copie ton code de parrainage unique</li>
+                    <li>Partage-le avec tes amis</li>
+                    <li>Tu gagnes <span className="text-primary font-semibold">30%</span> de commission sur chaque vente</li>
+                  </ol>
+                </div>
+
+                {referralStats && (
+                  <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border/50">
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground mb-1">Ton code de parrainage</p>
+                      <p className="text-xl font-mono font-bold tracking-widest text-primary" data-testid="text-referral-code">
+                        {referralStats.code}
+                      </p>
                     </div>
-                  </>
-                );
-              })()}
-            </Card>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      data-testid="button-copy-referral"
+                      onClick={() => {
+                        navigator.clipboard.writeText(referralStats.code);
+                        setCopiedReferral(true);
+                        setTimeout(() => setCopiedReferral(false), 2000);
+                        toast({ title: "Code copié !" });
+                      }}
+                    >
+                      {copiedReferral ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-500/10 to-primary/5 border border-primary/30 text-center">
+                    <Percent className="w-4 h-4 text-primary mx-auto mb-1" />
+                    <p className="text-xl font-bold text-primary">30%</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Par vente</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-secondary/20 border border-border/50 text-center">
+                    <Users className="w-4 h-4 text-primary mx-auto mb-1" />
+                    <p className="text-xl font-bold text-foreground">{referralStats?.referralCount ?? 0}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Vente{(referralStats?.referralCount ?? 0) !== 1 ? "s" : ""}</p>
+                  </div>
+                </div>
+
+                <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer" className="block">
+                  <Button variant="outline" className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10" size="sm" data-testid="button-withdraw-commission-side">
+                    <Wallet className="w-4 h-4" />
+                    Retirer ma commission
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Button>
+                </a>
+                <p className="text-[10px] text-muted-foreground text-center leading-tight">
+                  Ouvre un ticket Discord pour retirer ta commission
+                </p>
+              </Card>
+            </div>
 
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <Star className="w-5 h-5 text-primary" />
+                <Star className="w-5 h-5 text-amber-500" />
                 <h3 className="text-lg font-display font-bold">Échelle des Grades</h3>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
@@ -999,38 +1057,6 @@ export default function ProfilePage() {
                 })}
               </div>
             </div>
-
-            <Card className="p-6 space-y-5">
-              <div className="flex items-center gap-3">
-                <Wallet className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-display font-bold">Commission</h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-primary/5 border border-primary/30 text-center">
-                  <Percent className="w-5 h-5 text-primary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-primary">20%</p>
-                  <p className="text-xs text-muted-foreground mt-1">Commission par vente</p>
-                </div>
-                <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
-                  <Users className="w-5 h-5 text-primary mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">{referralStats?.referralCount ?? 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Vente{(referralStats?.referralCount ?? 0) !== 1 ? "s" : ""} via ton code</p>
-                </div>
-                <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 flex flex-col items-center justify-center gap-3">
-                  <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer" className="block w-full">
-                    <Button variant="outline" className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10" size="sm" data-testid="button-withdraw-commission-side">
-                      <Wallet className="w-4 h-4" />
-                      Retirer
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Button>
-                  </a>
-                  <p className="text-[10px] text-muted-foreground text-center leading-tight">
-                    Ouvre un ticket Discord pour retirer ta commission
-                  </p>
-                </div>
-              </div>
-            </Card>
           </section>
         )}
 

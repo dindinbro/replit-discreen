@@ -43,7 +43,7 @@ const PLANS = [
     icon: Zap,
     popular: false,
     features: [
-      "5 recherches par jour",
+      "3 recherches par jour",
       "Bases de donnees limitees",
       "Recherche basique",
       "Resultats limites",
