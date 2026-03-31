@@ -87,15 +87,7 @@ export default function LandingPage() {
   return (
     <main className="relative overflow-hidden">
       {theme === "dark" && <InteractiveGrid />}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background pointer-events-none" />
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]"
-        style={{
-          backgroundImage:
-            "linear-gradient(hsl(var(--foreground) / 0.15) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / 0.15) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-        }}
-      />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
 
       <section className="relative container max-w-5xl mx-auto px-4 pt-20 pb-12 text-center space-y-8">
         <motion.div
@@ -341,14 +333,14 @@ export default function LandingPage() {
           ].map((item, i) => (
             <div
               key={i}
-              className="glass-panel rounded-xl p-5 space-y-3 hover-elevate"
+              className="rounded-xl p-5 space-y-3 border border-border/30 dark:border-white/5 bg-transparent hover:border-primary/20 dark:hover:border-primary/15 transition-colors duration-300"
               data-testid={`feature-card-${i}`}
             >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <item.icon className="w-5 h-5 text-primary" />
+              <div className="w-9 h-9 rounded-lg bg-primary/8 dark:bg-primary/10 flex items-center justify-center">
+                <item.icon className="w-4.5 h-4.5 text-primary" />
               </div>
-              <h3 className="font-display font-semibold text-foreground">{t(item.titleKey)}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{t(item.descKey)}</p>
+              <h3 className="font-display font-semibold text-foreground text-sm">{t(item.titleKey)}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{t(item.descKey)}</p>
             </div>
           ))}
         </motion.div>
