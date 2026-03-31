@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
-import { Search, CreditCard, Sparkles, Database, Shield, Zap, Lock, Mail, User, Phone, Globe, Hash } from "lucide-react";
+import { Search, CreditCard, Database, Shield, Zap, Lock, Mail, User, Phone, Globe, Hash, ArrowRight } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
@@ -31,29 +30,23 @@ function AnimatedCounter({ target, duration = 2000, suffix = "" }: { target: num
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-
     const startTime = performance.now();
-
     const animate = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
       setCount(Math.floor(eased * target));
-
       if (progress < 1) {
         frameRef.current = requestAnimationFrame(animate);
       } else {
         setCount(target);
       }
     };
-
     frameRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameRef.current);
   }, [target, duration]);
 
-  const formatted = count.toLocaleString("fr-FR");
-
-  return <>{formatted}{suffix}</>;
+  return <>{count.toLocaleString("fr-FR")}{suffix}</>;
 }
 
 export default function LandingPage() {
@@ -74,273 +67,188 @@ export default function LandingPage() {
     discordId: t("landing.placeholders.discord"),
   };
 
-  const handleSearch = () => {
-    setAuthDialogOpen(true);
-  };
-
+  const handleSearch = () => setAuthDialogOpen(true);
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && searchValue.trim()) {
-      handleSearch();
-    }
+    if (e.key === "Enter" && searchValue.trim()) handleSearch();
   };
 
   return (
-    <main className="relative overflow-hidden">
+    <main className="relative">
       {theme === "dark" && <InteractiveGrid />}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent pointer-events-none" />
 
-      <section className="relative container max-w-5xl mx-auto px-4 pt-20 pb-12 text-center space-y-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Badge
-            variant="outline"
-            className="px-4 py-1.5 text-sm font-medium border-primary/30 text-primary gap-2"
-            data-testid="badge-platform"
+      {/* ── Hero ── */}
+      <section className="relative flex flex-col items-center justify-center min-h-[calc(100vh-64px)] px-4 text-center">
+        <div className="w-full max-w-3xl mx-auto space-y-10">
+
+          {/* Signature phrase */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            className="signature-phrase text-[10px] md:text-xs tracking-[0.28em] select-none"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            {t("landing.badge")}
-            <Search className="w-3.5 h-3.5" />
-          </Badge>
-        </motion.div>
+            Power. Precision. Intelligence.
+          </motion.p>
 
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.05 }}
-          className="signature-phrase text-xs md:text-sm tracking-[0.22em]"
-        >
-          Power. Precision. Intelligence.
-        </motion.p>
+          {/* Title */}
+          <motion.h1
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.08 }}
+            className="text-6xl md:text-7xl lg:text-8xl font-display font-bold tracking-tight leading-[1.02]"
+          >
+            {t("landing.title1")}{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#b8902e] via-[#f0c060] to-[#d4a843]">
+              {t("landing.title2")}
+            </span>
+          </motion.h1>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-5xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[1.05]"
-        >
-          {t("landing.title1")}{" "}
-          <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#b8902e] via-[#f0c060] to-[#d4a843]">
-            {t("landing.title2")}
-          </span>
-        </motion.h1>
+          {/* Subtitle — one concise line */}
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.18 }}
+            className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto"
+          >
+            {t("landing.subtitle")}
+          </motion.p>
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
-        >
-          {t("landing.subtitle")}
-        </motion.p>
-
-        {isLoggedIn ? (
-          <>
+          {/* CTA area */}
+          {isLoggedIn ? (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex items-center justify-center"
-            >
-              <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-secondary/60 dark:bg-secondary/40 px-5 py-2.5 rounded-full border border-border/50">
-                <span>{t("landing.joinPrefix")}</span>
-                <span className="font-bold text-primary" data-testid="text-counter-users">
-                  <AnimatedCounter target={1247} duration={2200} />
-                </span>
-                <span>{t("landing.usersSuffix")}</span>
-                <span className="font-bold text-primary" data-testid="text-counter-data">
-                  <AnimatedCounter target={18} duration={1800} suffix=".7+ To" />
-                </span>
-                <span>{t("landing.dataSuffix")}</span>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="flex items-center justify-center gap-4 flex-wrap"
+              transition={{ duration: 0.5, delay: 0.28 }}
+              className="flex items-center justify-center gap-3 flex-wrap"
             >
               <Link href="/search">
-                <Button size="lg" className="gap-2 shadow-lg shadow-primary/25 px-8" data-testid="button-start-searching">
-                  <Search className="w-5 h-5" />
+                <Button size="lg" className="gap-2 px-8 shadow-lg shadow-primary/20" data-testid="button-start-searching">
+                  <Search className="w-4 h-4" />
                   {t("landing.startSearch")}
                 </Button>
               </Link>
               <Link href="/pricing">
                 <Button size="lg" variant="outline" className="gap-2 px-8" data-testid="button-view-pricing">
-                  <CreditCard className="w-5 h-5" />
+                  <CreditCard className="w-4 h-4" />
                   {t("landing.viewPricing")}
                 </Button>
               </Link>
             </motion.div>
-
+          ) : (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-              className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
-            >
-              <div className="w-2 h-2 rounded-full bg-[#d4a843] animate-pulse" />
-              <span>{t("landing.needHelp")}</span>
-              <a
-                href="https://discord.gg/discreen"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-medium text-primary"
-                data-testid="link-discord-support"
-              >
-                {t("landing.joinDiscord")}
-                <SiDiscord className="w-4 h-4" />
-              </a>
-            </motion.div>
-          </>
-        ) : (
-          <>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="max-w-xl mx-auto space-y-4"
+              transition={{ duration: 0.5, delay: 0.28 }}
+              className="space-y-4 max-w-lg mx-auto w-full"
             >
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              {/* Search bar */}
+              <div className="relative flex items-center">
+                <Search className="absolute left-4 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
                 <Input
                   placeholder={FILTER_PLACEHOLDERS[activeFilter] || t("landing.searchPlaceholder")}
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="h-12 pl-12 pr-24 text-base rounded-full border-border/60 bg-card/80 backdrop-blur-sm"
+                  className="h-13 pl-11 pr-14 text-base rounded-2xl border-border/40 dark:border-white/8 bg-card/60 dark:bg-white/4 backdrop-blur-sm focus-visible:border-primary/50"
                   data-testid="input-landing-search"
                 />
-                <Button
-                  size="sm"
+                <button
                   onClick={handleSearch}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full gap-1.5 px-4"
+                  className="absolute right-2 w-9 h-9 rounded-xl bg-primary hover:bg-primary/90 transition-colors flex items-center justify-center text-primary-foreground"
                   data-testid="button-landing-search"
                 >
-                  <Search className="w-4 h-4" />
-                </Button>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="flex items-center justify-center gap-2 flex-wrap">
+              {/* Filter tabs — minimal, no border, text only */}
+              <div className="flex items-center justify-center gap-1 flex-wrap">
                 {QUICK_FILTER_KEYS.map((filter) => {
                   const isActive = activeFilter === filter.key;
                   return (
-                    <Button
+                    <button
                       key={filter.key}
-                      variant={isActive ? "default" : "outline"}
-                      size="sm"
                       onClick={() => setActiveFilter(filter.key)}
-                      className="rounded-full gap-1.5"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200 ${
+                        isActive
+                          ? "bg-primary/12 dark:bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
                       data-testid={`button-filter-${filter.key}`}
                     >
-                      <filter.icon className="w-3.5 h-3.5" />
+                      <filter.icon className="w-3 h-3" />
                       {t(filter.labelKey)}
-                    </Button>
+                    </button>
                   );
                 })}
               </div>
             </motion.div>
+          )}
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="flex items-center justify-center"
-            >
-              <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-secondary/60 dark:bg-secondary/40 px-5 py-2.5 rounded-full border border-border/50">
-                <span>{t("landing.joinPrefix")}</span>
-                <span className="font-bold text-primary" data-testid="text-counter-users">
-                  <AnimatedCounter target={1247} duration={2200} />
-                </span>
-                <span>{t("landing.usersSuffix")}</span>
-                <span className="font-bold text-primary" data-testid="text-counter-data">
-                  <AnimatedCounter target={18} duration={1800} suffix=".7+ To" />
-                </span>
-                <span>{t("landing.dataSuffix")}</span>
-              </div>
-            </motion.div>
+          {/* Stats — minimal pill */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.42 }}
+            className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/70"
+          >
+            <span>{t("landing.joinPrefix")}</span>
+            <span className="text-primary font-semibold" data-testid="text-counter-users">
+              <AnimatedCounter target={1247} duration={2200} />
+            </span>
+            <span>{t("landing.usersSuffix")}</span>
+            <span className="mx-0.5 opacity-30">·</span>
+            <span className="text-primary font-semibold" data-testid="text-counter-data">
+              <AnimatedCounter target={18} duration={1800} suffix=".7+ To" />
+            </span>
+            <span>{t("landing.dataSuffix")}</span>
+          </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-              className="flex items-center justify-center gap-4 flex-wrap"
+          {/* Discord help — minimal */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.52 }}
+            className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/60"
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse" />
+            <span>{t("landing.needHelp")}</span>
+            <a
+              href="https://discord.gg/discreen"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary/80 hover:text-primary transition-colors font-medium"
+              data-testid="link-discord-support"
             >
-              <p className="text-sm text-muted-foreground">
-                {t("landing.disclaimer")}{" "}
-                <Link href="/documentation" className="text-primary hover:underline">{t("landing.terms")}</Link>
-                {" "}{t("landing.and")}{" "}
-                <Link href="/documentation" className="text-primary hover:underline">{t("landing.privacy")}</Link>.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.55 }}
-              className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
-            >
-              <div className="w-2 h-2 rounded-full bg-[#d4a843] animate-pulse" />
-              <span>{t("landing.needHelp")}</span>
-              <a
-                href="https://discord.gg/discreen"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-medium text-primary"
-                data-testid="link-discord-support"
-              >
-                {t("landing.joinDiscord")}
-                <SiDiscord className="w-4 h-4" />
-              </a>
-            </motion.div>
-          </>
-        )}
+              {t("landing.joinDiscord")}
+              <SiDiscord className="w-3 h-3" />
+            </a>
+          </motion.div>
+        </div>
       </section>
 
-      <section className="relative container max-w-5xl mx-auto px-4 pb-24">
+      {/* ── Feature strip ── */}
+      <section className="relative container max-w-4xl mx-auto px-4 pb-20">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border/20 dark:bg-white/4 rounded-2xl overflow-hidden border border-border/20 dark:border-white/4"
         >
           {[
-            {
-              icon: Database,
-              titleKey: "landing.features.databases",
-              descKey: "landing.features.databasesDesc",
-            },
-            {
-              icon: Search,
-              titleKey: "landing.features.advancedSearch",
-              descKey: "landing.features.advancedSearchDesc",
-            },
-            {
-              icon: Shield,
-              titleKey: "landing.features.secure",
-              descKey: "landing.features.secureDesc",
-            },
-            {
-              icon: Zap,
-              titleKey: "landing.features.fast",
-              descKey: "landing.features.fastDesc",
-            },
+            { icon: Database, titleKey: "landing.features.databases", descKey: "landing.features.databasesDesc" },
+            { icon: Search, titleKey: "landing.features.advancedSearch", descKey: "landing.features.advancedSearchDesc" },
+            { icon: Shield, titleKey: "landing.features.secure", descKey: "landing.features.secureDesc" },
+            { icon: Zap, titleKey: "landing.features.fast", descKey: "landing.features.fastDesc" },
           ].map((item, i) => (
             <div
               key={i}
-              className="rounded-xl p-5 space-y-3 border border-border/30 dark:border-white/5 bg-transparent hover:border-primary/20 dark:hover:border-primary/15 transition-colors duration-300"
+              className="bg-background dark:bg-[hsl(0,0%,5%)] p-6 space-y-2.5 group hover:bg-primary/3 dark:hover:bg-primary/4 transition-colors duration-300"
               data-testid={`feature-card-${i}`}
             >
-              <div className="w-9 h-9 rounded-lg bg-primary/8 dark:bg-primary/10 flex items-center justify-center">
-                <item.icon className="w-4.5 h-4.5 text-primary" />
-              </div>
-              <h3 className="font-display font-semibold text-foreground text-sm">{t(item.titleKey)}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">{t(item.descKey)}</p>
+              <item.icon className="w-4 h-4 text-primary/70 group-hover:text-primary transition-colors" />
+              <h3 className="font-semibold text-sm text-foreground">{t(item.titleKey)}</h3>
+              <p className="text-xs text-muted-foreground/70 leading-relaxed">{t(item.descKey)}</p>
             </div>
           ))}
         </motion.div>
@@ -354,17 +262,12 @@ export default function LandingPage() {
             </div>
             <div className="space-y-2">
               <h2 className="text-xl font-display font-bold">{t("landing.authRequired")}</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {t("landing.authDesc")}
-              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{t("landing.authDesc")}</p>
             </div>
             <Button
               size="lg"
               className="w-full gap-2 mt-2"
-              onClick={() => {
-                setAuthDialogOpen(false);
-                navigate("/login");
-              }}
+              onClick={() => { setAuthDialogOpen(false); navigate("/login"); }}
               data-testid="button-auth-redirect"
             >
               {t("landing.signUp")}
