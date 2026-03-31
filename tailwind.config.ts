@@ -6,12 +6,11 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: ".5625rem",
+        md: ".375rem",
+        sm: ".1875rem",
       },
       colors: {
-        // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
@@ -52,6 +51,12 @@ export default {
           border: "var(--destructive-border)",
         },
         ring: "hsl(var(--ring) / <alpha-value>)",
+        gold: {
+          DEFAULT: "#d4a843",
+          light: "#f0c060",
+          dark: "#b8902e",
+          glow: "rgba(212,168,67,0.35)",
+        },
         chart: {
           "1": "hsl(var(--chart-1) / <alpha-value>)",
           "2": "hsl(var(--chart-2) / <alpha-value>)",
@@ -96,10 +101,35 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "scan-line": {
+          "0%": { transform: "translateY(-100%)", opacity: "0.8" },
+          "100%": { transform: "translateY(100vh)", opacity: "0" },
+        },
+        "shimmer-gold": {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        "pulse-gold": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(212,168,67,0.4)" },
+          "50%": { boxShadow: "0 0 16px 4px rgba(212,168,67,0.15)" },
+        },
+        "fade-in-up": {
+          from: { opacity: "0", transform: "translateY(16px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "glow-gold": {
+          "0%, 100%": { textShadow: "0 0 8px rgba(212,168,67,0.4)" },
+          "50%": { textShadow: "0 0 20px rgba(212,168,67,0.8)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "scan-line": "scan-line 1.2s ease-in forwards",
+        "shimmer-gold": "shimmer-gold 2.5s linear infinite",
+        "pulse-gold": "pulse-gold 2s ease-in-out infinite",
+        "fade-in-up": "fade-in-up 0.3s ease-out",
+        "glow-gold": "glow-gold 3s ease-in-out infinite",
       },
     },
   },

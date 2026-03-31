@@ -498,6 +498,43 @@ export function webhookSubscriptionExpired(count: number) {
   });
 }
 
+export function webhookSubscriptionExpiredDetailed(sub: {
+  id: number;
+  userId: string;
+  tier: string;
+  discordId?: string | null;
+  createdAt: Date;
+  expiresAt?: Date | null;
+}, email: string) {
+  const startedStr = sub.createdAt
+    ? `<t:${Math.floor(new Date(sub.createdAt).getTime() / 1000)}:D>`
+    : "Inconnue";
+  const expiredStr = sub.expiresAt
+    ? `<t:${Math.floor(new Date(sub.expiresAt).getTime() / 1000)}:D>`
+    : "Aujourd'hui";
+
+  const lines = [
+    `>>> **Abonnement Expire**`,
+    sep(),
+    `**ID Unique** : \`#${sub.id}\``,
+    `**Email** : \`${email}\``,
+    sub.discordId
+      ? `**Discord** : <@${sub.discordId}> (\`${sub.discordId}\`)`
+      : `**Discord** : Non lie`,
+    sep(),
+    `**Plan expire** : \`${sub.tier.toUpperCase()}\``,
+    `**Date de debut** : ${startedStr}`,
+    `**Date de fin** : ${expiredStr}`,
+    `**Statut** : Remis en **FREE**`,
+  ];
+
+  sendWebhook({
+    title: "\u{23F0} Abonnement Expire",
+    description: lines.join("\n"),
+    color: COLORS.info,
+  });
+}
+
 const ALERT_ROLE_ID = "1469798855099945172";
 
 function getBotLogsWebhookUrl(): string | undefined {
@@ -513,21 +550,22 @@ async function sendBotLogsWebhook(options: WebhookOptions): Promise<void> {
   await sendToWebhook(url, options, "bot-logs");
 }
 
-export function webhookBotGkey(adminTag: string, adminDiscordId: string, tier: string, key: string) {
+export function webhookBotGkey(adminTag: string, adminDiscordId: string, tier: string, key: string, duree?: string) {
   const desc = [
     `>>> **Commande Bot**`,
     `**Admin** : <@${adminDiscordId}> (\`${adminTag}\`)`,
     `**Discord ID** : \`${adminDiscordId}\``,
     sep(),
     `**Tier** : \`${tier.toUpperCase()}\``,
-    `**Duree** : 30 jours`,
+    `**Duree** : ${duree || "1 mois (30 jours)"}`,
     `**Cle** : ||\`${key}\`||`,
   ].join("\n");
 
+  const isLifetime = key.startsWith("LFT-");
   sendBotLogsWebhook({
-    title: "\u{1F511} /gkey - Cle Generee",
+    title: isLifetime ? "\u2728 /gkey - Cle Lifetime Generee" : "\u{1F511} /gkey - Cle Generee",
     description: desc,
-    color: COLORS.admin,
+    color: isLifetime ? 0xd4a843 : COLORS.admin,
   });
 }
 

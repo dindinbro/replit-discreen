@@ -7,20 +7,20 @@
 :root {
   --background: 0 0% 100%;
   --foreground: 222 47% 11%;
-  
-  /* Emerald Green Brand Colors */
-  --primary: 158 64% 52%;
-  --primary-foreground: 144 70% 98%;
-  
+
+  /* Gold Brand Colors */
+  --primary: 43 74% 55%;
+  --primary-foreground: 40 100% 98%;
+
   --secondary: 210 40% 96.1%;
   --secondary-foreground: 222 47% 11.2%;
-  
+
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
-  
-  --accent: 158 64% 96%;
-  --accent-foreground: 158 64% 35%;
-  
+
+  --accent: 43 60% 92%;
+  --accent-foreground: 43 74% 35%;
+
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
 
@@ -34,51 +34,56 @@
 
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
-  --ring: 158 64% 52%;
-  
+  --ring: 43 74% 55%;
+
   --radius: 0.75rem;
 
-  --field-person: 158 64% 45%;
+  --field-person: 43 74% 45%;
   --field-email: 217 91% 55%;
   --field-location: 347 77% 55%;
   --field-phone: 38 92% 55%;
   --field-id: 263 70% 55%;
   --field-date: 187 72% 48%;
   --field-finance: 25 95% 55%;
+
+  --gold: #d4a843;
+  --gold-light: #f0c060;
+  --gold-dark: #b8902e;
 }
 
 .dark {
-  --background: 220 14% 10%;
+  --background: 0 0% 4%;
   --foreground: 220 13% 91%;
-  
-  --primary: 158 64% 52%;
-  --primary-foreground: 144 70% 98%;
-  
-  --secondary: 220 13% 15%;
+
+  /* Gold in dark mode */
+  --primary: 43 74% 55%;
+  --primary-foreground: 40 100% 5%;
+
+  --secondary: 220 10% 10%;
   --secondary-foreground: 220 13% 91%;
-  
-  --muted: 220 13% 15%;
-  --muted-foreground: 220 9% 55%;
-  
-  --accent: 158 40% 14%;
-  --accent-foreground: 158 64% 80%;
-  
+
+  --muted: 220 10% 10%;
+  --muted-foreground: 220 9% 50%;
+
+  --accent: 43 30% 10%;
+  --accent-foreground: 43 74% 75%;
+
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
-  
-  --card: 220 14% 13%;
+
+  --card: 0 0% 7%;
   --card-foreground: 220 13% 91%;
-  --card-border: 220 12% 19%;
+  --card-border: 43 20% 16%;
 
-  --popover: 220 14% 13%;
+  --popover: 0 0% 7%;
   --popover-foreground: 220 13% 91%;
-  --popover-border: 220 12% 19%;
+  --popover-border: 43 20% 16%;
 
-  --border: 220 12% 19%;
-  --input: 220 12% 19%;
-  --ring: 158 64% 52%;
+  --border: 43 15% 14%;
+  --input: 220 10% 12%;
+  --ring: 43 74% 55%;
 
-  --field-person: 158 64% 55%;
+  --field-person: 43 74% 60%;
   --field-email: 217 91% 65%;
   --field-location: 347 77% 65%;
   --field-phone: 38 92% 65%;
@@ -94,6 +99,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', sans-serif;
+    scroll-behavior: smooth;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', sans-serif;
@@ -102,22 +108,113 @@
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full;
+  background: rgba(212,168,67,0.25);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/40;
+  background: rgba(212,168,67,0.5);
 }
 
-/* Utilities */
+/* ─── Premium Gold Card ───────────────────────────────── */
+.card-premium {
+  background: hsl(0 0% 7%);
+  border: 1px solid rgba(212,168,67,0.28);
+  box-shadow:
+    0 0 0 1px rgba(212,168,67,0.06),
+    0 4px 24px rgba(0,0,0,0.6),
+    0 1px 0 rgba(212,168,67,0.1) inset;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.card-premium:hover {
+  border-color: rgba(212,168,67,0.55);
+  box-shadow:
+    0 0 0 1px rgba(212,168,67,0.12),
+    0 8px 32px rgba(0,0,0,0.7),
+    0 0 20px rgba(212,168,67,0.08);
+}
+
+/* ─── Gold Glow Buttons ───────────────────────────────── */
+.btn-gold-glow {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.btn-gold-glow:hover {
+  box-shadow: 0 0 18px rgba(212,168,67,0.45);
+  transform: translateY(-1px);
+}
+
+/* ─── Relevance Score Badge ───────────────────────────── */
+.score-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(212,168,67,0.4);
+  background: rgba(212,168,67,0.08);
+  color: #d4a843;
+}
+
+/* ─── Scan Line Animation ─────────────────────────────── */
+.scan-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(212,168,67,0.9) 30%, rgba(255,220,100,1) 50%, rgba(212,168,67,0.9) 70%, transparent);
+  box-shadow: 0 0 20px 6px rgba(212,168,67,0.5);
+  animation: scan-line 1.2s ease-in forwards;
+}
+@keyframes scan-line {
+  0%   { top: -2px; opacity: 1; }
+  90%  { opacity: 0.6; }
+  100% { top: 100vh; opacity: 0; }
+}
+
+/* ─── Gold Shimmer on Scroll ──────────────────────────── */
+.shimmer-on-scroll {
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(212,168,67,0.06) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-gold 3s linear infinite;
+}
+@keyframes shimmer-gold {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ─── Mouse-follow line ───────────────────────────────── */
+.mouse-line {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1;
+  width: 120px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212,168,67,0.35), transparent);
+  transform-origin: left center;
+  transition: opacity 0.3s;
+}
+
+/* ─── Glass Panel ─────────────────────────────────────── */
 .glass-panel {
-  @apply bg-white/80 dark:bg-[hsl(220,14%,13%)]/90 backdrop-blur-md border border-white/20 dark:border-white/5 shadow-xl;
+  @apply bg-white/80 dark:bg-[hsl(0,0%,7%)]/90 backdrop-blur-md border border-white/20 dark:border-[rgba(212,168,67,0.12)] shadow-xl;
 }
 
 .glass-panel-wanted {
@@ -193,22 +290,23 @@
 }
 
 .animate-in {
-  animation: fadeIn 0.4s ease-out;
+  animation: fadeIn 0.3s ease-out;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ─── Interactive Grid ────────────────────────────────── */
 .interactive-grid-lines {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(212,168,67,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,168,67,0.04) 1px, transparent 1px);
   background-size: 50px 50px;
 }
 
@@ -219,19 +317,33 @@
   z-index: 1;
   transition: opacity 0.35s ease;
   background-image:
-    linear-gradient(rgba(52, 211, 153, 0.15) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(52, 211, 153, 0.15) 1px, transparent 1px);
+    linear-gradient(rgba(212,168,67,0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212,168,67,0.18) 1px, transparent 1px);
   background-size: 50px 50px;
   -webkit-mask-image: radial-gradient(
     350px circle at var(--mx) var(--my),
-    rgba(0, 0, 0, 0.8) 0%,
-    rgba(0, 0, 0, 0.3) 40%,
+    rgba(0,0,0,0.8) 0%,
+    rgba(0,0,0,0.3) 40%,
     transparent 70%
   );
   mask-image: radial-gradient(
     350px circle at var(--mx) var(--my),
-    rgba(0, 0, 0, 0.8) 0%,
-    rgba(0, 0, 0, 0.3) 40%,
+    rgba(0,0,0,0.8) 0%,
+    rgba(0,0,0,0.3) 40%,
     transparent 70%
   );
+}
+
+/* ─── Signature phrase ────────────────────────────────── */
+.signature-phrase {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #b8902e, #f0c060, #d4a843, #f0c060, #b8902e);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer-gold 4s linear infinite;
 }

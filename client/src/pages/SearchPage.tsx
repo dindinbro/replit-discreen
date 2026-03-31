@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
 import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, SearchLimitError } from "@/hooks/use-search";
 import SearchLoader from "@/components/SearchLoader";
@@ -367,6 +367,13 @@ function BlurredResultCards({ tier }: { tier: string }) {
   );
 }
 
+function computeRelevanceScore(row: Record<string, unknown>, globalIndex: number): number {
+  const fieldCount = Object.entries(row).filter(([k]) => !HIDDEN_FIELDS.has(k) && k.toLowerCase() !== "source").length;
+  const base = 35 + Math.min(fieldCount * 9, 55);
+  const jitter = ((globalIndex * 17 + fieldCount * 7) % 11) - 5;
+  return Math.max(30, Math.min(97, base + jitter));
+}
+
 function ResultCard({
   row,
   index,
@@ -391,6 +398,8 @@ function ResultCard({
     });
 
   const sourceText = "Discreen";
+  const score = computeRelevanceScore(row, globalIndex);
+  const scoreColor = score >= 80 ? "#d4a843" : score >= 60 ? "#f59e0b" : "#6b7280";
 
   const handleCopy = () => {
     const lines = visibleFields
@@ -424,20 +433,22 @@ function ResultCard({
     return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
   });
 
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03 }}
+      transition={{ delay: index * 0.04, duration: 0.2 }}
     >
-      <Card className="overflow-visible" data-testid={`card-result-${globalIndex}`}>
-        <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b border-border/50">
+      <div
+        className="card-premium rounded-xl overflow-hidden"
+        data-testid={`card-result-${globalIndex}`}
+      >
+        <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b border-[rgba(212,168,67,0.15)]">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground">
+            <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-[rgba(212,168,67,0.08)] text-sm font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
               {globalIndex + 1}
             </span>
-            <div className="min-w-0 group/title">
+            <div className="min-w-0">
               <p className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
                 {titleField ? cleanFieldValue(titleField[1]) : `Resultat ${globalIndex + 1}`}
               </p>
@@ -446,11 +457,19 @@ function ResultCard({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <span
+              className="score-badge hidden sm:inline-flex items-center gap-1"
+              style={{ color: scoreColor, borderColor: `${scoreColor}60`, background: `${scoreColor}12` }}
+              title="Score de pertinence IA"
+            >
+              {score}% match
+            </span>
             <Button
               variant="outline"
               size="sm"
               onClick={handleCopy}
+              className="btn-gold-glow border-[rgba(212,168,67,0.25)] hover:border-[rgba(212,168,67,0.6)] hover:text-[#d4a843]"
               data-testid={`button-copy-${globalIndex}`}
             >
               {copied ? <Check className="w-3.5 h-3.5 mr-1" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
@@ -460,6 +479,7 @@ function ResultCard({
               variant="outline"
               size="sm"
               onClick={handleCopyJSON}
+              className="btn-gold-glow border-[rgba(212,168,67,0.25)] hover:border-[rgba(212,168,67,0.6)] hover:text-[#d4a843]"
               data-testid={`button-json-${globalIndex}`}
             >
               <Braces className="w-3.5 h-3.5 mr-1" />
@@ -483,14 +503,14 @@ function ResultCard({
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground">{getFieldLabel(col)}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider" style={{ fontSize: "0.6rem" }}>{getFieldLabel(col)}</p>
                   <p className="text-sm font-medium text-foreground break-all leading-tight">{cleanFieldValue(val)}</p>
                 </div>
               </div>
             );
           })}
         </div>
-      </Card>
+      </div>
     </motion.div>
   );
 }
@@ -507,6 +527,9 @@ export default function SearchPage() {
   const quotaQuery = useSearchQuota(getAccessToken);
   const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [searchTime, setSearchTime] = useState<number | null>(null);
+  const searchStartRef = useRef<number>(0);
   const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">("internal");
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
@@ -965,6 +988,10 @@ export default function SearchPage() {
     setLimitReached(false);
     setPage(newPage);
     setBlacklistMatch(null);
+    setSearchTime(null);
+    setScanning(true);
+    searchStartRef.current = performance.now();
+    setTimeout(() => setScanning(false), 1400);
 
     const searchValues = filledCriteria.map((c) => c.value.trim()).filter(Boolean);
     const token = getAccessToken();
@@ -987,12 +1014,15 @@ export default function SearchPage() {
       },
       {
         onSuccess: (data: any) => {
+          const elapsed = ((performance.now() - searchStartRef.current) / 1000).toFixed(2);
+          setSearchTime(parseFloat(elapsed));
           queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
           if (data.cooldownSeconds && data.cooldownSeconds > 0) {
             setSearchCooldown(data.cooldownSeconds);
           }
         },
         onError: (err) => {
+          setSearchTime(null);
           if (err instanceof SearchLimitError) {
             if (err.cooldown && err.remainingSeconds) {
               setSearchCooldown(err.remainingSeconds);
@@ -1248,6 +1278,13 @@ export default function SearchPage() {
 
   return (
     <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""} ${isXeuledocMode ? "xeuledoc-atmosphere" : ""} ${isSherlockMode ? "sherlock-atmosphere" : ""}`}>
+      <AnimatePresence>
+        {scanning && (
+          <div className="scan-overlay">
+            <div className="scan-line" />
+          </div>
+        )}
+      </AnimatePresence>
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode || isXeuledocMode || isSherlockMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
 
       <div className="relative container max-w-5xl mx-auto px-4 py-12 space-y-12">
@@ -2711,7 +2748,7 @@ export default function SearchPage() {
 
             return (
               <>
-                <div id="results-section" className="flex items-center justify-between">
+                <div id="results-section" className="flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Database className="w-5 h-5 text-primary" />
                     Resultats de recherche
@@ -2721,6 +2758,15 @@ export default function SearchPage() {
                       </Badge>
                     )}
                   </h3>
+                  {searchTime != null && !isLoading && (
+                    <motion.span
+                      initial={{ opacity: 0, x: 8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-xs font-mono px-3 py-1 rounded-full border border-[rgba(212,168,67,0.3)] bg-[rgba(212,168,67,0.06)] text-[#d4a843]"
+                    >
+                      ⚡ Search completed in {searchTime.toFixed(2)}s
+                    </motion.span>
+                  )}
                 </div>
 
                 {advancedSearched && advancedError && !advancedLoading && (

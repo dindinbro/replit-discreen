@@ -32,7 +32,8 @@ import { startTaskBot } from "./task-bot";
 import { startLinksBot } from "./links-bot";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { webhookSubscriptionExpired } from "./webhook";
+import { webhookSubscriptionExpired, webhookSubscriptionExpiredDetailed } from "./webhook";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -213,10 +214,23 @@ app.use((req, res, next) => {
 
   setInterval(async () => {
     try {
-      const count = await storage.expireSubscriptions();
+      const { count, expired } = await storage.expireSubscriptions();
       if (count > 0) {
         log(`Expired ${count} subscription(s)`, "cron");
         webhookSubscriptionExpired(count);
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        for (const sub of expired) {
+          let email = "Inconnu";
+          if (supabaseUrl && supabaseKey) {
+            try {
+              const supaAdmin = createClient(supabaseUrl, supabaseKey);
+              const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+              if (data?.user?.email) email = data.user.email;
+            } catch {}
+          }
+          webhookSubscriptionExpiredDetailed(sub as any, email);
+        }
       }
     } catch (err) {
       log(`Subscription expiry check error: ${err}`, "cron");

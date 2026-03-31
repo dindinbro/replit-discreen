@@ -186,8 +186,17 @@ export async function startDiscordBot() {
         .addChoices(
           { name: "VIP", value: "vip" },
           { name: "PRO", value: "pro" },
-          { name: "Business", value: "business" },
           { name: "API", value: "api" }
+        )
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName("duree")
+        .setDescription("Duree de l'abonnement")
+        .setRequired(false)
+        .addChoices(
+          { name: "1 mois (par defaut)", value: "1month" },
+          { name: "Lifetime (a vie)", value: "lifetime" }
         )
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
@@ -245,7 +254,6 @@ export async function startDiscordBot() {
           { name: "Free", value: "free" },
           { name: "VIP", value: "vip" },
           { name: "PRO", value: "pro" },
-          { name: "Business", value: "business" },
           { name: "API", value: "api" }
         )
     )
@@ -1022,20 +1030,23 @@ export async function startDiscordBot() {
     if (interaction.commandName === "gkey") {
       try {
         const tier = interaction.options.getString("tier", true) as any;
-        const license = await (storage as any).createLicenseKey(tier);
+        const duree = interaction.options.getString("duree") ?? "1month";
+        const isLifetime = duree === "lifetime";
+        const license = await (storage as any).createLicenseKey(tier, undefined, isLifetime);
+        const dureeLabel = isLifetime ? "Lifetime (a vie)" : "1 mois (30 jours)";
         
         const embed = new EmbedBuilder()
-          .setColor(0x10b981)
-          .setTitle("Cle de licence generee")
+          .setColor(isLifetime ? 0xd4a843 : 0x10b981)
+          .setTitle(isLifetime ? "✨ Cle Lifetime generee" : "🔑 Cle de licence generee")
           .addFields(
             { name: "Cle", value: `\`${license.key}\`` },
             { name: "Tier", value: tier.toUpperCase(), inline: true },
-            { name: "Duree", value: "30 jours", inline: true }
+            { name: "Duree", value: dureeLabel, inline: true }
           )
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
-        webhookBotGkey(interaction.user.tag, interaction.user.id, tier, license.key);
+        webhookBotGkey(interaction.user.tag, interaction.user.id, tier, license.key, dureeLabel);
       } catch (err) {
         log(`Error generating key: ${err}`, "discord");
         if (!interaction.replied && !interaction.deferred) {

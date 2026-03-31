@@ -114,6 +114,15 @@ export default function LandingPage() {
           </Badge>
         </motion.div>
 
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.05 }}
+          className="signature-phrase text-xs md:text-sm tracking-[0.22em]"
+        >
+          Power. Precision. Intelligence.
+        </motion.p>
+
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -122,7 +131,7 @@ export default function LandingPage() {
         >
           {t("landing.title1")}{" "}
           <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#b8902e] via-[#f0c060] to-[#d4a843]">
             {t("landing.title2")}
           </span>
         </motion.h1>
@@ -183,7 +192,7 @@ export default function LandingPage() {
               transition={{ duration: 0.5, delay: 0.5 }}
               className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
             >
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-[#d4a843] animate-pulse" />
               <span>{t("landing.needHelp")}</span>
               <a
                 href="https://discord.gg/discreen"
@@ -284,7 +293,7 @@ export default function LandingPage() {
               transition={{ duration: 0.5, delay: 0.55 }}
               className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
             >
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-[#d4a843] animate-pulse" />
               <span>{t("landing.needHelp")}</span>
               <a
                 href="https://discord.gg/discreen"

@@ -51,7 +51,7 @@ export interface IStorage {
   redeemLicenseKey(key: string, userId: string): Promise<{ success: boolean; tier?: PlanTier; message: string }>;
   getLicenseKeys(): Promise<LicenseKey[]>;
   getLicenseKeyByOrder(orderId: string): Promise<LicenseKey | undefined>;
-  expireSubscriptions(): Promise<number>;
+  expireSubscriptions(): Promise<{ count: number; expired: typeof subscriptions.$inferSelect[] }>;
   createBlacklistRequest(data: InsertBlacklistRequest): Promise<BlacklistRequest>;
   getBlacklistRequests(): Promise<BlacklistRequest[]>;
   updateBlacklistRequestStatus(id: number, status: string, adminNotes?: string): Promise<BlacklistRequest | undefined>;
@@ -486,7 +486,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async expireSubscriptions(): Promise<number> {
+  async expireSubscriptions(): Promise<{ count: number; expired: typeof subscriptions.$inferSelect[] }> {
     const now = new Date();
     const expired = await db
       .update(subscriptions)
@@ -497,7 +497,7 @@ export class DatabaseStorage implements IStorage {
         eq(subscriptions.frozen, false)
       ))
       .returning();
-    return expired.length;
+    return { count: expired.length, expired };
   }
 
   async createBlacklistRequest(data: InsertBlacklistRequest): Promise<BlacklistRequest> {
