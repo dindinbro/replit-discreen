@@ -10,9 +10,7 @@ import { Search, CreditCard, Database, Shield, Zap, Lock, Mail, User, Phone, Glo
 import { SiDiscord } from "react-icons/si";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
-import { useTheme } from "@/hooks/use-theme";
 import { useTranslation } from "react-i18next";
-import InteractiveGrid from "@/components/InteractiveGrid";
 
 const QUICK_FILTER_KEYS = [
   { key: "email", labelKey: "landing.filters.email", icon: Mail },
@@ -56,7 +54,6 @@ export default function LandingPage() {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const { theme } = useTheme();
   const isLoggedIn = !!user;
 
   const FILTER_PLACEHOLDERS: Record<string, string> = {
@@ -73,12 +70,11 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="relative">
-      {theme === "dark" && <InteractiveGrid />}
+    <main className="relative flex flex-col" style={{ minHeight: "calc(100dvh - 56px)" }}>
 
       {/* ── Hero ── */}
-      <section className="relative flex flex-col items-center justify-center min-h-[calc(100vh-64px)] px-4 text-center">
-        <div className="w-full max-w-3xl mx-auto space-y-10">
+      <section className="relative flex-1 flex flex-col items-center justify-center px-4 text-center">
+        <div className="w-full max-w-3xl mx-auto space-y-7">
 
           {/* Signature phrase */}
           <motion.p
