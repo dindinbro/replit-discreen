@@ -2789,9 +2789,7 @@ export default function AdminPage() {
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container max-w-7xl mx-auto h-16 flex items-center justify-between gap-2 px-4">
           <div className="flex items-center gap-2">
-            <div className="bg-primary/10 p-2 rounded-lg">
-              <ShieldCheck className="w-6 h-6 text-primary" />
-            </div>
+            <img src="/favicon.png" alt="Discreen" className="w-8 h-8 rounded-lg object-contain shrink-0" />
             <span className="font-display font-bold text-2xl tracking-tight">
               Di<span className="text-primary">screen</span>
             </span>

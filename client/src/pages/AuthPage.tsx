@@ -77,9 +77,7 @@ export default function AuthPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
         <div className="relative z-10 max-w-lg space-y-8">
           <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-3 rounded-xl border border-primary/20">
-              <ShieldCheck className="w-10 h-10 text-primary" />
-            </div>
+            <img src="/favicon.png" alt="Discreen" className="w-16 h-16 rounded-2xl object-contain" />
             <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
               Di<span className="text-primary">screen</span>
             </h1>
@@ -114,9 +112,7 @@ export default function AuthPage() {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center space-y-3 lg:hidden">
             <div className="flex items-center justify-center gap-2">
-              <div className="bg-primary/10 p-2.5 rounded-xl">
-                <ShieldCheck className="w-8 h-8 text-primary" />
-              </div>
+              <img src="/favicon.png" alt="Discreen" className="w-12 h-12 rounded-xl object-contain" />
             </div>
             <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
               Di<span className="text-primary">screen</span>

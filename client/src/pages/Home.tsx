@@ -318,9 +318,7 @@ export default function Home() {
             >
               <LayoutGrid className="w-5 h-5" />
             </Button>
-            <div className="bg-primary/10 p-2 rounded-lg">
-              <ShieldCheck className="w-6 h-6 text-primary" />
-            </div>
+            <img src="/favicon.png" alt="Discreen" className="w-8 h-8 rounded-lg object-contain shrink-0" />
             <span className="font-display font-bold text-2xl tracking-tight">
               Di<span className="text-primary">screen</span>
             </span>

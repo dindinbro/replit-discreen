@@ -297,9 +297,7 @@ export default function MaintenancePage() {
       <header className="relative z-10 border-b border-border/30 px-6 py-3 sticky top-0 bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Shield className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src="/favicon.png" alt="Discreen" className="w-8 h-8 rounded-lg object-contain shrink-0" />
             <span className="text-lg font-bold tracking-tight">Di<span className="text-primary">screen</span></span>
           </div>
           <div className="flex items-center gap-3">

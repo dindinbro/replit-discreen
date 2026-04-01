@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "WlANRdIy1S_XbiXc2TMIf"
+uri = "file://client/public/favicon.png"
+type = "image"
+title = "discreen gold favicon"
+
+[[generated]]
+id = "AoISZahSH3I1z1lD02rsk"
+uri = "file://client/public/og-image.png"
+type = "image"
+title = "discreen og banner"

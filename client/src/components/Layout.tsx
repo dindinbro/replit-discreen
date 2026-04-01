@@ -304,9 +304,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="h-14 flex items-center shrink-0 px-3 border-b border-border/20">
         <Link href="/">
           <div className={`flex items-center gap-2 cursor-pointer ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
-            <div className="bg-primary/10 p-1.5 rounded-lg shrink-0">
-              <ShieldCheck className="w-5 h-5 text-primary" />
-            </div>
+            <img src="/favicon.png" alt="Discreen" className="w-8 h-8 rounded-lg shrink-0 object-contain" />
             <span
               className="font-display font-bold text-lg tracking-tight whitespace-nowrap overflow-hidden"
               style={{ opacity: collapsed ? 0 : 1, maxWidth: collapsed ? 0 : 140, transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
@@ -509,9 +507,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="h-14 flex items-center justify-between gap-2 px-4">
               <Link href="/">
                 <div className="flex items-center gap-2 cursor-pointer">
-                  <div className="bg-primary/10 p-1.5 rounded-lg">
-                    <ShieldCheck className="w-5 h-5 text-primary" />
-                  </div>
+                  <img src="/favicon.png" alt="Discreen" className="w-8 h-8 rounded-lg object-contain" />
                   <span className="font-display font-bold text-xl tracking-tight">
                     Di<span className="text-primary">screen</span>
                   </span>
