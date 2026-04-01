@@ -3,115 +3,105 @@ import { motion } from "framer-motion";
 export default function SearchLoader({ variant = "primary" }: { variant?: "primary" | "red" }) {
   const color = variant === "red" ? "text-red-500" : "text-primary";
   const bgColor = variant === "red" ? "bg-red-500" : "bg-primary";
-  const stroke = "currentColor";
+  const fill = variant === "red" ? "#ef4444" : "hsl(var(--primary))";
+
+  const legAnim = (d1: string, d2: string, delay: number) => ({
+    animate: { d: [d1, d2, d1] },
+    transition: { duration: 1.1, repeat: Infinity, ease: "easeInOut", delay },
+  });
 
   return (
     <div className="flex flex-col items-center justify-center py-16 space-y-6" data-testid="search-loader">
-      <svg
-        viewBox="0 0 80 90"
-        className={`w-28 h-28 ${color}`}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {/* ── Web thread ── */}
-        <motion.line
-          x1="40" y1="0" x2="40" y2="22"
-          animate={{ y2: [22, 25, 22] }}
+      <svg viewBox="0 0 100 108" className={`w-32 h-32 ${color}`} fill="none"
+        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+
+        {/* ── Thread ── */}
+        <motion.line x1="50" y1="0" x2="50" y2="24"
+          animate={{ y2: [24, 27, 24] }}
           transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        {/* ── Spider body (bounces on thread) ── */}
+        {/* ── Body group — bounces on thread ── */}
         <motion.g
           animate={{ y: [0, 3, 0] }}
           transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
         >
           {/* Cephalothorax */}
-          <ellipse cx="40" cy="33" rx="9" ry="8" />
+          <ellipse cx="50" cy="36" rx="11" ry="9.5" strokeWidth="1.8" />
 
-          {/* Abdomen */}
-          <ellipse cx="40" cy="51" rx="11.5" ry="12.5" />
+          {/* Fangs */}
+          <path d="M 45 43 Q 43 47 42 50" strokeWidth="1.4" strokeOpacity="0.7" />
+          <path d="M 55 43 Q 57 47 58 50" strokeWidth="1.4" strokeOpacity="0.7" />
 
-          {/* Abdomen pattern line */}
-          <line x1="40" y1="39" x2="40" y2="63" strokeWidth="0.8" strokeOpacity="0.4" />
-          <line x1="30" y1="47" x2="50" y2="47" strokeWidth="0.8" strokeOpacity="0.3" />
-          <line x1="31" y1="54" x2="49" y2="54" strokeWidth="0.8" strokeOpacity="0.3" />
+          {/* Abdomen — bigger, rounder */}
+          <ellipse cx="50" cy="66" rx="15.5" ry="18" strokeWidth="1.8" />
 
-          {/* Eyes — 4 main eyes */}
-          <circle cx="36" cy="31" r="1.8" fill="currentColor" stroke="none" />
-          <circle cx="44" cy="31" r="1.8" fill="currentColor" stroke="none" />
-          <circle cx="38.2" cy="35.5" r="1.2" fill="currentColor" stroke="none" />
-          <circle cx="41.8" cy="35.5" r="1.2" fill="currentColor" stroke="none" />
+          {/* Abdomen markings */}
+          <path d="M 50 51 L 50 82" strokeWidth="0.7" strokeOpacity="0.25" />
+          <path d="M 40 60 Q 50 57 60 60" strokeWidth="0.7" strokeOpacity="0.2" />
+          <path d="M 38 68 Q 50 65 62 68" strokeWidth="0.7" strokeOpacity="0.2" />
 
-          {/* ── Left legs ── */}
-          {/* L1 — top front */}
-          <motion.path
-            d="M 33 27 L 20 18 L 10 14"
-            animate={{ d: ["M 33 27 L 20 18 L 10 14", "M 33 27 L 20 16 L 10 12", "M 33 27 L 20 18 L 10 14"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-          />
-          {/* L2 — front */}
-          <motion.path
-            d="M 32 31 L 18 27 L 7 25"
-            animate={{ d: ["M 32 31 L 18 27 L 7 25", "M 32 31 L 18 25 L 7 23", "M 32 31 L 18 27 L 7 25"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.15 }}
-          />
-          {/* L3 — back */}
-          <motion.path
-            d="M 32 37 L 18 39 L 7 43"
-            animate={{ d: ["M 32 37 L 18 39 L 7 43", "M 32 37 L 18 41 L 7 46", "M 32 37 L 18 39 L 7 43"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-          />
-          {/* L4 — bottom back */}
-          <motion.path
-            d="M 33 40 L 21 50 L 13 57"
-            animate={{ d: ["M 33 40 L 21 50 L 13 57", "M 33 40 L 21 52 L 13 60", "M 33 40 L 21 50 L 13 57"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.45 }}
-          />
+          {/* Eyes — 2 large + 2 small */}
+          <circle cx="45.5" cy="33.5" r="2.4" fill={fill} stroke="none" />
+          <circle cx="54.5" cy="33.5" r="2.4" fill={fill} stroke="none" />
+          <circle cx="47.5" cy="39" r="1.5" fill={fill} stroke="none" />
+          <circle cx="52.5" cy="39" r="1.5" fill={fill} stroke="none" />
 
-          {/* ── Right legs (mirrored) ── */}
+          {/* ── Legs — cubic bezier curves for natural shape ── */}
+
+          {/* L1 — top-front (reaches up and out) */}
+          <motion.path {...legAnim(
+            "M 41 28 C 30 20 16 16 5 13",
+            "M 41 28 C 30 18 16 13 5 10"
+          , 0)} />
+          {/* L2 — front (sweeps forward) */}
+          <motion.path {...legAnim(
+            "M 40 33 C 27 28 14 24 3 24",
+            "M 40 33 C 27 26 14 21 3 21"
+          , 0.28)} />
+          {/* L3 — mid (horizontal then slightly down) */}
+          <motion.path {...legAnim(
+            "M 40 38 C 26 38 14 42 4 48",
+            "M 40 38 C 26 40 14 45 4 52"
+          , 0)} />
+          {/* L4 — rear (curves back and down) */}
+          <motion.path {...legAnim(
+            "M 41 42 C 30 52 22 60 16 72",
+            "M 41 42 C 30 54 22 63 16 76"
+          , 0.28)} />
+
           {/* R1 */}
-          <motion.path
-            d="M 47 27 L 60 18 L 70 14"
-            animate={{ d: ["M 47 27 L 60 18 L 70 14", "M 47 27 L 60 16 L 70 12", "M 47 27 L 60 18 L 70 14"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-          />
+          <motion.path {...legAnim(
+            "M 59 28 C 70 20 84 16 95 13",
+            "M 59 28 C 70 18 84 13 95 10"
+          , 0.14)} />
           {/* R2 */}
-          <motion.path
-            d="M 48 31 L 62 27 L 73 25"
-            animate={{ d: ["M 48 31 L 62 27 L 73 25", "M 48 31 L 62 25 L 73 23", "M 48 31 L 62 27 L 73 25"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.15 }}
-          />
+          <motion.path {...legAnim(
+            "M 60 33 C 73 28 86 24 97 24",
+            "M 60 33 C 73 26 86 21 97 21"
+          , 0.42)} />
           {/* R3 */}
-          <motion.path
-            d="M 48 37 L 62 39 L 73 43"
-            animate={{ d: ["M 48 37 L 62 39 L 73 43", "M 48 37 L 62 41 L 73 46", "M 48 37 L 62 39 L 73 43"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-          />
+          <motion.path {...legAnim(
+            "M 60 38 C 74 38 86 42 96 48",
+            "M 60 38 C 74 40 86 45 96 52"
+          , 0.14)} />
           {/* R4 */}
-          <motion.path
-            d="M 47 40 L 59 50 L 67 57"
-            animate={{ d: ["M 47 40 L 59 50 L 67 57", "M 47 40 L 59 52 L 67 60", "M 47 40 L 59 50 L 67 57"] }}
-            transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: 0.45 }}
-          />
+          <motion.path {...legAnim(
+            "M 59 42 C 70 52 78 60 84 72",
+            "M 59 42 C 70 54 78 63 84 76"
+          , 0.42)} />
         </motion.g>
       </svg>
 
       <div className="flex flex-col items-center space-y-2">
-        <motion.p
-          className={`${color} font-medium text-sm`}
+        <motion.p className={`${color} font-medium text-sm`}
           animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          Analyse des bases de donnees...
+          transition={{ duration: 2, repeat: Infinity }}>
+          Analyse des bases de données...
         </motion.p>
         <div className="flex items-center gap-1">
           {[0, 1, 2, 3, 4].map(i => (
-            <motion.div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full ${bgColor}`}
+            <motion.div key={i} className={`w-1.5 h-1.5 rounded-full ${bgColor}`}
               animate={{ scale: [0.5, 1.2, 0.5], opacity: [0.3, 1, 0.3] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
             />
