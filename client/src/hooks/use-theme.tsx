@@ -1,5 +1,11 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
+declare global {
+  interface Document {
+    startViewTransition?: (cb: () => void) => void;
+  }
+}
+
 type Theme = "light" | "dark";
 
 interface ThemeContextType {
@@ -34,7 +40,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    const next: Theme = theme === "light" ? "dark" : "light";
+    if (!document.startViewTransition) {
+      setTheme(next);
+      return;
+    }
+    document.startViewTransition(() => {
+      setTheme(next);
+    });
   };
 
   return (

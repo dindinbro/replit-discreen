@@ -342,6 +342,23 @@
   );
 }
 
+/* ─── Theme toggle — vertical wipe transition ─────────── */
+@keyframes theme-wipe-in {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0% 0);   }
+}
+@keyframes theme-wipe-out {
+  from { clip-path: inset(0 0 0% 0);   }
+  to   { clip-path: inset(100% 0 0 0); }
+}
+
+::view-transition-old(root) {
+  animation: theme-wipe-out 0.45s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+}
+::view-transition-new(root) {
+  animation: theme-wipe-in 0.45s cubic-bezier(0.76, 0, 0.24, 1) forwards;
+}
+
 /* ─── Signature phrase ────────────────────────────────── */
 .signature-phrase {
   font-family: 'Outfit', sans-serif;
