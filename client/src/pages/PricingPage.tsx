@@ -67,6 +67,7 @@ const PLANS = [
       "Username OSINT illimite",
       { text: "Moteur de recherche Wanted", excluded: true },
       { text: "Parrainage", excluded: true },
+      { text: "Agent DisX IA", soon: true },
     ],
   },
   {
@@ -87,6 +88,7 @@ const PLANS = [
       "Username OSINT illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
+      { text: "Agent DisX IA", available: true },
     ],
   },
   {
@@ -108,6 +110,7 @@ const PLANS = [
       "Possibilite de revente",
       "Endpoint API /api/v1/search",
       "Support premium 24/7",
+      { text: "Agent DisX IA", available: true },
     ],
   },
 ];
@@ -508,8 +511,10 @@ export default function PricingPage() {
 
                   <ul className="space-y-2 mb-6 flex-1">
                     {plan.features.map((feature, featureIdx) => {
-                      const isExcluded = typeof feature === "object" && feature.excluded;
-                      const featureText = typeof feature === "object" ? feature.text : feature;
+                      const isExcluded = typeof feature === "object" && (feature as any).excluded;
+                      const isSoon = typeof feature === "object" && (feature as any).soon;
+                      const isAvailable = typeof feature === "object" && (feature as any).available;
+                      const featureText = typeof feature === "object" ? (feature as any).text : feature;
                       return (
                         <motion.li
                           key={featureText}
@@ -520,30 +525,38 @@ export default function PricingPage() {
                             duration: 0.35,
                             ease: [0.22, 1, 0.36, 1],
                           }}
-                          whileHover={{
-                            x: 4,
-                            transition: { duration: 0.2 },
-                          }}
-                          className={`flex items-start gap-2 text-xs cursor-default ${isExcluded ? "text-muted-foreground/50 line-through" : ""}`}
+                          whileHover={{ x: 4, transition: { duration: 0.2 } }}
+                          className={`flex items-start gap-2 text-xs cursor-default ${
+                            isExcluded ? "text-muted-foreground/50 line-through" :
+                            isSoon ? "text-red-400/90" :
+                            isAvailable ? "text-green-400/90 font-medium" : ""
+                          }`}
                         >
                           {isExcluded ? (
                             <X className="w-3.5 h-3.5 text-destructive/60 mt-0.5 shrink-0" />
+                          ) : isSoon ? (
+                            <X className="w-3.5 h-3.5 text-red-500/70 mt-0.5 shrink-0" />
+                          ) : isAvailable ? (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ delay: 0.5 + featureIdx * 0.06, duration: 0.3, type: "spring", stiffness: 300, damping: 15 }}
+                            >
+                              <Check className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+                            </motion.div>
                           ) : (
                             <motion.div
                               initial={{ scale: 0 }}
                               animate={{ scale: 1 }}
-                              transition={{
-                                delay: 0.5 + featureIdx * 0.06,
-                                duration: 0.3,
-                                type: "spring",
-                                stiffness: 300,
-                                damping: 15,
-                              }}
+                              transition={{ delay: 0.5 + featureIdx * 0.06, duration: 0.3, type: "spring", stiffness: 300, damping: 15 }}
                             >
                               <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
                             </motion.div>
                           )}
-                          <span>{featureText}</span>
+                          <span>
+                            {featureText}
+                            {isSoon && <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider text-red-500/70 bg-red-500/10 px-1 py-0.5 rounded">soon</span>}
+                          </span>
                         </motion.li>
                       );
                     })}
