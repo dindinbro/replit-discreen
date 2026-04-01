@@ -2,189 +2,37 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserPlus, CreditCard, Search, BarChart3, X, ZoomIn } from "lucide-react";
 
-/* ── Mock-up components ─────────────────────────────────────── */
-function MockupRegister() {
-  return (
-    <div className="w-full h-full bg-[#0d0d0d] rounded-lg p-4 flex items-center justify-center">
-      <div className="w-full max-w-[200px] space-y-2.5">
-        <div className="flex gap-1.5 mb-3">
-          <div className="flex-1 h-7 rounded-md bg-primary/80 flex items-center justify-center">
-            <span className="text-[9px] font-semibold text-black">Inscription</span>
-          </div>
-          <div className="flex-1 h-7 rounded-md bg-white/5 border border-white/10 flex items-center justify-center">
-            <span className="text-[9px] text-white/50">Connexion</span>
-          </div>
-        </div>
-        <div className="h-7 rounded-md bg-white/6 border border-white/10 px-2 flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
-          <span className="text-[9px] text-white/40">vous@exemple.com</span>
-        </div>
-        <div className="h-7 rounded-md bg-white/6 border border-white/10 px-2 flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
-          <span className="text-[9px] text-white/40">••••••••</span>
-        </div>
-        <div className="h-7 rounded-md bg-primary flex items-center justify-center">
-          <span className="text-[9px] font-semibold text-black">Créer mon compte →</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-[8px] text-white/30">OR</span>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
-        <div className="h-7 rounded-md bg-white/5 border border-white/10 flex items-center justify-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded bg-[#5865F2]" />
-          <span className="text-[9px] text-white/60">Discord</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MockupPricing() {
-  const plans = [
-    { name: "Free", price: "0€", color: "bg-white/5", border: "border-white/10", active: false },
-    { name: "VIP", price: "9.99€", color: "bg-primary/10", border: "border-primary/50", active: true },
-    { name: "PRO", price: "19.99€", color: "bg-white/5", border: "border-white/10", active: false },
-  ];
-  return (
-    <div className="w-full h-full bg-[#0d0d0d] rounded-lg p-4 flex items-center justify-center">
-      <div className="flex gap-2 w-full">
-        {plans.map((p) => (
-          <div key={p.name} className={`flex-1 rounded-lg border ${p.border} ${p.color} p-2 space-y-1.5 ${p.active ? "ring-1 ring-primary/40" : ""}`}>
-            <div className="text-[9px] font-bold text-white/80">{p.name}</div>
-            <div className="text-[11px] font-bold text-primary">{p.price}</div>
-            {[1,2,3].map(i => (
-              <div key={i} className={`h-1 rounded-full ${p.active ? "bg-primary/30" : "bg-white/8"}`} style={{ width: `${60 + i*10}%` }} />
-            ))}
-            <div className={`h-5 rounded-md ${p.active ? "bg-primary" : "bg-white/8"} flex items-center justify-center mt-1`}>
-              <span className="text-[7px] font-semibold text-black">{p.active ? "Choisir" : "Voir"}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MockupSearch() {
-  return (
-    <div className="w-full h-full bg-[#0d0d0d] rounded-lg p-4 flex flex-col gap-2.5">
-      <div className="flex gap-1.5 flex-wrap">
-        {["Email", "Téléphone", "IP", "Username", "Discord"].map((f, i) => (
-          <span key={f} className={`text-[8px] px-2 py-0.5 rounded-full ${i === 0 ? "bg-primary/20 text-primary border border-primary/40" : "bg-white/5 text-white/40 border border-white/10"}`}>
-            {f}
-          </span>
-        ))}
-      </div>
-      <div className="flex gap-1.5">
-        <div className="flex-1 h-7 rounded-md bg-white/6 border border-white/10 px-2 flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-white/20" />
-          <span className="text-[9px] text-white/30">exemple@email.com</span>
-        </div>
-        <div className="w-16 h-7 rounded-md bg-primary flex items-center justify-center">
-          <span className="text-[8px] font-bold text-black">Rechercher</span>
-        </div>
-      </div>
-      <div className="flex-1 rounded-md bg-white/3 border border-white/8 flex items-center justify-center">
-        <div className="text-center space-y-1">
-          <div className="w-5 h-5 rounded-full bg-primary/20 mx-auto flex items-center justify-center">
-            <Search className="w-2.5 h-2.5 text-primary" />
-          </div>
-          <span className="text-[8px] text-white/30">Entrez vos critères</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MockupResults() {
-  const rows = [
-    { label: "Email", val: "j••••@gmail.com", w: "70%" },
-    { label: "IP", val: "82.64.•••.•••", w: "55%" },
-    { label: "Username", val: "j4rv••", w: "45%" },
-    { label: "Source", val: "Breach 2023", w: "65%" },
-  ];
-  return (
-    <div className="w-full h-full bg-[#0d0d0d] rounded-lg p-4 flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-[9px] font-semibold text-primary">3 résultats trouvés</span>
-        <div className="flex gap-1">
-          {[1,2,3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-primary/60" />)}
-        </div>
-      </div>
-      <div className="flex-1 rounded-md bg-white/3 border border-white/8 p-2 space-y-2">
-        {rows.map((r) => (
-          <div key={r.label} className="flex items-center justify-between gap-2">
-            <span className="text-[8px] text-white/40 w-12 shrink-0">{r.label}</span>
-            <div className="flex-1 h-1.5 rounded-full bg-white/6 overflow-hidden">
-              <div className="h-full rounded-full bg-primary/40" style={{ width: r.w }} />
-            </div>
-            <span className="text-[8px] text-white/60 font-mono w-20 text-right shrink-0">{r.val}</span>
-          </div>
-        ))}
-      </div>
-      <div className="h-6 rounded-md bg-white/5 border border-white/10 flex items-center justify-center">
-        <span className="text-[8px] text-white/40">Voir la fiche complète →</span>
-      </div>
-    </div>
-  );
-}
-
-/* ── Step data ──────────────────────────────────────────────── */
 const STEPS = [
   {
     num: "01",
     icon: UserPlus,
     title: "Créer un compte",
     desc: "Inscrivez-vous en quelques secondes avec votre adresse email ou connectez-vous directement via Discord. Votre accès est sécurisé et votre compte activé instantanément.",
-    mockup: <MockupRegister />,
+    img: "/tuto/step1-login.jpg",
   },
   {
     num: "02",
     icon: CreditCard,
     title: "Choisir un abonnement",
     desc: "Sélectionnez le forfait adapté à vos besoins : Free, VIP ou PRO. Chaque plan débloque des modules de recherche supplémentaires et augmente votre quota quotidien.",
-    mockup: <MockupPricing />,
+    img: "/tuto/step2-pricing.jpg",
   },
   {
     num: "03",
     icon: Search,
     title: "Lancer une recherche",
     desc: "Utilisez la recherche Paramétrique pour filtrer par email, téléphone, IP, username, Discord ID et bien plus. Combinez plusieurs critères pour des résultats ultra-précis.",
-    mockup: <MockupSearch />,
+    img: "/tuto/step3-search.jpg",
   },
   {
     num: "04",
     icon: BarChart3,
     title: "Exploiter les résultats",
-    desc: "Consultez les fiches détaillées, parcourez les données structurées et croisez les informations entre les différentes bases de données indexées.",
-    mockup: <MockupResults />,
+    desc: "Consultez les fiches détaillées, parcourez les données structurées et croisez les informations entre les différentes bases de données indexées. Accédez à des milliards d'enregistrements.",
+    img: "/tuto/step4-results.jpg",
   },
 ];
 
-/* ── Browser chrome wrapper ─────────────────────────────────── */
-function BrowserChrome({ children, num }: { children: React.ReactNode; num: string }) {
-  return (
-    <div className="relative w-full h-full flex flex-col bg-[#0d0d0d] rounded-lg overflow-hidden">
-      <div className="h-6 bg-[#111]/90 border-b border-white/5 flex items-center px-3 gap-1.5 shrink-0">
-        {["#ff5f56","#ffbd2e","#27c93f"].map(c => (
-          <div key={c} className="w-2 h-2 rounded-full" style={{ background: c }} />
-        ))}
-        <div className="flex-1 mx-3 h-3 rounded bg-white/5 border border-white/6 flex items-center px-2">
-          <span className="text-[7px] text-white/25">discreen.app</span>
-        </div>
-      </div>
-      <div className="relative flex-1 p-2 overflow-hidden">
-        <div className="absolute top-2 left-2 z-10 w-7 h-7 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center">
-          <span className="text-[10px] font-bold text-primary">{num}</span>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/* ── Main page ──────────────────────────────────────────────── */
 export default function TutorialPage() {
   const [open, setOpen] = useState<number | null>(null);
   const active = open !== null ? STEPS[open] : null;
@@ -226,14 +74,32 @@ export default function TutorialPage() {
               className="group rounded-2xl border border-border/30 bg-card/40 overflow-hidden hover:border-primary/40 hover:shadow-[0_0_24px_rgba(212,175,55,0.10)] transition-all duration-300 cursor-pointer"
               data-testid={`tutorial-step-${i}`}
             >
-              {/* Mockup area */}
-              <div className="relative h-52 border-b border-border/20 overflow-hidden">
-                <BrowserChrome num={step.num}>
-                  {step.mockup}
-                </BrowserChrome>
-                {/* Zoom hint */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/30 rounded-t-2xl">
-                  <div className="flex items-center gap-2 bg-black/70 border border-white/10 rounded-full px-4 py-2">
+              {/* Screenshot */}
+              <div className="relative h-52 overflow-hidden bg-[#0d0d0d]">
+                {/* Browser chrome */}
+                <div className="absolute top-0 inset-x-0 h-6 bg-[#111]/90 border-b border-white/5 flex items-center px-3 gap-1.5 z-10">
+                  {["#ff5f56","#ffbd2e","#27c93f"].map(c => (
+                    <div key={c} className="w-2 h-2 rounded-full shrink-0" style={{ background: c }} />
+                  ))}
+                  <div className="flex-1 mx-3 h-3 rounded bg-white/5 border border-white/6 flex items-center px-2">
+                    <span className="text-[7px] text-white/25">discreen.app</span>
+                  </div>
+                </div>
+
+                <img
+                  src={step.img}
+                  alt={step.title}
+                  className="absolute inset-0 w-full h-full object-cover object-top pt-6"
+                />
+
+                {/* Step badge */}
+                <div className="absolute top-8 left-3 z-20 w-7 h-7 rounded-lg bg-black/60 border border-primary/40 backdrop-blur-sm flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-primary">{step.num}</span>
+                </div>
+
+                {/* Zoom hint overlay */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/40">
+                  <div className="flex items-center gap-2 bg-black/70 border border-white/10 rounded-full px-4 py-2 backdrop-blur-sm">
                     <ZoomIn className="w-3.5 h-3.5 text-primary" />
                     <span className="text-xs text-white/80 font-medium">Agrandir</span>
                   </div>
@@ -287,7 +153,7 @@ export default function TutorialPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm"
+              className="fixed inset-0 z-[1000] bg-black/85 backdrop-blur-md"
               onClick={() => setOpen(null)}
             />
 
@@ -301,48 +167,56 @@ export default function TutorialPage() {
               className="fixed inset-0 z-[1001] flex items-center justify-center p-4 pointer-events-none"
             >
               <div
-                className="pointer-events-auto w-full max-w-2xl rounded-2xl border border-border/40 bg-background shadow-2xl overflow-hidden"
+                className="pointer-events-auto w-full max-w-3xl rounded-2xl border border-border/40 bg-background shadow-2xl overflow-hidden"
                 onClick={e => e.stopPropagation()}
               >
-                {/* Modal mockup — bigger */}
-                <div className="relative h-80 bg-[#0d0d0d]">
-                  <BrowserChrome num={active.num}>
-                    {active.mockup}
-                  </BrowserChrome>
+                {/* Large screenshot */}
+                <div className="relative bg-[#0d0d0d]">
+                  {/* Browser chrome */}
+                  <div className="h-7 bg-[#111]/90 border-b border-white/5 flex items-center px-4 gap-1.5">
+                    {["#ff5f56","#ffbd2e","#27c93f"].map(c => (
+                      <div key={c} className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c }} />
+                    ))}
+                    <div className="flex-1 mx-3 h-4 rounded bg-white/5 border border-white/6 flex items-center px-2">
+                      <span className="text-[8px] text-white/30">discreen.app</span>
+                    </div>
+                  </div>
+                  <img
+                    src={active.img}
+                    alt={active.title}
+                    className="w-full object-cover object-top max-h-[55vh]"
+                  />
                   {/* Close button */}
                   <button
                     onClick={() => setOpen(null)}
-                    className="absolute top-8 right-3 z-20 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:border-white/30 transition-colors"
+                    className="absolute top-9 right-3 z-20 w-8 h-8 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:border-white/30 transition-colors backdrop-blur-sm"
                     data-testid="button-tutorial-close"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* Modal text */}
+                {/* Modal text + nav */}
                 <div className="p-6 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-primary/60 tracking-widest">ÉTAPE {active.num}</span>
-                  </div>
+                  <span className="text-xs font-bold text-primary/60 tracking-widest">ÉTAPE {active.num}</span>
                   <h2 className="text-2xl font-display font-bold text-foreground">{active.title}</h2>
                   <p className="text-base text-muted-foreground leading-relaxed">{active.desc}</p>
 
-                  {/* Nav between steps */}
-                  <div className="flex items-center justify-between pt-3 border-t border-border/20">
+                  <div className="flex items-center justify-between pt-4 border-t border-border/20">
                     <button
                       onClick={() => setOpen(o => o !== null && o > 0 ? o - 1 : o)}
                       disabled={open === 0}
-                      className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
                       data-testid="button-tutorial-prev"
                     >
                       ← Précédent
                     </button>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-2">
                       {STEPS.map((_, i) => (
                         <button
                           key={i}
                           onClick={() => setOpen(i)}
-                          className={`w-1.5 h-1.5 rounded-full transition-colors ${i === open ? "bg-primary" : "bg-border hover:bg-primary/50"}`}
+                          className={`transition-all duration-200 rounded-full ${i === open ? "w-5 h-2 bg-primary" : "w-2 h-2 bg-border hover:bg-primary/50"}`}
                           data-testid={`button-tutorial-dot-${i}`}
                         />
                       ))}
@@ -350,7 +224,7 @@ export default function TutorialPage() {
                     <button
                       onClick={() => setOpen(o => o !== null && o < STEPS.length - 1 ? o + 1 : o)}
                       disabled={open === STEPS.length - 1}
-                      className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
                       data-testid="button-tutorial-next"
                     >
                       Suivant →
