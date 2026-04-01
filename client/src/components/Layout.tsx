@@ -157,6 +157,13 @@ function matchesHref(href: string, pathname: string, search: string): boolean {
   return pathname.startsWith(href);
 }
 
+/* ── Search navigation helper ──────────────────────────────── */
+function navigateSearchMode(href: string) {
+  window.history.pushState(null, "", href);
+  // Manually dispatch popstate so SearchPage and sidebar react immediately
+  window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+}
+
 /* ── Layout ──────────────────────────────────────────────── */
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, role, frozen, signOut, displayName, avatarUrl } = useAuth();
@@ -164,6 +171,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
   const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Track window.location.search reactively so sidebar active state updates on popstate
+  const [currentSearch, setCurrentSearch] = useState(() =>
+    typeof window !== "undefined" ? window.location.search : ""
+  );
+  useEffect(() => {
+    const handler = () => setCurrentSearch(window.location.search);
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
@@ -200,9 +217,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const sidebarW = collapsed ? W_COLLAPSED : W_EXPANDED;
 
   const pathname = location.split("?")[0].split("#")[0];
-  const search = typeof window !== "undefined" ? window.location.search : "";
 
-  const isActive = (href: string) => matchesHref(href, pathname, search);
+  const isActive = (href: string) => matchesHref(href, pathname, currentSearch);
 
   const itemLabel = (item: NavItem) =>
     item.labelKey ? t(item.labelKey, { defaultValue: item.label }) : item.label;
@@ -220,34 +236,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const active = isActive(item.href);
     const Icon = item.icon;
     const label = itemLabel(item);
+    const isQueryNav = item.href.includes("?"); // search module items use popstate trick
 
-    const inner = (
-      <Link href={item.href}>
-        <div
-          className={`flex items-center rounded-lg cursor-pointer transition-all duration-150 select-none
-            ${collapsed ? "justify-center px-0 py-2.5 mx-1 gap-0" : indent ? "gap-2.5 px-3 py-2 ml-2" : "gap-3 px-3 py-2.5"}
-            ${active
-              ? "bg-primary/10 text-primary border-l-2 border-primary"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent/50 border-l-2 border-transparent"
-            }`}
-          data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+    const itemClass = `flex items-center rounded-lg cursor-pointer transition-all duration-150 select-none
+      ${collapsed ? "justify-center px-0 py-2.5 mx-1 gap-0" : indent ? "gap-2.5 px-3 py-2 ml-2" : "gap-3 px-3 py-2.5"}
+      ${active
+        ? "bg-primary/10 text-primary border-l-2 border-primary"
+        : "text-muted-foreground hover:text-foreground hover:bg-accent/50 border-l-2 border-transparent"
+      }`;
+
+    const innerContent = (
+      <>
+        <Icon className={`shrink-0 ${indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active ? "text-primary" : ""}`} />
+        <span
+          className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12.5px]" : "text-sm"}`}
+          style={{
+            opacity: collapsed ? 0 : 1,
+            maxWidth: collapsed ? 0 : 160,
+            transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
+          }}
         >
-          <Icon className={`shrink-0 ${indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active ? "text-primary" : ""}`} />
-          <span
-            className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12.5px]" : "text-sm"}`}
-            style={{
-              opacity: collapsed ? 0 : 1,
-              maxWidth: collapsed ? 0 : 160,
-              transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
-            }}
-          >
-            {label}
+          {label}
+        </span>
+        {item.badge && !collapsed && (
+          <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${badgeClass(item.badgeColor)}`}>
+            {item.badge}
           </span>
-          {item.badge && !collapsed && (
-            <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${badgeClass(item.badgeColor)}`}>
-              {item.badge}
-            </span>
-          )}
+        )}
+      </>
+    );
+
+    const inner = isQueryNav ? (
+      <a
+        href={item.href}
+        data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+        className={itemClass}
+        onClick={(e) => { e.preventDefault(); navigateSearchMode(item.href); }}
+      >
+        {innerContent}
+      </a>
+    ) : (
+      <Link href={item.href}>
+        <div className={itemClass} data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+          {innerContent}
         </div>
       </Link>
     );

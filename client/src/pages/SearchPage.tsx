@@ -548,17 +548,25 @@ export default function SearchPage() {
     }
   }, [searchMode]);
 
-  // Sync mode when navigating from sidebar (URL changes externally via wouter)
+  // Sync mode when sidebar dispatches a popstate event (pushState + manual popstate dispatch)
   useEffect(() => {
-    const queryStr = wouterLocation.includes("?") ? wouterLocation.split("?")[1] : "";
-    const params = new URLSearchParams(queryStr);
-    const m = params.get("mode");
-    const valid = ["internal", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock"];
-    if (m && valid.includes(m) && m !== searchMode) {
-      setSearchMode(m as typeof searchMode);
-      setCriteria([]);
-    }
-  }, [wouterLocation]);
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get("mode");
+      const valid = ["internal", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock"];
+      if (m && valid.includes(m)) {
+        setSearchMode(current => {
+          if (current !== m) {
+            // Schedule criteria reset after mode update
+            setTimeout(() => setCriteria([]), 0);
+          }
+          return m as typeof searchMode;
+        });
+      }
+    };
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, []);
 
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
