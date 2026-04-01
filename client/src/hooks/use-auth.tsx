@@ -103,27 +103,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Detect OAuth redirect params — PKCE code in query string OR implicit tokens in hash
+    const hasOAuthParams =
+      window.location.search.includes("code=") ||
+      window.location.hash.includes("access_token=") ||
+      window.location.hash.includes("error=");
+
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       if (currentSession?.access_token) {
+        // Already have a valid session (e.g. returning user)
         fetchRole(currentSession.access_token).then(() => setLoading(false));
-      } else {
+      } else if (!hasOAuthParams) {
+        // No session and no OAuth params → not logged in, safe to unblock
         setLoading(false);
       }
+      // If hasOAuthParams but no session yet: keep loading=true and wait for
+      // onAuthStateChange to fire once the SDK finishes exchanging the code
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.access_token) {
-        fetchRole(newSession.access_token);
+        fetchRole(newSession.access_token).then(() => setLoading(false));
       } else {
         setRole(null);
+        setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Safety valve: never block the app longer than 10 s
+    const safetyTimer = setTimeout(() => setLoading(false), 10_000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimer);
+    };
   }, [fetchRole]);
 
   useEffect(() => {
