@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "WlANRdIy1S_XbiXc2TMIf"
@@ -12,3 +11,9 @@ id = "AoISZahSH3I1z1lD02rsk"
 uri = "file://client/public/og-image.png"
 type = "image"
 title = "discreen og banner"
+
+[[outputs]]
+id = "TKWdsLrCrZe-Nvkya1FNL"
+uri = "file://client/public/favicon.png"
+type = "image"
+title = "Logo Discreen"
