@@ -4251,9 +4251,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Message requis." });
       }
 
+      const dixApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+      const dixBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
+      const dixModel = process.env.DISX_MODEL || (dixApiKey?.startsWith("gsk_") ? "llama-3.3-70b-versatile" : "gpt-4o-mini");
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-        ...(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
+        apiKey: dixApiKey,
+        ...(dixBaseUrl ? { baseURL: dixBaseUrl } : {}),
       });
 
       const DISX_SYSTEM = `Tu es DisX, un assistant IA spécialisé en recherche OSINT intégré à la plateforme Discreen.
@@ -4308,14 +4311,14 @@ RÈGLES STRICTES :
       res.setHeader("Connection", "keep-alive");
 
       const stream = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: dixModel,
         messages: [
           { role: "system", content: DISX_SYSTEM },
           ...chatHistory,
           { role: "user", content: message.trim().slice(0, 2000) },
         ],
         stream: true,
-        max_completion_tokens: 800,
+        max_tokens: 800,
         temperature: 0.4,
       });
 
