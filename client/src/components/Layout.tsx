@@ -9,7 +9,7 @@ import {
   Home, Search, CreditCard, MessageSquare,
   Key, FileText, Menu, X, Star, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
-  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen,
+  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen, BotMessageSquare,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -96,6 +96,7 @@ const SEARCH_MODULES: NavItem[] = [
   { label: "Gaming",        href: "/search?mode=fivem",     icon: Gamepad2,   badge: "VIP", badgeColor: "blue" },
   { label: "Google OSINT",  href: "/search?mode=xeuledoc",  icon: FileSearch, badge: "PRO", badgeColor: "red" },
   { label: "Wanted",        href: "/search?mode=wanted",    icon: ShieldAlert,badge: "PRO", badgeColor: "red" },
+  { label: "DisX IA",       href: "/disx",                  icon: BotMessageSquare, badge: "IA", badgeColor: "gold" },
 ];
 
 const NAV_SECTIONS: NavSection[] = [

@@ -4242,5 +4242,100 @@ export async function registerRoutes(
     }
   });
 
+  /* ── DisX AI OSINT Assistant ─────────────────────────── */
+  app.post("/api/disx/chat", requireAuth, async (req: any, res: any) => {
+    try {
+      const { message, history = [] } = req.body;
+      if (!message || typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ error: "Message requis." });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const DISX_SYSTEM = `Tu es DisX, un assistant IA spécialisé en recherche OSINT intégré à la plateforme Discreen.
+
+TON RÔLE :
+Analyser des descriptions en langage naturel de personnes à rechercher, extraire les identifiants clés, et proposer une stratégie de recherche structurée sur Discreen.
+
+TON TON :
+- Professionnel, précis, efficace
+- Tu tutoies l'utilisateur
+- Répond TOUJOURS en français
+- Tes réponses sont structurées avec des sections claires
+
+MODULES DISCREEN DISPONIBLES :
+- **Paramétrique** : Recherche par email, username, IP, Discord ID, hash, téléphone — base principale
+- **Téléphone** : Lookup numéro de téléphone (opérateur, localisation, identité liée)
+- **GeoIP** : Géolocalisation d'adresse IP
+- **NIR** : Recherche par numéro de sécurité sociale
+- **Username OSINT** (VIP) : Recherche username sur des centaines de plateformes
+- **Gaming** (VIP) : Recherche sur FiveM, Discord Gaming, Steam
+- **Google OSINT** (PRO) : Dorks Google avancés, recherche d'images, documents publics
+- **Wanted** (PRO) : Recherche dans les fichiers officiels
+
+PROCESSUS D'ANALYSE :
+Quand l'utilisateur décrit une personne, tu dois :
+1. **Extraire** tous les identifiants mentionnés (prénom, nom, âge, ville, famille, profession, etc.)
+2. **Évaluer** la qualité de chaque identifiant (fort/moyen/faible)
+3. **Recommander** les modules Discreen à utiliser en ordre de priorité
+4. **Suggérer** des recherches croisées entre les informations trouvées
+5. **Alerter** si les informations sont insuffisantes pour une recherche précise
+
+FORMAT DE RÉPONSE :
+Utilise toujours cette structure :
+📋 **Identifiants extraits** : liste les éléments clés
+🎯 **Modules recommandés** : par ordre de priorité avec justification
+🔍 **Stratégie** : comment croiser les données
+⚠️ **Limites** : ce qui manque ou risque de donner des faux positifs
+
+RÈGLES STRICTES :
+- Ne jamais effectuer de vraies recherches toi-même
+- Ne jamais inventer de résultats
+- Refuser toute demande de harcèlement, surveillance illégale ou doxing malveillant
+- Rappeler que l'utilisation doit être légale et éthique`;
+
+      const chatHistory = (Array.isArray(history) ? history.slice(-8) : []).map((m: any) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: DISX_SYSTEM },
+          ...chatHistory,
+          { role: "user", content: message.trim().slice(0, 2000) },
+        ],
+        stream: true,
+        max_completion_tokens: 800,
+        temperature: 0.4,
+      });
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content || "";
+        if (delta) res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      console.error("DisX chat error:", err);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "Erreur DisX" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: "Erreur serveur DisX" });
+      }
+    }
+  });
+
   return httpServer;
 }

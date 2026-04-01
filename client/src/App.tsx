@@ -12,6 +12,7 @@ import SearchPage from "@/pages/SearchPage";
 import PricingPage from "@/pages/PricingPage";
 import ContactPage from "@/pages/ContactPage";
 import TutorialPage from "@/pages/TutorialPage";
+import DisXPage from "@/pages/DisXPage";
 import AuthPage from "@/pages/AuthPage";
 import AdminPage from "@/pages/AdminPage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
@@ -246,6 +247,9 @@ function Router() {
       </Route>
       <Route path="/tuto">
         <PublicRoute component={TutorialPage} />
+      </Route>
+      <Route path="/disx">
+        <ProtectedRoute component={DisXPage} />
       </Route>
       <Route path="/contact">
         <PublicRoute component={ContactPage} />
