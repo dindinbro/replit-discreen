@@ -11,11 +11,11 @@ interface Message {
 }
 
 const EXAMPLE_QUERIES = [
-  "Je cherche un Kevin Martin, il a un frère qui s'appelle Dylan, ils habitent à Bordeaux, Kevin doit avoir 24-26 ans.",
-  "Retrouve la famille Benali à Toulouse — le père s'appelle Mohamed, il a une fille prénommée Sarah née vers 2001.",
-  "Je cherche une femme prénommée Nadia, elle habite dans le 93, son mari s'appelle Karim et ils ont un fils de 8 ans environ.",
-  "Cherche Julien Moreau né vers 1988 à Strasbourg, il a une sœur prénommée Camille, même nom de famille.",
-  "Je cherche un pseudo gamer connu sous le nom de 'ShadowFox', joue à GTA FiveM, probablement français.",
+  "Je cherche un homme prénommé Lucas, il habite à Lyon, travaille dans l'informatique, environ 30 ans.",
+  "Trouve-moi des infos sur une fille prénommée Inès Durand, elle est de Paris 13e, née autour de 1999.",
+  "Je cherche le numéro de téléphone ou l'email d'un certain Thomas Petit, il est électricien à Marseille.",
+  "Un gars connu sous le pseudo 'NightWolf94' sur les jeux en ligne, probablement sur Discord aussi.",
+  "Je cherche une personne avec l'adresse IP 185.220.101.45, c'est quoi sa localisation approximative ?",
 ];
 
 function formatMessage(content: string) {
