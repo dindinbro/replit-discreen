@@ -1171,6 +1171,18 @@ export default function SearchPage() {
   const isXeuledocMode = searchMode === "xeuledoc";
   const isSherlockMode = searchMode === "sherlock";
 
+  // Apply atmosphere to body so sidebar + content share the same base background
+  useEffect(() => {
+    const body = document.body;
+    const ATMO = ["wanted-atmosphere", "fivem-atmosphere", "xeuledoc-atmosphere", "sherlock-atmosphere"];
+    ATMO.forEach(c => body.classList.remove(c));
+    if (isWantedMode) body.classList.add("wanted-atmosphere");
+    else if (isFivemMode) body.classList.add("fivem-atmosphere");
+    else if (isXeuledocMode) body.classList.add("xeuledoc-atmosphere");
+    else if (isSherlockMode) body.classList.add("sherlock-atmosphere");
+    return () => ATMO.forEach(c => body.classList.remove(c));
+  }, [isWantedMode, isFivemMode, isXeuledocMode, isSherlockMode]);
+
   const handleSherlockSearch = async () => {
     const u = sherlockUsername.trim().replace(/^@/, "");
     if (!u) return;
@@ -1314,7 +1326,7 @@ export default function SearchPage() {
   };
 
   return (
-    <main className={`relative w-full min-h-screen transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""} ${isXeuledocMode ? "xeuledoc-atmosphere" : ""} ${isSherlockMode ? "sherlock-atmosphere" : ""}`}>
+    <main className="relative w-full min-h-screen">
       <AnimatePresence>
         {scanning && (
           <div className="scan-overlay">

@@ -298,7 +298,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   /* ── Sidebar content ── */
   const sidebarContent = (
-    <div className="flex flex-col h-full w-full border-r border-border/30 bg-background overflow-hidden">
+    <div className="flex flex-col h-full w-full border-r border-border/30 bg-background/[0.93] backdrop-blur-sm overflow-hidden">
 
       {/* Logo */}
       <div className="h-14 flex items-center shrink-0 px-3 border-b border-border/20">
@@ -476,7 +476,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="min-h-screen bg-background text-foreground flex">
+      <div className="min-h-screen text-foreground flex">
 
         {/* ── Desktop Sidebar ── */}
         <aside
