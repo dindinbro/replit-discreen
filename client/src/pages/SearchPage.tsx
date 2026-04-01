@@ -530,7 +530,23 @@ export default function SearchPage() {
   const [scanning, setScanning] = useState(false);
   const [searchTime, setSearchTime] = useState<number | null>(null);
   const searchStartRef = useRef<number>(0);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">("internal");
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">(() => {
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get("mode");
+    const valid = ["internal", "external", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock"];
+    return (m && valid.includes(m) ? m : "internal") as any;
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get("mode");
+    if (m !== searchMode) {
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.set("mode", searchMode);
+      window.history.replaceState(null, "", `/search?${newParams.toString()}`);
+    }
+  }, [searchMode]);
+
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);

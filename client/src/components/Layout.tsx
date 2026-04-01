@@ -8,7 +8,8 @@ import {
   ShieldCheck, LogOut, Settings, Moon, Sun,
   Home, Search, CreditCard, MessageSquare,
   Key, FileText, Menu, X, Star, Users, User,
-  ChevronDown, ChevronLeft, ChevronRight, LogIn, Languages,
+  ChevronDown, ChevronLeft, ChevronRight, LogIn,
+  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -21,6 +22,7 @@ import { Link, useLocation } from "wouter";
 import ChatWidget from "@/components/ChatWidget";
 import InteractiveGrid from "@/components/InteractiveGrid";
 
+/* ── Online count ────────────────────────────────────────── */
 function useOnlineCount() {
   const [count, setCount] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -52,9 +54,10 @@ function useOnlineCount() {
   return count;
 }
 
-const ROLE_DISPLAY: Record<string, { label: string }> = {
-  admin: { label: "Admin" }, free: { label: "Free" }, vip: { label: "VIP" },
-  pro: { label: "PRO" }, business: { label: "Business" }, api: { label: "API" },
+/* ── Role badges ─────────────────────────────────────────── */
+const ROLE_DISPLAY: Record<string, string> = {
+  admin: "Admin", free: "Free", vip: "VIP",
+  pro: "PRO", business: "Business", api: "API",
 };
 
 const ROLE_COLOR: Record<string, string> = {
@@ -66,70 +69,379 @@ const ROLE_COLOR: Record<string, string> = {
   api: "bg-blue-500/20 text-blue-400 border border-blue-500/30",
 };
 
-interface NavSection {
+/* ── Nav data ────────────────────────────────────────────── */
+interface NavItem {
+  label: string;
   labelKey?: string;
-  items: { labelKey: string; href: string; icon: React.ElementType; badge?: string }[];
+  href: string;
+  icon: React.ElementType;
+  badge?: string;
+  badgeColor?: "gold" | "red" | "blue";
 }
+
+interface NavSection {
+  key: string;
+  labelKey?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+  items: NavItem[];
+}
+
+const SEARCH_MODULES: NavItem[] = [
+  { label: "Paramétrique",  href: "/search?mode=internal",  icon: Sparkles },
+  { label: "Téléphone",     href: "/search?mode=phone",     icon: Phone },
+  { label: "GeoIP",         href: "/search?mode=geoip",     icon: MapPin },
+  { label: "NIR",           href: "/search?mode=nir",       icon: Hash },
+  { label: "Google OSINT",  href: "/search?mode=xeuledoc",  icon: FileSearch, badge: "VIP", badgeColor: "blue" },
+  { label: "Username OSINT",href: "/search?mode=sherlock",  icon: Eye,        badge: "VIP", badgeColor: "blue" },
+  { label: "Gaming",        href: "/search?mode=fivem",     icon: Gamepad2,   badge: "VIP", badgeColor: "blue" },
+  { label: "Wanted",        href: "/search?mode=wanted",    icon: ShieldAlert,badge: "PRO", badgeColor: "red" },
+];
 
 const NAV_SECTIONS: NavSection[] = [
   {
+    key: "home",
     items: [
-      { labelKey: "nav.home", href: "/", icon: Home },
+      { label: "nav.home", labelKey: "nav.home", href: "/", icon: Home },
     ],
   },
   {
-    labelKey: "nav.section.main",
+    key: "recherche",
+    labelKey: "nav.section.recherche",
+    collapsible: true,
+    defaultOpen: true,
+    items: SEARCH_MODULES,
+  },
+  {
+    key: "community",
+    labelKey: "nav.section.community",
     items: [
-      { labelKey: "nav.search", href: "/search", icon: Search },
-      { labelKey: "nav.reviews", href: "/avis", icon: Star },
-      { labelKey: "nav.dof", href: "/users", icon: Users },
+      { label: "nav.reviews", labelKey: "nav.reviews", href: "/avis",  icon: Star },
+      { label: "nav.dof",     labelKey: "nav.dof",     href: "/users", icon: Users },
     ],
   },
   {
+    key: "info",
     labelKey: "nav.section.info",
     items: [
-      { labelKey: "nav.pricing", href: "/pricing", icon: CreditCard },
-      { labelKey: "nav.contact", href: "/contact", icon: MessageSquare },
+      { label: "nav.pricing", labelKey: "nav.pricing", href: "/pricing",  icon: CreditCard },
+      { label: "nav.contact", labelKey: "nav.contact", href: "/contact",  icon: MessageSquare },
     ],
   },
 ];
 
-// Flat list for mobile nav
-const ALL_NAV_ITEMS = NAV_SECTIONS.flatMap(s => s.items);
+const ALL_FLAT_ITEMS: NavItem[] = NAV_SECTIONS.flatMap(s => s.items);
 
 const W_EXPANDED = 224;
 const W_COLLAPSED = 56;
 
+/* ── Helpers ─────────────────────────────────────────────── */
+function matchesHref(href: string, pathname: string, search: string): boolean {
+  if (href.includes("?")) {
+    const [hp, hq] = href.split("?");
+    if (!pathname.startsWith(hp)) return false;
+    const cur = new URLSearchParams(search);
+    const exp = new URLSearchParams(hq);
+    for (const [k, v] of exp) {
+      const curVal = cur.get(k);
+      if (curVal !== v) {
+        // default mode = internal
+        if (k === "mode" && v === "internal" && !curVal) return true;
+        return false;
+      }
+    }
+    return true;
+  }
+  if (href === "/") return pathname === "/";
+  // Don't match /search exactly if there are search mode sub-items
+  return pathname.startsWith(href);
+}
+
+/* ── Layout ──────────────────────────────────────────────── */
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, role, frozen, signOut, displayName, avatarUrl } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
   });
-  const onlineCount = useOnlineCount();
 
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const defaults: Record<string, boolean> = {};
+    for (const s of NAV_SECTIONS) {
+      if (s.collapsible) {
+        try {
+          const stored = localStorage.getItem(`sidebar-section-${s.key}`);
+          defaults[s.key] = stored !== null ? stored === "true" : (s.defaultOpen ?? true);
+        } catch { defaults[s.key] = s.defaultOpen ?? true; }
+      }
+    }
+    return defaults;
+  });
+
+  const onlineCount = useOnlineCount();
   const toggleLanguage = () => i18n.changeLanguage(i18n.language === "fr" ? "en" : "fr");
 
-  const toggleCollapsed = () => {
-    setCollapsed(prev => {
-      const next = !prev;
-      try { localStorage.setItem("sidebar-collapsed", String(next)); } catch {}
-      return next;
-    });
-  };
+  const toggleCollapsed = () => setCollapsed(prev => {
+    const next = !prev;
+    try { localStorage.setItem("sidebar-collapsed", String(next)); } catch {}
+    return next;
+  });
+
+  const toggleSection = (key: string) => setOpenSections(prev => {
+    const next = { ...prev, [key]: !prev[key] };
+    try { localStorage.setItem(`sidebar-section-${key}`, String(next[key])); } catch {}
+    return next;
+  });
 
   const sidebarW = collapsed ? W_COLLAPSED : W_EXPANDED;
 
-  const isActive = (href: string) => {
-    const pathname = location.split("?")[0].split("#")[0];
-    return href === "/" ? pathname === "/" : pathname.startsWith(href);
-  };
+  const pathname = location.split("?")[0].split("#")[0];
+  const search = typeof window !== "undefined" ? window.location.search : "";
+
+  const isActive = (href: string) => matchesHref(href, pathname, search);
+
+  const itemLabel = (item: NavItem) =>
+    item.labelKey ? t(item.labelKey, { defaultValue: item.label }) : item.label;
+
+  const badgeClass = (color?: string) =>
+    color === "red"  ? "bg-red-500/20 text-red-400 border border-red-500/30" :
+    color === "blue" ? "bg-blue-500/20 text-blue-400 border border-blue-500/30" :
+                       "bg-primary/20 text-primary border border-primary/30";
 
   const userHandle = user?.email?.split("@")[0];
   const userName = displayName || userHandle || "";
+
+  /* ── Nav item renderer ── */
+  const renderNavItem = (item: NavItem, indent = false) => {
+    const active = isActive(item.href);
+    const Icon = item.icon;
+    const label = itemLabel(item);
+
+    const inner = (
+      <Link href={item.href}>
+        <div
+          className={`flex items-center rounded-lg cursor-pointer transition-all duration-150 select-none
+            ${collapsed ? "justify-center px-0 py-2.5 mx-1 gap-0" : indent ? "gap-2.5 px-3 py-2 ml-2" : "gap-3 px-3 py-2.5"}
+            ${active
+              ? "bg-primary/10 text-primary border-l-2 border-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent/50 border-l-2 border-transparent"
+            }`}
+          data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+        >
+          <Icon className={`shrink-0 ${indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active ? "text-primary" : ""}`} />
+          <span
+            className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12.5px]" : "text-sm"}`}
+            style={{
+              opacity: collapsed ? 0 : 1,
+              maxWidth: collapsed ? 0 : 160,
+              transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
+            }}
+          >
+            {label}
+          </span>
+          {item.badge && !collapsed && (
+            <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${badgeClass(item.badgeColor)}`}>
+              {item.badge}
+            </span>
+          )}
+        </div>
+      </Link>
+    );
+
+    if (collapsed) {
+      return (
+        <Tooltip key={item.href}>
+          <TooltipTrigger asChild>{inner}</TooltipTrigger>
+          <TooltipContent side="right" className="font-medium">
+            {label}{item.badge && ` (${item.badge})`}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    return <div key={item.href}>{inner}</div>;
+  };
+
+  /* ── Sidebar content ── */
+  const sidebarContent = (
+    <div className="flex flex-col h-full w-full border-r border-border/30 bg-background overflow-hidden">
+
+      {/* Logo */}
+      <div className="h-14 flex items-center shrink-0 px-3 border-b border-border/20">
+        <Link href="/">
+          <div className={`flex items-center gap-2 cursor-pointer ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
+            <div className="bg-primary/10 p-1.5 rounded-lg shrink-0">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+            </div>
+            <span
+              className="font-display font-bold text-lg tracking-tight whitespace-nowrap overflow-hidden"
+              style={{ opacity: collapsed ? 0 : 1, maxWidth: collapsed ? 0 : 140, transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
+            >
+              Di<span className="text-primary">screen</span>
+            </span>
+          </div>
+        </Link>
+      </div>
+
+      {/* Profile card */}
+      {user ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={`shrink-0 border-b border-border/20 hover:bg-accent/30 transition-colors focus:outline-none
+                ${collapsed ? "py-3 flex justify-center items-center" : "py-5 px-4 flex flex-col items-center gap-1.5"}`}
+              data-testid="button-user-menu"
+              title={collapsed ? userName : undefined}
+            >
+              {!collapsed ? (
+                <>
+                  <div className="w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden">
+                    {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-6 h-6 text-primary" />}
+                  </div>
+                  <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
+                  {role && (
+                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${ROLE_COLOR[role] || ROLE_COLOR.free}`}>
+                      {ROLE_DISPLAY[role] || ROLE_DISPLAY.free}
+                    </span>
+                  )}
+                  {userHandle && <span className="text-[11px] text-muted-foreground/60">@{userHandle}</span>}
+                </>
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden">
+                  {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-primary" />}
+                </div>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="w-48">
+            <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
+              <User className="w-4 h-4 mr-2" />{t("header.myAccount")}
+            </DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
+              <Key className="w-4 h-4 mr-2" />{t("header.apiKeys")}
+            </DropdownMenuItem>
+            <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
+              <FileText className="w-4 h-4 mr-2" />{t("header.documentation")}
+            </DropdownMenuItem>
+            {role === "admin" && (
+              <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
+                <Settings className="w-4 h-4 mr-2" />{t("header.admin")}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem data-testid="menu-item-sign-out" onClick={() => signOut()} className="text-destructive focus:text-destructive">
+              <LogOut className="w-4 h-4 mr-2" />{t("header.signOut")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <div className={`shrink-0 border-b border-border/20 ${collapsed ? "py-3 flex justify-center" : "py-4 px-4"}`}>
+          <Link href="/login">
+            <Button
+              variant="default"
+              className={`overflow-hidden ${collapsed ? "w-9 h-9 p-0 justify-center" : "w-full gap-2 justify-center"}`}
+              data-testid="button-login"
+              title={collapsed ? t("header.signIn") : undefined}
+            >
+              <LogIn className="w-4 h-4 shrink-0" />
+              {!collapsed && <span>{t("header.signIn")}</span>}
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* Nav sections */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 scrollbar-none" data-testid="nav-main">
+        {NAV_SECTIONS.map((section, si) => {
+          const isOpen = section.collapsible ? (openSections[section.key] ?? true) : true;
+
+          return (
+            <div key={section.key} className={si > 0 ? "mt-1" : ""}>
+              {/* Section header */}
+              {section.labelKey && !collapsed && (
+                <div
+                  className={`flex items-center justify-between px-4 py-1.5 mt-1 ${section.collapsible ? "cursor-pointer hover:text-foreground" : ""}`}
+                  onClick={section.collapsible ? () => toggleSection(section.key) : undefined}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 select-none">
+                    {t(section.labelKey, { defaultValue: section.key.toUpperCase() })}
+                  </span>
+                  {section.collapsible && (
+                    <ChevronDown
+                      className={`w-3 h-3 text-muted-foreground/40 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
+                    />
+                  )}
+                </div>
+              )}
+              {section.labelKey && collapsed && <div className="my-1 mx-3 border-t border-border/20" />}
+
+              {/* Items */}
+              {(isOpen || collapsed) && (
+                <div className="px-2 flex flex-col gap-0.5">
+                  {section.items.map(item => renderNavItem(item, section.key === "recherche"))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Bottom bar */}
+      <div className="shrink-0 border-t border-border/20 flex items-center justify-around h-12 px-1">
+        {onlineCount !== null && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5 cursor-default px-1" data-testid="status-online-count">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                {!collapsed && <span className="text-[11px] text-muted-foreground font-medium tabular-nums">{onlineCount}</span>}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">{onlineCount} {t("header.onlineUsers", { count: onlineCount })}</TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleLanguage} data-testid="button-lang-toggle">
+              <span className="text-[10px] font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{i18n.language === "fr" ? "Switch to English" : "Passer en Français"}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleTheme} data-testid="button-theme-toggle">
+              {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}</TooltipContent>
+        </Tooltip>
+        {user ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => signOut()} data-testid="button-sign-out-bar">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{t("header.signOut")}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href="/login">
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid="button-login-bar">
+                  <LogIn className="w-4 h-4" />
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="top">{t("header.signIn")}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -137,10 +449,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ── Desktop Sidebar ── */}
         <aside
-          className="hidden lg:block fixed top-0 left-0 h-screen z-[998]"
+          className="hidden lg:block fixed top-0 left-0 h-screen z-[998] relative"
           style={{ width: sidebarW, transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
         >
-          {/* Collapse tab on right edge */}
+          {/* Collapse tab */}
           <button
             onClick={toggleCollapsed}
             data-testid="button-sidebar-collapse"
@@ -149,252 +461,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
           </button>
-
-          {/* Inner panel */}
-          <div className="flex flex-col h-full w-full border-r border-border/30 bg-background overflow-hidden">
-
-            {/* ── Logo ── */}
-            <div className="h-14 flex items-center shrink-0 px-3 border-b border-border/20">
-              <Link href="/">
-                <div className={`flex items-center gap-2 cursor-pointer ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
-                  <div className="bg-primary/10 p-1.5 rounded-lg shrink-0">
-                    <ShieldCheck className="w-5 h-5 text-primary" />
-                  </div>
-                  <span
-                    className="font-display font-bold text-lg tracking-tight whitespace-nowrap overflow-hidden"
-                    style={{
-                      opacity: collapsed ? 0 : 1,
-                      maxWidth: collapsed ? 0 : 140,
-                      transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
-                    }}
-                  >
-                    Di<span className="text-primary">screen</span>
-                  </span>
-                </div>
-              </Link>
-            </div>
-
-            {/* ── Profile card ── */}
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className={`shrink-0 border-b border-border/20 hover:bg-accent/30 transition-colors focus:outline-none ${collapsed ? "py-3 flex justify-center items-center" : "py-5 px-4 flex flex-col items-center gap-1.5"}`}
-                    data-testid="button-user-menu"
-                    title={collapsed ? userName : undefined}
-                  >
-                    {!collapsed ? (
-                      <>
-                        <div className="w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden">
-                          {avatarUrl
-                            ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                            : <User className="w-6 h-6 text-primary" />
-                          }
-                        </div>
-                        <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
-                        {role && (
-                          <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${ROLE_COLOR[role] || ROLE_COLOR.free}`}>
-                            {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
-                          </span>
-                        )}
-                        {userHandle && (
-                          <span className="text-[11px] text-muted-foreground/60">@{userHandle}</span>
-                        )}
-                      </>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden">
-                        {avatarUrl
-                          ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                          : <User className="w-4 h-4 text-primary" />
-                        }
-                      </div>
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="right" align="start" className="w-48">
-                  <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
-                    <User className="w-4 h-4 mr-2" />{t("header.myAccount")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
-                    <Key className="w-4 h-4 mr-2" />{t("header.apiKeys")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
-                    <FileText className="w-4 h-4 mr-2" />{t("header.documentation")}
-                  </DropdownMenuItem>
-                  {role === "admin" && (
-                    <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
-                      <Settings className="w-4 h-4 mr-2" />{t("header.admin")}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    data-testid="menu-item-sign-out"
-                    onClick={() => signOut()}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />{t("header.signOut")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <div className={`shrink-0 border-b border-border/20 ${collapsed ? "py-3 flex justify-center" : "py-4 px-4"}`}>
-                <Link href="/login">
-                  <Button
-                    variant="default"
-                    className={`overflow-hidden ${collapsed ? "w-9 h-9 p-0 justify-center" : "w-full gap-2 justify-center"}`}
-                    data-testid="button-login"
-                    title={collapsed ? t("header.signIn") : undefined}
-                  >
-                    <LogIn className="w-4 h-4 shrink-0" />
-                    {!collapsed && <span>{t("header.signIn")}</span>}
-                  </Button>
-                </Link>
-              </div>
-            )}
-
-            {/* ── Nav sections ── */}
-            <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 scrollbar-none" data-testid="nav-main">
-              {NAV_SECTIONS.map((section, si) => (
-                <div key={si} className={si > 0 ? "mt-1" : ""}>
-                  {/* Section header */}
-                  {section.labelKey && !collapsed && (
-                    <div className="flex items-center justify-between px-4 py-2 mt-1">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 select-none">
-                        {t(section.labelKey, { defaultValue: section.labelKey.split(".").pop()?.toUpperCase() })}
-                      </span>
-                    </div>
-                  )}
-                  {section.labelKey && collapsed && <div className="my-1 mx-3 border-t border-border/20" />}
-
-                  {/* Items */}
-                  <div className="px-2 flex flex-col gap-0.5">
-                    {section.items.map((item) => {
-                      const active = isActive(item.href);
-                      const Icon = item.icon;
-                      const label = t(item.labelKey);
-
-                      const btn = (
-                        <Link key={item.href} href={item.href}>
-                          <div
-                            className={`flex items-center gap-3 rounded-lg cursor-pointer transition-all duration-150 select-none
-                              ${collapsed ? "justify-center px-0 py-2.5 mx-1" : "px-3 py-2.5"}
-                              ${active
-                                ? "bg-primary/10 text-primary border-l-2 border-primary"
-                                : "text-muted-foreground hover:text-foreground hover:bg-accent/50 border-l-2 border-transparent"
-                              }`}
-                            data-testid={`nav-${label.toLowerCase()}`}
-                          >
-                            <Icon className={`w-4 h-4 shrink-0 ${active ? "text-primary" : ""}`} />
-                            <span
-                              className="text-sm font-medium whitespace-nowrap overflow-hidden"
-                              style={{
-                                opacity: collapsed ? 0 : 1,
-                                maxWidth: collapsed ? 0 : 150,
-                                transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
-                              }}
-                            >
-                              {label}
-                            </span>
-                            {item.badge && !collapsed && (
-                              <span className="ml-auto text-[9px] font-bold uppercase bg-primary/20 text-primary px-1.5 py-0.5 rounded-full border border-primary/30">
-                                {item.badge}
-                              </span>
-                            )}
-                          </div>
-                        </Link>
-                      );
-
-                      if (collapsed) {
-                        return (
-                          <Tooltip key={item.href}>
-                            <TooltipTrigger asChild>{btn}</TooltipTrigger>
-                            <TooltipContent side="right" className="font-medium">{label}</TooltipContent>
-                          </Tooltip>
-                        );
-                      }
-                      return <div key={item.href}>{btn}</div>;
-                    })}
-                  </div>
-                </div>
-              ))}
-            </nav>
-
-            {/* ── Bottom bar ── */}
-            <div className={`shrink-0 border-t border-border/20 flex items-center justify-around h-12 px-1`}>
-              {/* Online dot */}
-              {onlineCount !== null && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5 cursor-default px-1" data-testid="status-online-count">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                      {!collapsed && (
-                        <span className="text-[11px] text-muted-foreground font-medium tabular-nums">{onlineCount}</span>
-                      )}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{onlineCount} {t("header.onlineUsers", { count: onlineCount })}</TooltipContent>
-                </Tooltip>
-              )}
-
-              {/* Lang */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleLanguage} data-testid="button-lang-toggle">
-                    <span className="text-[10px] font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">{i18n.language === "fr" ? "Switch to English" : "Passer en Français"}</TooltipContent>
-              </Tooltip>
-
-              {/* Theme */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleTheme} data-testid="button-theme-toggle">
-                    {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">{theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}</TooltipContent>
-              </Tooltip>
-
-              {/* Logout or Login */}
-              {user ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => signOut()}
-                      data-testid="button-sign-out-bar"
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{t("header.signOut")}</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link href="/login">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid="button-login-bar">
-                        <LogIn className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{t("header.signIn")}</TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-          </div>
+          {sidebarContent}
         </aside>
 
         {/* ── Main area ── */}
         <div
           className="flex-1 flex flex-col min-w-0"
-          style={{
-            marginLeft: `${sidebarW}px`,
-            transition: "margin-left 0.22s cubic-bezier(0.4,0,0.2,1)",
-          }}
+          style={{ marginLeft: `${sidebarW}px`, transition: "margin-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}
         >
           {/* Mobile top bar */}
           <header className="lg:hidden sticky top-0 z-[999] w-full border-b border-border/30 bg-background/90 backdrop-blur">
@@ -431,21 +504,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
 
             {mobileOpen && (
-              <div className="border-t border-border/30 bg-background/95 backdrop-blur">
+              <div className="border-t border-border/30 bg-background/95 backdrop-blur max-h-[80vh] overflow-y-auto">
                 <nav className="px-4 py-3 flex flex-col gap-1" data-testid="nav-mobile">
-                  {ALL_NAV_ITEMS.map((item) => {
+                  {ALL_FLAT_ITEMS.map((item) => {
                     const active = isActive(item.href);
                     const Icon = item.icon;
-                    const label = t(item.labelKey);
+                    const label = itemLabel(item);
                     return (
                       <Link key={item.href} href={item.href}>
                         <Button
                           variant={active ? "secondary" : "ghost"}
                           className="w-full justify-start gap-2"
-                          data-testid={`nav-mobile-${label.toLowerCase()}`}
+                          data-testid={`nav-mobile-${label.toLowerCase().replace(/\s+/g, "-")}`}
                           onClick={() => setMobileOpen(false)}
                         >
                           <Icon className="w-4 h-4" />{label}
+                          {item.badge && (
+                            <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full ${badgeClass(item.badgeColor)}`}>
+                              {item.badge}
+                            </span>
+                          )}
                         </Button>
                       </Link>
                     );

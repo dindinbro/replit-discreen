@@ -8,7 +8,9 @@
     "contact": "Contact",
     "section": {
       "main": "Main",
-      "info": "Information"
+      "info": "Information",
+      "recherche": "Search",
+      "community": "Community"
     },
     "darkMode": "Dark mode",
     "lightMode": "Light mode"
