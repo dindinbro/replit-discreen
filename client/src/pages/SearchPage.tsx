@@ -1913,14 +1913,17 @@ export default function SearchPage() {
             </motion.div>
           )}
 
-          {searchMode === "xeuledoc" && (
+          {searchMode === "xeuledoc" && (() => {
+            const canAccessXeuledoc = ["pro", "business", "api", "admin"].includes(internalTier);
+            return (
             <motion.div
               key="xeuledoc"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="glass-panel-xeuledoc rounded-2xl p-6 md:p-8 space-y-6"
+              className="glass-panel-xeuledoc rounded-2xl p-6 md:p-8 space-y-6 relative"
             >
+              <div className={canAccessXeuledoc ? "" : "blur-sm select-none pointer-events-none"}>
               <div className="flex items-center gap-2">
                 <FileSearch className="w-5 h-5 text-blue-500" />
                 <h2 className="text-xl font-semibold">Google Docs OSINT</h2>
@@ -2064,8 +2067,28 @@ export default function SearchPage() {
                   )}
                 </motion.div>
               )}
+              </div>
+              {!canAccessXeuledoc && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl bg-background/30" data-testid="xeuledoc-upgrade-overlay">
+                  <div className="text-center space-y-3 p-6">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                      <Lock className="w-6 h-6 text-red-500" />
+                    </div>
+                    <h3 className="text-lg font-bold">Abonnement PRO requis</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                      Google Docs OSINT est disponible a partir de l'abonnement PRO ou superieur.
+                    </p>
+                    <Link href="/pricing">
+                      <Button className="mt-2 gap-2" data-testid="button-upgrade-xeuledoc">
+                        Voir les abonnements
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
             </motion.div>
-          )}
+            );
+          })()}
 
           {searchMode === "sherlock" && (
             <motion.div
