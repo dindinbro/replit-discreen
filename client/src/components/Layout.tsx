@@ -495,7 +495,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ── Main area ── */}
         <div
-          className="flex flex-col min-w-0"
+          className="flex flex-col min-w-0 overflow-x-hidden"
           style={{
             marginLeft: `${sidebarW}px`,
             width: `calc(100vw - ${sidebarW}px)`,
