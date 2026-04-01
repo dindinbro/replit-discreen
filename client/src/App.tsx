@@ -18,6 +18,7 @@ import DocumentationPage from "@/pages/DocumentationPage";
 import VouchesPage from "@/pages/VouchesPage";
 import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
 import ProfilePage from "@/pages/ProfilePage";
+import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import BlacklistRequestPage from "@/pages/BlacklistRequestPage";
 import InfoRequestPage from "@/pages/InfoRequestPage";
 import UsersPage from "@/pages/UsersPage";
@@ -80,6 +81,9 @@ function GuestRoute({ component: Component }: { component: React.ComponentType }
 function Router() {
   return (
     <Switch>
+      <Route path="/auth/callback">
+        <AuthCallbackPage />
+      </Route>
       <Route path="/login">
         <GuestRoute component={AuthPage} />
       </Route>
@@ -149,7 +153,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const bypassPaths = ["/login", "/admin"];
+  const bypassPaths = ["/login", "/admin", "/auth/callback"];
   const isBypassed = bypassPaths.some((p) => location === p || location.startsWith(p + "/"));
 
   if (maintenance && role !== "admin" && !isBypassed) {
