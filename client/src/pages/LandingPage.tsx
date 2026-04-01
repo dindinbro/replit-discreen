@@ -239,15 +239,15 @@ export default function LandingPage() {
               key={i}
               whileHover={{ y: -4, scale: 1.02 }}
               transition={{ type: "spring", stiffness: 320, damping: 22 }}
-              className="group relative rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4 space-y-2 cursor-default overflow-hidden hover:border-primary/40 hover:shadow-[0_0_18px_rgba(212,175,55,0.12)] transition-colors duration-200"
+              className="group relative rounded-xl border border-border/40 bg-gray-100 dark:bg-card/50 dark:backdrop-blur-sm p-4 space-y-2 cursor-default overflow-hidden hover:border-primary/50 hover:shadow-[0_0_18px_rgba(212,175,55,0.14)] transition-colors duration-200"
               data-testid={`feature-card-${i}`}
             >
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none rounded-xl" />
-              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-200">
-                <item.icon className="w-3.5 h-3.5 text-primary/70 group-hover:text-primary transition-colors duration-200" />
+              <div className="w-7 h-7 rounded-lg bg-primary/15 dark:bg-primary/10 flex items-center justify-center group-hover:bg-primary/25 dark:group-hover:bg-primary/20 transition-colors duration-200">
+                <item.icon className="w-3.5 h-3.5 text-primary group-hover:text-primary transition-colors duration-200" />
               </div>
-              <h3 className="font-semibold text-sm text-foreground">{t(item.titleKey)}</h3>
-              <p className="text-xs text-muted-foreground/70 leading-relaxed">{t(item.descKey)}</p>
+              <h3 className="font-semibold text-sm text-gray-800 dark:text-foreground">{t(item.titleKey)}</h3>
+              <p className="text-xs text-gray-500 dark:text-muted-foreground/70 leading-relaxed">{t(item.descKey)}</p>
             </motion.div>
           ))}
         </motion.div>
