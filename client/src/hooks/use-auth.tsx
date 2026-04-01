@@ -20,6 +20,7 @@ interface AuthContextType {
   displayName: string | null;
   avatarUrl: string | null;
   expiresAt: string | null;
+  uniqueId: number | null;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signInWithDiscord: () => Promise<void>;
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [uniqueId, setUniqueId] = useState<number | null>(null);
 
   const sessionRegisteredRef = useRef(false);
 
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setDisplayName(data.display_name || null);
         setAvatarUrl(data.avatar_url || null);
         setExpiresAt(data.expires_at || null);
+        setUniqueId(data.unique_id ?? null);
 
         // Refresh the raw Supabase user object so user_metadata stays in sync
         // (needed for checks like user.user_metadata?.display_name after username setup)
@@ -94,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setDisplayName(null);
         setAvatarUrl(null);
         setExpiresAt(null);
+        setUniqueId(null);
       }
     } catch {
       setRole("user");
@@ -101,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setDisplayName(null);
       setAvatarUrl(null);
       setExpiresAt(null);
+      setUniqueId(null);
     }
   }, [registerSession]);
 
@@ -263,6 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       displayName,
       avatarUrl,
       expiresAt,
+      uniqueId,
       signInWithEmail,
       signUpWithEmail,
       signInWithDiscord,

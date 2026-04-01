@@ -168,7 +168,7 @@ function navigateSearchMode(href: string) {
 
 /* ── Layout ──────────────────────────────────────────────── */
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, role, frozen, signOut, displayName, avatarUrl } = useAuth();
+  const { user, role, frozen, signOut, displayName, avatarUrl, uniqueId } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [location, navigate] = useLocation();
@@ -340,7 +340,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <div className="w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden">
                     {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-6 h-6 text-primary" />}
                   </div>
-                  <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
+                    {uniqueId && (
+                      <span className="text-[10px] font-mono text-muted-foreground/40 mt-0.5">#{uniqueId}</span>
+                    )}
+                  </div>
                   {role && (
                     <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${ROLE_COLOR[role] || ROLE_COLOR.free}`}>
                       {ROLE_DISPLAY[role] || ROLE_DISPLAY.free}
