@@ -16,7 +16,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("discreen-theme");
-      if (stored === "dark" || stored === "light") return stored;
+      if (stored === "dark") return "dark";
+      // Reset any stored "light" preference — site defaults to dark
+      localStorage.removeItem("discreen-theme");
     }
     return "dark";
   });
