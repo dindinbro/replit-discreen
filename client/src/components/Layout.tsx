@@ -497,8 +497,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ── Main area ── */}
         <div
-          className="flex-1 flex flex-col min-w-0"
-          style={{ marginLeft: `${sidebarW}px`, transition: "margin-left 0.22s cubic-bezier(0.4,0,0.2,1)" }}
+          className="flex flex-col min-w-0"
+          style={{
+            marginLeft: `${sidebarW}px`,
+            width: `calc(100vw - ${sidebarW}px)`,
+            transition: "margin-left 0.22s cubic-bezier(0.4,0,0.2,1), width 0.22s cubic-bezier(0.4,0,0.2,1)"
+          }}
         >
           {/* Mobile top bar */}
           <header className="lg:hidden sticky top-0 z-[999] w-full border-b border-border/30 bg-background/90 backdrop-blur">
