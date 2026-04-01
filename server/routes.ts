@@ -4340,6 +4340,28 @@ Règles :
         }
       }
 
+      // Also search Wanted profiles
+      try {
+        const wantedCriteriaMap: Record<string, string> = {};
+        for (const c of criteria) {
+          if (["firstName", "lastName", "email", "phone", "username", "city", "discordId"].includes(c.type)) {
+            wantedCriteriaMap[c.type] = c.value.trim();
+          }
+        }
+        if (Object.keys(wantedCriteriaMap).length > 0) {
+          const wantedResults = await storage.searchWantedProfiles(wantedCriteriaMap);
+          if (wantedResults.length > 0) {
+            const wantedMapped = wantedResults.slice(0, 5).map((w: any) => ({ ...w, _wantedProfile: true }));
+            searchResult = {
+              results: [...wantedMapped, ...searchResult.results],
+              total: searchResult.total + wantedResults.length,
+            };
+          }
+        }
+      } catch (e) {
+        console.error("[DisX] Wanted search error:", e);
+      }
+
       send({ type: "results", data: { results: searchResult.results, total: searchResult.total } });
 
       /* ── Phase 3 : AI summary ── */
@@ -4347,7 +4369,8 @@ Règles :
 
 Règles :
 - Sois direct et factuel
-- Si des résultats sont trouvés, résume les informations clés disponibles
+- Si des résultats sont trouvés, résume les informations clés disponibles (données personnelles, localisation, contacts...)
+- Si des profils "Wanted" (_wantedProfile: true) apparaissent, mentionne-les clairement comme des profils recherchés/signalés
 - Si aucun résultat, suggère d'affiner la recherche (plus de critères)
 - Ne jamais inventer d'informations qui ne sont pas dans les résultats
 - Maximum 3-4 phrases`;

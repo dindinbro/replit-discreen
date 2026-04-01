@@ -45,14 +45,11 @@ function CriterionBadge({ c }: { c: Criterion }) {
 
 function ResultCard({ record }: { record: any }) {
   const entries = Object.entries(record).filter(([k, v]) =>
-    v !== null && v !== undefined && v !== "" && k !== "source" && k !== "_score"
+    v !== null && v !== undefined && v !== "" &&
+    k !== "source" && k !== "_score" && k !== "_source" && k !== "id" && k !== "createdAt" && k !== "updatedAt"
   );
-  const source = record.source || record._source || "";
   return (
     <div className="rounded-xl border border-border/30 bg-card/40 p-3 space-y-2">
-      {source && (
-        <div className="text-[10px] text-primary/60 font-semibold uppercase tracking-wider">{source}</div>
-      )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
         {entries.slice(0, 10).map(([k, v]) => (
           <div key={k} className="flex flex-col">

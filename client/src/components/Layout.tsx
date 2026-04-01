@@ -184,6 +184,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("popstate", handler);
   }, []);
 
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" ? window.innerWidth >= 1024 : true);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem("sidebar-collapsed") === "true"; } catch { return false; }
   });
@@ -480,7 +488,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ── Desktop Sidebar ── */}
         <aside
-          className="hidden lg:block fixed top-0 left-0 h-screen z-[998] relative"
+          className="hidden lg:flex fixed top-0 left-0 h-screen z-[998] flex-col"
           style={{ width: sidebarW, transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
         >
           {/* Collapse tab */}
@@ -497,10 +505,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ── Main area ── */}
         <div
-          className="flex flex-col min-w-0 overflow-x-hidden"
+          className="flex flex-col min-w-0 overflow-x-hidden w-full"
           style={{
-            marginLeft: `${sidebarW}px`,
-            width: `calc(100vw - ${sidebarW}px)`,
+            marginLeft: isDesktop ? `${sidebarW}px` : "0",
+            width: isDesktop ? `calc(100vw - ${sidebarW}px)` : "100vw",
             transition: "margin-left 0.22s cubic-bezier(0.4,0,0.2,1), width 0.22s cubic-bezier(0.4,0,0.2,1)"
           }}
         >
