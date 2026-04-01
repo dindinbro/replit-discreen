@@ -7,7 +7,13 @@ let supabaseInstance: SupabaseClient | null = null;
 
 if (supabaseUrl && supabaseAnonKey) {
   try {
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        detectSessionInUrl: true,
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    });
   } catch (error) {
     console.error("Failed to initialize Supabase client:", error);
   }

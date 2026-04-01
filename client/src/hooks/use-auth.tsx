@@ -103,39 +103,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Detect OAuth redirect params — PKCE code in query string OR implicit tokens in hash
-    const hasOAuthParams =
-      window.location.search.includes("code=") ||
-      window.location.hash.includes("access_token=") ||
-      window.location.hash.includes("error=");
-
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.access_token) {
-        // Already have a valid session (e.g. returning user)
-        fetchRole(currentSession.access_token).then(() => setLoading(false));
-      } else if (!hasOAuthParams) {
-        // No session and no OAuth params → not logged in, safe to unblock
+    let loadingResolved = false;
+    const resolveLoading = () => {
+      if (!loadingResolved) {
+        loadingResolved = true;
         setLoading(false);
       }
-      // If hasOAuthParams but no session yet: keep loading=true and wait for
-      // onAuthStateChange to fire once the SDK finishes exchanging the code
-    });
+    };
 
+    // ① Register listener FIRST — it is the single source of truth for resolving loading
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.access_token) {
-        fetchRole(newSession.access_token).then(() => setLoading(false));
+        fetchRole(newSession.access_token).then(resolveLoading);
       } else {
         setRole(null);
-        setLoading(false);
+        resolveLoading();
       }
     });
 
-    // Safety valve: never block the app longer than 10 s
-    const safetyTimer = setTimeout(() => setLoading(false), 10_000);
+    // ② Then initialise the session — handles all OAuth redirect cases
+    const initSession = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
+
+      if (code) {
+        // PKCE flow: explicit code exchange fires onAuthStateChange → SIGNED_IN
+        try {
+          await supabase.auth.exchangeCodeForSession(code);
+          // Remove code from URL so a page refresh doesn't fail the exchange
+          const clean = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, "", clean);
+        } catch {
+          // Code already consumed by detectSessionInUrl — check for existing session
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) resolveLoading();
+        }
+        return;
+      }
+
+      // Implicit flow / existing session: getSession() triggers detectSessionInUrl
+      // which fires onAuthStateChange automatically via the Supabase SDK
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session && !window.location.hash.includes("access_token")) {
+        // Truly not logged in — safe to unblock
+        resolveLoading();
+      }
+      // Otherwise wait for onAuthStateChange (hash or refreshed session)
+    };
+
+    initSession();
+
+    // Safety valve — never block more than 10 s
+    const safetyTimer = setTimeout(resolveLoading, 10_000);
 
     return () => {
       subscription.unsubscribe();
