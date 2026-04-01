@@ -208,129 +208,109 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </nav>
 
           {/* Bottom section */}
-          <div
-            className="pb-3 pt-2 border-t border-border/40 shrink-0 overflow-hidden"
-            style={{ padding: collapsed ? "8px 6px" : "8px 8px 12px" }}
-          >
+          <div className="border-t border-border/40 shrink-0 overflow-hidden px-1.5 py-2 space-y-0.5">
+
             {/* Online count */}
             {onlineCount !== null && (
-              collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center justify-center py-1.5 cursor-default" data-testid="status-online-count">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{onlineCount} online</TooltipContent>
-                </Tooltip>
-              ) : (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1.5 overflow-hidden" data-testid="status-online-count">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span className="font-medium tabular-nums shrink-0">{onlineCount}</span>
-                  <span className="truncate">{t("header.onlineUsers", { count: onlineCount })}</span>
-                </div>
-              )
+              <div
+                className={`flex items-center gap-2 text-xs text-muted-foreground py-1 overflow-hidden ${collapsed ? "justify-center px-0" : "px-2"}`}
+                title={collapsed ? `${onlineCount} online` : undefined}
+                data-testid="status-online-count"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span
+                  className="whitespace-nowrap overflow-hidden"
+                  style={{
+                    opacity: collapsed ? 0 : 1,
+                    maxWidth: collapsed ? 0 : 160,
+                    transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
+                  }}
+                >
+                  <span className="font-medium tabular-nums">{onlineCount}</span>
+                  {" "}{t("header.onlineUsers", { count: onlineCount })}
+                </span>
+              </div>
             )}
 
-            {/* Controls row */}
-            <div className={`flex gap-1 ${collapsed ? "flex-col items-center" : "flex-row px-1"}`}>
-              {/* Lang */}
-              {collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleLanguage} data-testid="button-lang-toggle">
-                      <span className="text-[10px] font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {i18n.language === "fr" ? "Switch to English" : "Passer en Français"}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleLanguage} data-testid="button-lang-toggle">
-                  <span className="text-[10px] font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
-                </Button>
-              )}
+            {/* Lang + Theme + Status row */}
+            <div className={`flex gap-0.5 overflow-hidden ${collapsed ? "flex-col items-center" : "flex-row items-center"}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={toggleLanguage}
+                title={i18n.language === "fr" ? "Switch to English" : "Passer en Français"}
+                data-testid="button-lang-toggle"
+              >
+                <span className="text-[10px] font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
+              </Button>
 
-              {/* Theme */}
-              {collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleTheme} data-testid="button-theme-toggle">
-                      {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleTheme} data-testid="button-theme-toggle">
-                  {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={toggleTheme}
+                title={theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}
+                data-testid="button-theme-toggle"
+              >
+                {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              </Button>
 
-              {/* Status */}
-              {!collapsed && (
-                user && frozen ? (
-                  <div className="flex items-center text-xs font-medium text-red-500 dark:text-red-400 ml-1" data-testid="status-frozen">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1" />
-                    {t("header.frozen")}
-                  </div>
-                ) : (
-                  <div className="flex items-center text-xs font-medium text-muted-foreground ml-1" data-testid="status-operational">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
-                    {t("header.operational")}
-                  </div>
-                )
-              )}
+              <div
+                className="flex items-center text-xs font-medium overflow-hidden shrink-0"
+                style={{
+                  opacity: collapsed ? 0 : 1,
+                  maxWidth: collapsed ? 0 : 100,
+                  transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
+                }}
+                data-testid={user && frozen ? "status-frozen" : "status-operational"}
+              >
+                <div className={`w-1.5 h-1.5 rounded-full mr-1 shrink-0 ${user && frozen ? "bg-red-500" : "bg-emerald-500 animate-pulse"}`} />
+                <span className={user && frozen ? "text-red-500 dark:text-red-400" : "text-muted-foreground"}>
+                  {user && frozen ? t("header.frozen") : t("header.operational")}
+                </span>
+              </div>
             </div>
 
-            {/* User / login */}
+            {/* User menu */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  {collapsed ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" className="w-full h-9 px-0 justify-center" data-testid="button-user-menu">
-                          <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden">
-                            {avatarUrl ? (
-                              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <User className="w-3.5 h-3.5 text-primary" />
-                            )}
-                          </div>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{displayName || user.email?.split("@")[0]}</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <Button variant="ghost" className="w-full justify-start gap-2 h-9 px-2 text-sm" data-testid="button-user-menu">
-                      <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-3.5 h-3.5 text-primary" />
-                        )}
-                      </div>
-                      <div className="flex flex-col items-start leading-tight min-w-0">
-                        <span className="text-xs font-medium truncate max-w-[100px]">
-                          {displayName || user.email?.split("@")[0]}
+                  <Button
+                    variant="ghost"
+                    className={`w-full h-9 text-sm overflow-hidden ${collapsed ? "justify-center px-0" : "justify-start gap-2 px-2"}`}
+                    data-testid="button-user-menu"
+                    title={collapsed ? (displayName || user.email?.split("@")[0]) : undefined}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0">
+                      {avatarUrl
+                        ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                        : <User className="w-3.5 h-3.5 text-primary" />
+                      }
+                    </div>
+                    <div
+                      className="flex flex-col items-start leading-tight min-w-0 overflow-hidden"
+                      style={{
+                        opacity: collapsed ? 0 : 1,
+                        maxWidth: collapsed ? 0 : 120,
+                        transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
+                      }}
+                    >
+                      <span className="text-xs font-medium truncate">
+                        {displayName || user.email?.split("@")[0]}
+                      </span>
+                      {role && (
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                          role === "admin" ? "text-red-400" :
+                          role === "pro" || role === "business" ? "text-primary" :
+                          role === "vip" ? "text-amber-400" : "text-muted-foreground"
+                        }`}>
+                          {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
                         </span>
-                        {role && (
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                            role === "admin" ? "text-red-400" :
-                            role === "pro" || role === "business" ? "text-primary" :
-                            role === "vip" ? "text-amber-400" : "text-muted-foreground"
-                          }`}>
-                            {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
-                          </span>
-                        )}
-                      </div>
-                      <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />
-                    </Button>
-                  )}
+                      )}
+                    </div>
+                    {!collapsed && <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right" align="end" className="w-48">
                   <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
@@ -358,25 +338,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              collapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link href="/login">
-                      <Button variant="default" size="icon" className="w-full h-9" data-testid="button-login">
-                        <LogIn className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{t("header.signIn")}</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Link href="/login">
-                  <Button variant="default" size="sm" className="w-full gap-2 justify-start" data-testid="button-login">
-                    <LogIn className="w-4 h-4" />
+              <Link href="/login">
+                <Button
+                  variant="default"
+                  className={`w-full h-9 overflow-hidden ${collapsed ? "justify-center px-0" : "gap-2 justify-start px-3"}`}
+                  data-testid="button-login"
+                  title={collapsed ? t("header.signIn") : undefined}
+                >
+                  <LogIn className="w-4 h-4 shrink-0" />
+                  <span
+                    className="whitespace-nowrap overflow-hidden"
+                    style={{
+                      opacity: collapsed ? 0 : 1,
+                      maxWidth: collapsed ? 0 : 120,
+                      transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
+                    }}
+                  >
                     {t("header.signIn")}
-                  </Button>
-                </Link>
-              )
+                  </span>
+                </Button>
+              </Link>
             )}
 
             {/* Collapse toggle */}
