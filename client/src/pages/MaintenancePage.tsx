@@ -7,19 +7,21 @@ import {
   Mail, User, Phone, Globe, Hash, MapPin, Key, Calendar,
   Crown, Rocket, Code, Check, X, Gamepad2, Fingerprint,
   Cpu, FileSearch, UserSearch, AlertTriangle, Infinity,
+  Clock, ChevronRight,
 } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
+/* ── helpers ── */
 function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
   const started = useRef(false);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const start = performance.now();
+    const t0 = performance.now();
     const run = (now: number) => {
-      const p = Math.min((now - start) / 1800, 1);
+      const p = Math.min((now - t0) / 1800, 1);
       setCount(Math.floor((1 - Math.pow(1 - p, 3)) * target));
       if (p < 1) requestAnimationFrame(run);
       else setCount(target);
@@ -29,118 +31,150 @@ function AnimatedNumber({ target, suffix = "" }: { target: number; suffix?: stri
   return <>{count.toLocaleString("fr-FR")}{suffix}</>;
 }
 
-const fakeResults = [
-  {
-    title: "j••••.d••••@gmail.com",
-    source: "Discreen",
-    fields: [
-      { icon: Mail, label: "Email", value: "j••••.d••••@gmail.com", color: "--primary" },
-      { icon: User, label: "Pseudo", value: "jd••••42", color: "--chart-2" },
-      { icon: Phone, label: "Telephone", value: "06 •• •• •• 78", color: "--chart-3" },
-      { icon: Key, label: "Mot de passe", value: "••••••••••", color: "--chart-4" },
-      { icon: MapPin, label: "Ville", value: "P••••s", color: "--chart-5" },
-      { icon: Calendar, label: "Date", value: "2024-••-••", color: "--chart-1" },
-    ],
-  },
-  {
-    title: "je••.du••••@outlook.fr",
-    source: "Discreen",
-    fields: [
-      { icon: Mail, label: "Email", value: "je••.du••••@outlook.fr", color: "--primary" },
-      { icon: User, label: "Nom", value: "D••••t", color: "--chart-2" },
-      { icon: Globe, label: "IP", value: "92.••.••.137", color: "--chart-3" },
-      { icon: Key, label: "Mot de passe", value: "••••••••", color: "--chart-4" },
-    ],
-  },
-  {
-    title: "jdup••••@yahoo.com",
-    source: "Discreen",
-    fields: [
-      { icon: Mail, label: "Email", value: "jdup••••@yahoo.com", color: "--primary" },
-      { icon: User, label: "Pseudo", value: "D••k_R••der", color: "--chart-2" },
-      { icon: Phone, label: "Telephone", value: "07 •• •• •• 15", color: "--chart-3" },
-    ],
-  },
-];
+/* ── search category tabs data ── */
+type SearchMode = "internal" | "phone" | "geoip" | "nir" | "sherlock" | "fivem" | "xeuledoc" | "wanted";
 
-const criteria = [
-  { icon: Mail, label: "Email" },
-  { icon: User, label: "Pseudo" },
-  { icon: Phone, label: "Telephone" },
-  { icon: Globe, label: "Domaine" },
-  { icon: Hash, label: "Adresse IP" },
-];
+interface CategoryTab {
+  id: SearchMode;
+  label: string;
+  icon: React.ElementType;
+  tier: "FREE" | "VIP" | "PRO";
+  placeholder: string;
+  color: string;
+  fakeResults: Array<{ label: string; value: string; icon: React.ElementType }>;
+}
 
-const SEARCH_CATEGORIES = [
+const CATEGORIES: CategoryTab[] = [
   {
-    icon: Database,
+    id: "internal",
     label: "Paramétrique",
-    desc: "Recherche multi-champs dans toutes nos bases de données indexées",
-    badge: "FREE",
-    badgeColor: "secondary",
+    icon: Database,
+    tier: "FREE",
+    placeholder: "jean.dupont@gmail.com",
+    color: "from-primary to-emerald-400",
+    fakeResults: [
+      { label: "Email", value: "j••••.d••••@gmail.com", icon: Mail },
+      { label: "Pseudo", value: "jd••••42", icon: User },
+      { label: "Téléphone", value: "06 •• •• •• 78", icon: Phone },
+      { label: "Mot de passe", value: "••••••••••", icon: Key },
+      { label: "Ville", value: "P••••s", icon: MapPin },
+      { label: "Date", value: "2024-••-••", icon: Calendar },
+    ],
   },
   {
-    icon: Phone,
+    id: "phone",
     label: "Téléphone",
-    desc: "Identification d'un numéro — opérateur, localisation, identité liée",
-    badge: "FREE",
-    badgeColor: "secondary",
+    icon: Phone,
+    tier: "FREE",
+    placeholder: "0612345678",
+    color: "from-sky-400 to-blue-500",
+    fakeResults: [
+      { label: "Numéro", value: "06 •• •• •• 78", icon: Phone },
+      { label: "Opérateur", value: "Bou••••s", icon: Globe },
+      { label: "Prénom", value: "J••n", icon: User },
+      { label: "Nom", value: "D••••t", icon: User },
+      { label: "Ville", value: "L••n", icon: MapPin },
+    ],
   },
   {
-    icon: Globe,
+    id: "geoip",
     label: "GeoIP",
-    desc: "Géolocalisation précise d'une adresse IP, FAI, ASN, coordonnées",
-    badge: "FREE",
-    badgeColor: "secondary",
+    icon: Globe,
+    tier: "FREE",
+    placeholder: "92.184.xx.xx",
+    color: "from-teal-400 to-cyan-500",
+    fakeResults: [
+      { label: "Adresse IP", value: "92.••.••.137", icon: Hash },
+      { label: "FAI", value: "Or••••", icon: Globe },
+      { label: "ASN", value: "AS••••", icon: Cpu },
+      { label: "Ville", value: "P••••s", icon: MapPin },
+      { label: "Pays", value: "FR 🇫🇷", icon: Globe },
+    ],
   },
   {
-    icon: Fingerprint,
+    id: "nir",
     label: "NIR / INSEE",
-    desc: "Recherche par numéro de sécurité sociale — département, âge, sexe",
-    badge: "FREE",
-    badgeColor: "secondary",
+    icon: Fingerprint,
+    tier: "FREE",
+    placeholder: "1 91 06 75 XXX XXX XX",
+    color: "from-violet-400 to-purple-500",
+    fakeResults: [
+      { label: "Sexe", value: "Homme", icon: User },
+      { label: "Né en", value: "19••", icon: Calendar },
+      { label: "Département", value: "75 — Pa••••", icon: MapPin },
+      { label: "Commune", value: "P••••s 1er", icon: MapPin },
+    ],
   },
   {
-    icon: UserSearch,
+    id: "sherlock",
     label: "Username OSINT",
-    desc: "Recherche d'un pseudonyme sur plus de 500 plateformes simultanément",
-    badge: "VIP",
-    badgeColor: "outline",
+    icon: UserSearch,
+    tier: "VIP",
+    placeholder: "dark_rider42",
+    color: "from-purple-500 to-violet-400",
+    fakeResults: [
+      { label: "Twitter", value: "Trouvé ✓", icon: Globe },
+      { label: "Instagram", value: "Trouvé ✓", icon: Globe },
+      { label: "Reddit", value: "Trouvé ✓", icon: Globe },
+      { label: "Steam", value: "Trouvé ✓", icon: Globe },
+      { label: "GitHub", value: "Non trouvé ✗", icon: Globe },
+    ],
   },
   {
-    icon: Gamepad2,
+    id: "fivem",
     label: "Gaming",
-    desc: "Recherche FiveM, Steam, Discord, Minecraft et autres plateformes gaming",
-    badge: "VIP",
-    badgeColor: "outline",
+    icon: Gamepad2,
+    tier: "VIP",
+    placeholder: "Steam / FiveM / Discord ID…",
+    color: "from-orange-500 to-amber-400",
+    fakeResults: [
+      { label: "Steam ID", value: "765••••••••••••", icon: Globe },
+      { label: "Pseudo FiveM", value: "D••k_R••der", icon: User },
+      { label: "Licence", value: "steam:••••••••••", icon: Key },
+      { label: "Discord", value: "••••••••••••", icon: Hash },
+    ],
   },
   {
-    icon: FileSearch,
+    id: "xeuledoc",
     label: "Google OSINT",
-    desc: "Dorks Google avancés pour retrouver des informations publiques exposées",
-    badge: "PRO",
-    badgeColor: "destructive",
+    icon: FileSearch,
+    tier: "PRO",
+    placeholder: "jean.dupont@gmail.com",
+    color: "from-blue-500 to-cyan-400",
+    fakeResults: [
+      { label: "Google Doc", value: "bit.ly/••••••", icon: Globe },
+      { label: "Drive", value: "docs.google.com/••••", icon: Globe },
+      { label: "Résultat", value: "14 fichiers exposés", icon: Database },
+    ],
   },
   {
-    icon: AlertTriangle,
+    id: "wanted",
     label: "Wanted",
-    desc: "Moteur de recherche dans les bases de données judiciaires et signalements",
-    badge: "PRO",
-    badgeColor: "destructive",
-  },
-  {
-    icon: Cpu,
-    label: "API",
-    desc: "Accès programmatique à toutes les sources — intégration dans vos outils",
-    badge: "API",
-    badgeColor: "default",
+    icon: AlertTriangle,
+    tier: "PRO",
+    placeholder: "Prénom Nom ou ID…",
+    color: "from-red-500 to-orange-400",
+    fakeResults: [
+      { label: "Nom", value: "D••••t J••n", icon: User },
+      { label: "Statut", value: "Recherché ⚠️", icon: AlertTriangle },
+      { label: "Motif", value: "••••••••••", icon: Key },
+      { label: "Département", value: "75", icon: MapPin },
+    ],
   },
 ];
 
+const TIER_BADGE: Record<string, { label: string; variant: "secondary" | "outline" | "destructive" }> = {
+  FREE: { label: "FREE", variant: "secondary" },
+  VIP: { label: "VIP", variant: "outline" },
+  PRO: { label: "PRO", variant: "destructive" },
+};
+
+/* ── pricing data ── */
 const PLANS = [
   {
     id: "free",
     name: "Free",
+    subtitle: "Pour commencer",
     icon: Zap,
     price: 0,
     lifetimePrice: 0,
@@ -151,11 +185,13 @@ const PLANS = [
       { text: "Recherche basique", ok: true },
       { text: "OSINT avancé", ok: false },
       { text: "Wanted", ok: false },
+      { text: "API", ok: false },
     ],
   },
   {
     id: "vip",
     name: "VIP",
+    subtitle: "Pour les réguliers",
     icon: Crown,
     price: 6.99,
     lifetimePrice: 69.99,
@@ -172,6 +208,7 @@ const PLANS = [
   {
     id: "pro",
     name: "PRO",
+    subtitle: "Puissance maximale",
     icon: Rocket,
     price: 14.99,
     lifetimePrice: 124.99,
@@ -188,6 +225,7 @@ const PLANS = [
   {
     id: "api",
     name: "API",
+    subtitle: "Recherches illimitées",
     icon: Code,
     price: 49.99,
     lifetimePrice: 399.99,
@@ -204,62 +242,69 @@ const PLANS = [
 ];
 
 export default function MaintenancePage() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window !== "undefined") {
-      return document.documentElement.classList.contains("dark");
-    }
-    return true;
-  });
-
-  const [showResults, setShowResults] = useState(false);
+  const [dark, setDark] = useState(() =>
+    typeof window !== "undefined" ? document.documentElement.classList.contains("dark") : true
+  );
+  const [activeCategory, setActiveCategory] = useState<SearchMode>("internal");
+  const [pricingMode, setPricingMode] = useState<"monthly" | "lifetime">("monthly");
+  const [tiltStyles, setTiltStyles] = useState<Record<string, { rotateX: number; rotateY: number; scale: number }>>({});
   const [typedText, setTypedText] = useState("");
-  const demoQuery = "jean.dupont@gmail.com";
+  const [showResults, setShowResults] = useState(false);
+
+  const currentCat = CATEGORIES.find((c) => c.id === activeCategory)!;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
+  /* typing animation for hero */
   useEffect(() => {
+    setTypedText("");
+    setShowResults(false);
     let i = 0;
-    const interval = setInterval(() => {
-      if (i <= demoQuery.length) {
-        setTypedText(demoQuery.slice(0, i));
-        i++;
-      } else {
-        clearInterval(interval);
-        setTimeout(() => setShowResults(true), 400);
-      }
-    }, 60);
-    return () => clearInterval(interval);
-  }, []);
+    const q = currentCat.placeholder;
+    const iv = setInterval(() => {
+      if (i <= q.length) { setTypedText(q.slice(0, i)); i++; }
+      else { clearInterval(iv); setTimeout(() => setShowResults(true), 300); }
+    }, 55);
+    return () => clearInterval(iv);
+  }, [activeCategory]);
+
+  /* 3-D tilt for pricing cards */
+  function handleTiltMove(id: string, e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    setTiltStyles((prev) => ({
+      ...prev,
+      [id]: { rotateX: ((y - cy) / cy) * -6, rotateY: ((x - cx) / cx) * 6, scale: 1.02 },
+    }));
+  }
+  function handleTiltLeave(id: string) {
+    setTiltStyles((prev) => ({ ...prev, [id]: { rotateX: 0, rotateY: 0, scale: 1 } }));
+  }
+
+  const isLifetime = pricingMode === "lifetime";
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-x-hidden flex flex-col">
-      <div className="absolute top-[-20%] left-[50%] translate-x-[-50%] w-[700px] h-[700px] rounded-full bg-primary/[0.04] blur-3xl pointer-events-none" />
+      <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-primary/[0.04] blur-3xl pointer-events-none" />
 
-      {/* Header */}
+      {/* ── Header ── */}
       <header className="relative z-10 border-b border-border/30 px-6 py-3 sticky top-0 bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Shield className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold tracking-tight">
-              Di<span className="text-primary">screen</span>
-            </span>
+            <span className="text-lg font-bold tracking-tight">Di<span className="text-primary">screen</span></span>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Badge variant="outline" className="text-xs gap-1">
-              <Lock className="w-3 h-3" />
-              Accès restreint
-            </Badge>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setDark(!dark)}
-              data-testid="button-theme-toggle"
-            >
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="text-xs gap-1"><Lock className="w-3 h-3" />Accès restreint</Badge>
+            <Button size="icon" variant="ghost" onClick={() => setDark(!dark)} data-testid="button-theme-toggle">
               {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
           </div>
@@ -268,324 +313,349 @@ export default function MaintenancePage() {
 
       <main className="relative z-10 flex-1 flex flex-col items-center px-4 sm:px-6">
 
-        {/* Hero + Search demo */}
-        <section className="w-full max-w-2xl pt-10 sm:pt-16 pb-10 flex flex-col items-center">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center w-full"
-          >
+        {/* ── Hero ── */}
+        <section className="w-full max-w-3xl pt-12 sm:pt-16 pb-4 flex flex-col items-center">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-center w-full mb-6">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-3 tracking-tight">
               Recherchez. Trouvez.{" "}
-              <span className="text-primary">Instantanément.</span>
+              <motion.span
+                key={activeCategory}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className={`text-transparent bg-clip-text bg-gradient-to-r ${currentCat.color}`}
+              >
+                Instantanément.
+              </motion.span>
             </h1>
-            <p className="text-muted-foreground text-sm sm:text-base mb-8 max-w-lg mx-auto">
+            <p className="text-muted-foreground text-sm sm:text-base max-w-lg mx-auto">
               Plus de 11 milliards de lignes indexées. Résultats en millisecondes.
             </p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-            className="w-full mb-4"
-          >
+          {/* Category tabs */}
+          <div className="w-full mb-5 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="flex items-center gap-2 min-w-max mx-auto justify-center flex-wrap">
+              {CATEGORIES.map((cat) => {
+                const Icon = cat.icon;
+                const isActive = cat.id === activeCategory;
+                const badge = TIER_BADGE[cat.tier];
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.id)}
+                    data-testid={`tab-category-${cat.id}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                      isActive
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {cat.label}
+                    {cat.tier !== "FREE" && (
+                      <Badge variant={badge.variant} className="text-[9px] px-1 py-0 h-4 ml-0.5">{badge.label}</Badge>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div className="w-full mb-5">
             <div className="flex items-center border border-border rounded-lg bg-card px-4 h-12 shadow-sm">
               <Search className="w-4 h-4 text-muted-foreground shrink-0 mr-3" />
               <span className="text-foreground text-sm flex-1 text-left">
                 {typedText}
                 <span className="inline-block w-[2px] h-4 bg-primary ml-0.5 animate-pulse align-middle" />
               </span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.3 }}
-            className="flex items-center justify-center gap-2 flex-wrap mb-8"
-          >
-            {criteria.map((c) => (
-              <Badge key={c.label} variant="secondary" className="gap-1 text-xs cursor-default">
-                <c.icon className="w-3 h-3" />
-                {c.label}
-              </Badge>
-            ))}
-          </motion.div>
+          {/* Results */}
+          <AnimatePresence mode="wait">
+            {showResults && (
+              <motion.div
+                key={activeCategory}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="w-full mb-6"
+              >
+                <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                  <p className="text-sm font-medium">
+                    <span className="text-primary font-bold">
+                      {activeCategory === "sherlock" ? "487" : activeCategory === "geoip" ? "1" : "2 847"}
+                    </span>{" "}
+                    <span className="text-muted-foreground">
+                      {activeCategory === "sherlock" ? "plateformes analysées en 3.2s" : activeCategory === "geoip" ? "résultat trouvé en 0.04s" : "résultats trouvés en 0.12s"}
+                    </span>
+                  </p>
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Database className="w-3 h-3" />
+                    {activeCategory === "sherlock" ? "500+ sites" : activeCategory === "geoip" ? "IP Registry" : "12 sources"}
+                  </Badge>
+                </div>
 
-          {showResults && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="w-full"
-            >
-              <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                <p className="text-sm font-medium">
-                  <span className="text-primary font-bold">2 847</span>{" "}
-                  <span className="text-muted-foreground">résultats trouvés en 0.12s</span>
-                </p>
-                <Badge variant="outline" className="text-xs gap-1">
-                  <Database className="w-3 h-3" />
-                  12 sources
-                </Badge>
-              </div>
-
-              <div className="space-y-3 relative">
-                {fakeResults.map((result, i) => (
-                  <Card
-                    key={i}
-                    className="overflow-visible"
-                    style={{ filter: i > 0 ? `blur(${Math.min(i * 2.5, 6)}px)` : "none" }}
-                  >
-                    <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b border-border/50">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground">
-                          {i + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground truncate text-sm">{result.title}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{result.source}</p>
-                        </div>
+                <div className="space-y-3 relative">
+                  {/* First result (visible) */}
+                  <Card className="overflow-visible">
+                    <div className="flex items-center gap-3 p-4 pb-3 border-b border-border/50">
+                      <span className="flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground shrink-0">1</span>
+                      <div>
+                        <p className="font-semibold text-sm">{currentCat.placeholder}</p>
+                        <p className="text-xs text-muted-foreground">Discreen</p>
                       </div>
                     </div>
-                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
-                      {result.fields.map((field, fi) => {
-                        const Icon = field.icon;
+                    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                      {currentCat.fakeResults.map((f, fi) => {
+                        const Icon = f.icon;
                         return (
-                          <div key={fi} className="flex items-start gap-3">
-                            <div
-                              className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                              style={{
-                                color: `hsl(var(${field.color}))`,
-                                backgroundColor: `hsl(var(${field.color}) / 0.12)`,
-                              }}
-                            >
-                              <Icon className="w-4 h-4" />
+                          <div key={fi} className="flex items-start gap-2.5">
+                            <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-primary/10">
+                              <Icon className="w-3.5 h-3.5 text-primary" />
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs text-muted-foreground">{field.label}</p>
-                              <p className="text-sm font-medium text-foreground break-all leading-tight">{field.value}</p>
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground">{f.label}</p>
+                              <p className="text-xs font-medium break-all leading-tight">{f.value}</p>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   </Card>
-                ))}
 
-                <div className="absolute inset-0 top-20 flex items-center justify-center pointer-events-none">
-                  <div className="bg-background/80 backdrop-blur-sm border border-border rounded-lg px-6 py-5 text-center pointer-events-auto shadow-lg">
-                    <Lock className="w-6 h-6 text-primary mx-auto mb-2" />
-                    <p className="text-sm font-semibold mb-1">Contenu verrouillé</p>
-                    <p className="text-xs text-muted-foreground mb-4 max-w-xs">
-                      Connectez-vous pour voir les résultats complets et accéder à toutes les fonctionnalités
-                    </p>
-                    <Button
-                      onClick={() => window.open("https://discord.gg/discreen", "_blank")}
-                      data-testid="button-discord-join"
-                    >
-                      <SiDiscord className="w-4 h-4 mr-2" />
-                      Obtenir l'accès
-                    </Button>
+                  {/* Blurred second result */}
+                  <Card style={{ filter: "blur(4px)" }}>
+                    <div className="flex items-center gap-3 p-4 pb-3 border-b border-border/50">
+                      <span className="flex items-center justify-center w-8 h-8 rounded-md bg-secondary text-sm font-bold text-muted-foreground shrink-0">2</span>
+                      <div>
+                        <p className="font-semibold text-sm">••••••••••••••</p>
+                        <p className="text-xs text-muted-foreground">Discreen</p>
+                      </div>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                      {currentCat.fakeResults.slice(0, 4).map((f, fi) => (
+                        <div key={fi} className="flex items-start gap-2.5">
+                          <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-primary/10" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] text-muted-foreground">••••••</p>
+                            <p className="text-xs font-medium">••••••••••</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+
+                  {/* Lock overlay */}
+                  <div className="absolute inset-0 top-24 flex items-center justify-center pointer-events-none">
+                    <div className="bg-background/85 backdrop-blur-sm border border-border rounded-xl px-6 py-5 text-center pointer-events-auto shadow-lg">
+                      <Lock className="w-6 h-6 text-primary mx-auto mb-2" />
+                      <p className="text-sm font-semibold mb-1">Contenu verrouillé</p>
+                      <p className="text-xs text-muted-foreground mb-4 max-w-xs">
+                        Connectez-vous pour voir les résultats complets
+                      </p>
+                      <Button size="sm" onClick={() => window.open("https://discord.gg/discreen", "_blank")} data-testid="button-discord-join">
+                        <SiDiscord className="w-4 h-4 mr-2" />Obtenir l'accès
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            className="flex items-center justify-center gap-6 sm:gap-10 mt-10 mb-2 flex-wrap"
-          >
+          <div className="flex items-center justify-center gap-6 sm:gap-10 mt-2 mb-4 flex-wrap">
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-primary">
-                <AnimatedNumber target={11} suffix="B+" />
-              </div>
+              <div className="text-2xl font-bold text-primary"><AnimatedNumber target={11} suffix="B+" /></div>
               <div className="text-xs text-muted-foreground mt-0.5">Lignes indexées</div>
             </div>
             <div className="w-px h-8 bg-border hidden sm:block" />
             <div className="text-center">
-              <div className="text-2xl sm:text-3xl font-bold text-primary">
-                <AnimatedNumber target={500} suffix="+" />
-              </div>
+              <div className="text-2xl font-bold text-primary"><AnimatedNumber target={500} suffix="+" /></div>
               <div className="text-xs text-muted-foreground mt-0.5">Sources</div>
             </div>
             <div className="w-px h-8 bg-border hidden sm:block" />
             <div className="text-center">
-              <div className="flex items-center gap-1 justify-center text-2xl sm:text-3xl font-bold text-primary">
-                <Zap className="w-5 h-5" />0.1s
-              </div>
+              <div className="flex items-center gap-1 justify-center text-2xl font-bold text-primary"><Zap className="w-4 h-4" />0.1s</div>
               <div className="text-xs text-muted-foreground mt-0.5">Temps moyen</div>
             </div>
-          </motion.div>
-        </section>
-
-        {/* Divider */}
-        <div className="w-full max-w-6xl border-t border-border/30 mb-12" />
-
-        {/* Search Categories */}
-        <section className="w-full max-w-6xl mb-14">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-8"
-          >
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2">
-              Modules de <span className="text-primary">recherche</span>
-            </h2>
-            <p className="text-muted-foreground text-sm max-w-xl mx-auto">
-              9 moteurs spécialisés pour couvrir tous les cas d'usage OSINT
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {SEARCH_CATEGORIES.map((cat, i) => {
-              const Icon = cat.icon;
-              const badgeVariant =
-                cat.badgeColor === "destructive" ? "destructive"
-                : cat.badgeColor === "default" ? "default"
-                : cat.badgeColor === "outline" ? "outline"
-                : "secondary";
-              return (
-                <motion.div
-                  key={cat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: i * 0.06 }}
-                >
-                  <Card className="p-4 h-full flex flex-col gap-3 hover:border-primary/40 transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <Icon className="w-4 h-4 text-primary" />
-                        </div>
-                        <span className="font-semibold text-sm">{cat.label}</span>
-                      </div>
-                      <Badge variant={badgeVariant} className="text-[10px] shrink-0">
-                        {cat.badge}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{cat.desc}</p>
-                  </Card>
-                </motion.div>
-              );
-            })}
           </div>
         </section>
 
-        {/* Divider */}
-        <div className="w-full max-w-6xl border-t border-border/30 mb-12" />
+        <div className="w-full max-w-6xl border-t border-border/30 my-10" />
 
-        {/* Pricing */}
-        <section className="w-full max-w-6xl mb-14">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-8"
-          >
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2">
-              Nos <span className="text-primary">offres</span>
-            </h2>
-            <p className="text-muted-foreground text-sm max-w-xl mx-auto">
-              Du plan gratuit à l'accès illimité — choisissez selon vos besoins
+        {/* ── Pricing ── */}
+        <section className="w-full max-w-6xl mb-16">
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }} className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2">Nos <span className="text-primary">offres</span></h2>
+            <p className="text-muted-foreground text-sm max-w-lg mx-auto mb-6">
+              Du plan gratuit à l'accès illimité — paiement mensuel ou unique à vie
             </p>
+
+            {/* Pricing toggle */}
+            <div className="flex justify-center">
+              <div className="relative flex items-center">
+                <div
+                  onClick={() => setPricingMode("monthly")}
+                  className={`relative z-10 px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
+                    pricingMode === "monthly"
+                      ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105"
+                      : "bg-card text-muted-foreground border-border/50 -mr-3"
+                  }`}
+                  data-testid="button-pricing-monthly"
+                >
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <div>
+                      <p className="text-sm font-bold">Mensuel</p>
+                      <p className="text-[10px] opacity-80">Paiement chaque mois</p>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  onClick={() => setPricingMode("lifetime")}
+                  className={`relative px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
+                    pricingMode === "lifetime"
+                      ? "z-10 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-lg shadow-amber-500/20 scale-105"
+                      : "z-0 bg-card text-muted-foreground border-border/50 -ml-3"
+                  }`}
+                  data-testid="button-pricing-lifetime"
+                >
+                  <div className="flex items-center gap-2">
+                    <Infinity className="w-4 h-4" />
+                    <div>
+                      <p className="text-sm font-bold">Lifetime</p>
+                      <p className="text-[10px] opacity-80">Paiement unique</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {PLANS.map((plan, i) => {
-              const Icon = plan.icon;
-              return (
-                <motion.div
-                  key={plan.id}
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: i * 0.08 }}
-                  className="relative"
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-3 left-0 right-0 flex justify-center z-10">
-                      <Badge className="text-[10px] px-3">⭐ Populaire</Badge>
-                    </div>
-                  )}
-                  <Card
-                    className={`p-5 h-full flex flex-col gap-4 ${plan.popular ? "border-primary/60 shadow-[0_0_20px_hsl(var(--primary)/0.12)]" : ""}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${plan.popular ? "bg-primary text-primary-foreground" : "bg-primary/10"}`}>
-                        <Icon className={`w-4 h-4 ${plan.popular ? "text-primary-foreground" : "text-primary"}`} />
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm">{plan.name}</p>
-                        <div className="flex items-baseline gap-1">
-                          {plan.price === 0 ? (
-                            <span className="text-lg font-extrabold text-primary">Gratuit</span>
-                          ) : (
-                            <>
-                              <span className="text-lg font-extrabold text-primary">{plan.price}€</span>
-                              <span className="text-xs text-muted-foreground">/mois</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pricingMode}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.3 }}
+              className={`grid grid-cols-1 sm:grid-cols-2 ${isLifetime ? "lg:grid-cols-3 max-w-4xl mx-auto" : "lg:grid-cols-4"} gap-4`}
+            >
+              {PLANS.filter((p) => !(isLifetime && p.price === 0)).map((plan, i) => {
+                const Icon = plan.icon;
+                const tilt = tiltStyles[plan.id] || { rotateX: 0, rotateY: 0, scale: 1 };
+                const isTilted = tilt.scale > 1;
+                const yearlyIfMonthly = plan.price * 12;
+                const savedPerYear = yearlyIfMonthly - plan.lifetimePrice;
+                const discountPct = plan.price > 0 ? Math.round((1 - plan.lifetimePrice / yearlyIfMonthly) * 100) : 0;
 
-                    {plan.lifetimePrice > 0 && (
-                      <div className="flex items-center gap-1.5 bg-primary/8 rounded-md px-3 py-1.5">
-                        <Infinity className="w-3 h-3 text-primary shrink-0" />
-                        <span className="text-xs text-primary font-medium">Lifetime : {plan.lifetimePrice}€</span>
+                return (
+                  <motion.div
+                    key={plan.id}
+                    initial={{ opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: i * 0.07 }}
+                    style={{ perspective: "800px" }}
+                    onMouseMove={(e) => handleTiltMove(plan.id, e)}
+                    onMouseLeave={() => handleTiltLeave(plan.id)}
+                    className="relative"
+                  >
+                    {plan.popular && (
+                      <div className="absolute -top-3 left-0 right-0 flex justify-center z-10">
+                        <Badge className={`text-[10px] px-3 ${isLifetime ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0" : ""}`}>
+                          {isLifetime ? "✨ Lifetime" : "⭐ Populaire"}
+                        </Badge>
                       </div>
                     )}
-
-                    <ul className="flex flex-col gap-2 flex-1">
-                      {plan.features.map((f, fi) => (
-                        <li key={fi} className="flex items-start gap-2">
-                          {f.ok ? (
-                            <Check className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
-                          ) : (
-                            <X className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 mt-0.5" />
-                          )}
-                          <span className={`text-xs leading-relaxed ${f.ok ? "text-foreground" : "text-muted-foreground/60"}`}>
-                            {f.text}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Button
-                      variant={plan.popular ? "default" : "outline"}
-                      size="sm"
-                      className="w-full mt-auto"
-                      onClick={() => window.open("https://discord.gg/discreen", "_blank")}
+                    <Card
+                      className={`relative flex flex-col p-5 h-full overflow-visible transition-all duration-200 ${
+                        plan.popular && isLifetime
+                          ? "border-amber-500/50 shadow-[0_0_24px_-6px] shadow-amber-500/20"
+                          : plan.popular
+                          ? "border-primary/50 shadow-[0_0_24px_-6px] shadow-primary/15"
+                          : ""
+                      } ${isTilted && isLifetime ? "shadow-xl shadow-amber-500/20 border-amber-500/40" : isTilted ? "shadow-xl shadow-primary/25 border-primary/40" : ""}`}
+                      style={{
+                        transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(${tilt.scale},${tilt.scale},${tilt.scale})`,
+                        transition: "transform 0.15s ease-out",
+                        transformStyle: "preserve-3d",
+                        willChange: "transform",
+                      }}
+                      data-testid={`card-plan-${plan.id}`}
                     >
-                      <SiDiscord className="w-3.5 h-3.5 mr-2" />
-                      {plan.price === 0 ? "Commencer" : "S'abonner"}
-                    </Button>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </div>
+                      {/* Plan header */}
+                      <div className="space-y-3 mb-5">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-300 ${isLifetime && plan.price > 0 ? "bg-amber-500/10" : "bg-primary/10"}`}>
+                          <Icon className={`w-4.5 h-4.5 transition-colors duration-300 ${isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"}`} />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold">{plan.name}</h3>
+                          <p className="text-xs text-muted-foreground">{plan.subtitle}</p>
+                        </div>
+
+                        {/* Price */}
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className={`text-2xl font-bold transition-colors duration-300 ${isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"}`}>
+                            {plan.price === 0 ? "Gratuit" : isLifetime ? `€${plan.lifetimePrice.toFixed(2)}` : `€${plan.price.toFixed(2)}`}
+                          </span>
+                          {plan.price > 0 && (
+                            <span className="text-xs text-muted-foreground">{isLifetime ? "unique" : "/mois"}</span>
+                          )}
+                        </div>
+
+                        {/* Lifetime savings */}
+                        {isLifetime && plan.price > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground line-through">€{plan.price.toFixed(2)}/mois</span>
+                              <span className="text-xs font-bold text-amber-500">-{discountPct}%</span>
+                            </div>
+                            <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px] px-2 py-0.5">
+                              Économisez €{savedPerYear.toFixed(2)}/an
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Features */}
+                      <ul className="space-y-2 flex-1 mb-5">
+                        {plan.features.map((f, fi) => (
+                          <li key={fi} className={`flex items-start gap-2 text-xs ${f.ok ? "" : "text-muted-foreground/50"}`}>
+                            {f.ok
+                              ? <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                              : <X className="w-3.5 h-3.5 text-muted-foreground/40 mt-0.5 shrink-0" />
+                            }
+                            <span className={f.ok ? "" : "line-through"}>{f.text}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <Button
+                        variant={plan.popular ? "default" : "outline"}
+                        size="sm"
+                        className={`w-full gap-2 ${isLifetime && plan.price > 0 && plan.popular ? "bg-gradient-to-r from-amber-500 to-orange-500 border-0 hover:opacity-90 text-white" : ""}`}
+                        onClick={() => window.open("https://discord.gg/discreen", "_blank")}
+                        data-testid={`button-plan-${plan.id}`}
+                      >
+                        <SiDiscord className="w-3.5 h-3.5" />
+                        {plan.price === 0 ? "Commencer" : "S'abonner"}
+                      </Button>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          </AnimatePresence>
         </section>
 
-        {/* Discord CTA */}
+        {/* ── Discord CTA ── */}
         <section className="w-full max-w-6xl mb-16">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
             <Card className="p-8 text-center border-primary/20 bg-primary/[0.03] relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.06] to-transparent pointer-events-none" />
               <div className="relative z-10 flex flex-col items-center gap-4">
@@ -604,8 +674,7 @@ export default function MaintenancePage() {
                   onClick={() => window.open("https://discord.gg/discreen", "_blank")}
                   data-testid="button-discord-cta"
                 >
-                  <SiDiscord className="w-5 h-5" />
-                  Rejoindre Discord
+                  <SiDiscord className="w-5 h-5" />Rejoindre Discord
                 </Button>
               </div>
             </Card>
