@@ -9,7 +9,7 @@ import {
   Home, Search, CreditCard, MessageSquare,
   Key, FileText, Menu, X, Star, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
-  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert,
+  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -124,8 +124,9 @@ const NAV_SECTIONS: NavSection[] = [
     key: "info",
     labelKey: "nav.section.info",
     items: [
-      { label: "nav.pricing", labelKey: "nav.pricing", href: "/pricing",  icon: CreditCard },
-      { label: "nav.contact", labelKey: "nav.contact", href: "/contact",  icon: MessageSquare },
+      { label: "nav.pricing",  labelKey: "nav.pricing",  href: "/pricing",  icon: CreditCard },
+      { label: "nav.tutorial", labelKey: "nav.tutorial", href: "/tuto",    icon: BookOpen },
+      { label: "nav.contact",  labelKey: "nav.contact",  href: "/contact",  icon: MessageSquare },
     ],
   },
 ];

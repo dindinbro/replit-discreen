@@ -11,6 +11,7 @@ import LandingPage from "@/pages/LandingPage";
 import SearchPage from "@/pages/SearchPage";
 import PricingPage from "@/pages/PricingPage";
 import ContactPage from "@/pages/ContactPage";
+import TutorialPage from "@/pages/TutorialPage";
 import AuthPage from "@/pages/AuthPage";
 import AdminPage from "@/pages/AdminPage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
@@ -242,6 +243,9 @@ function Router() {
       </Route>
       <Route path="/pricing">
         <PublicRoute component={PricingPage} />
+      </Route>
+      <Route path="/tuto">
+        <PublicRoute component={TutorialPage} />
       </Route>
       <Route path="/contact">
         <PublicRoute component={ContactPage} />
