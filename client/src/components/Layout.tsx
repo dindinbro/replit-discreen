@@ -157,7 +157,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Nav items */}
-          <nav className="flex flex-col gap-0.5 px-1.5 pt-3 flex-1 overflow-hidden" data-testid="nav-main">
+          <nav className="flex flex-col gap-0.5 px-1.5 pt-3 overflow-hidden" data-testid="nav-main">
             {NAV_ITEMS.map((item) => {
               const pathname = location.split("?")[0].split("#")[0];
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
