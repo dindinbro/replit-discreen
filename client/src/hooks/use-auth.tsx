@@ -77,6 +77,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAvatarUrl(data.avatar_url || null);
         setExpiresAt(data.expires_at || null);
 
+        // Refresh the raw Supabase user object so user_metadata stays in sync
+        // (needed for checks like user.user_metadata?.display_name after username setup)
+        if (supabase) {
+          const { data: userData } = await supabase.auth.getUser(accessToken);
+          if (userData?.user) setUser(userData.user);
+        }
+
         if (!sessionRegisteredRef.current) {
           const ok = await registerSession(accessToken);
           if (ok) sessionRegisteredRef.current = true;

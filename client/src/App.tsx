@@ -31,16 +31,27 @@ import { Button } from "@/components/ui/button";
 const SKIP_USERNAME_MODAL_PATHS = ["/auth/callback", "/admin", "/login"];
 
 function UsernameSetupModal() {
-  const { user, loading, displayName, getAccessToken, refreshRole } = useAuth();
+  const { user, loading, getAccessToken, refreshRole } = useAuth();
   const [location] = useLocation();
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Only show when display_name is not explicitly set (ignores Discord full_name fallback)
+  const hasExplicitUsername = !!user?.user_metadata?.display_name?.trim();
+
+  // Pre-fill with Discord full_name or username once user is loaded
+  useEffect(() => {
+    if (user && !hasExplicitUsername && value === "") {
+      const suggestion = user.user_metadata?.full_name || user.user_metadata?.username || "";
+      if (suggestion) setValue(suggestion);
+    }
+  }, [user, hasExplicitUsername]);
+
   const shouldShow =
     !loading &&
     !!user &&
-    !displayName &&
+    !hasExplicitUsername &&
     !SKIP_USERNAME_MODAL_PATHS.some((p) => location === p || location.startsWith(p + "/"));
 
   if (!shouldShow) return null;
@@ -89,8 +100,10 @@ function UsernameSetupModal() {
               Choisis ton pseudo
             </h2>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Avant d'accéder à <span className="text-primary font-semibold">Discreen</span>, tu dois choisir un nom d'affichage unique.
-              Il sera visible par les autres membres.
+              Avant d'accéder à <span className="text-primary font-semibold">Discreen</span>, tu dois choisir un nom d'affichage <span className="text-foreground font-medium">unique</span>.
+              {user?.user_metadata?.full_name
+                ? " Ton pseudo Discord est suggéré — confirme ou modifie-le."
+                : " Il sera visible par les autres membres."}
             </p>
           </div>
 
