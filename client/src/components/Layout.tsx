@@ -129,12 +129,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* ── Left Sidebar ── */}
         <aside
-          className="hidden lg:flex flex-col fixed top-0 left-0 h-screen border-r border-border/40 bg-background/80 backdrop-blur z-[998] overflow-hidden"
+          className="hidden lg:block fixed top-0 left-0 h-screen z-[998]"
           style={{
             width: sidebarW,
             transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)",
           }}
         >
+          {/* Floating collapse tab on right edge */}
+          <button
+            onClick={toggleCollapsed}
+            data-testid="button-sidebar-collapse"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="absolute top-1/2 -right-3 -translate-y-1/2 w-6 h-6 rounded-full border border-border/60 bg-background shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors z-10"
+          >
+            {collapsed
+              ? <ChevronRight className="w-3 h-3" />
+              : <ChevronLeft className="w-3 h-3" />}
+          </button>
+
+          {/* Inner content wrapper — clips text during transition */}
+          <div className="flex flex-col h-full w-full border-r border-border/40 bg-background/80 backdrop-blur overflow-hidden">
           {/* Logo row */}
           <div className="h-14 flex items-center border-b border-border/40 shrink-0 px-3 gap-2 overflow-hidden">
             <Link href="/">
@@ -229,8 +243,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
                   }}
                 >
-                  <span className="font-medium tabular-nums">{onlineCount}</span>
-                  {" "}{t("header.onlineUsers", { count: onlineCount })}
+                  {t("header.onlineUsers", { count: onlineCount })}
                 </span>
               </div>
             )}
@@ -363,19 +376,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             )}
 
-            {/* Collapse toggle */}
-            <div className={`mt-1 ${collapsed ? "flex justify-center" : "px-1"}`}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground/50 hover:text-foreground"
-                onClick={toggleCollapsed}
-                data-testid="button-sidebar-collapse"
-                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-              </Button>
-            </div>
+          </div>
           </div>
         </aside>
 
