@@ -247,7 +247,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     const innerContent = (
       <>
-        <Icon className={`shrink-0 ${indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active ? "text-primary" : ""}`} />
+        <Icon className={`shrink-0 ${collapsed ? "w-5 h-5" : indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active ? "text-primary" : ""}`} />
         <span
           className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12.5px]" : "text-sm"}`}
           style={{
