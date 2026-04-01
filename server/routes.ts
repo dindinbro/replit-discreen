@@ -9,6 +9,7 @@ import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria, sortByRelevance } from "./searchSqlite";
 import { registerChatRoutes } from "./replit_integrations/chat";
+import OpenAI from "openai";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
@@ -4250,7 +4251,6 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Message requis." });
       }
 
-      const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,

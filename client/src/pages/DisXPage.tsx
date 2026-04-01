@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Send, Bot, User, Sparkles, RotateCcw, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/lib/supabase";
 
 interface Message {
   role: "user" | "assistant";
@@ -52,7 +52,6 @@ function formatMessage(content: string) {
 }
 
 export default function DisXPage() {
-  const { getAccessToken } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,12 +75,14 @@ export default function DisXPage() {
     setStreamingContent("");
 
     try {
-      const token = await getAccessToken();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const res = await fetch("/api/disx/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           message: content,
@@ -89,7 +90,10 @@ export default function DisXPage() {
         }),
       });
 
-      if (!res.ok) throw new Error("Erreur réseau");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `HTTP ${res.status}`);
+      }
 
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
@@ -115,8 +119,9 @@ export default function DisXPage() {
 
       setMessages(prev => [...prev, { role: "assistant", content: full }]);
       setStreamingContent("");
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: "❌ Une erreur est survenue. Réessaie dans quelques instants." }]);
+    } catch (err: any) {
+      const msg = err?.message || "Erreur inconnue";
+      setMessages(prev => [...prev, { role: "assistant", content: `❌ Erreur : ${msg}` }]);
       setStreamingContent("");
     } finally {
       setLoading(false);
