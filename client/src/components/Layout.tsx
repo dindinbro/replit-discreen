@@ -256,7 +256,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
 
           {/* Nav items */}
-          <nav className="flex flex-col gap-1 px-1.5 pt-4 overflow-hidden" data-testid="nav-main">
+          <nav className="flex flex-col gap-2 px-1.5 pt-5 overflow-hidden" data-testid="nav-main">
             {NAV_ITEMS.map((item) => {
               const pathname = location.split("?")[0].split("#")[0];
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -267,7 +267,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link key={item.href} href={item.href}>
                   <Button
                     variant="ghost"
-                    className={`w-full h-9 text-sm font-medium transition-all duration-150 overflow-hidden ${
+                    className={`w-full h-10 text-sm font-medium transition-all duration-150 overflow-hidden ${
                       collapsed ? "justify-center px-0" : "justify-start gap-2.5 px-2.5"
                     } ${
                       isActive
