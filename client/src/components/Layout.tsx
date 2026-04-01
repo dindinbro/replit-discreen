@@ -207,6 +207,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
+          {/* Spacer pushes controls to bottom */}
+          <div className="flex-1" />
+
           {/* Bottom section */}
           <div className="border-t border-border/40 shrink-0 overflow-hidden px-1.5 py-2 space-y-0.5">
 
