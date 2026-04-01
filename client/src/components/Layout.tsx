@@ -170,8 +170,93 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
+          {/* ── User profile card (top, below logo) ── */}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`w-full border-b border-border/40 overflow-hidden transition-colors hover:bg-accent/40 focus:outline-none ${collapsed ? "py-3 flex justify-center" : "py-4 px-4 flex flex-col items-center gap-1"}`}
+                  data-testid="button-user-menu"
+                  title={collapsed ? (displayName || user.email?.split("@")[0]) : undefined}
+                >
+                  {/* Expanded: name + role above, avatar below */}
+                  {!collapsed && (
+                    <div className="flex flex-col items-center gap-1 w-full">
+                      <span className="text-sm font-semibold truncate max-w-full">
+                        {displayName || user.email?.split("@")[0]}
+                      </span>
+                      {role && (
+                        <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                          role === "admin" ? "bg-red-500/15 text-red-400" :
+                          role === "pro" || role === "business" ? "bg-primary/15 text-primary" :
+                          role === "vip" ? "bg-amber-400/15 text-amber-400" :
+                          "bg-muted text-muted-foreground"
+                        }`}>
+                          {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
+                        </span>
+                      )}
+                      <div className="w-12 h-12 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center overflow-hidden mt-1">
+                        {avatarUrl
+                          ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                          : <User className="w-5 h-5 text-primary" />
+                        }
+                      </div>
+                    </div>
+                  )}
+                  {/* Collapsed: just avatar */}
+                  {collapsed && (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden">
+                      {avatarUrl
+                        ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                        : <User className="w-4 h-4 text-primary" />
+                      }
+                    </div>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-48">
+                <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
+                  <User className="w-4 h-4 mr-2" />{t("header.myAccount")}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
+                  <Key className="w-4 h-4 mr-2" />{t("header.apiKeys")}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
+                  <FileText className="w-4 h-4 mr-2" />{t("header.documentation")}
+                </DropdownMenuItem>
+                {role === "admin" && (
+                  <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
+                    <Settings className="w-4 h-4 mr-2" />{t("header.admin")}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  data-testid="menu-item-sign-out"
+                  onClick={() => signOut()}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />{t("header.signOut")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className={`border-b border-border/40 ${collapsed ? "py-3 flex justify-center px-2" : "py-4 px-4"}`}>
+              <Link href="/login">
+                <Button
+                  variant="default"
+                  className={`overflow-hidden ${collapsed ? "w-9 h-9 p-0 justify-center" : "w-full gap-2 justify-center"}`}
+                  data-testid="button-login"
+                  title={collapsed ? t("header.signIn") : undefined}
+                >
+                  <LogIn className="w-4 h-4 shrink-0" />
+                  {!collapsed && <span>{t("header.signIn")}</span>}
+                </Button>
+              </Link>
+            </div>
+          )}
+
           {/* Nav items */}
-          <nav className="flex flex-col gap-0.5 px-1.5 pt-3 overflow-hidden" data-testid="nav-main">
+          <nav className="flex flex-col gap-1 px-1.5 pt-4 overflow-hidden" data-testid="nav-main">
             {NAV_ITEMS.map((item) => {
               const pathname = location.split("?")[0].split("#")[0];
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -287,94 +372,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </span>
               </div>
             </div>
-
-            {/* User menu */}
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className={`w-full h-9 text-sm overflow-hidden ${collapsed ? "justify-center px-0" : "justify-start gap-2 px-2"}`}
-                    data-testid="button-user-menu"
-                    title={collapsed ? (displayName || user.email?.split("@")[0]) : undefined}
-                  >
-                    <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0">
-                      {avatarUrl
-                        ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                        : <User className="w-3.5 h-3.5 text-primary" />
-                      }
-                    </div>
-                    <div
-                      className="flex flex-col items-start leading-tight min-w-0 overflow-hidden"
-                      style={{
-                        opacity: collapsed ? 0 : 1,
-                        maxWidth: collapsed ? 0 : 120,
-                        transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
-                      }}
-                    >
-                      <span className="text-xs font-medium truncate">
-                        {displayName || user.email?.split("@")[0]}
-                      </span>
-                      {role && (
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                          role === "admin" ? "text-red-400" :
-                          role === "pro" || role === "business" ? "text-primary" :
-                          role === "vip" ? "text-amber-400" : "text-muted-foreground"
-                        }`}>
-                          {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
-                        </span>
-                      )}
-                    </div>
-                    {!collapsed && <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="right" align="end" className="w-48">
-                  <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
-                    <User className="w-4 h-4 mr-2" />{t("header.myAccount")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
-                    <Key className="w-4 h-4 mr-2" />{t("header.apiKeys")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
-                    <FileText className="w-4 h-4 mr-2" />{t("header.documentation")}
-                  </DropdownMenuItem>
-                  {role === "admin" && (
-                    <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
-                      <Settings className="w-4 h-4 mr-2" />{t("header.admin")}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    data-testid="menu-item-sign-out"
-                    onClick={() => signOut()}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />{t("header.signOut")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Link href="/login">
-                <Button
-                  variant="default"
-                  className={`w-full h-9 overflow-hidden ${collapsed ? "justify-center px-0" : "gap-2 justify-start px-3"}`}
-                  data-testid="button-login"
-                  title={collapsed ? t("header.signIn") : undefined}
-                >
-                  <LogIn className="w-4 h-4 shrink-0" />
-                  <span
-                    className="whitespace-nowrap overflow-hidden"
-                    style={{
-                      opacity: collapsed ? 0 : 1,
-                      maxWidth: collapsed ? 0 : 120,
-                      transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
-                    }}
-                  >
-                    {t("header.signIn")}
-                  </span>
-                </Button>
-              </Link>
-            )}
 
           </div>
           </div>
