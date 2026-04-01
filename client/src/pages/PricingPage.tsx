@@ -83,6 +83,7 @@ const PLANS = [
       "Recherches Discord / Externes",
       "Acces toutes les bases",
       "Recherche avancee Discreen",
+      "Google OSINT illimite",
       "Username OSINT illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
