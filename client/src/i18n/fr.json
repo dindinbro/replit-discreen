@@ -6,6 +6,10 @@
     "dof": "D.O.F",
     "pricing": "Prix",
     "contact": "Contact",
+    "section": {
+      "main": "Principal",
+      "info": "Informations"
+    },
     "darkMode": "Mode sombre",
     "lightMode": "Mode clair"
   },
