@@ -4243,10 +4243,10 @@ export async function registerRoutes(
     }
   });
 
-  /* ── DisX AI OSINT Assistant ─────────────────────────── */
+  /* ── DisX AI OSINT — Natural language → DB search ──────── */
   app.post("/api/disx/chat", requireAuth, async (req: any, res: any) => {
     try {
-      const { message, history = [] } = req.body;
+      const { message } = req.body;
       if (!message || typeof message !== "string" || !message.trim()) {
         return res.status(400).json({ error: "Message requis." });
       }
@@ -4259,80 +4259,125 @@ export async function registerRoutes(
         ...(dixBaseUrl ? { baseURL: dixBaseUrl } : {}),
       });
 
-      const DISX_SYSTEM = `Tu es DisX, un assistant IA spécialisé en recherche OSINT intégré à la plateforme Discreen.
-
-TON RÔLE :
-Analyser des descriptions en langage naturel de personnes à rechercher, extraire les identifiants clés, et proposer une stratégie de recherche structurée sur Discreen.
-
-TON TON :
-- Professionnel, précis, efficace
-- Tu tutoies l'utilisateur
-- Répond TOUJOURS en français
-- Tes réponses sont structurées avec des sections claires
-
-MODULES DISCREEN DISPONIBLES :
-- **Paramétrique** : Recherche par email, username, IP, Discord ID, hash, téléphone — base principale
-- **Téléphone** : Lookup numéro de téléphone (opérateur, localisation, identité liée)
-- **GeoIP** : Géolocalisation d'adresse IP
-- **NIR** : Recherche par numéro de sécurité sociale
-- **Username OSINT** (VIP) : Recherche username sur des centaines de plateformes
-- **Gaming** (VIP) : Recherche sur FiveM, Discord Gaming, Steam
-- **Google OSINT** (PRO) : Dorks Google avancés, recherche d'images, documents publics
-- **Wanted** (PRO) : Recherche dans les fichiers officiels
-
-PROCESSUS D'ANALYSE :
-Quand l'utilisateur décrit une personne, tu dois :
-1. **Extraire** tous les identifiants mentionnés (prénom, nom, âge, ville, famille, profession, etc.)
-2. **Évaluer** la qualité de chaque identifiant (fort/moyen/faible)
-3. **Recommander** les modules Discreen à utiliser en ordre de priorité
-4. **Suggérer** des recherches croisées entre les informations trouvées
-5. **Alerter** si les informations sont insuffisantes pour une recherche précise
-
-FORMAT DE RÉPONSE :
-Utilise toujours cette structure :
-📋 **Identifiants extraits** : liste les éléments clés
-🎯 **Modules recommandés** : par ordre de priorité avec justification
-🔍 **Stratégie** : comment croiser les données
-⚠️ **Limites** : ce qui manque ou risque de donner des faux positifs
-
-RÈGLES STRICTES :
-- Ne jamais effectuer de vraies recherches toi-même
-- Ne jamais inventer de résultats
-- Refuser toute demande de harcèlement, surveillance illégale ou doxing malveillant
-- Rappeler que l'utilisation doit être légale et éthique`;
-
-      const chatHistory = (Array.isArray(history) ? history.slice(-8) : []).map((m: any) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      }));
-
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const stream = await openai.chat.completions.create({
-        model: dixModel,
-        messages: [
-          { role: "system", content: DISX_SYSTEM },
-          ...chatHistory,
-          { role: "user", content: message.trim().slice(0, 2000) },
-        ],
-        stream: true,
-        max_tokens: 800,
-        temperature: 0.4,
-      });
+      const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-      for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta?.content || "";
-        if (delta) res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+      /* ── Phase 1 : Extract structured criteria ── */
+      send({ type: "extracting" });
+
+      const EXTRACTION_PROMPT = `Tu es un extracteur de critères de recherche OSINT. À partir d'une description en langage naturel, tu extrais des critères de recherche structurés.
+
+Retourne UNIQUEMENT un JSON valide avec ce format exact :
+{"criteria": [{"type": "...", "value": "..."}]}
+
+Types disponibles et leur usage :
+- firstName : prénom (ex: "MOUNIR")
+- lastName : nom de famille (ex: "Hadji")
+- dob : date de naissance au format JJ/MM/AAAA (ex: "23/06/2006")
+- yob : année de naissance uniquement (ex: "2006")
+- city : ville (ex: "Paris")
+- email : adresse email
+- phone : numéro de téléphone
+- username : pseudo/username
+- ipAddress : adresse IP
+- discordId : ID Discord (numéros uniquement)
+- address : adresse postale
+
+Règles :
+- N'inclus QUE les champs explicitement mentionnés
+- Si l'âge est mentionné, calcule l'année de naissance (année actuelle : 2026)
+- Si la date est "23 juin 2006", convertis en "23/06/2006"
+- Ne devine jamais, n'invente jamais de valeur
+- Maximum 4 critères les plus pertinents`;
+
+      let criteria: Array<{type: string; value: string}> = [];
+      try {
+        const extraction = await openai.chat.completions.create({
+          model: dixModel,
+          messages: [
+            { role: "system", content: EXTRACTION_PROMPT },
+            { role: "user", content: message.trim().slice(0, 1000) },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 300,
+          temperature: 0.1,
+        });
+        const raw = extraction.choices[0]?.message?.content || "{}";
+        const parsed = JSON.parse(raw);
+        criteria = (parsed.criteria || []).filter((c: any) =>
+          c && typeof c.type === "string" && typeof c.value === "string" && c.value.trim()
+        );
+      } catch (e) {
+        console.error("[DisX] Extraction error:", e);
       }
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      send({ type: "criteria", data: criteria });
+
+      if (criteria.length === 0) {
+        send({ type: "error", message: "Je n'ai pas pu extraire de critères de recherche. Essaie d'être plus précis (prénom, nom, ville, date de naissance, email...)" });
+        send({ type: "done" });
+        res.end();
+        return;
+      }
+
+      /* ── Phase 2 : Real DB search ── */
+      send({ type: "searching" });
+
+      const validTypes = ["username","displayName","macAddress","ipAddress","email","address","lastName","firstName","ssn","phone","gender","dob","yob","city","zipCode","iban","bic","hashedPassword","password","vin","discordId","fivemLicense","steamId","fivemId","xbox","live","minecraftUuid"];
+      const searchCriteria = criteria
+        .filter(c => validTypes.includes(c.type))
+        .map(c => ({ type: c.type as any, value: c.value.trim() }));
+
+      let searchResult = { results: [] as any[], total: 0 };
+      if (searchCriteria.length > 0) {
+        try {
+          searchResult = await searchAllIndexes(searchCriteria, 10, 0);
+        } catch (e) {
+          console.error("[DisX] Search error:", e);
+        }
+      }
+
+      send({ type: "results", data: { results: searchResult.results, total: searchResult.total } });
+
+      /* ── Phase 3 : AI summary ── */
+      const SUMMARY_PROMPT = `Tu es DisX, un assistant OSINT de Discreen. Analyse les résultats de recherche et fournis une synthèse concise en français.
+
+Règles :
+- Sois direct et factuel
+- Si des résultats sont trouvés, résume les informations clés disponibles
+- Si aucun résultat, suggère d'affiner la recherche (plus de critères)
+- Ne jamais inventer d'informations qui ne sont pas dans les résultats
+- Maximum 3-4 phrases`;
+
+      const resultsSummary = searchResult.results.length > 0
+        ? `${searchResult.total} résultat(s) trouvé(s). Données : ${JSON.stringify(searchResult.results.slice(0, 3))}`
+        : "Aucun résultat trouvé dans les bases de données.";
+
+      const summaryStream = await openai.chat.completions.create({
+        model: dixModel,
+        messages: [
+          { role: "system", content: SUMMARY_PROMPT },
+          { role: "user", content: `Requête : "${message}"\nCritères utilisés : ${JSON.stringify(criteria)}\n${resultsSummary}` },
+        ],
+        stream: true,
+        max_tokens: 300,
+        temperature: 0.3,
+      });
+
+      for await (const chunk of summaryStream) {
+        const delta = chunk.choices[0]?.delta?.content || "";
+        if (delta) send({ type: "summary", content: delta });
+      }
+
+      send({ type: "done" });
       res.end();
     } catch (err) {
       console.error("DisX chat error:", err);
       if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ error: "Erreur DisX" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: "error", message: "Erreur serveur DisX" })}\n\n`);
         res.end();
       } else {
         res.status(500).json({ error: "Erreur serveur DisX" });
