@@ -51,7 +51,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 
 const FILTER_ICONS: Record<string, typeof User> = {
@@ -521,6 +521,7 @@ export default function SearchPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { getAccessToken } = useAuth();
+  const [wouterLocation] = useLocation();
   const searchMutation = usePerformSearch(getAccessToken);
   const breachMutation = useBreachSearch(getAccessToken);
   const leakosintMutation = useLeakosintSearch(getAccessToken);
@@ -546,6 +547,18 @@ export default function SearchPage() {
       window.history.replaceState(null, "", `/search?${newParams.toString()}`);
     }
   }, [searchMode]);
+
+  // Sync mode when navigating from sidebar (URL changes externally via wouter)
+  useEffect(() => {
+    const queryStr = wouterLocation.includes("?") ? wouterLocation.split("?")[1] : "";
+    const params = new URLSearchParams(queryStr);
+    const m = params.get("mode");
+    const valid = ["internal", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock"];
+    if (m && valid.includes(m) && m !== searchMode) {
+      setSearchMode(m as typeof searchMode);
+      setCriteria([]);
+    }
+  }, [wouterLocation]);
 
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
@@ -1349,118 +1362,6 @@ export default function SearchPage() {
             )}
           </motion.h1>
         </section>
-
-        <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
-          <Button
-            variant={searchMode === "internal" ? "default" : "outline"}
-            onClick={() => { setSearchMode("internal"); setCriteria([]); }}
-            className="min-w-[180px] gap-2"
-            data-testid="button-mode-internal"
-          >
-            <Sparkles className="w-4 h-4" />
-            Recherche Paramétrique
-          </Button>
-          <Button
-            variant={searchMode === "phone" ? "default" : "outline"}
-            onClick={() => { setSearchMode("phone"); setCriteria([]); }}
-            className="min-w-[180px] gap-2"
-            data-testid="button-mode-phone"
-          >
-            <Phone className="w-4 h-4" />
-            Lookup Operateur
-          </Button>
-          <Button
-            variant={searchMode === "geoip" ? "default" : "outline"}
-            onClick={() => { setSearchMode("geoip"); setCriteria([]); }}
-            className="min-w-[180px] gap-2"
-            data-testid="button-mode-geoip"
-          >
-            <MapPin className="w-4 h-4" />
-            GeoIP
-          </Button>
-          <Button
-            variant={searchMode === "nir" ? "default" : "outline"}
-            onClick={() => { setSearchMode("nir"); setCriteria([]); }}
-            className="min-w-[180px] gap-2"
-            data-testid="button-mode-nir"
-          >
-            <Hash className="w-4 h-4" />
-            Decodeur NIR
-          </Button>
-          <Button
-            variant={searchMode === "xeuledoc" ? "default" : "outline"}
-            onClick={() => {
-              if (tierLevel >= 1) {
-                setSearchMode("xeuledoc");
-                setCriteria([]);
-                setXeuledocUrl("");
-                setXeuledocResult(null);
-              }
-            }}
-            disabled={tierLevel < 1}
-            className={`min-w-[180px] gap-2 ${searchMode === "xeuledoc" ? "bg-blue-600 text-white border-blue-600" : ""} ${tierLevel < 1 ? "opacity-50 cursor-not-allowed" : ""}`}
-            data-testid="button-mode-xeuledoc"
-          >
-            <FileSearch className="w-4 h-4" />
-            Google OSINT
-            {tierLevel < 1 && <span className="text-[10px] opacity-70">VIP+</span>}
-          </Button>
-          <Button
-            variant={searchMode === "sherlock" ? "default" : "outline"}
-            onClick={() => {
-              if (tierLevel >= 1) {
-                setSearchMode("sherlock");
-                setCriteria([]);
-                setSherlockUsername("");
-                setSherlockResult(null);
-                setWmnResult(null);
-                setHolehehEmail("");
-                setHolehehResult(null);
-              }
-            }}
-            disabled={tierLevel < 1}
-            className={`min-w-[180px] gap-2 ${searchMode === "sherlock" ? "bg-purple-600 text-white border-purple-600" : ""} ${tierLevel < 1 ? "opacity-50 cursor-not-allowed" : ""}`}
-            data-testid="button-mode-sherlock"
-          >
-            <Eye className="w-4 h-4" />
-            Username OSINT
-            {tierLevel < 1 && <span className="text-[10px] opacity-70">VIP+</span>}
-          </Button>
-          <Button
-            variant={searchMode === "fivem" ? "default" : "outline"}
-            onClick={() => {
-              if (tierLevel >= 1) {
-                setSearchMode("fivem");
-                setCriteria([]);
-              }
-            }}
-            disabled={tierLevel < 1}
-            title={tierLevel < 1 ? "Abonnement VIP minimum requis" : undefined}
-            className={`min-w-[180px] gap-2 ${searchMode === "fivem" ? "bg-orange-600 text-white border-orange-600" : ""} ${tierLevel < 1 ? "opacity-50 cursor-not-allowed" : ""}`}
-            data-testid="button-mode-fivem"
-          >
-            <Gamepad2 className="w-4 h-4" />
-            Gaming
-            {tierLevel < 1 && <span className="text-[10px] ml-1 opacity-70">(VIP+)</span>}
-          </Button>
-          <Button
-            variant={searchMode === "wanted" ? "default" : "outline"}
-            onClick={() => {
-              if (tierLevel >= 2) {
-                setSearchMode("wanted");
-                setCriteria([]);
-              }
-            }}
-            disabled={tierLevel < 2}
-            title={tierLevel < 2 ? "Abonnement PRO minimum requis" : undefined}
-            className={`min-w-[180px] gap-2 ${searchMode === "wanted" ? "bg-red-600 hover:bg-red-700 text-white border-red-600" : ""} ${tierLevel < 2 ? "opacity-50 cursor-not-allowed" : ""}`}
-            data-testid="button-mode-wanted"
-          >
-            <ShieldAlert className="w-4 h-4" />
-            Wanted
-            {tierLevel < 2 && <span className="text-[10px] ml-1 opacity-70">(PRO+)</span>}
-          </Button>
-        </div>
 
         <AnimatePresence mode="wait">
           {searchMode === "internal" && (
