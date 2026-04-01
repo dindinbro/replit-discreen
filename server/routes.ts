@@ -499,10 +499,25 @@ export async function registerRoutes(
       try {
         const sub = await storage.getOrCreateSubscription(user.id);
         const meta = user.user_metadata || {};
+        const provider = (user.app_metadata as any)?.provider || "unknown";
+        const username = meta.display_name || meta.full_name || user.email?.split("@")[0];
         const isBypassed = sub.id ? await isUserBypassed(sub.id) : false;
+
+        // Persist login log to database
+        await storage.createLoginLog({
+          userId: user.id,
+          email: user.email || undefined,
+          username,
+          ip,
+          userAgent,
+          provider,
+          tier: sub.tier || "free",
+          discordId: sub.discordId || undefined,
+        });
+
         if (!isBypassed) {
           webhookSessionLogin(
-            { id: user.id, email: user.email || "", username: meta.display_name || meta.full_name || user.email?.split("@")[0], uniqueId: sub.id },
+            { id: user.id, email: user.email || "", username, uniqueId: sub.id },
             ip,
             userAgent,
             sub.discordId,
@@ -924,6 +939,18 @@ export async function registerRoutes(
       console.log(`[admin] Maintenance mode ${enabled ? "ENABLED" : "DISABLED"} by admin`);
       res.json({ enabled: !!enabled });
     } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // GET /api/admin/login-logs — returns latest connection logs
+  app.get("/api/admin/login-logs", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 200, 500);
+      const logs = await storage.getLoginLogs(limit);
+      res.json(logs);
+    } catch (err) {
+      console.error("GET /api/admin/login-logs error:", err);
       res.status(500).json({ message: "Erreur serveur" });
     }
   });

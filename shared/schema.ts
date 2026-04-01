@@ -502,6 +502,21 @@ export const referralEvents = pgTable("referral_events", {
 
 export type ReferralEvent = typeof referralEvents.$inferSelect;
 
+export const loginLogs = pgTable("login_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  email: text("email"),
+  username: text("username"),
+  ip: text("ip").notNull(),
+  userAgent: text("user_agent"),
+  provider: text("provider").notNull().default("unknown"),
+  tier: text("tier").notNull().default("free"),
+  discordId: text("discord_id"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type LoginLog = typeof loginLogs.$inferSelect;
+
 export const REFERRAL_RANKS = [
   { name: "Fer", threshold: 0, color: "#8B8B8B" },
   { name: "Bronze", threshold: 2, color: "#CD7F32" },

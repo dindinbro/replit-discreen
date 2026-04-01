@@ -2,7 +2,7 @@ import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
-  blockedIps, referralCodes, referralEvents,
+  blockedIps, referralCodes, referralEvents, loginLogs,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -11,7 +11,7 @@ import {
   type WantedProfile, type InsertWantedProfile,
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
   type ActiveSession, type BlockedIp,
-  type ReferralCode, type ReferralEvent,
+  type ReferralCode, type ReferralEvent, type LoginLog,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -111,6 +111,8 @@ export interface IStorage {
   storeReferralForOrder(orderId: string, referrerUserId: string, refereeUserId: string): Promise<void>;
   getPendingReferral(orderId: string): Promise<{ referrerId: string; refereeId: string } | null>;
   setReferralCredits(userId: string, credits: number): Promise<void>;
+  createLoginLog(data: { userId: string; email?: string; username?: string; ip: string; userAgent?: string; provider: string; tier: string; discordId?: string }): Promise<void>;
+  getLoginLogs(limit?: number): Promise<LoginLog[]>;
 }
 
 function hashKey(key: string): string {
@@ -978,6 +980,23 @@ export class DatabaseStorage implements IStorage {
       const code = "DS-" + Array.from({ length: 6 }, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]).join("");
       await db.insert(referralCodes).values({ userId, code, totalCredits: credits });
     }
+  }
+
+  async createLoginLog(data: { userId: string; email?: string; username?: string; ip: string; userAgent?: string; provider: string; tier: string; discordId?: string }): Promise<void> {
+    await db.insert(loginLogs).values({
+      userId: data.userId,
+      email: data.email ?? null,
+      username: data.username ?? null,
+      ip: data.ip,
+      userAgent: data.userAgent ?? null,
+      provider: data.provider,
+      tier: data.tier,
+      discordId: data.discordId ?? null,
+    });
+  }
+
+  async getLoginLogs(limit = 200): Promise<LoginLog[]> {
+    return db.select().from(loginLogs).orderBy(desc(loginLogs.createdAt)).limit(limit);
   }
 }
 
