@@ -213,7 +213,7 @@ export default function DisXPage() {
             <div className="flex items-center gap-2">
               <span className="font-display font-bold text-base text-foreground">DisX</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 font-semibold">IA</span>
-              <span className="text-[10px] font-bold text-red-500 tracking-wide">soon</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded-full">NEW</span>
             </div>
             <p className="text-[11px] text-muted-foreground/70">Recherche naturelle · Résultats réels</p>
           </div>

@@ -4244,7 +4244,7 @@ export async function registerRoutes(
   });
 
   /* ── DisX AI OSINT — Natural language → DB search ──────── */
-  app.post("/api/disx/chat", requireAuth, async (req: any, res: any) => {
+  app.post("/api/disx/chat", requireAuth, requireRole("pro", "api"), async (req: any, res: any) => {
     try {
       const { message } = req.body;
       if (!message || typeof message !== "string" || !message.trim()) {

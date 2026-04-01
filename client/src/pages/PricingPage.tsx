@@ -67,7 +67,7 @@ const PLANS = [
       "Username OSINT illimite",
       { text: "Moteur de recherche Wanted", excluded: true },
       { text: "Parrainage", excluded: true },
-      { text: "Agent DisX IA", soon: true },
+      { text: "Agent DisX IA", excluded: true },
     ],
   },
   {
@@ -88,7 +88,7 @@ const PLANS = [
       "Username OSINT illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
-      { text: "Agent DisX IA", available: true },
+      { text: "Agent DisX IA", available: true, isNew: true },
     ],
   },
   {
@@ -110,7 +110,7 @@ const PLANS = [
       "Possibilite de revente",
       "Endpoint API /api/v1/search",
       "Support premium 24/7",
-      { text: "Agent DisX IA", available: true },
+      { text: "Agent DisX IA", available: true, isNew: true },
     ],
   },
 ];
@@ -514,6 +514,7 @@ export default function PricingPage() {
                       const isExcluded = typeof feature === "object" && (feature as any).excluded;
                       const isSoon = typeof feature === "object" && (feature as any).soon;
                       const isAvailable = typeof feature === "object" && (feature as any).available;
+                      const isNew = typeof feature === "object" && (feature as any).isNew;
                       const featureText = typeof feature === "object" ? (feature as any).text : feature;
                       return (
                         <motion.li
@@ -553,9 +554,9 @@ export default function PricingPage() {
                               <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
                             </motion.div>
                           )}
-                          <span>
+                          <span className="flex items-center gap-1.5 flex-wrap">
                             {featureText}
-                            {isSoon && <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider text-red-500/70 bg-red-500/10 px-1 py-0.5 rounded">soon</span>}
+                            {isNew && <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/15 border border-primary/30 px-1 py-0.5 rounded-full">NEW</span>}
                           </span>
                         </motion.li>
                       );
