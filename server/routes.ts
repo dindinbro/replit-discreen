@@ -4252,8 +4252,8 @@ export async function registerRoutes(
       }
 
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        ...(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ? { baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL } : {}),
       });
 
       const DISX_SYSTEM = `Tu es DisX, un assistant IA spécialisé en recherche OSINT intégré à la plateforme Discreen.
