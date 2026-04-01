@@ -1314,7 +1314,7 @@ export default function SearchPage() {
   };
 
   return (
-    <main className={`relative transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""} ${isXeuledocMode ? "xeuledoc-atmosphere" : ""} ${isSherlockMode ? "sherlock-atmosphere" : ""}`}>
+    <main className={`relative w-full min-h-screen transition-colors duration-700 ${isWantedMode ? "wanted-atmosphere" : ""} ${isFivemMode ? "fivem-atmosphere" : ""} ${isXeuledocMode ? "xeuledoc-atmosphere" : ""} ${isSherlockMode ? "sherlock-atmosphere" : ""}`}>
       <AnimatePresence>
         {scanning && (
           <div className="scan-overlay">
@@ -1324,7 +1324,7 @@ export default function SearchPage() {
       </AnimatePresence>
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode || isXeuledocMode || isSherlockMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
 
-      <div className="relative container max-w-5xl mx-auto px-4 py-12 space-y-12">
+      <div className="relative w-full max-w-5xl mx-auto px-4 py-12 space-y-12">
         <section className="text-center space-y-4 max-w-2xl mx-auto mb-8">
           <motion.h1
             key={isWantedMode ? "wanted-title" : isFivemMode ? "fivem-title" : isXeuledocMode ? "xeuledoc-title" : isSherlockMode ? "sherlock-title" : "normal-title"}
