@@ -343,7 +343,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
                     {uniqueId && (
-                      <span className="text-[10px] font-mono text-muted-foreground/40 mt-0.5">#{uniqueId}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground/70 mt-0.5">#{uniqueId}</span>
                     )}
                   </div>
                   {role && (
