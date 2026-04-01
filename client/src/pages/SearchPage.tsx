@@ -367,7 +367,18 @@ function BlurredResultCards({ tier }: { tier: string }) {
   );
 }
 
-function computeRelevanceScore(row: Record<string, unknown>, globalIndex: number): number {
+function computeRelevanceScore(row: Record<string, unknown>, globalIndex: number, searchTerms: string[] = []): number {
+  if (searchTerms.length > 0) {
+    const fieldValues = Object.entries(row)
+      .filter(([k]) => !HIDDEN_FIELDS.has(k))
+      .map(([, v]) => cleanFieldValue(v).toLowerCase().trim());
+    for (const term of searchTerms) {
+      const normalized = term.toLowerCase().trim();
+      if (normalized && fieldValues.some((fv) => fv === normalized)) {
+        return 100;
+      }
+    }
+  }
   const fieldCount = Object.entries(row).filter(([k]) => !HIDDEN_FIELDS.has(k) && k.toLowerCase() !== "source").length;
   const base = 35 + Math.min(fieldCount * 9, 55);
   const jitter = ((globalIndex * 17 + fieldCount * 7) % 11) - 5;
@@ -378,10 +389,12 @@ function ResultCard({
   row,
   index,
   globalIndex,
+  searchTerms = [],
 }: {
   row: Record<string, unknown>;
   index: number;
   globalIndex: number;
+  searchTerms?: string[];
 }) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -398,8 +411,8 @@ function ResultCard({
     });
 
   const sourceText = "Discreen";
-  const score = computeRelevanceScore(row, globalIndex);
-  const scoreColor = score >= 80 ? "#d4a843" : score >= 60 ? "#f59e0b" : "#6b7280";
+  const score = computeRelevanceScore(row, globalIndex, searchTerms);
+  const scoreColor = score === 100 ? "#d4a843" : score >= 80 ? "#d4a843" : score >= 60 ? "#f59e0b" : "#6b7280";
 
   const handleCopy = () => {
     const lines = visibleFields
@@ -578,6 +591,7 @@ export default function SearchPage() {
   const [advancedSearched, setAdvancedSearched] = useState(false);
   const [searchCooldown, setSearchCooldown] = useState(0);
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
+  const [submittedTerms, setSubmittedTerms] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -778,6 +792,8 @@ export default function SearchPage() {
       return;
     }
 
+    setSubmittedTerms(filledCriteria.map((c) => c.value.trim()));
+
     const token = getAccessToken();
     if (!token) return;
 
@@ -818,6 +834,7 @@ export default function SearchPage() {
       return;
     }
 
+    setSubmittedTerms(filledCriteria.map((c) => c.value.trim()));
     setLimitReached(false);
     setPage(newPage);
     searchMutation.mutate(
@@ -1022,6 +1039,7 @@ export default function SearchPage() {
       }
     }
 
+    setSubmittedTerms(filledCriteria.map((c) => c.value.trim()));
     setLimitReached(false);
     setPage(newPage);
     setBlacklistMatch(null);
@@ -2659,6 +2677,7 @@ export default function SearchPage() {
                     key={profile.id}
                     index={i}
                     globalIndex={i}
+                    searchTerms={submittedTerms}
                     row={{
                       nom: profile.nom,
                       prenom: profile.prenom,
@@ -2812,6 +2831,7 @@ export default function SearchPage() {
                   row={row}
                   index={idx}
                   globalIndex={((searchMode === "internal" || searchMode === "fivem") ? page * pageSize : 0) + idx}
+                  searchTerms={submittedTerms}
                 />
               ))}
 
