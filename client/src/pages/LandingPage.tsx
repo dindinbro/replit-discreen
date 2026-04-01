@@ -70,11 +70,11 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="relative flex flex-col" style={{ minHeight: "calc(100dvh - 56px)" }}>
+    <main className="relative">
 
       {/* ── Hero ── */}
-      <section className="relative flex-1 flex flex-col items-center justify-center px-4 text-center">
-        <div className="w-full max-w-3xl mx-auto space-y-7">
+      <section className="relative flex flex-col items-center justify-center h-[calc(100svh-56px)] lg:h-screen px-4 text-center">
+        <div className="w-full max-w-2xl mx-auto space-y-6">
 
           {/* Signature phrase */}
           <motion.p
@@ -91,7 +91,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.08 }}
-            className="text-6xl md:text-7xl lg:text-8xl font-display font-bold tracking-tight leading-[1.02]"
+            className="text-5xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[1.05]"
           >
             {t("landing.title1")}{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#b8902e] via-[#f0c060] to-[#d4a843]">

@@ -65,10 +65,7 @@ function useOnlineCount() {
 
     sendHeartbeat();
     intervalRef.current = setInterval(sendHeartbeat, 60_000);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
   return count;
@@ -92,6 +89,8 @@ const NAV_ITEMS = [
   { labelKey: "nav.contact", href: "/contact", icon: MessageSquare },
 ];
 
+const SIDEBAR_W = 200;
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, role, frozen, signOut, displayName, avatarUrl } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -106,60 +105,77 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-[999] w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-7xl mx-auto h-14 flex items-center justify-between gap-2 px-4">
-          <div className="flex items-center gap-3 shrink-0">
-            <Link href="/">
-              <div className="flex items-center gap-2 cursor-pointer" data-testid="link-logo">
-                <div className="bg-primary/10 p-1.5 rounded-lg">
-                  <ShieldCheck className="w-5 h-5 text-primary" />
-                </div>
-                <span className="font-display font-bold text-xl tracking-tight hidden sm:inline">
-                  Di<span className="text-primary">screen</span>
-                </span>
-              </div>
-            </Link>
-            {onlineCount !== null && (
-              <div
-                className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary/50 px-2 py-1 rounded-full border border-border/50"
-                data-testid="status-online-count"
-                title={t("header.onlineUsers", { count: onlineCount })}
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <Users className="w-3.5 h-3.5" />
-                <span className="font-medium tabular-nums">{onlineCount}</span>
-              </div>
-            )}
-          </div>
+    <div className="min-h-screen bg-background text-foreground flex">
 
-          <nav className="hidden lg:flex items-center gap-1" data-testid="nav-main">
-            {NAV_ITEMS.map((item) => {
-              const pathname = location.split("?")[0].split("#")[0];
-              const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-              const Icon = item.icon;
-              const label = t(item.labelKey);
-              return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    size="sm"
-                    className="gap-1.5"
-                    data-testid={`nav-${label.toLowerCase()}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {label}
-                  </Button>
-                </Link>
-              );
-            })}
-          </nav>
+      {/* ── Left Sidebar ── */}
+      <aside
+        className="hidden lg:flex flex-col fixed top-0 left-0 h-screen border-r border-border/40 bg-background/80 backdrop-blur z-[998]"
+        style={{ width: SIDEBAR_W }}
+      >
+        {/* Logo */}
+        <div className="h-14 flex items-center px-4 border-b border-border/40 shrink-0">
+          <Link href="/">
+            <div className="flex items-center gap-2 cursor-pointer" data-testid="link-logo">
+              <div className="bg-primary/10 p-1.5 rounded-lg">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+              </div>
+              <span className="font-display font-bold text-lg tracking-tight">
+                Di<span className="text-primary">screen</span>
+              </span>
+            </div>
+          </Link>
+        </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+        {/* Nav items */}
+        <nav className="flex flex-col gap-0.5 px-2 pt-4 flex-1" data-testid="nav-main">
+          {NAV_ITEMS.map((item) => {
+            const pathname = location.split("?")[0].split("#")[0];
+            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const Icon = item.icon;
+            const label = t(item.labelKey);
+            return (
+              <Link key={item.href} href={item.href}>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-2.5 h-9 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-primary/10 text-primary hover:bg-primary/15"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                  }`}
+                  data-testid={`nav-${label.toLowerCase()}`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
+                  {label}
+                  {isActive && (
+                    <div className="ml-auto w-1 h-4 rounded-full bg-primary" />
+                  )}
+                </Button>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Bottom controls */}
+        <div className="px-2 pb-4 pt-2 border-t border-border/40 space-y-1 shrink-0">
+          {/* Online / status */}
+          {onlineCount !== null && (
+            <div
+              className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1.5"
+              data-testid="status-online-count"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-medium tabular-nums">{onlineCount}</span>
+              <span className="truncate">{t("header.onlineUsers", { count: onlineCount })}</span>
+            </div>
+          )}
+
+          {/* Theme + Lang row */}
+          <div className="flex gap-1 px-1">
             <Button
               data-testid="button-lang-toggle"
               variant="ghost"
               size="icon"
+              className="h-8 w-8"
               onClick={toggleLanguage}
               title={i18n.language === "fr" ? "Switch to English" : "Passer en Francais"}
             >
@@ -169,135 +185,192 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               data-testid="button-theme-toggle"
               variant="ghost"
               size="icon"
+              className="h-8 w-8"
               onClick={toggleTheme}
               title={theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}
             >
-              {theme === "light" ? (
-                <Moon className="w-4 h-4" />
-              ) : (
-                <Sun className="w-4 h-4" />
-              )}
+              {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </Button>
+
+            {/* Status pill */}
             {user && frozen ? (
-              <div className="hidden xl:flex items-center text-xs font-medium text-red-500 dark:text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/30" data-testid="status-frozen">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5" />
+              <div className="flex items-center text-xs font-medium text-red-500 dark:text-red-400" data-testid="status-frozen">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1" />
                 {t("header.frozen")}
               </div>
             ) : (
-              <div className="hidden xl:flex items-center text-xs font-medium text-muted-foreground bg-secondary/50 px-2.5 py-1 rounded-full border border-border/50" data-testid="status-operational">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+              <div className="flex items-center text-xs font-medium text-muted-foreground" data-testid="status-operational">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
                 {t("header.operational")}
               </div>
             )}
-            {user && (
-              <>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2 h-auto py-1.5 px-2.5" data-testid="button-user-menu">
-                      <div className="hidden md:flex flex-col items-end leading-tight">
-                        <span className="text-xs font-medium truncate max-w-[120px]" title={displayName || user.email || ""}>
-                          {displayName || user.email?.split("@")[0]}
-                        </span>
-                        {role && (
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                            role === "admin" ? "text-red-400" :
-                            role === "pro" || role === "business" ? "text-primary" :
-                            role === "vip" ? "text-amber-400" :
-                            "text-muted-foreground"
-                          }`}>
-                            {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
-                          </span>
-                        )}
-                      </div>
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-4 h-4 text-primary" />
-                        )}
-                      </div>
-                      <ChevronDown className="w-3 h-3 text-muted-foreground hidden md:block" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
-                      <User className="w-4 h-4 mr-2" />
-                      {t("header.myAccount")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
-                      <Key className="w-4 h-4 mr-2" />
-                      {t("header.apiKeys")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
-                      <FileText className="w-4 h-4 mr-2" />
-                      {t("header.documentation")}
-                    </DropdownMenuItem>
-                    {role === "admin" && (
-                      <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
-                        <Settings className="w-4 h-4 mr-2" />
-                        {t("header.admin")}
-                      </DropdownMenuItem>
+          </div>
+
+          {/* User menu or login */}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 h-9 px-2 text-sm"
+                  data-testid="button-user-menu"
+                >
+                  <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden shrink-0">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-3.5 h-3.5 text-primary" />
                     )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem data-testid="menu-item-sign-out" onClick={() => signOut()} className="text-destructive focus:text-destructive">
-                      <LogOut className="w-4 h-4 mr-2" />
-                      {t("header.signOut")}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
-            {!user && (
-              <Link href="/login">
-                <Button variant="default" size="sm" className="gap-1.5" data-testid="button-login">
-                  <LogIn className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t("header.signIn")}</span>
+                  </div>
+                  <div className="flex flex-col items-start leading-tight min-w-0">
+                    <span className="text-xs font-medium truncate max-w-[110px]">
+                      {displayName || user.email?.split("@")[0]}
+                    </span>
+                    {role && (
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+                        role === "admin" ? "text-red-400" :
+                        role === "pro" || role === "business" ? "text-primary" :
+                        role === "vip" ? "text-amber-400" :
+                        "text-muted-foreground"
+                      }`}>
+                        {(ROLE_DISPLAY[role] || ROLE_DISPLAY.free).label}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />
                 </Button>
-              </Link>
-            )}
-            <Button
-              data-testid="button-mobile-menu"
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              title="Menu"
-            >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-          </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="end" className="w-48">
+                <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
+                  <User className="w-4 h-4 mr-2" />
+                  {t("header.myAccount")}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
+                  <Key className="w-4 h-4 mr-2" />
+                  {t("header.apiKeys")}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  {t("header.documentation")}
+                </DropdownMenuItem>
+                {role === "admin" && (
+                  <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    {t("header.admin")}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  data-testid="menu-item-sign-out"
+                  onClick={() => signOut()}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  {t("header.signOut")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link href="/login">
+              <Button variant="default" size="sm" className="w-full gap-2 justify-start" data-testid="button-login">
+                <LogIn className="w-4 h-4" />
+                {t("header.signIn")}
+              </Button>
+            </Link>
+          )}
         </div>
+      </aside>
 
-        {mobileOpen && (
-          <div className="lg:hidden border-t border-border/40 bg-background/95 backdrop-blur">
-            <nav className="container max-w-7xl mx-auto px-4 py-3 flex flex-col gap-1" data-testid="nav-mobile">
-              {NAV_ITEMS.map((item) => {
-                const pathname = location.split("?")[0].split("#")[0];
-                const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-                const Icon = item.icon;
-                const label = t(item.labelKey);
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={isActive ? "secondary" : "ghost"}
-                      className="w-full justify-start gap-2"
-                      data-testid={`nav-mobile-${label.toLowerCase()}`}
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {label}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </nav>
+      {/* ── Main area (offset by sidebar on desktop) ── */}
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-[200px]">
+
+        {/* Mobile top bar (no sidebar on small screens) */}
+        <header className="lg:hidden sticky top-0 z-[999] w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="h-14 flex items-center justify-between gap-2 px-4">
+            <Link href="/">
+              <div className="flex items-center gap-2 cursor-pointer">
+                <div className="bg-primary/10 p-1.5 rounded-lg">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                </div>
+                <span className="font-display font-bold text-xl tracking-tight">
+                  Di<span className="text-primary">screen</span>
+                </span>
+              </div>
+            </Link>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={toggleLanguage}>
+                <span className="text-xs font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={toggleTheme}>
+                {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              </Button>
+              {!user && (
+                <Link href="/login">
+                  <Button variant="default" size="sm" className="gap-1.5" data-testid="button-login-mobile">
+                    <LogIn className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t("header.signIn")}</span>
+                  </Button>
+                </Link>
+              )}
+              <Button
+                data-testid="button-mobile-menu"
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileOpen(!mobileOpen)}
+              >
+                {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+            </div>
           </div>
-        )}
-      </header>
 
-      {children}
+          {mobileOpen && (
+            <div className="border-t border-border/40 bg-background/95 backdrop-blur">
+              <nav className="px-4 py-3 flex flex-col gap-1" data-testid="nav-mobile">
+                {NAV_ITEMS.map((item) => {
+                  const pathname = location.split("?")[0].split("#")[0];
+                  const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  const Icon = item.icon;
+                  const label = t(item.labelKey);
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant={isActive ? "secondary" : "ghost"}
+                        className="w-full justify-start gap-2"
+                        data-testid={`nav-mobile-${label.toLowerCase()}`}
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {label}
+                      </Button>
+                    </Link>
+                  );
+                })}
+                {user && (
+                  <>
+                    <div className="border-t border-border/40 my-1" />
+                    <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => { navigate("/profile"); setMobileOpen(false); }}>
+                      <User className="w-4 h-4" />
+                      {t("header.myAccount")}
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start gap-2 text-destructive hover:text-destructive" onClick={() => signOut()}>
+                      <LogOut className="w-4 h-4" />
+                      {t("header.signOut")}
+                    </Button>
+                  </>
+                )}
+              </nav>
+            </div>
+          )}
+        </header>
 
-      <ChatWidget />
+        {/* Page content */}
+        <main className="flex-1 min-w-0">
+          {children}
+        </main>
+
+        <ChatWidget />
+      </div>
+
       {theme === "dark" && <InteractiveGrid />}
     </div>
   );
