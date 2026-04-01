@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, RotateCcw, ChevronRight, Database, Brain, Search, CheckCircle2, AlertCircle } from "lucide-react";
+import { Send, Sparkles, RotateCcw, ChevronRight, Database, Brain, Search, CheckCircle2, AlertCircle, Square, Trash2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -91,6 +91,7 @@ export default function DisXPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const idRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,12 +101,25 @@ export default function DisXPage() {
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
   };
 
+  const stopSearch = () => {
+    abortRef.current?.abort();
+  };
+
+  const clearChat = () => {
+    abortRef.current?.abort();
+    setEntries([]);
+    setInput("");
+  };
+
   const sendMessage = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || loading) return;
 
     setInput("");
     setLoading(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const entryId = ++idRef.current;
     const newEntry: SearchEntry = {
@@ -125,6 +139,7 @@ export default function DisXPage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ message: content }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -169,9 +184,14 @@ export default function DisXPage() {
         }
       }
     } catch (err: any) {
-      updateEntry(entryId, { status: "error", errorMsg: err?.message || "Erreur réseau" });
+      if (err?.name === "AbortError") {
+        updateEntry(entryId, { status: "done" });
+      } else {
+        updateEntry(entryId, { status: "error", errorMsg: err?.message || "Erreur réseau" });
+      }
     } finally {
       setLoading(false);
+      abortRef.current = null;
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
   };
@@ -198,13 +218,9 @@ export default function DisXPage() {
             <p className="text-[11px] text-muted-foreground/70">Recherche naturelle · Résultats réels</p>
           </div>
         </div>
-        {entries.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => setEntries([])}
-            className="gap-1.5 text-muted-foreground hover:text-foreground" data-testid="button-disx-reset">
-            <RotateCcw className="w-3.5 h-3.5" />
-            Effacer
-          </Button>
-        )}
+        <div className="text-[10px] text-muted-foreground/30 font-medium tabular-nums">
+          {entries.length > 0 && `${entries.length} recherche${entries.length > 1 ? "s" : ""}`}
+        </div>
       </div>
 
       {/* ── Content ── */}
@@ -344,7 +360,40 @@ export default function DisXPage() {
 
       {/* ── Input area ── */}
       <div className="shrink-0 border-t border-border/30 px-4 md:px-8 py-4 bg-background/80 backdrop-blur-sm">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-2">
+          {/* Action buttons row */}
+          <div className="flex items-center gap-2 justify-end">
+            {loading && (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={stopSearch}
+                  className="h-7 gap-1.5 text-[11px] border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/50"
+                  data-testid="button-disx-stop"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                  Stopper
+                </Button>
+              </motion.div>
+            )}
+            {entries.length > 0 && !loading && (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearChat}
+                  className="h-7 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                  data-testid="button-disx-clear"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Effacer
+                </Button>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Textarea row */}
           <div className="relative flex items-end gap-2 rounded-2xl border border-border/40 bg-card/50 px-4 py-3 focus-within:border-primary/40 transition-colors">
             <Textarea
               ref={textareaRef}
@@ -353,7 +402,8 @@ export default function DisXPage() {
               onKeyDown={handleKeyDown}
               placeholder="Décris la personne que tu cherches..."
               rows={1}
-              className="flex-1 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 text-sm placeholder:text-muted-foreground/40 max-h-32"
+              disabled={loading}
+              className="flex-1 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 text-sm placeholder:text-muted-foreground/40 max-h-32 disabled:opacity-50"
               data-testid="input-disx-message"
             />
             <Button size="icon" onClick={() => sendMessage()} disabled={!input.trim() || loading}
@@ -361,7 +411,7 @@ export default function DisXPage() {
               <Send className="w-3.5 h-3.5" />
             </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground/40 mt-2 text-center">
+          <p className="text-[10px] text-muted-foreground/40 text-center">
             Entrée pour lancer · Maj+Entrée pour saut de ligne · Usage légal uniquement
           </p>
         </div>
