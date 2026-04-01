@@ -73,8 +73,8 @@ export default function LandingPage() {
     <main className="relative">
 
       {/* ── Hero ── */}
-      <section className="relative flex flex-col items-center justify-center h-[calc(100svh-56px)] lg:h-screen px-4 text-center">
-        <div className="w-full max-w-2xl mx-auto space-y-6">
+      <section className="relative flex flex-col items-center h-[calc(100svh-56px)] lg:h-screen px-4 pt-8 pb-6">
+        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl mx-auto space-y-6 text-center">
 
           {/* Signature phrase */}
           <motion.p
@@ -221,15 +221,13 @@ export default function LandingPage() {
             </a>
           </motion.div>
         </div>
-      </section>
 
-      {/* ── Feature strip ── */}
-      <section className="relative container max-w-4xl mx-auto px-4 pb-20">
+        {/* ── Feature cards — inside hero, anchored to bottom ── */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border/20 dark:bg-white/4 rounded-2xl overflow-hidden border border-border/20 dark:border-white/4"
+          transition={{ duration: 0.55, delay: 0.55 }}
+          className="w-full max-w-4xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3"
         >
           {[
             { icon: Database, titleKey: "landing.features.databases", descKey: "landing.features.databasesDesc" },
@@ -237,15 +235,20 @@ export default function LandingPage() {
             { icon: Shield, titleKey: "landing.features.secure", descKey: "landing.features.secureDesc" },
             { icon: Zap, titleKey: "landing.features.fast", descKey: "landing.features.fastDesc" },
           ].map((item, i) => (
-            <div
+            <motion.div
               key={i}
-              className="bg-background dark:bg-[hsl(0,0%,5%)] p-6 space-y-2.5 group hover:bg-primary/3 dark:hover:bg-primary/4 transition-colors duration-300"
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              className="group relative rounded-xl border border-border/30 bg-card/50 backdrop-blur-sm p-4 space-y-2 cursor-default overflow-hidden hover:border-primary/40 hover:shadow-[0_0_18px_rgba(212,175,55,0.12)] transition-colors duration-200"
               data-testid={`feature-card-${i}`}
             >
-              <item.icon className="w-4 h-4 text-primary/70 group-hover:text-primary transition-colors" />
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none rounded-xl" />
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-200">
+                <item.icon className="w-3.5 h-3.5 text-primary/70 group-hover:text-primary transition-colors duration-200" />
+              </div>
               <h3 className="font-semibold text-sm text-foreground">{t(item.titleKey)}</h3>
               <p className="text-xs text-muted-foreground/70 leading-relaxed">{t(item.descKey)}</p>
-            </div>
+            </motion.div>
           ))}
         </motion.div>
       </section>
