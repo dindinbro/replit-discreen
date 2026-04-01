@@ -24,7 +24,123 @@ import InfoRequestPage from "@/pages/InfoRequestPage";
 import UsersPage from "@/pages/UsersPage";
 import MaintenancePage from "@/pages/MaintenancePage";
 import Layout from "@/components/Layout";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserCircle2, Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+const SKIP_USERNAME_MODAL_PATHS = ["/auth/callback", "/admin", "/login"];
+
+function UsernameSetupModal() {
+  const { user, loading, displayName, getAccessToken, refreshRole } = useAuth();
+  const [location] = useLocation();
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const shouldShow =
+    !loading &&
+    !!user &&
+    !displayName &&
+    !SKIP_USERNAME_MODAL_PATHS.some((p) => location === p || location.startsWith(p + "/"));
+
+  if (!shouldShow) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > 30) {
+      setError("Le pseudo doit contenir entre 2 et 30 caractères.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const token = getAccessToken();
+      const res = await fetch("/api/profile/setup-username", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ display_name: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Une erreur est survenue.");
+        return;
+      }
+      await refreshRole();
+    } catch {
+      setError("Erreur réseau, veuillez réessayer.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="relative w-full max-w-md mx-4">
+        <div className="rounded-2xl border border-primary/40 bg-background shadow-[0_0_60px_rgba(var(--primary-rgb,212,175,55),0.15)] overflow-hidden">
+          <div className="bg-gradient-to-b from-primary/10 to-transparent px-8 pt-8 pb-6 text-center border-b border-border/40">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 border border-primary/30 mb-4">
+              <UserCircle2 className="w-7 h-7 text-primary" />
+            </div>
+            <h2 className="text-xl font-bold tracking-tight">
+              Choisis ton pseudo
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+              Avant d'accéder à <span className="text-primary font-semibold">Discreen</span>, tu dois choisir un nom d'affichage unique.
+              Il sera visible par les autres membres.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="px-8 py-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="setup-username">
+                Nom d'utilisateur
+              </label>
+              <Input
+                id="setup-username"
+                data-testid="input-setup-username"
+                placeholder="ex: ShadowHunter42"
+                value={value}
+                onChange={(e) => { setValue(e.target.value); setError(null); }}
+                maxLength={30}
+                autoFocus
+                autoComplete="off"
+                className="border-border/60 focus:border-primary/60 bg-background/60"
+              />
+              <div className="flex items-center justify-between">
+                {error ? (
+                  <p className="text-xs text-destructive">{error}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Entre 2 et 30 caractères</p>
+                )}
+                <span className={`text-xs tabular-nums ${value.length > 25 ? "text-yellow-500" : "text-muted-foreground"}`}>
+                  {value.length}/30
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full font-semibold"
+              disabled={saving || value.trim().length < 2}
+              data-testid="button-setup-username-submit"
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              {saving ? "Enregistrement..." : "Confirmer mon pseudo"}
+            </Button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ProtectedRoute({ component: Component, withLayout = true }: { component: React.ComponentType; withLayout?: boolean }) {
   const { user, loading } = useAuth();
@@ -170,6 +286,7 @@ function App() {
         <ThemeProvider>
           <AuthProvider>
             <Toaster />
+            <UsernameSetupModal />
             <MaintenanceGate>
               <Router />
             </MaintenanceGate>

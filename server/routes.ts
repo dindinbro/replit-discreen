@@ -630,6 +630,51 @@ export async function registerRoutes(
   });
 
   // PATCH /api/profile/display-name — update display name (admin only)
+  // POST /api/profile/setup-username — first-time username setup (any authenticated user, only if no display_name yet)
+  app.post("/api/profile/setup-username", requireAuth, async (req, res) => {
+    try {
+      if (!supabaseAdmin) {
+        return res.status(500).json({ message: "Supabase not configured" });
+      }
+      const user = (req as any).user;
+      // Only allowed if the user doesn't have a display_name yet
+      const existingName = user.user_metadata?.display_name;
+      if (existingName && existingName.trim().length >= 2) {
+        return res.status(403).json({ message: "Vous avez deja un pseudo. Contactez un admin pour le modifier." });
+      }
+      const { display_name } = req.body;
+      if (!display_name || typeof display_name !== "string" || display_name.trim().length < 2 || display_name.trim().length > 30) {
+        return res.status(400).json({ message: "Le pseudo doit contenir entre 2 et 30 caracteres." });
+      }
+      const trimmedName = display_name.trim();
+      // Check uniqueness
+      let page = 1;
+      let taken = false;
+      while (!taken) {
+        const { data: pageData } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (!pageData?.users || pageData.users.length === 0) break;
+        taken = pageData.users.some(
+          (u) => u.id !== user.id && u.user_metadata?.display_name?.toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (pageData.users.length < 1000) break;
+        page++;
+      }
+      if (taken) {
+        return res.status(409).json({ message: "Ce pseudo est deja utilise. Choisissez-en un autre." });
+      }
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        user_metadata: { ...user.user_metadata, display_name: trimmedName },
+      });
+      if (error) {
+        return res.status(500).json({ message: error.message });
+      }
+      res.json({ success: true, display_name: trimmedName });
+    } catch (err) {
+      console.error("POST /api/profile/setup-username error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.patch("/api/profile/display-name", requireAuth, async (req, res) => {
     try {
       if (!supabaseAdmin) {
