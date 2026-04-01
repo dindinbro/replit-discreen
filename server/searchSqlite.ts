@@ -18,6 +18,10 @@ const BLACKLISTED_SOURCES = new Set([
   "PassSport",
 ]);
 
+const PER_SOURCE_EXCLUDED_COLS: Record<string, Set<string>> = {
+  indexed: new Set(["id", "steam_url", "date"]),
+};
+
 interface DbInfo {
   db: Database.Database;
   tableName: string;
@@ -569,9 +573,12 @@ function processResults(rows: Record<string, string>[], sourceKey: string): Reco
       }
 
       const cleaned: Record<string, string> = {};
+      const excludedCols = PER_SOURCE_EXCLUDED_COLS[sourceKey];
       for (const [k, v] of Object.entries(r)) {
         const kl = k.toLowerCase();
-        if (kl !== "rownum" && v && String(v).trim().length > 0) {
+        if (kl === "rownum") continue;
+        if (excludedCols && excludedCols.has(kl)) continue;
+        if (v && String(v).trim().length > 0) {
           cleaned[k] = v;
         }
       }
