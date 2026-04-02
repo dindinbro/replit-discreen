@@ -28,9 +28,14 @@ const BG    = "#070707";
 type Status = "idle" | "playing" | "dead";
 
 /* ─── Obstacle types ─────────────────────────────── */
-interface SpikeObs   { kind: "spike";   x: number; side: "ground"|"ceil"; w: number; h: number; }
-interface WallObs    { kind: "wall";    x: number; gapTop: number; gapH: number; }
-type Obs = SpikeObs | WallObs;
+interface CactusGroup { kind: "cactus"; x: number; cacti: Array<{ h: number; large: boolean }>; }
+interface PteroObs    { kind: "ptero";  x: number; y: number; }
+type Obs = CactusGroup | PteroObs;
+
+const CACTUS_GAP = 11; // px gap between trunks in a group
+function cactusMetrics(c: { large: boolean }) {
+  return { tw: c.large ? 14 : 10, aw: c.large ? 17 : 12, ah: c.large ? 11 : 8 };
+}
 
 interface GS {
   playerY: number;
@@ -177,104 +182,164 @@ function drawScorpion(ctx: CanvasRenderingContext2D, y: number, t: number, inAir
   ctx.restore();
 }
 
-/* ─── Spike obstacle ─────────────────────────────── */
-function drawSpike(ctx: CanvasRenderingContext2D, sp: SpikeObs, t: number) {
+/* ─── Cactus group obstacle ──────────────────────── */
+function drawCactusGroup(ctx: CanvasRenderingContext2D, cg: CactusGroup) {
   ctx.save();
-  ctx.shadowColor = RED; ctx.shadowBlur = 18;
-  const count = Math.round(sp.w / 22);
-  for (let i = 0; i < count; i++) {
-    const sx = sp.x + i * 22 + 11;
-    const baseY = sp.side === "ground" ? GROUND_Y : CEIL_Y;
-    const tipY  = sp.side === "ground" ? GROUND_Y - sp.h : CEIL_Y + sp.h;
-    ctx.beginPath();
-    ctx.moveTo(sx - 10, baseY);
-    ctx.lineTo(sx,       tipY);
-    ctx.lineTo(sx + 10,  baseY);
-    ctx.closePath();
-    ctx.fillStyle = REDA; ctx.fill();
-    ctx.strokeStyle = RED; ctx.lineWidth = 1.6;
-    ctx.setLineDash([5,3]); ctx.lineDashOffset = -t * 22;
-    ctx.stroke(); ctx.setLineDash([]);
+  ctx.lineCap   = "square";
+  ctx.lineJoin  = "miter";
+  ctx.shadowColor = RED;
+  ctx.shadowBlur  = 14;
+  ctx.lineWidth   = 1.6;
+
+  let cx = cg.x;
+  for (const c of cg.cacti) {
+    const { tw, aw, ah } = cactusMetrics(c);
+    const armY = GROUND_Y - Math.round(c.h * 0.58); // arm attachment height
+
+    // trunk
+    ctx.fillStyle = REDA; ctx.fillRect(cx, GROUND_Y - c.h, tw, c.h);
+    ctx.strokeStyle = RED; ctx.strokeRect(cx, GROUND_Y - c.h, tw, c.h);
+
+    // left arm — horizontal bar
+    ctx.fillStyle = REDA; ctx.fillRect(cx - aw, armY, aw, ah);
+    ctx.strokeStyle = RED; ctx.strokeRect(cx - aw, armY, aw, ah);
+    // left arm — vertical tip
+    const ltw = Math.round(tw * 0.6);
+    ctx.fillRect(cx - aw, armY - Math.round(ah * 2), ltw, Math.round(ah * 2));
+    ctx.strokeRect(cx - aw, armY - Math.round(ah * 2), ltw, Math.round(ah * 2));
+
+    // right arm — horizontal bar
+    ctx.fillRect(cx + tw, armY, aw, ah);
+    ctx.strokeRect(cx + tw, armY, aw, ah);
+    // right arm — vertical tip
+    ctx.fillRect(cx + tw + aw - ltw, armY - Math.round(ah * 2), ltw, Math.round(ah * 2));
+    ctx.strokeRect(cx + tw + aw - ltw, armY - Math.round(ah * 2), ltw, Math.round(ah * 2));
+
+    cx += tw + CACTUS_GAP;
   }
-  // glow strip at base
+
+  // glow at ground base
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(239,68,68,0.25)";
-  if (sp.side === "ground") ctx.fillRect(sp.x, GROUND_Y - 3, sp.w, 3);
-  else                      ctx.fillRect(sp.x, CEIL_Y, sp.w, 3);
+  ctx.fillStyle = "rgba(239,68,68,0.22)";
+  const { aw: faw } = cactusMetrics(cg.cacti[0]);
+  const totalW = cg.cacti.reduce((s, c) => s + cactusMetrics(c).tw + CACTUS_GAP, 0)
+    - CACTUS_GAP + cactusMetrics(cg.cacti[cg.cacti.length - 1]).aw;
+  ctx.fillRect(cg.x - faw, GROUND_Y - 3, totalW + faw, 3);
+
   ctx.restore();
 }
 
-/* ─── Wall obstacle ──────────────────────────────── */
-function drawWall(ctx: CanvasRenderingContext2D, wl: WallObs, t: number) {
-  const WW = 24;
+/* ─── Pterodactyl obstacle ───────────────────────── */
+function drawPtero(ctx: CanvasRenderingContext2D, pt: PteroObs, t: number) {
   ctx.save();
-  ctx.shadowColor = RED; ctx.shadowBlur = 20;
+  ctx.lineCap  = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = RED;
+  ctx.shadowColor = RED;
+  ctx.shadowBlur  = 12;
+  ctx.lineWidth   = 2;
 
-  const drawBlock = (y: number, h: number) => {
-    if (h <= 0) return;
-    ctx.fillStyle = REDA; ctx.fillRect(wl.x, y, WW, h);
-    ctx.strokeStyle = RED; ctx.lineWidth = 1.5;
-    ctx.setLineDash([5,4]); ctx.lineDashOffset = -t * 26;
-    ctx.strokeRect(wl.x, y, WW, h);
-    ctx.setLineDash([]);
-    if (h > 22) {
-      ctx.shadowBlur = 0; ctx.fillStyle = RED;
-      ctx.font = "bold 8px monospace"; ctx.textAlign = "center";
-      ctx.fillText("FW", wl.x + WW / 2, y + h / 2 + 3);
-    }
-  };
+  const { x, y } = pt;
+  const flap = Math.sin(t * 9) * 12; // wing oscillation
 
-  drawBlock(CEIL_Y,          wl.gapTop - CEIL_Y);
-  drawBlock(wl.gapTop + wl.gapH, GROUND_Y - wl.gapTop - wl.gapH);
+  // body
+  ctx.fillStyle = REDA;
+  ctx.beginPath(); ctx.ellipse(x + 10, y, 13, 7, -0.1, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
 
-  // Gap highlight
-  const gGrad = ctx.createLinearGradient(wl.x, 0, wl.x + WW, 0);
-  gGrad.addColorStop(0,   "rgba(212,160,23,0)");
-  gGrad.addColorStop(0.5, "rgba(212,160,23,0.12)");
-  gGrad.addColorStop(1,   "rgba(212,160,23,0)");
-  ctx.shadowColor = GOLD; ctx.shadowBlur = 8;
-  ctx.fillStyle = gGrad;
-  ctx.fillRect(wl.x, wl.gapTop, WW, wl.gapH);
+  // head (facing right)
+  ctx.beginPath(); ctx.ellipse(x + 21, y - 6, 8, 6, 0.2, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // beak
+  ctx.beginPath();
+  ctx.moveTo(x + 28, y - 7);
+  ctx.lineTo(x + 42, y - 4);
+  ctx.lineTo(x + 28, y - 2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // eye
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = RED;
+  ctx.beginPath(); ctx.arc(x + 24, y - 7, 2, 0, Math.PI * 2); ctx.fill();
+
+  // upper wing (animated)
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(x + 6, y - 5);
+  ctx.bezierCurveTo(x - 10, y - 10 - flap, x - 28, y - 18 - flap, x - 34, y - 10 - flap);
+  ctx.stroke();
+  // wing membrane fill
+  ctx.beginPath();
+  ctx.moveTo(x + 6, y - 5);
+  ctx.bezierCurveTo(x - 10, y - 10 - flap, x - 28, y - 18 - flap, x - 34, y - 10 - flap);
+  ctx.lineTo(x + 4, y + 5);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(239,68,68,0.11)"; ctx.fill();
+
+  // lower wing hint (counter-flap)
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(x + 6, y + 3);
+  ctx.bezierCurveTo(x - 6, y + 6 + flap * 0.4, x - 18, y + 10 + flap * 0.4, x - 22, y + 7 + flap * 0.4);
+  ctx.stroke();
+
+  // tail fork
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(x - 3, y + 2);
+  ctx.lineTo(x - 16, y + 9);
+  ctx.lineTo(x - 22, y + 4);
+  ctx.moveTo(x - 16, y + 9);
+  ctx.lineTo(x - 20, y + 15);
+  ctx.stroke();
 
   ctx.restore();
 }
 
-/* ─── Spawn helpers ──────────────────────────────── */
+/* ─── Spawn ──────────────────────────────────────── */
 function spawnObs(score: number): Obs {
-  const prog = Math.min(1, score / 600);
-  const roll = Math.random();
+  const prog = Math.min(1, score / 500);
 
-  if (roll < 0.32) {
-    // Ground spike cluster
-    const cnt = 1 + Math.floor(Math.random() * (1 + Math.round(prog * 2)));
-    return { kind: "spike", x: CW + 80, side: "ground", w: cnt * 22, h: 28 + Math.random() * 32 };
-  } else if (roll < 0.55) {
-    // Ceiling spike cluster
-    const cnt = 1 + Math.floor(Math.random() * (1 + Math.round(prog * 2)));
-    return { kind: "spike", x: CW + 80, side: "ceil",   w: cnt * 22, h: 22 + Math.random() * 26 };
-  } else {
-    // Wall with gap — gap shrinks from 130 to 75px as score increases
-    const gapH   = Math.max(75, 130 - prog * 55);
-    const minTop = CEIL_Y + 28;
-    const maxTop = GROUND_Y - gapH - 28;
-    const gapTop = minTop + Math.random() * Math.max(0, maxTop - minTop);
-    return { kind: "wall", x: CW + 80, gapTop, gapH };
+  // Ptero: unlocks at score 80, probability grows with progress
+  if (score >= 80 && Math.random() > 0.68 - prog * 0.18) {
+    // 3 heights: low (must jump over), mid, high (walk under)
+    const heights = [GROUND_Y - 38, GROUND_Y - 72, GROUND_Y - 108];
+    const y = heights[Math.floor(Math.random() * heights.length)];
+    return { kind: "ptero", x: CW + 80, y };
   }
+
+  // Cactus group: 1-3 cacti, size proportional to progress
+  const roll = Math.random();
+  const n    = roll < 0.52 ? 1 : roll < 0.80 ? 2 : 3;
+  const cacti = Array.from({ length: n }, () => ({
+    h:     26 + Math.random() * 36,
+    large: Math.random() < 0.42,
+  }));
+  return { kind: "cactus", x: CW + 80, cacti };
 }
 
+/* ─── Hit test ───────────────────────────────────── */
 function hitTest(pY: number, o: Obs): boolean {
   const px1 = PLAYER_X - HIT_R, px2 = PLAYER_X + HIT_R;
-  const py1 = pY - HIT_R,      py2 = pY + HIT_R;
+  const py1 = pY - HIT_R,       py2 = pY + HIT_R;
 
-  if (o.kind === "spike") {
-    if (px2 < o.x || px1 > o.x + o.w) return false;
-    return o.side === "ground" ? py2 > GROUND_Y - o.h
-                               : py1 < CEIL_Y + o.h;
+  if (o.kind === "cactus") {
+    const { aw: faw } = cactusMetrics(o.cacti[0]);
+    const last = o.cacti[o.cacti.length - 1];
+    const { tw, aw } = cactusMetrics(last);
+    const groupRight = o.cacti.reduce((s, c) => s + cactusMetrics(c).tw + CACTUS_GAP, o.x)
+      - CACTUS_GAP + aw;
+    const groupLeft = o.x - faw;
+    if (px2 < groupLeft || px1 > groupRight) return false;
+    const maxH = Math.max(...o.cacti.map(c => c.h));
+    return py2 > GROUND_Y - maxH + 4;
   } else {
-    const WW = 24;
-    if (px2 < o.x || px1 > o.x + WW) return false;
-    const inGap = py2 > o.gapTop && py1 < o.gapTop + o.gapH;
-    return !inGap;
+    // Ptero: bounding box ~70px wide, 28px tall centred on (x+4, y)
+    if (px2 < o.x - 34 || px1 > o.x + 42) return false;
+    if (py2 < o.y - 18 || py1 > o.y + 12) return false;
+    return true;
   }
 }
 
@@ -434,7 +499,7 @@ export default function GamePage() {
       ctx.fillStyle = vig; ctx.fillRect(0, 0, CW, CH);
 
       drawBg(ctx, gs.bgOff);
-      gs.obs.forEach(o => o.kind === "spike" ? drawSpike(ctx, o, gs.t) : drawWall(ctx, o, gs.t));
+      gs.obs.forEach(o => o.kind === "cactus" ? drawCactusGroup(ctx, o) : drawPtero(ctx, o, gs.t));
       drawScorpion(ctx, gs.playerY, gs.t, !gs.onGround);
 
       // Shadow under scorpion on ground
@@ -497,7 +562,7 @@ export default function GamePage() {
             <span className="text-[10px] font-bold bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded uppercase tracking-widest">Mini-Jeu</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Évite les pièges · Passe dans les brèches · Survive le plus longtemps
+            Saute par-dessus les cactus · Évite les ptéros · Survive le plus longtemps
           </p>
         </div>
         <div className="text-right text-sm text-muted-foreground">
@@ -525,7 +590,7 @@ export default function GamePage() {
                 <div className="text-center space-y-2">
                   <div className="text-primary font-black text-3xl font-mono tracking-tight">STING.EXE</div>
                   <div className="text-muted-foreground text-sm max-w-xs leading-relaxed text-center">
-                    Évite les pièges au sol, passe dans<br />les brèches des firewalls.
+                    Saute par-dessus les cactus.<br />Évite les ptéros volants. Survive.
                   </div>
                 </div>
                 <button
