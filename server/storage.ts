@@ -116,6 +116,7 @@ export interface IStorage {
   submitGameScore(userId: string, username: string, score: number): Promise<void>;
   getGameLeaderboard(): Promise<Array<{ userId: string; username: string; score: number; rank: number }>>;
   getUserBestScore(userId: string): Promise<number>;
+  getUserGameCredits(userId: string): Promise<{ total: number; gamesPlayed: number }>;
 }
 
 function hashKey(key: string): string {
@@ -1022,6 +1023,15 @@ export class DatabaseStorage implements IStorage {
       .from(gameScores)
       .where(eq(gameScores.userId, userId));
     return rows[0]?.best ?? 0;
+  }
+
+  async getUserGameCredits(userId: string): Promise<{ total: number; gamesPlayed: number }> {
+    const rows = await db
+      .select({ score: gameScores.score })
+      .from(gameScores)
+      .where(eq(gameScores.userId, userId));
+    const total = rows.reduce((acc, r) => acc + Math.min(20, Math.floor(r.score / 60)), 0);
+    return { total, gamesPlayed: rows.length };
   }
 }
 

@@ -4443,5 +4443,14 @@ Règles :
     }
   });
 
+  app.get("/api/game/credits", requireAuth, async (req: any, res) => {
+    try {
+      const data = await storage.getUserGameCredits(req.user.id);
+      res.json(data);
+    } catch {
+      res.json({ total: 0, gamesPlayed: 0 });
+    }
+  });
+
   return httpServer;
 }

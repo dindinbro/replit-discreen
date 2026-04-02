@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Trophy, RotateCcw, Play, Coins, ChevronUp, ChevronDown } from "lucide-react";
+import { Trophy, RotateCcw, Play, Coins, ChevronUp, ChevronDown, Lock, Zap } from "lucide-react";
 
 /* ═══════════════════════════════════════════════
    ARACHN.RUN — Web Strand Navigator
@@ -274,13 +274,19 @@ export default function GamePage() {
     Array<{ userId: string; username: string; score: number; rank: number }>
   >({
     queryKey: ["/api/game/scores"],
-    refetchInterval: 8_000,  // refresh every 8 seconds
+    refetchInterval: 8_000,
+  });
+
+  const { data: gameCredits, refetch: refetchCredits } = useQuery<{ total: number; gamesPlayed: number }>({
+    queryKey: ["/api/game/credits"],
+    enabled: !!user,
   });
 
   const submitMut = useMutation({
     mutationFn: (s: number) => apiRequest("POST", "/api/game/submit", { score: s }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/game/scores"] });
+      refetchCredits();
     },
   });
 
@@ -618,6 +624,60 @@ export default function GamePage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Credits section */}
+      <div className="border border-primary/20 rounded-xl overflow-hidden bg-card/30">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-border/25">
+          <Coins className="w-4 h-4 text-primary" />
+          <span className="font-bold text-sm">Crédits ARACHN.RUN</span>
+        </div>
+
+        {!user ? (
+          <div className="px-5 py-6 text-sm text-muted-foreground/60 text-center">
+            Connecte-toi pour voir tes crédits accumulés.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] divide-y sm:divide-y-0 sm:divide-x divide-border/25">
+            {/* Credit balance */}
+            <div className="px-6 py-5 flex flex-col gap-1 sm:min-w-[200px]">
+              <div className="text-xs text-muted-foreground/60 uppercase tracking-widest font-mono">Solde</div>
+              <div className="flex items-end gap-2 mt-1">
+                <span className="text-4xl font-black text-primary font-mono tabular-nums leading-none">
+                  {gameCredits?.total ?? 0}
+                </span>
+                <span className="text-sm text-muted-foreground/70 mb-0.5">crédits</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground/45 font-mono mt-1">
+                {gameCredits?.gamesPlayed ?? 0} partie{(gameCredits?.gamesPlayed ?? 0) !== 1 ? "s" : ""} jouée{(gameCredits?.gamesPlayed ?? 0) !== 1 ? "s" : ""}
+              </div>
+            </div>
+
+            {/* How to earn + offers */}
+            <div className="px-6 py-5 space-y-4 flex-1">
+              {/* Earning rule */}
+              <div>
+                <div className="text-xs text-muted-foreground/50 uppercase tracking-widest font-mono mb-2">Comment gagner</div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground/80">
+                  <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span>60 pts de score = <span className="text-primary font-semibold">1 crédit</span> · max 20 crédits par partie</span>
+                </div>
+              </div>
+
+              {/* Offers — none for now */}
+              <div>
+                <div className="text-xs text-muted-foreground/50 uppercase tracking-widest font-mono mb-2">Dépenser ses crédits</div>
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-border/35 bg-muted/20">
+                  <Lock className="w-5 h-5 text-muted-foreground/30 shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground/60">Pas d'offre pour le moment</div>
+                    <div className="text-xs text-muted-foreground/40 mt-0.5">Les offres de conversion arrivent bientôt.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
