@@ -4448,6 +4448,39 @@ Règles :
     }
   });
 
+  app.post("/api/game/redeem", requireAuth, async (req: any, res) => {
+    try {
+      const { plan } = req.body;
+      if (plan !== "vip" && plan !== "pro") {
+        return res.status(400).json({ message: "Plan invalide" });
+      }
+      const COSTS: Record<string, number> = { vip: 10000, pro: 30000 };
+      const required = COSTS[plan];
+      const userId = req.user.id;
+
+      const { total } = await storage.getUserGameCredits(userId);
+      if (total < required) {
+        return res.status(400).json({ message: `Crédits insuffisants (${total} / ${required})` });
+      }
+
+      // Check current role — don't downgrade
+      const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).single();
+      const currentRole = profile?.role || "user";
+      const TIERS = ["user", "vip", "pro", "admin"];
+      if (TIERS.indexOf(currentRole) >= TIERS.indexOf(plan)) {
+        return res.status(400).json({ message: "Tu as déjà ce plan ou supérieur." });
+      }
+
+      const { error } = await supabaseAdmin.from("profiles").update({ role: plan }).eq("id", userId);
+      if (error) throw error;
+
+      res.json({ ok: true, plan });
+    } catch (err: any) {
+      console.error("[game/redeem] error:", err);
+      res.status(500).json({ message: err?.message || "Erreur lors de la réclamation" });
+    }
+  });
+
   app.get("/api/game/best", requireAuth, async (req: any, res) => {
     try {
       const best = await storage.getUserBestScore(req.user.id);

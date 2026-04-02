@@ -348,7 +348,7 @@ function hitTest(pY: number, o: Obs): boolean {
    Component
 ═══════════════════════════════════════════════ */
 export default function GamePage() {
-  const { user, getAccessToken } = useAuth();
+  const { user, role, getAccessToken } = useAuth();
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gsRef     = useRef<GS | null>(null);
@@ -389,6 +389,26 @@ export default function GamePage() {
   const { data: gameCredits, refetch: refetchCredits } = useQuery<{ total: number; gamesPlayed: number }>({
     queryKey: ["/api/game/credits"],
     enabled: !!user,
+  });
+
+  const [redeemPending, setRedeemPending] = useState<"vip" | "pro" | null>(null);
+
+  const redeemMut = useMutation({
+    mutationFn: async (plan: "vip" | "pro") => {
+      setRedeemPending(plan);
+      const res = await apiRequest("POST", "/api/game/redeem", { plan });
+      return res.json();
+    },
+    onSuccess: (_, plan) => {
+      setRedeemPending(null);
+      toast({ title: `Plan ${plan.toUpperCase()} activé !`, description: "Ton plan a été mis à jour avec succès." });
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/game/credits"] });
+    },
+    onError: (err: Error) => {
+      setRedeemPending(null);
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    },
   });
 
   const submitMut = useMutation({
@@ -781,12 +801,51 @@ export default function GamePage() {
               </div>
               <div>
                 <div className="text-xs text-muted-foreground/50 uppercase tracking-widest font-mono mb-2">Dépenser ses crédits</div>
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-border/35 bg-muted/20">
-                  <Lock className="w-5 h-5 text-muted-foreground/30 shrink-0" />
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground/60">Pas d'offre pour le moment</div>
-                    <div className="text-xs text-muted-foreground/40 mt-0.5">Les offres de conversion arrivent bientôt.</div>
-                  </div>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { plan: "vip",  label: "VIP",  cost: 10000, color: "text-yellow-400", border: "border-yellow-400/20", bg: "bg-yellow-400/5" },
+                    { plan: "pro",  label: "PRO",  cost: 30000, color: "text-primary",    border: "border-primary/20",    bg: "bg-primary/5"    },
+                  ].map(({ plan, label, cost, color, border, bg }) => {
+                    const credits    = gameCredits?.total ?? 0;
+                    const pct        = Math.min(100, Math.round((credits / cost) * 100));
+                    const hasEnough  = credits >= cost;
+                    const alreadyHas = role === plan || role === "pro" && plan === "vip" || role === "admin";
+                    return (
+                      <div key={plan} className={`rounded-lg border ${border} ${bg} p-3`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-black tracking-widest font-mono ${color}`}>{label}</span>
+                            <span className="text-xs text-muted-foreground/50 font-mono">{cost.toLocaleString()} crédits</span>
+                          </div>
+                          {alreadyHas ? (
+                            <span className={`text-[10px] font-bold tracking-widest uppercase ${color} opacity-80`}>✓ Actif</span>
+                          ) : (
+                            <button
+                              data-testid={`btn-redeem-${plan}`}
+                              disabled={!hasEnough || redeemPending === plan}
+                              onClick={() => redeemMut.mutate(plan as "vip" | "pro")}
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded transition-all ${
+                                hasEnough
+                                  ? `${color} border ${border} hover:bg-white/5 cursor-pointer`
+                                  : "text-muted-foreground/30 border border-border/20 cursor-not-allowed"
+                              }`}
+                            >
+                              {redeemPending === plan ? "..." : "Réclamer"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-border/20 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${hasEnough ? (plan === "vip" ? "bg-yellow-400" : "bg-primary") : "bg-muted-foreground/30"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground/40 font-mono mt-1">
+                          {credits.toLocaleString()} / {cost.toLocaleString()} crédits {!alreadyHas && !hasEnough && `· encore ${(cost - credits).toLocaleString()}`}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
