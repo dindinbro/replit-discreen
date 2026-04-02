@@ -41,9 +41,12 @@ function useOnlineCount() {
         const res = await fetch("/api/heartbeat", { method: "POST", headers });
         if (res.ok) {
           await res.json();
-          const drift = Math.floor(Math.random() * 15) - 7;
-          fakeBaseRef.current = Math.min(130, Math.max(60, fakeBaseRef.current + drift));
-          setCount(fakeBaseRef.current);
+          // Only drift occasionally and by a small amount to feel realistic
+          if (Math.random() < 0.3) {
+            const drift = Math.floor(Math.random() * 5) - 2;
+            fakeBaseRef.current = Math.min(130, Math.max(60, fakeBaseRef.current + drift));
+            setCount(fakeBaseRef.current);
+          }
         }
       } catch {}
     };
@@ -443,7 +446,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {!collapsed && <span className="text-[11px] text-muted-foreground font-medium tabular-nums">{onlineCount}</span>}
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top">{onlineCount} {t("header.onlineUsers", { count: onlineCount })}</TooltipContent>
+            <TooltipContent side="top">{t("header.onlineUsers", { count: onlineCount })}</TooltipContent>
           </Tooltip>
         )}
         <Tooltip>
