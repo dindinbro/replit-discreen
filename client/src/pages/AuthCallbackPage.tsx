@@ -9,79 +9,83 @@ export default function AuthCallbackPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    async function handleCallback() {
-      if (!supabase) {
-        setStatus("error");
-        setErrorMsg("Auth non configuré.");
-        return;
-      }
-
-      // Check for error in URL (from Discord/Supabase)
-      const searchParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.slice(1));
-      const errorParam = searchParams.get("error") || hashParams.get("error");
-      const errorDescription = searchParams.get("error_description") || hashParams.get("error_description");
-
-      if (errorParam) {
-        setStatus("error");
-        setErrorMsg(errorDescription || errorParam);
-        return;
-      }
-
-      // Check if the Supabase SDK already established a session
-      // (detectSessionInUrl fires automatically on client init)
-      const { data: { session: existingSession } } = await supabase.auth.getSession();
-      if (existingSession) {
-        setStatus("success");
-        setTimeout(() => navigate("/search"), 800);
-        return;
-      }
-
-      // Try explicit code exchange (PKCE flow — code in query string)
-      const code = searchParams.get("code");
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          // Code might have been consumed by detectSessionInUrl already — check session again
-          const { data: { session: retrySession } } = await supabase.auth.getSession();
-          if (retrySession) {
-            setStatus("success");
-            setTimeout(() => navigate("/search"), 800);
-            return;
-          }
-          setStatus("error");
-          setErrorMsg(error.message);
-          return;
-        }
-        setStatus("success");
-        setTimeout(() => navigate("/search"), 800);
-        return;
-      }
-
-      // No code in URL — wait for onAuthStateChange (implicit flow via hash)
-      if (hashParams.get("access_token")) {
-        // SDK handles implicit tokens automatically, just wait
-        const timeout = setTimeout(() => {
-          setStatus("error");
-          setErrorMsg("La session n'a pas pu être établie. Réessayez.");
-        }, 8000);
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (session) {
-            clearTimeout(timeout);
-            subscription.unsubscribe();
-            setStatus("success");
-            setTimeout(() => navigate("/search"), 800);
-          }
-        });
-        return;
-      }
-
-      // Nothing useful in URL — redirect to login
-      navigate("/login");
+    if (!supabase) {
+      setStatus("error");
+      setErrorMsg("Auth non configuré.");
+      return;
     }
 
-    handleCallback();
+    // Check for error in URL first
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const errorParam = searchParams.get("error") || hashParams.get("error");
+    const errorDescription = searchParams.get("error_description") || hashParams.get("error_description");
+
+    if (errorParam) {
+      setStatus("error");
+      setErrorMsg(errorDescription || errorParam);
+      return;
+    }
+
+    let done = false;
+    const finish = (success: boolean, msg?: string) => {
+      if (done) return;
+      done = true;
+      if (success) {
+        setStatus("success");
+        setTimeout(() => navigate("/search"), 800);
+      } else {
+        setStatus("error");
+        setErrorMsg(msg || "La session n'a pas pu être établie.");
+      }
+    };
+
+    // Listen for auth state changes — covers both implicit (hash token) and PKCE (code exchange)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        subscription.unsubscribe();
+        finish(true);
+      }
+    });
+
+    // Also try to get an existing session immediately (in case detectSessionInUrl already ran)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        subscription.unsubscribe();
+        finish(true);
+      }
+    });
+
+    // If there's a code in the URL (PKCE fallback), try to exchange it
+    const code = searchParams.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          // Code might already be consumed by detectSessionInUrl — check session
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session && !done) {
+              finish(false, error.message);
+            }
+          });
+        }
+      });
+    }
+
+    // Timeout fallback — give 10 seconds for the session to be established
+    const timeout = setTimeout(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          finish(true);
+        } else {
+          finish(false, "Délai d'attente dépassé. Réessaye.");
+        }
+      });
+    }, 10000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [navigate]);
 
   return (
