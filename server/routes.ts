@@ -4426,7 +4426,7 @@ Règles :
       const board = await storage.getGameLeaderboard();
       res.json(board);
     } catch (err) {
-      log(`[game/scores] error: ${err}`, "express");
+      console.error(`[game/scores] error:`, err);
       res.status(500).json({ error: "Erreur leaderboard" });
     }
   });
@@ -4443,7 +4443,7 @@ Règles :
       const best = await storage.getUserBestScore(userId);
       res.json({ ok: true, best });
     } catch (err) {
-      log(`[game/submit] error: ${err}`, "express");
+      console.error(`[game/submit] error:`, err);
       res.status(500).json({ error: "Erreur submit" });
     }
   });
