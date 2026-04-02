@@ -73,52 +73,90 @@ function drawBg(ctx: CanvasRenderingContext2D, off: number) {
   ctx.restore();
 }
 
-/* ─── Spider ─────────────────────────────────────── */
-function drawSpider(ctx: CanvasRenderingContext2D, y: number, t: number, inAir: boolean) {
+/* ─── Scorpion ───────────────────────────────────── */
+function drawScorpion(ctx: CanvasRenderingContext2D, y: number, t: number, inAir: boolean) {
   const x = PLAYER_X;
   ctx.save();
-  ctx.shadowColor = GOLD; ctx.shadowBlur = 14;
+  ctx.shadowColor = GOLD; ctx.shadowBlur = 12;
   ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD;
 
-  const cyc = inAir ? Math.sin(t * 6) * 4 : Math.sin(t * 16) * 3.5;
+  const cyc = inAir ? Math.sin(t * 5) * 3 : Math.sin(t * 15) * 3;
 
-  // Abdomen
+  // Opisthosoma (rear abdomen) — larger oval
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.ellipse(x - 12, y, 13, 11, -0.1, 0, Math.PI * 2); ctx.stroke();
-  // Abdomen chevrons
-  ctx.save(); ctx.globalAlpha = 0.3; ctx.lineWidth = 0.9;
-  ctx.beginPath(); ctx.moveTo(x - 20, y - 3); ctx.quadraticCurveTo(x - 12, y - 7, x - 4, y - 3); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x - 20, y + 4); ctx.quadraticCurveTo(x - 12, y + 0,  x - 4, y + 4); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(x - 14, y + 1, 15, 10, 0.1, 0, Math.PI * 2); ctx.stroke();
+  // Abdominal segment lines
+  ctx.save(); ctx.globalAlpha = 0.35; ctx.lineWidth = 0.9;
+  for (let i = -1; i <= 1; i++) {
+    const sy = y + 1 + i * 6;
+    ctx.beginPath(); ctx.moveTo(x - 25, sy); ctx.lineTo(x - 4, sy); ctx.stroke();
+  }
   ctx.restore();
-  // Pedicel
-  ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(x - 1, y - 1); ctx.lineTo(x + 2, y - 2); ctx.stroke();
-  // Cephalothorax
+
+  // Prosoma (front carapace) — smaller oval
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.ellipse(x + 8, y - 1, 9, 8, 0.1, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(x + 6, y - 1, 11, 8, -0.08, 0, Math.PI * 2); ctx.stroke();
+
   // Eyes
   ctx.shadowBlur = 18;
-  ctx.beginPath(); ctx.arc(x + 15, y - 4, 2.5, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 15, y + 2, 2.5, 0, Math.PI * 2); ctx.fill();
-  // Fangs
-  ctx.shadowBlur = 0; ctx.lineWidth = 1.4;
-  ctx.beginPath(); ctx.moveTo(x + 17, y + 3); ctx.lineTo(x + 22, y + 9); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + 17, y - 4); ctx.lineTo(x + 22, y - 10); ctx.stroke();
-  // 8 legs
+  ctx.beginPath(); ctx.arc(x + 14, y - 4, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 14, y + 2, 2.2, 0, Math.PI * 2); ctx.fill();
+
+  // Metasoma / tail — arches up and over the body
+  const sway = Math.sin(t * 2.2) * 4;
+  ctx.shadowBlur = 10; ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(x - 29, y + 2);
+  ctx.bezierCurveTo(
+    x - 42, y - 8 + sway,
+    x - 40, y - 26 + sway,
+    x - 20, y - 34
+  );
+  ctx.bezierCurveTo(
+    x - 4,  y - 42,
+    x + 12, y - 38,
+    x + 16, y - 27
+  );
+  ctx.stroke();
+
+  // Telson (stinger bulb + tip)
+  ctx.shadowBlur = 16;
+  ctx.beginPath(); ctx.arc(x + 16, y - 27, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(x + 16, y - 23);
+  ctx.lineTo(x + 20, y - 14);
+  ctx.stroke();
+
+  // Left chelae (upper claw — faces right)
   ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(x + 15, y - 6); ctx.lineTo(x + 28, y - 10); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + 28, y - 10); ctx.lineTo(x + 38, y - 5); ctx.stroke();
+  const cg1 = 3 + 2.5 * Math.abs(Math.sin(t * 3.2));
+  ctx.beginPath(); ctx.moveTo(x + 28, y - 10); ctx.lineTo(x + 38, y - 10 - cg1); ctx.stroke();
+
+  // Right chelae (lower claw)
+  ctx.beginPath(); ctx.moveTo(x + 15, y + 5); ctx.lineTo(x + 28, y + 10); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + 28, y + 10); ctx.lineTo(x + 38, y + 5); ctx.stroke();
+  const cg2 = 3 + 2.5 * Math.abs(Math.sin(t * 3.2 + 0.5));
+  ctx.beginPath(); ctx.moveTo(x + 28, y + 10); ctx.lineTo(x + 38, y + 10 + cg2); ctx.stroke();
+
+  // 8 walking legs along opisthosoma
+  ctx.lineWidth = 1.7;
   const legs: [number,number, number,number, number,number][] = [
-    [x-2,  y-9,   x-16, y-22+cyc,  x-36, y-14],
-    [x,    y-3,   x-18, y-6-cyc,   x-40, y+3 ],
-    [x,    y+4,   x-18, y+17+cyc,  x-36, y+28],
-    [x-2,  y+10,  x-14, y+25-cyc,  x-24, y+40],
-    [x+13, y-9,   x+27, y-24+cyc,  x+46, y-15],
-    [x+15, y-3,   x+30, y-5-cyc,   x+50, y+4 ],
-    [x+15, y+4,   x+28, y+19+cyc,  x+46, y+30],
-    [x+13, y+10,  x+24, y+26-cyc,  x+38, y+42],
+    [x - 3,  y - 7,  x - 8,  y - 19 + cyc, x - 20, y - 13],
+    [x - 11, y - 8,  x - 16, y - 21 - cyc, x - 28, y - 15],
+    [x - 19, y - 8,  x - 23, y - 19 + cyc, x - 36, y - 13],
+    [x - 25, y - 7,  x - 30, y - 17 - cyc, x - 42, y - 11],
+    [x - 3,  y + 8,  x - 8,  y + 21 - cyc, x - 20, y + 15],
+    [x - 11, y + 9,  x - 16, y + 23 + cyc, x - 28, y + 17],
+    [x - 19, y + 9,  x - 23, y + 21 - cyc, x - 36, y + 15],
+    [x - 25, y + 8,  x - 30, y + 19 + cyc, x - 42, y + 13],
   ];
   for (const [ax,ay,kx,ky,tx,ty] of legs) {
     ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(kx,ky); ctx.lineTo(tx,ty); ctx.stroke();
   }
+
   ctx.restore();
 }
 
@@ -380,9 +418,9 @@ export default function GamePage() {
 
       drawBg(ctx, gs.bgOff);
       gs.obs.forEach(o => o.kind === "spike" ? drawSpike(ctx, o, gs.t) : drawWall(ctx, o, gs.t));
-      drawSpider(ctx, gs.playerY, gs.t, !gs.onGround);
+      drawScorpion(ctx, gs.playerY, gs.t, !gs.onGround);
 
-      // Shadow under spider on ground
+      // Shadow under scorpion on ground
       if (gs.onGround) {
         ctx.save();
         ctx.shadowBlur = 0;
@@ -427,7 +465,7 @@ export default function GamePage() {
     vig.addColorStop(0, "transparent"); vig.addColorStop(1, "rgba(0,0,0,0.6)");
     ctx.fillStyle = vig; ctx.fillRect(0, 0, CW, CH);
     drawBg(ctx, 0);
-    drawSpider(ctx, GROUND_Y - 22, 0, false);
+    drawScorpion(ctx, GROUND_Y - 22, 1.2, false);
   }, [status]);
 
   const creditsEarned = Math.min(20, Math.floor(score / 60));
