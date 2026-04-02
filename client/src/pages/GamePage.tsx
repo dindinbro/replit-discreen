@@ -710,7 +710,7 @@ export default function GamePage() {
         </div>
 
         {/* Leaderboard */}
-        <div className="bg-card/40 border border-border/30 rounded-xl overflow-hidden flex flex-col">
+        <div className="bg-card/40 border border-border/30 rounded-xl overflow-hidden flex flex-col self-start">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/30">
             <Trophy className="w-4 h-4 text-primary" />
             <span className="font-bold text-sm">Classement</span>
@@ -736,7 +736,7 @@ export default function GamePage() {
               </button>
             </div>
           </div>
-          <div className="divide-y divide-border/20 flex-1">
+          <div className="divide-y divide-border/20">
             {leaderboard.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground/50">
                 Aucun score encore.<br />Sois le premier !
