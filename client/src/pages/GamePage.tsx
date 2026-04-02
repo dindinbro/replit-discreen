@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 import { Trophy, RotateCcw, Play, Coins, Lock, Zap } from "lucide-react";
 
 /* ═══════════════════════════════════════════════
@@ -348,6 +350,7 @@ function hitTest(pY: number, o: Obs): boolean {
 ═══════════════════════════════════════════════ */
 export default function GamePage() {
   const { user, getAccessToken } = useAuth();
+  const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gsRef     = useRef<GS | null>(null);
   const rafRef    = useRef(0);
@@ -391,7 +394,10 @@ export default function GamePage() {
 
   const submitMut = useMutation({
     mutationFn: async (s: number) => {
-      const token = getAccessToken();
+      // Always fetch a fresh session token from Supabase
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      const token = freshSession?.access_token ?? getAccessToken();
+
       const res = await fetch("/api/game/submit", {
         method: "POST",
         headers: {
@@ -401,12 +407,22 @@ export default function GamePage() {
         credentials: "include",
         body: JSON.stringify({ score: s }),
       });
-      if (!res.ok) throw new Error(`${res.status}`);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`${res.status}: ${body}`);
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/game/scores"] });
       refetchCredits();
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Score non sauvegardé",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 
