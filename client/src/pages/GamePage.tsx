@@ -363,9 +363,26 @@ export default function GamePage() {
   });
   const [credits, setCredits] = useState(0);
 
-  const { data: leaderboard = [] } = useQuery<
+  const LEADERBOARD_INTERVAL = 3 * 60 * 1000; // 3 minutes
+  const REFRESH_COOLDOWN    = 30;             // seconds
+
+  const { data: leaderboard = [], refetch: refetchLeaderboard, dataUpdatedAt } = useQuery<
     Array<{ userId: string; username: string; score: number; rank: number }>
-  >({ queryKey: ["/api/game/scores"], refetchInterval: 8_000 });
+  >({ queryKey: ["/api/game/scores"], refetchInterval: LEADERBOARD_INTERVAL });
+
+  const [cooldown, setCooldown] = useState(0); // seconds remaining
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setInterval(() => setCooldown(c => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldown]);
+
+  const handleRefreshLeaderboard = useCallback(() => {
+    if (cooldown > 0) return;
+    refetchLeaderboard();
+    setCooldown(REFRESH_COOLDOWN);
+  }, [cooldown, refetchLeaderboard]);
 
   const { data: gameCredits, refetch: refetchCredits } = useQuery<{ total: number; gamesPlayed: number }>({
     queryKey: ["/api/game/credits"],
@@ -659,7 +676,27 @@ export default function GamePage() {
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/30">
             <Trophy className="w-4 h-4 text-primary" />
             <span className="font-bold text-sm">Classement</span>
-            <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono">actu ~8s</span>
+            <div className="ml-auto flex items-center gap-2">
+              {dataUpdatedAt > 0 && (
+                <span className="text-[10px] text-muted-foreground/40 font-mono">
+                  actu {new Date(dataUpdatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+              <button
+                onClick={handleRefreshLeaderboard}
+                disabled={cooldown > 0}
+                title={cooldown > 0 ? `Disponible dans ${cooldown}s` : "Actualiser le classement"}
+                className={`flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                  cooldown > 0
+                    ? "border-border/20 text-muted-foreground/30 cursor-not-allowed"
+                    : "border-primary/30 text-primary/60 hover:text-primary hover:border-primary/60 cursor-pointer"
+                }`}
+                data-testid="button-refresh-leaderboard"
+              >
+                <RotateCcw className={`w-2.5 h-2.5 ${cooldown > 0 ? "" : "group-hover:rotate-180 transition-transform"}`} />
+                {cooldown > 0 ? `${cooldown}s` : "↺"}
+              </button>
+            </div>
           </div>
           <div className="divide-y divide-border/20 flex-1">
             {leaderboard.length === 0 && (
