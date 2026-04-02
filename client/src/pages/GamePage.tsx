@@ -30,7 +30,6 @@ interface Obstacle {
   h: number;
   flash: number;
 }
-interface Packet { x: number; lane: number; alive: boolean; }
 interface GS {
   currentLane: number;
   spiderY: number;
@@ -39,7 +38,6 @@ interface GS {
   frame: number;
   nextObs: number;
   obstacles: Obstacle[];
-  packets: Packet[];
   t: number;
   webOff: number;
 }
@@ -212,22 +210,6 @@ function drawObstacle(ctx: CanvasRenderingContext2D, obs: Obstacle, t: number) {
   ctx.restore();
 }
 
-function drawPacket(ctx: CanvasRenderingContext2D, p: Packet, t: number) {
-  const x = p.x;
-  const y = LANE_Y[p.lane];
-  ctx.save();
-  const pulse = 1 + 0.15 * Math.sin(t * 5 + p.x * 0.01);
-  ctx.shadowColor = GOLD; ctx.shadowBlur = 16;
-  ctx.beginPath(); ctx.arc(x, y, 9 * pulse, 0, Math.PI * 2);
-  ctx.fillStyle = GOLD_A; ctx.fill();
-  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2);
-  ctx.fillStyle = GOLD; ctx.fill();
-  ctx.strokeStyle = BG; ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(x, y - 3.5); ctx.lineTo(x + 3.5, y); ctx.lineTo(x, y + 3.5); ctx.lineTo(x - 3.5, y); ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
-}
 
 function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -298,7 +280,6 @@ export default function GamePage() {
     frame: 0,
     nextObs: 160,
     obstacles: [],
-    packets: [],
     t: 0,
     webOff: 0,
   }), []);
@@ -362,23 +343,14 @@ export default function GamePage() {
       gs.spiderY += (targetY - gs.spiderY) * LERP_SPEED * dt * 3;
       const switching = Math.abs(gs.spiderY - targetY) > 3;
 
-      // Move obstacles + packets
+      // Move obstacles
       gs.obstacles = gs.obstacles.filter(o => o.x > -80);
       gs.obstacles.forEach(o => { o.x -= gs.speed * dt; if (o.flash > 0) o.flash--; });
-      gs.packets = gs.packets.filter(p => p.alive && p.x > -20);
-      gs.packets.forEach(p => p.x -= gs.speed * dt);
 
       // Spawn
       gs.nextObs -= gs.speed * dt;
       if (gs.nextObs <= 0) {
         gs.obstacles.push(spawnObs(gs.speed));
-        // Maybe add a packet on the safe lane
-        const takenLanes = gs.obstacles[gs.obstacles.length - 1].lanes;
-        const safeLanes = [0, 1, 2].filter(l => !takenLanes.includes(l));
-        if (safeLanes.length > 0 && Math.random() < 0.6) {
-          const lane = safeLanes[Math.floor(Math.random() * safeLanes.length)];
-          gs.packets.push({ x: CW + 90 + Math.random() * 80, lane, alive: true });
-        }
         gs.nextObs = 300 + Math.random() * 280;
       }
 
@@ -399,14 +371,6 @@ export default function GamePage() {
         }
       }
 
-      // Collect packets
-      for (const p of gs.packets) {
-        if (p.lane === gs.currentLane && Math.abs(p.x - SPIDER_X) < 28) {
-          p.alive = false;
-          gs.score += 40;
-        }
-      }
-
       // Score
       gs.score += 0.08 * dt * (gs.speed / INIT_SPEED);
       setScore(Math.floor(gs.score));
@@ -423,7 +387,6 @@ export default function GamePage() {
       ctx.fillRect(0, 0, CW, CH);
 
       drawWeb(ctx, gs.webOff);
-      gs.packets.forEach(p => drawPacket(ctx, p, gs.t));
       gs.obstacles.forEach(o => drawObstacle(ctx, o, gs.t));
       drawSpider(ctx, gs.spiderY, gs.t, switching);
 
@@ -496,7 +459,7 @@ export default function GamePage() {
             <span className="text-[10px] font-bold bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded uppercase tracking-widest">Mini-Jeu</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Navigate les 3 fils de toile · Évite les firewalls · Collecte les données
+            Navigate les 3 fils de toile · Évite les firewalls · Survive le plus longtemps
           </p>
         </div>
         <div className="text-right text-sm text-muted-foreground">
@@ -585,7 +548,7 @@ export default function GamePage() {
           <div className="flex items-center gap-5 text-xs text-muted-foreground/55 flex-wrap">
             <span><kbd className="px-1.5 py-0.5 bg-white/8 border border-white/10 rounded text-[10px]">↑</kbd><kbd className="ml-0.5 px-1.5 py-0.5 bg-white/8 border border-white/10 rounded text-[10px]">↓</kbd> Changer de fil</span>
             <span><kbd className="px-1.5 py-0.5 bg-white/8 border border-white/10 rounded text-[10px]">W</kbd><kbd className="ml-0.5 px-1.5 py-0.5 bg-white/8 border border-white/10 rounded text-[10px]">S</kbd> Alternatif</span>
-            <span className="ml-auto text-primary/50">⬡ Données = +40 pts · 60 pts = 1 crédit (max 20)</span>
+            <span className="ml-auto text-primary/50">60 pts de survie = 1 crédit (max 20)</span>
           </div>
         </div>
 
@@ -660,7 +623,7 @@ export default function GamePage() {
                 <div className="text-xs text-muted-foreground/50 uppercase tracking-widest font-mono mb-2">Comment gagner</div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground/80">
                   <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span>60 pts de score = <span className="text-primary font-semibold">1 crédit</span> · max 20 crédits par partie</span>
+                  <span>Survie en continu : 60 pts = <span className="text-primary font-semibold">1 crédit</span> · max 20 crédits par partie</span>
                 </div>
               </div>
 
