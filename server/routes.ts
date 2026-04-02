@@ -4425,7 +4425,8 @@ Règles :
     try {
       const board = await storage.getGameLeaderboard();
       res.json(board);
-    } catch {
+    } catch (err) {
+      log(`[game/scores] error: ${err}`, "express");
       res.status(500).json({ error: "Erreur leaderboard" });
     }
   });
@@ -4437,11 +4438,12 @@ Règles :
         return res.status(400).json({ error: "Score invalide" });
       }
       const userId = req.user.id;
-      const username = req.user.username || req.user.email?.split("@")[0] || "Agent";
+      const username = req.user.user_metadata?.display_name || req.user.email?.split("@")[0] || "Agent";
       await storage.submitGameScore(userId, username, Math.floor(score));
       const best = await storage.getUserBestScore(userId);
       res.json({ ok: true, best });
-    } catch {
+    } catch (err) {
+      log(`[game/submit] error: ${err}`, "express");
       res.status(500).json({ error: "Erreur submit" });
     }
   });

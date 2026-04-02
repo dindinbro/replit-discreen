@@ -633,10 +633,16 @@ export default function GamePage() {
                   {score > 0 && score >= best && (
                     <div className="text-xs text-primary/80 font-mono animate-pulse">✦ NOUVEAU RECORD ✦</div>
                   )}
-                  {creditsEarned > 0 && (
-                    <div className="flex items-center gap-1.5 justify-center text-sm text-yellow-400/90 mt-1">
-                      <Coins className="w-4 h-4" />
-                      <span className="font-bold">+{creditsEarned} crédit{creditsEarned > 1 ? "s" : ""} gagnés</span>
+                  {user ? (
+                    creditsEarned > 0 && (
+                      <div className="flex items-center gap-1.5 justify-center text-sm text-yellow-400/90 mt-1">
+                        <Coins className="w-4 h-4" />
+                        <span className="font-bold">+{creditsEarned} crédit{creditsEarned > 1 ? "s" : ""} gagnés</span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-xs text-muted-foreground/60 mt-1 font-mono">
+                      🔒 Connecte-toi pour sauvegarder ton score
                     </div>
                   )}
                 </div>

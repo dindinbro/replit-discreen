@@ -1009,12 +1009,28 @@ export class DatabaseStorage implements IStorage {
 
   async getGameLeaderboard(): Promise<Array<{ userId: string; username: string; score: number; rank: number }>> {
     const rows = await db
-      .select({ userId: gameScores.userId, username: gameScores.username, score: sql<number>`MAX(${gameScores.score})` })
+      .select({
+        userId:   gameScores.userId,
+        username: gameScores.username,
+        score:    sql<number>`MAX(${gameScores.score})`,
+      })
       .from(gameScores)
       .groupBy(gameScores.userId, gameScores.username)
       .orderBy(desc(sql`MAX(${gameScores.score})`))
-      .limit(10);
-    return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+      .limit(50); // over-fetch to de-dup by userId client-side
+
+    // If a user has multiple usernames (pseudo change), keep only their best
+    const byUser = new Map<string, { userId: string; username: string; score: number }>();
+    for (const r of rows) {
+      const existing = byUser.get(r.userId);
+      if (!existing || r.score > existing.score) {
+        byUser.set(r.userId, r);
+      }
+    }
+    return Array.from(byUser.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map((r, i) => ({ ...r, rank: i + 1 }));
   }
 
   async getUserBestScore(userId: string): Promise<number> {
