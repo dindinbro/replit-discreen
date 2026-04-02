@@ -1001,18 +1001,26 @@ export async function registerRoutes(
     }
   });
 
-  // GET /api/admin/users — returns effective role for each user
+  // GET /api/admin/users — returns all users with effective role (paginated Supabase fetch)
   app.get("/api/admin/users", requireAuth, requireAdmin, async (_req, res) => {
     try {
       if (!supabaseAdmin) {
         return res.status(500).json({ message: "Supabase not configured" });
       }
 
-      const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
-
-      if (usersError) {
-        console.error("listUsers error:", usersError);
-        return res.status(500).json({ message: "Erreur lors de la récupération des utilisateurs" });
+      // Paginate through all Supabase auth users (default limit is 50)
+      const allUsers: any[] = [];
+      let page = 1;
+      while (true) {
+        const { data: pageData, error: pageError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (pageError) {
+          console.error("listUsers error:", pageError);
+          return res.status(500).json({ message: "Erreur lors de la récupération des utilisateurs" });
+        }
+        if (!pageData?.users?.length) break;
+        allUsers.push(...pageData.users);
+        if (pageData.users.length < 1000) break;
+        page++;
       }
 
       const { data: profiles, error: profilesError } = await supabaseAdmin
@@ -1026,7 +1034,7 @@ export async function registerRoutes(
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-      const result = await Promise.all(users.map(async (u) => {
+      const result = await Promise.all(allUsers.map(async (u) => {
         const profile = profileMap.get(u.id);
         const profileRole = profile?.role || "user";
 
@@ -1038,9 +1046,13 @@ export async function registerRoutes(
           effectiveRole = (sub?.tier as string) || "free";
         }
 
+        const meta = u.user_metadata || {};
+        const username: string | null = meta.display_name || meta.username || meta.full_name || null;
+
         return {
           id: u.id,
           email: u.email || "",
+          username,
           role: effectiveRole,
           frozen: sub?.frozen ?? false,
           created_at: profile?.created_at || u.created_at,

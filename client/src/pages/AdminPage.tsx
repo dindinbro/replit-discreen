@@ -62,6 +62,7 @@ import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel"
 interface UserProfile {
   id: string;
   email: string;
+  username?: string | null;
   role: string;
   frozen: boolean;
   created_at: string;
@@ -728,6 +729,8 @@ function CategoryFormDialog({
   );
 }
 
+const PAGE_SIZE = 25;
+
 function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string | null; userId: string }) {
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -738,6 +741,7 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -851,22 +855,30 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   const filtered = users.filter(u => {
     if (!userSearch.trim()) return true;
     const q = userSearch.toLowerCase();
-    const username = u.email.split("@")[0].toLowerCase();
+    const displayName = (u.username || u.email.split("@")[0]).toLowerCase();
+    const emailPrefix = u.email.split("@")[0].toLowerCase();
     const uid = u.unique_id ? `${u.unique_id}` : u.id.slice(0, 8);
-    return username.includes(q) || u.email.toLowerCase().includes(q) || uid.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
+    return displayName.includes(q) || emailPrefix.includes(q) || u.email.toLowerCase().includes(q) || uid.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Rechercher un utilisateur..."
-          value={userSearch}
-          onChange={(e) => setUserSearch(e.target.value)}
-          className="pl-9"
-          data-testid="input-user-search"
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher un utilisateur..."
+            value={userSearch}
+            onChange={(e) => { setUserSearch(e.target.value); setPage(1); }}
+            className="pl-9"
+            data-testid="input-user-search"
+          />
+        </div>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{filtered.length} utilisateur{filtered.length > 1 ? "s" : ""}</span>
       </div>
 
       {filtered.length === 0 ? (
@@ -875,10 +887,11 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map(u => {
+          {paginated.map(u => {
             const currentRole = pendingChanges[u.id] || u.role;
             const hasChange = pendingChanges[u.id] !== undefined && pendingChanges[u.id] !== u.role;
-            const username = u.email.split("@")[0];
+            const displayName = u.username || u.email.split("@")[0];
+            const hasCustomName = !!u.username;
             const shortId = u.unique_id ? `${u.unique_id}` : u.id.slice(0, 8).toUpperCase();
 
             return (
@@ -886,7 +899,10 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium" data-testid={`text-username-${u.id}`}>{username}</p>
+                      <p className="font-medium" data-testid={`text-username-${u.id}`}>{displayName}</p>
+                      {!hasCustomName && (
+                        <span className="text-[10px] text-muted-foreground/50 italic">email</span>
+                      )}
                       <Badge variant="outline" className="font-mono text-xs" data-testid={`badge-id-${u.id}`}>#{shortId}</Badge>
                       {u.frozen && (
                         <Badge variant="secondary" className="gap-1 text-blue-500" data-testid={`badge-frozen-${u.id}`}>
@@ -944,6 +960,54 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
               </Card>
             );
           })}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-muted-foreground">
+                Page {safePage} / {totalPages} — {filtered.length} utilisateurs
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={safePage === 1}
+                  data-testid="button-page-first"
+                >«</Button>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  data-testid="button-page-prev"
+                >‹</Button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const start = Math.max(1, Math.min(safePage - 2, totalPages - 4));
+                  const p = start + i;
+                  if (p > totalPages) return null;
+                  return (
+                    <Button
+                      key={p} variant={p === safePage ? "default" : "outline"} size="sm"
+                      onClick={() => setPage(p)}
+                      data-testid={`button-page-${p}`}
+                      className="w-8"
+                    >{p}</Button>
+                  );
+                })}
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  data-testid="button-page-next"
+                >›</Button>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  data-testid="button-page-last"
+                >»</Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -448,6 +448,25 @@ export async function startDiscordBot() {
         .setDescription("Afficher la whitelist actuelle")
     );
 
+  const setPseudoCommand = new SlashCommandBuilder()
+    .setName("setpseudo")
+    .setDescription("Forcer le changement de pseudo d'un utilisateur Discreen")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addIntegerOption((opt) =>
+      opt.setName("idunique").setDescription("ID unique de l'utilisateur").setRequired(true).setMinValue(1)
+    )
+    .addStringOption((opt) =>
+      opt.setName("pseudo").setDescription("Nouveau pseudo (2-30 caractères)").setRequired(true)
+    );
+
+  const resetPseudoCommand = new SlashCommandBuilder()
+    .setName("resetpseudo")
+    .setDescription("Réinitialiser le pseudo d'un utilisateur (supprime son display_name)")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addIntegerOption((opt) =>
+      opt.setName("idunique").setDescription("ID unique de l'utilisateur").setRequired(true).setMinValue(1)
+    );
+
   const setrankCommand = new SlashCommandBuilder()
     .setName("setrank")
     .setDescription("Definir le rang de parrainage (Eclats) d'un utilisateur")
@@ -500,7 +519,9 @@ export async function startDiscordBot() {
         setstatusCommand.toJSON(),
         openticketCommand.toJSON(),
         freezeCommand.toJSON(),
-        setrankCommand.toJSON()
+        setrankCommand.toJSON(),
+        setPseudoCommand.toJSON(),
+        resetPseudoCommand.toJSON(),
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -537,7 +558,9 @@ export async function startDiscordBot() {
       setstatusCommand.toJSON(),
       openticketCommand.toJSON(),
       freezeCommand.toJSON(),
-      setrankCommand.toJSON()
+      setrankCommand.toJSON(),
+      setPseudoCommand.toJSON(),
+      resetPseudoCommand.toJSON(),
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -2205,6 +2228,131 @@ export async function startDiscordBot() {
         } else if (!interaction.replied) {
           await interaction.reply({ content: "Erreur lors du gel/degel du compte.", ephemeral: true });
         }
+      }
+    }
+
+    if (interaction.commandName === "setpseudo") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const uniqueId = interaction.options.getInteger("idunique", true);
+        const newPseudo = interaction.options.getString("pseudo", true).trim();
+
+        if (newPseudo.length < 2 || newPseudo.length > 30) {
+          await interaction.editReply({ content: "Le pseudo doit faire entre 2 et 30 caractères." });
+          return;
+        }
+
+        const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+        if (!sub) {
+          await interaction.editReply({ content: `Aucun utilisateur trouvé avec l'ID unique \`${uniqueId}\`.` });
+          return;
+        }
+
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!supabaseUrl || !supabaseKey) {
+          await interaction.editReply({ content: "Configuration Supabase manquante." });
+          return;
+        }
+
+        const supaAdmin = createClient(supabaseUrl, supabaseKey);
+
+        // Fetch current user to preserve existing metadata
+        const { data: userData } = await supaAdmin.auth.admin.getUserById(sub.userId);
+        if (!userData?.user) {
+          await interaction.editReply({ content: "Utilisateur introuvable dans Supabase." });
+          return;
+        }
+        const oldPseudo = userData.user.user_metadata?.display_name || userData.user.email?.split("@")[0] || "N/A";
+        const email = userData.user.email || "Inconnu";
+
+        // Update display_name in user_metadata
+        const { error: updateError } = await supaAdmin.auth.admin.updateUserById(sub.userId, {
+          user_metadata: { ...userData.user.user_metadata, display_name: newPseudo },
+        });
+        if (updateError) {
+          await interaction.editReply({ content: `Erreur lors de la mise à jour : ${updateError.message}` });
+          return;
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0xd4a017)
+          .setTitle("✏️ Pseudo modifié")
+          .addFields(
+            { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
+            { name: "Email", value: `\`${email}\``, inline: true },
+            { name: "Ancien pseudo", value: `\`${oldPseudo}\``, inline: true },
+            { name: "Nouveau pseudo", value: `\`${newPseudo}\``, inline: true },
+            { name: "Par", value: `<@${interaction.user.id}>`, inline: true },
+          )
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        webhookBotGeneric(interaction.user.tag, "setpseudo", `**ID Unique** : #${uniqueId}\n**Email** : ${email}\n**Ancien** : ${oldPseudo}\n**Nouveau** : ${newPseudo}`);
+        log(`/setpseudo: User #${uniqueId} pseudo set to "${newPseudo}" by ${interaction.user.username}`, "discord");
+      } catch (err) {
+        log(`Error in /setpseudo: ${err}`, "discord");
+        await safeReply(interaction, { content: "Erreur lors du changement de pseudo.", ephemeral: true });
+      }
+    }
+
+    if (interaction.commandName === "resetpseudo") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const uniqueId = interaction.options.getInteger("idunique", true);
+
+        const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+        if (!sub) {
+          await interaction.editReply({ content: `Aucun utilisateur trouvé avec l'ID unique \`${uniqueId}\`.` });
+          return;
+        }
+
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!supabaseUrl || !supabaseKey) {
+          await interaction.editReply({ content: "Configuration Supabase manquante." });
+          return;
+        }
+
+        const supaAdmin = createClient(supabaseUrl, supabaseKey);
+
+        const { data: userData } = await supaAdmin.auth.admin.getUserById(sub.userId);
+        if (!userData?.user) {
+          await interaction.editReply({ content: "Utilisateur introuvable dans Supabase." });
+          return;
+        }
+        const oldPseudo = userData.user.user_metadata?.display_name || "Aucun";
+        const email = userData.user.email || "Inconnu";
+
+        // Remove display_name from metadata
+        const newMeta = { ...userData.user.user_metadata };
+        delete newMeta.display_name;
+
+        const { error: updateError } = await supaAdmin.auth.admin.updateUserById(sub.userId, {
+          user_metadata: newMeta,
+        });
+        if (updateError) {
+          await interaction.editReply({ content: `Erreur lors du reset : ${updateError.message}` });
+          return;
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0x6b7280)
+          .setTitle("🔄 Pseudo réinitialisé")
+          .addFields(
+            { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
+            { name: "Email", value: `\`${email}\``, inline: true },
+            { name: "Pseudo supprimé", value: `\`${oldPseudo}\``, inline: true },
+            { name: "Par", value: `<@${interaction.user.id}>`, inline: true },
+          )
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        webhookBotGeneric(interaction.user.tag, "resetpseudo", `**ID Unique** : #${uniqueId}\n**Email** : ${email}\n**Pseudo supprimé** : ${oldPseudo}`);
+        log(`/resetpseudo: User #${uniqueId} pseudo reset by ${interaction.user.username}`, "discord");
+      } catch (err) {
+        log(`Error in /resetpseudo: ${err}`, "discord");
+        await safeReply(interaction, { content: "Erreur lors du reset du pseudo.", ephemeral: true });
       }
     }
 
