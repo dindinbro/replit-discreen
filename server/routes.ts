@@ -4408,5 +4408,40 @@ Règles :
     }
   });
 
+  /* ── Game: ARACHN.RUN ──────────────────────────────── */
+  app.get("/api/game/scores", async (_req, res) => {
+    try {
+      const board = await storage.getGameLeaderboard();
+      res.json(board);
+    } catch {
+      res.status(500).json({ error: "Erreur leaderboard" });
+    }
+  });
+
+  app.post("/api/game/submit", requireAuth, async (req: any, res) => {
+    try {
+      const { score } = req.body;
+      if (typeof score !== "number" || score < 0 || score > 999999) {
+        return res.status(400).json({ error: "Score invalide" });
+      }
+      const userId = req.user.id;
+      const username = req.user.username || req.user.email?.split("@")[0] || "Agent";
+      await storage.submitGameScore(userId, username, Math.floor(score));
+      const best = await storage.getUserBestScore(userId);
+      res.json({ ok: true, best });
+    } catch {
+      res.status(500).json({ error: "Erreur submit" });
+    }
+  });
+
+  app.get("/api/game/best", requireAuth, async (req: any, res) => {
+    try {
+      const best = await storage.getUserBestScore(req.user.id);
+      res.json({ best });
+    } catch {
+      res.json({ best: 0 });
+    }
+  });
+
   return httpServer;
 }

@@ -9,7 +9,7 @@ import {
   Home, Search, CreditCard, MessageSquare,
   Key, FileText, Menu, X, Star, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
-  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen, BotMessageSquare,
+  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen, BotMessageSquare, Sword,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -125,6 +125,7 @@ const NAV_SECTIONS: NavSection[] = [
     key: "community",
     labelKey: "nav.section.community",
     items: [
+      { label: "ARACHN.RUN",  href: "/game",  icon: Sword, badge: "JEU", badgeColor: "gold" },
       { label: "nav.reviews", labelKey: "nav.reviews", href: "/avis",  icon: Star },
       { label: "nav.dof",     labelKey: "nav.dof",     href: "/users", icon: Users },
     ],

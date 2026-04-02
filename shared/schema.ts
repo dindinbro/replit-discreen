@@ -546,3 +546,15 @@ export function getReferralRank(credits: number): { current: ReferralRankInfo; n
 }
 
 export * from "./models/chat";
+
+export const gameScores = pgTable("game_scores", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  username: text("username").notNull().default("Agent"),
+  score: integer("score").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type GameScore = typeof gameScores.$inferSelect;
+export const insertGameScoreSchema = createInsertSchema(gameScores).omit({ id: true, createdAt: true });
+export type InsertGameScore = z.infer<typeof insertGameScoreSchema>;

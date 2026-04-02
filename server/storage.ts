@@ -2,7 +2,7 @@ import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
-  blockedIps, referralCodes, referralEvents, loginLogs,
+  blockedIps, referralCodes, referralEvents, loginLogs, gameScores,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -113,6 +113,9 @@ export interface IStorage {
   setReferralCredits(userId: string, credits: number): Promise<void>;
   createLoginLog(data: { userId: string; email?: string; username?: string; ip: string; userAgent?: string; provider: string; tier: string; discordId?: string }): Promise<void>;
   getLoginLogs(limit?: number): Promise<LoginLog[]>;
+  submitGameScore(userId: string, username: string, score: number): Promise<void>;
+  getGameLeaderboard(): Promise<Array<{ userId: string; username: string; score: number; rank: number }>>;
+  getUserBestScore(userId: string): Promise<number>;
 }
 
 function hashKey(key: string): string {
@@ -997,6 +1000,28 @@ export class DatabaseStorage implements IStorage {
 
   async getLoginLogs(limit = 200): Promise<LoginLog[]> {
     return db.select().from(loginLogs).orderBy(desc(loginLogs.createdAt)).limit(limit);
+  }
+
+  async submitGameScore(userId: string, username: string, score: number): Promise<void> {
+    await db.insert(gameScores).values({ userId, username, score });
+  }
+
+  async getGameLeaderboard(): Promise<Array<{ userId: string; username: string; score: number; rank: number }>> {
+    const rows = await db
+      .select({ userId: gameScores.userId, username: gameScores.username, score: sql<number>`MAX(${gameScores.score})` })
+      .from(gameScores)
+      .groupBy(gameScores.userId, gameScores.username)
+      .orderBy(desc(sql`MAX(${gameScores.score})`))
+      .limit(10);
+    return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+  }
+
+  async getUserBestScore(userId: string): Promise<number> {
+    const rows = await db
+      .select({ best: sql<number>`MAX(${gameScores.score})` })
+      .from(gameScores)
+      .where(eq(gameScores.userId, userId));
+    return rows[0]?.best ?? 0;
   }
 }
 

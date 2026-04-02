@@ -25,6 +25,7 @@ import BlacklistRequestPage from "@/pages/BlacklistRequestPage";
 import InfoRequestPage from "@/pages/InfoRequestPage";
 import UsersPage from "@/pages/UsersPage";
 import MaintenancePage from "@/pages/MaintenancePage";
+import GamePage from "@/pages/GamePage";
 import Layout from "@/components/Layout";
 import { Loader2, UserCircle2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -256,6 +257,9 @@ function Router() {
       </Route>
       <Route path="/avis">
         <PublicRoute component={VouchesPage} />
+      </Route>
+      <Route path="/game">
+        <PublicRoute component={GamePage} />
       </Route>
       <Route path="/payment-success">
         <PublicRoute component={PaymentSuccessPage} />
