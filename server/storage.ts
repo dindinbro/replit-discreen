@@ -1004,7 +1004,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async submitGameScore(userId: string, username: string, score: number): Promise<void> {
-    await db.insert(gameScores).values({ userId, username, score });
+    // Compute next id manually to avoid requiring sequence USAGE permission.
+    // The sequence (game_scores_id_seq) may not be granted to the app DB user on VPS.
+    const [{ nextId }] = await db
+      .select({ nextId: sql<number>`COALESCE(MAX(${gameScores.id}), 0) + 1` })
+      .from(gameScores);
+    await db.insert(gameScores).values({ id: nextId, userId, username, score });
   }
 
   async getGameLeaderboard(): Promise<Array<{ userId: string; username: string; score: number; rank: number }>> {
