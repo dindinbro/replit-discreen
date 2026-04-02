@@ -4442,9 +4442,9 @@ Règles :
       await storage.submitGameScore(userId, username, Math.floor(score));
       const best = await storage.getUserBestScore(userId);
       res.json({ ok: true, best });
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[game/submit] error:`, err);
-      res.status(500).json({ error: "Erreur submit" });
+      res.status(500).json({ error: "Erreur submit", detail: String(err?.message ?? err) });
     }
   });
 

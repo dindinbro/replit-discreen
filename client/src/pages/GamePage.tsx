@@ -408,8 +408,10 @@ export default function GamePage() {
         body: JSON.stringify({ score: s }),
       });
       if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`${res.status}: ${body}`);
+        let body: any;
+        try { body = await res.json(); } catch { body = await res.text(); }
+        const detail = body?.detail || body?.error || JSON.stringify(body);
+        throw new Error(`${res.status}: ${detail}`);
       }
       return res.json();
     },
