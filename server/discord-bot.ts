@@ -1162,6 +1162,8 @@ export async function startDiscordBot() {
           }
         }
 
+        const discordMention = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
+
         const embed = new EmbedBuilder()
           .setColor(0x10b981)
           .setTitle(`Utilisateur #${uniqueId}`)
@@ -1169,6 +1171,7 @@ export async function startDiscordBot() {
             { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
             { name: "Email", value: email, inline: true },
             { name: "Nom d'utilisateur", value: username, inline: true },
+            { name: "Discord", value: discordMention, inline: true },
             { name: "Abonnement", value: tier.toUpperCase(), inline: true },
             { name: "Gele", value: sub.frozen ? "Oui" : "Non", inline: true },
             { name: "Expiration", value: expiryStr, inline: true },
@@ -1225,6 +1228,7 @@ export async function startDiscordBot() {
         }
 
         let email = "Inconnu";
+        let usernameSetplan = "Inconnu";
         try {
           const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
           const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1233,11 +1237,14 @@ export async function startDiscordBot() {
             const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
             if (data?.user) {
               email = data.user.email || "Inconnu";
+              usernameSetplan = data.user.user_metadata?.display_name || data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Inconnu";
             }
           }
         } catch (supaErr) {
           log(`/setplan: Supabase lookup failed: ${supaErr}`, "discord");
         }
+
+        const discordSetplan = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
 
         const embed = new EmbedBuilder()
           .setColor(0xf59e0b)
@@ -1245,6 +1252,8 @@ export async function startDiscordBot() {
           .addFields(
             { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
             { name: "Email", value: email, inline: true },
+            { name: "Nom d'utilisateur", value: usernameSetplan, inline: true },
+            { name: "Discord", value: discordSetplan, inline: true },
             { name: "Nouveau Plan", value: plan.toUpperCase(), inline: true }
           )
           .setTimestamp();
@@ -1280,15 +1289,21 @@ export async function startDiscordBot() {
         await storage.setReferralCredits(sub.userId, rank.threshold);
 
         let email = "Inconnu";
+        let usernameSetrank = "Inconnu";
         try {
           const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
           const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
           if (supabaseUrl && supabaseKey) {
             const supaAdmin = createClient(supabaseUrl, supabaseKey);
             const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
-            if (data?.user) email = data.user.email || "Inconnu";
+            if (data?.user) {
+              email = data.user.email || "Inconnu";
+              usernameSetrank = data.user.user_metadata?.display_name || data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Inconnu";
+            }
           }
         } catch (_) {}
+
+        const discordSetrank = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
 
         const embed = new EmbedBuilder()
           .setColor(parseInt(rank.color.replace("#", ""), 16))
@@ -1296,6 +1311,8 @@ export async function startDiscordBot() {
           .addFields(
             { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
             { name: "Email", value: email, inline: true },
+            { name: "Nom d'utilisateur", value: usernameSetrank, inline: true },
+            { name: "Discord", value: discordSetrank, inline: true },
             { name: "Nouveau Rang", value: `${rank.name} (${rank.threshold} Eclats)`, inline: true }
           )
           .setTimestamp();
@@ -1345,6 +1362,8 @@ export async function startDiscordBot() {
 
         const tier = sub.tier || "free";
 
+        const discordResetr = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
+
         const embed = new EmbedBuilder()
           .setColor(0x10b981)
           .setTitle("Recherches Reinitialisees")
@@ -1353,6 +1372,7 @@ export async function startDiscordBot() {
             { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
             { name: "Email", value: email, inline: true },
             { name: "Nom d'utilisateur", value: username, inline: true },
+            { name: "Discord", value: discordResetr, inline: true },
             { name: "Abonnement", value: tier.toUpperCase(), inline: true }
           )
           .setTimestamp();
@@ -1407,6 +1427,8 @@ export async function startDiscordBot() {
             }
           } catch {}
 
+          const discordBypassAdd = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
+
           const embed = new EmbedBuilder()
             .setColor(0x10b981)
             .setTitle("Whitelist Bypass - Ajout")
@@ -1415,6 +1437,7 @@ export async function startDiscordBot() {
               { name: "ID Unique", value: `\`#${uniqueId}\``, inline: true },
               { name: "Email", value: email, inline: true },
               { name: "Nom d'utilisateur", value: username, inline: true },
+              { name: "Discord", value: discordBypassAdd, inline: true },
               { name: "Abonnement", value: (sub.tier || "free").toUpperCase(), inline: true }
             )
             .setTimestamp();
@@ -2206,6 +2229,8 @@ export async function startDiscordBot() {
         const label = shouldFreeze ? "Compte Gele" : "Compte Degele";
         const color = shouldFreeze ? 0xe74c3c : 0x10b981;
 
+        const discordFreeze = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
+
         const embed = new EmbedBuilder()
           .setColor(color)
           .setTitle(`${icon} ${label}`)
@@ -2213,6 +2238,7 @@ export async function startDiscordBot() {
             { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
             { name: "Email", value: `\`${email}\``, inline: true },
             { name: "Nom d'utilisateur", value: `\`${username}\``, inline: true },
+            { name: "Discord", value: discordFreeze, inline: true },
             { name: "Action", value: shouldFreeze ? "**GELE**" : "**DEGELE**", inline: true },
             { name: "Par", value: `<@${interaction.user.id}>`, inline: true }
           )
@@ -2275,12 +2301,15 @@ export async function startDiscordBot() {
           return;
         }
 
+        const discordSetpseudo = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
+
         const embed = new EmbedBuilder()
           .setColor(0xd4a017)
           .setTitle("✏️ Pseudo modifié")
           .addFields(
             { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
             { name: "Email", value: `\`${email}\``, inline: true },
+            { name: "Discord", value: discordSetpseudo, inline: true },
             { name: "Ancien pseudo", value: `\`${oldPseudo}\``, inline: true },
             { name: "Nouveau pseudo", value: `\`${newPseudo}\``, inline: true },
             { name: "Par", value: `<@${interaction.user.id}>`, inline: true },
@@ -2336,12 +2365,15 @@ export async function startDiscordBot() {
           return;
         }
 
+        const discordResetpseudo = sub.discordId ? `<@${sub.discordId}>` : "Non lié";
+
         const embed = new EmbedBuilder()
           .setColor(0x6b7280)
           .setTitle("🔄 Pseudo réinitialisé")
           .addFields(
             { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
             { name: "Email", value: `\`${email}\``, inline: true },
+            { name: "Discord", value: discordResetpseudo, inline: true },
             { name: "Pseudo supprimé", value: `\`${oldPseudo}\``, inline: true },
             { name: "Par", value: `<@${interaction.user.id}>`, inline: true },
           )
