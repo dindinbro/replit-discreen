@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { Trophy, RotateCcw, Play, Coins, Lock, Zap } from "lucide-react";
 
 /* ═══════════════════════════════════════════════
@@ -347,7 +347,7 @@ function hitTest(pY: number, o: Obs): boolean {
    Component
 ═══════════════════════════════════════════════ */
 export default function GamePage() {
-  const { user } = useAuth();
+  const { user, getAccessToken } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gsRef     = useRef<GS | null>(null);
   const rafRef    = useRef(0);
@@ -390,7 +390,20 @@ export default function GamePage() {
   });
 
   const submitMut = useMutation({
-    mutationFn: (s: number) => apiRequest("POST", "/api/game/submit", { score: s }),
+    mutationFn: async (s: number) => {
+      const token = getAccessToken();
+      const res = await fetch("/api/game/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ score: s }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/game/scores"] });
       refetchCredits();
