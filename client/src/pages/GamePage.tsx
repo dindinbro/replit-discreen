@@ -73,90 +73,105 @@ function drawBg(ctx: CanvasRenderingContext2D, off: number) {
   ctx.restore();
 }
 
-/* ─── Scorpion ───────────────────────────────────── */
+/* ─── Scorpion (vue de profil) ───────────────────── */
 function drawScorpion(ctx: CanvasRenderingContext2D, y: number, t: number, inAir: boolean) {
   const x = PLAYER_X;
   ctx.save();
-  ctx.lineCap = "round";
+  ctx.lineCap  = "round";
   ctx.lineJoin = "round";
   ctx.shadowColor = GOLD;
   ctx.strokeStyle = GOLD;
-  ctx.fillStyle = GOLD;
+  ctx.fillStyle   = GOLD;
 
-  const walk  = inAir ? 0 : Math.sin(t * 13) * 3;
-  const sway  = Math.sin(t * 2.6) * 5;
+  // animations
+  const walk = inAir ? 0 : Math.sin(t * 12) * 3;
+  const sway = Math.sin(t * 2.2) * 4; // queue qui ondule
 
-  /* ── Body ── */
-  // Opisthosoma — wide rear
-  ctx.shadowBlur = 10; ctx.lineWidth = 2.6;
-  ctx.beginPath(); ctx.ellipse(x - 12, y, 14, 10, 0, 0, Math.PI * 2); ctx.stroke();
-  // Subtle segment grooves
-  ctx.save(); ctx.globalAlpha = 0.22; ctx.lineWidth = 1.2;
-  [-4.5, 0, 4.5].forEach(dy => {
-    ctx.beginPath(); ctx.moveTo(x - 23, y + dy); ctx.lineTo(x - 1, y + dy); ctx.stroke();
-  });
-  ctx.restore();
-  // Prosoma — compact front
-  ctx.lineWidth = 2.4;
-  ctx.beginPath(); ctx.ellipse(x + 5, y, 9, 7.5, 0, 0, Math.PI * 2); ctx.stroke();
-  // Eyes
-  ctx.shadowBlur = 18;
-  ctx.beginPath(); ctx.arc(x + 11, y - 3.5, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 11, y + 3.5, 2, 0, Math.PI * 2); ctx.fill();
+  /* ── Corps horizontal segmenté (opisthosoma) ──
+     5 segments allant de gauche (arrière) vers le centre */
+  ctx.shadowBlur = 8; ctx.lineWidth = 2;
+  const segs = 5;
+  const segW = 10;
+  const bodyLeft = x - 42;
+  for (let i = 0; i < segs; i++) {
+    const cx = bodyLeft + i * segW + segW / 2;
+    const rw = segW / 2 + 0.5;
+    const rh = 8 - i * 0.5; // légère diminution vers l'avant
+    ctx.beginPath(); ctx.ellipse(cx, y, rw, rh, 0, 0, Math.PI * 2); ctx.stroke();
+  }
 
-  /* ── Metasoma (tail) — dramatic J-arc ── */
-  ctx.shadowBlur = 14; ctx.lineWidth = 2.8;
+  /* ── Céphalothorax (prosoma) — tête/thorax, côté droit ── */
+  ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.ellipse(x + 16, y - 1, 14, 10, 0, 0, Math.PI * 2); ctx.stroke();
+
+  /* ── Œil ── */
+  ctx.shadowBlur = 16;
+  ctx.beginPath(); ctx.arc(x + 26, y - 4, 2.5, 0, Math.PI * 2); ctx.fill();
+
+  /* ── Queue (metasoma) — arc depuis l'arrière vers l'avant au-dessus ──
+     Démarre à l'extrémité gauche du corps, monte haut, se recourbe
+     en avant pour que le stinger pointe vers le bas */
+  ctx.shadowBlur = 12; ctx.lineWidth = 2.6;
+  const tailStart = { x: bodyLeft - 2, y: y - 4 };
   ctx.beginPath();
-  ctx.moveTo(x - 26, y + 2);
-  // Sweeps backward-up then curves hard forward
+  ctx.moveTo(tailStart.x, tailStart.y);
+  // coude gauche-arrière
   ctx.bezierCurveTo(
-    x - 44, y - 2 + sway,   // pull back
-    x - 44, y - 28 + sway,  // rise high
-    x - 18, y - 42           // top of arc
+    bodyLeft - 18, y - 6  + sway,   // part en arrière
+    bodyLeft - 22, y - 36 + sway,   // monte
+    x - 10,        y - 50            // sommet de l'arc, au-dessus du corps
   );
+  // descend vers l'avant pour former le stinger
   ctx.bezierCurveTo(
-    x +  2, y - 52,          // continue forward
-    x + 22, y - 44,          // descend
-    x + 22, y - 30           // stinger position
+    x + 10, y - 56,
+    x + 30, y - 50,
+    x + 28, y - 34                   // base du stinger
   );
   ctx.stroke();
-  // Telson bulb (filled, glowing)
+
+  /* ── Telson (bulbe du stinger) ── */
   ctx.shadowBlur = 22;
-  ctx.beginPath(); ctx.arc(x + 22, y - 30, 4.5, 0, Math.PI * 2); ctx.fill();
-  // Stinger tip — sharp downward hook
-  ctx.shadowBlur = 6; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x + 28, y - 34, 4.5, 0, Math.PI * 2); ctx.fill();
+
+  /* ── Pointe du stinger (crochet vers le bas) ── */
+  ctx.shadowBlur = 4; ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(x + 22, y - 25);
-  ctx.quadraticCurveTo(x + 26, y - 18, x + 24, y - 12);
+  ctx.moveTo(x + 28, y - 29);
+  ctx.quadraticCurveTo(x + 32, y - 22, x + 30, y - 16);
   ctx.stroke();
 
-  /* ── Chelae (pincers) ── */
-  ctx.shadowBlur = 4; ctx.lineWidth = 2;
-  // Upper arm → pincer
-  ctx.beginPath(); ctx.moveTo(x + 12, y - 5); ctx.lineTo(x + 26, y - 9); ctx.stroke();
-  const cg1 = 4.5 + 2 * Math.abs(Math.sin(t * 3.4));
-  ctx.beginPath(); ctx.moveTo(x + 26, y - 9); ctx.lineTo(x + 37, y - 4);        ctx.stroke(); // fixed
-  ctx.beginPath(); ctx.moveTo(x + 26, y - 9); ctx.lineTo(x + 37, y - 9 - cg1); ctx.stroke(); // mobile
-  // Lower arm → pincer
-  ctx.beginPath(); ctx.moveTo(x + 12, y + 5); ctx.lineTo(x + 26, y + 9); ctx.stroke();
-  const cg2 = 4.5 + 2 * Math.abs(Math.sin(t * 3.4 + 1));
-  ctx.beginPath(); ctx.moveTo(x + 26, y + 9); ctx.lineTo(x + 37, y + 4);        ctx.stroke(); // fixed
-  ctx.beginPath(); ctx.moveTo(x + 26, y + 9); ctx.lineTo(x + 37, y + 9 + cg2); ctx.stroke(); // mobile
+  /* ── Chélicères/Pédipalpes (pinces) vers la droite ── */
+  ctx.shadowBlur = 4; ctx.lineWidth = 1.9;
+  // bras supérieur
+  ctx.beginPath(); ctx.moveTo(x + 28, y - 7); ctx.lineTo(x + 42, y - 13); ctx.stroke();
+  const cg1 = 3.5 + 2 * Math.abs(Math.sin(t * 3.2));
+  ctx.beginPath(); ctx.moveTo(x + 42, y - 13); ctx.lineTo(x + 54, y -  8); ctx.stroke(); // fixe
+  ctx.beginPath(); ctx.moveTo(x + 42, y - 13); ctx.lineTo(x + 54, y - 13 - cg1); ctx.stroke(); // mobile
+  // bras inférieur
+  ctx.beginPath(); ctx.moveTo(x + 28, y + 4); ctx.lineTo(x + 42, y + 11); ctx.stroke();
+  const cg2 = 3.5 + 2 * Math.abs(Math.sin(t * 3.2 + 1.2));
+  ctx.beginPath(); ctx.moveTo(x + 42, y + 11); ctx.lineTo(x + 54, y +  6); ctx.stroke(); // fixe
+  ctx.beginPath(); ctx.moveTo(x + 42, y + 11); ctx.lineTo(x + 54, y + 11 + cg2); ctx.stroke(); // mobile
 
-  /* ── 4 pairs of walking legs ── */
+  /* ── 4 paires de pattes (sous le corps) ── */
   ctx.shadowBlur = 0; ctx.lineWidth = 1.6;
-  const legs: [number,number, number,number, number,number][] = [
-    [x-2,  y-6,  x-7,  y-16+walk, x-16, y-11],
-    [x-9,  y-7,  x-13, y-18-walk, x-23, y-13],
-    [x-16, y-7,  x-19, y-17+walk, x-29, y-12],
-    [x-22, y-6,  x-25, y-15-walk, x-35, y-10],
-    [x-2,  y+6,  x-7,  y+16-walk, x-16, y+11],
-    [x-9,  y+7,  x-13, y+18+walk, x-23, y+13],
-    [x-16, y+7,  x-19, y+17-walk, x-29, y+12],
-    [x-22, y+6,  x-25, y+15+walk, x-35, y+10],
-  ];
-  for (const [ax,ay,kx,ky,tx,ty] of legs) {
-    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(kx,ky); ctx.lineTo(tx,ty); ctx.stroke();
+  // positions X le long de l'opisthosoma
+  const legRoots = [x - 36, x - 26, x - 16, x - 6];
+  for (let i = 0; i < 4; i++) {
+    const lx = legRoots[i];
+    const ph = (i % 2 === 0) ? walk : -walk; // alternance avant/arrière
+    // patte avant (inclinée vers l'avant)
+    ctx.beginPath();
+    ctx.moveTo(lx,      y + 8);
+    ctx.lineTo(lx + 8 - ph, y + 17);
+    ctx.lineTo(lx + 14 - ph, y + 24);
+    ctx.stroke();
+    // patte arrière (inclinée vers l'arrière)
+    ctx.beginPath();
+    ctx.moveTo(lx,      y + 8);
+    ctx.lineTo(lx - 8 + ph, y + 17);
+    ctx.lineTo(lx - 12 + ph, y + 24);
+    ctx.stroke();
   }
 
   ctx.restore();
