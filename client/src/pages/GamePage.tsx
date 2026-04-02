@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
 import { Trophy, RotateCcw, Play, Coins, Lock, Zap } from "lucide-react";
 
 /* ═══════════════════════════════════════════════
@@ -394,25 +393,7 @@ export default function GamePage() {
 
   const submitMut = useMutation({
     mutationFn: async (s: number) => {
-      // Always fetch a fresh session token from Supabase
-      const { data: { session: freshSession } } = await supabase.auth.getSession();
-      const token = freshSession?.access_token ?? getAccessToken();
-
-      const res = await fetch("/api/game/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify({ score: s }),
-      });
-      if (!res.ok) {
-        let body: any;
-        try { body = await res.json(); } catch { body = await res.text(); }
-        const detail = body?.detail || body?.error || JSON.stringify(body);
-        throw new Error(`${res.status}: ${detail}`);
-      }
+      const res = await apiRequest("POST", "/api/game/submit", { score: s });
       return res.json();
     },
     onSuccess: () => {
