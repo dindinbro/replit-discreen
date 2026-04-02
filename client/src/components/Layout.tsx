@@ -24,9 +24,10 @@ import InteractiveGrid from "@/components/InteractiveGrid";
 
 /* ── Online count ────────────────────────────────────────── */
 function useOnlineCount() {
-  const [count, setCount] = useState<number | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fakeBaseRef = useRef(60 + Math.floor(Math.random() * 40));
+  const [count, setCount] = useState<number>(fakeBaseRef.current);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
     const sendHeartbeat = async () => {
@@ -41,8 +42,12 @@ function useOnlineCount() {
         const res = await fetch("/api/heartbeat", { method: "POST", headers });
         if (res.ok) {
           await res.json();
-          // Only drift occasionally and by a small amount to feel realistic
-          if (Math.random() < 0.3) {
+          if (!initialized.current) {
+            // First successful heartbeat — show count immediately
+            initialized.current = true;
+            setCount(fakeBaseRef.current);
+          } else if (Math.random() < 0.25) {
+            // Subsequent calls — drift slightly and rarely (±2 max)
             const drift = Math.floor(Math.random() * 5) - 2;
             fakeBaseRef.current = Math.min(130, Math.max(60, fakeBaseRef.current + drift));
             setCount(fakeBaseRef.current);
