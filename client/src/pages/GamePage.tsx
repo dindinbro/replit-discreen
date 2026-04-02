@@ -5,7 +5,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Trophy, RotateCcw, Play, Coins, Lock, Zap } from "lucide-react";
 
 /* ═══════════════════════════════════════════════
-   ARACHN.RUN — Endless Runner
+   STING.EXE — Endless Runner
    Saute par-dessus les pièges, passe dans les brèches
 ═══════════════════════════════════════════════ */
 const CW = 800;
@@ -77,81 +77,83 @@ function drawBg(ctx: CanvasRenderingContext2D, off: number) {
 function drawScorpion(ctx: CanvasRenderingContext2D, y: number, t: number, inAir: boolean) {
   const x = PLAYER_X;
   ctx.save();
-  ctx.shadowColor = GOLD; ctx.shadowBlur = 12;
-  ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.shadowColor = GOLD;
+  ctx.strokeStyle = GOLD;
+  ctx.fillStyle = GOLD;
 
-  const cyc = inAir ? Math.sin(t * 5) * 3 : Math.sin(t * 15) * 3;
+  const walk  = inAir ? 0 : Math.sin(t * 13) * 3;
+  const sway  = Math.sin(t * 2.6) * 5;
 
-  // Opisthosoma (rear abdomen) — larger oval
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.ellipse(x - 14, y + 1, 15, 10, 0.1, 0, Math.PI * 2); ctx.stroke();
-  // Abdominal segment lines
-  ctx.save(); ctx.globalAlpha = 0.35; ctx.lineWidth = 0.9;
-  for (let i = -1; i <= 1; i++) {
-    const sy = y + 1 + i * 6;
-    ctx.beginPath(); ctx.moveTo(x - 25, sy); ctx.lineTo(x - 4, sy); ctx.stroke();
-  }
+  /* ── Body ── */
+  // Opisthosoma — wide rear
+  ctx.shadowBlur = 10; ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.ellipse(x - 12, y, 14, 10, 0, 0, Math.PI * 2); ctx.stroke();
+  // Subtle segment grooves
+  ctx.save(); ctx.globalAlpha = 0.22; ctx.lineWidth = 1.2;
+  [-4.5, 0, 4.5].forEach(dy => {
+    ctx.beginPath(); ctx.moveTo(x - 23, y + dy); ctx.lineTo(x - 1, y + dy); ctx.stroke();
+  });
   ctx.restore();
-
-  // Prosoma (front carapace) — smaller oval
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.ellipse(x + 6, y - 1, 11, 8, -0.08, 0, Math.PI * 2); ctx.stroke();
-
+  // Prosoma — compact front
+  ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.ellipse(x + 5, y, 9, 7.5, 0, 0, Math.PI * 2); ctx.stroke();
   // Eyes
   ctx.shadowBlur = 18;
-  ctx.beginPath(); ctx.arc(x + 14, y - 4, 2.2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + 14, y + 2, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 11, y - 3.5, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 11, y + 3.5, 2, 0, Math.PI * 2); ctx.fill();
 
-  // Metasoma / tail — arches up and over the body
-  const sway = Math.sin(t * 2.2) * 4;
-  ctx.shadowBlur = 10; ctx.lineWidth = 2.2;
+  /* ── Metasoma (tail) — dramatic J-arc ── */
+  ctx.shadowBlur = 14; ctx.lineWidth = 2.8;
   ctx.beginPath();
-  ctx.moveTo(x - 29, y + 2);
+  ctx.moveTo(x - 26, y + 2);
+  // Sweeps backward-up then curves hard forward
   ctx.bezierCurveTo(
-    x - 42, y - 8 + sway,
-    x - 40, y - 26 + sway,
-    x - 20, y - 34
+    x - 44, y - 2 + sway,   // pull back
+    x - 44, y - 28 + sway,  // rise high
+    x - 18, y - 42           // top of arc
   );
   ctx.bezierCurveTo(
-    x - 4,  y - 42,
-    x + 12, y - 38,
-    x + 16, y - 27
+    x +  2, y - 52,          // continue forward
+    x + 22, y - 44,          // descend
+    x + 22, y - 30           // stinger position
   );
   ctx.stroke();
+  // Telson bulb (filled, glowing)
+  ctx.shadowBlur = 22;
+  ctx.beginPath(); ctx.arc(x + 22, y - 30, 4.5, 0, Math.PI * 2); ctx.fill();
+  // Stinger tip — sharp downward hook
+  ctx.shadowBlur = 6; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x + 22, y - 25);
+  ctx.quadraticCurveTo(x + 26, y - 18, x + 24, y - 12);
+  ctx.stroke();
 
-  // Telson (stinger bulb + tip)
-  ctx.shadowBlur = 16;
-  ctx.beginPath(); ctx.arc(x + 16, y - 27, 3.5, 0, Math.PI * 2); ctx.fill();
+  /* ── Chelae (pincers) ── */
+  ctx.shadowBlur = 4; ctx.lineWidth = 2;
+  // Upper arm → pincer
+  ctx.beginPath(); ctx.moveTo(x + 12, y - 5); ctx.lineTo(x + 26, y - 9); ctx.stroke();
+  const cg1 = 4.5 + 2 * Math.abs(Math.sin(t * 3.4));
+  ctx.beginPath(); ctx.moveTo(x + 26, y - 9); ctx.lineTo(x + 37, y - 4);        ctx.stroke(); // fixed
+  ctx.beginPath(); ctx.moveTo(x + 26, y - 9); ctx.lineTo(x + 37, y - 9 - cg1); ctx.stroke(); // mobile
+  // Lower arm → pincer
+  ctx.beginPath(); ctx.moveTo(x + 12, y + 5); ctx.lineTo(x + 26, y + 9); ctx.stroke();
+  const cg2 = 4.5 + 2 * Math.abs(Math.sin(t * 3.4 + 1));
+  ctx.beginPath(); ctx.moveTo(x + 26, y + 9); ctx.lineTo(x + 37, y + 4);        ctx.stroke(); // fixed
+  ctx.beginPath(); ctx.moveTo(x + 26, y + 9); ctx.lineTo(x + 37, y + 9 + cg2); ctx.stroke(); // mobile
+
+  /* ── 4 pairs of walking legs ── */
   ctx.shadowBlur = 0; ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(x + 16, y - 23);
-  ctx.lineTo(x + 20, y - 14);
-  ctx.stroke();
-
-  // Left chelae (upper claw — faces right)
-  ctx.lineWidth = 1.8;
-  ctx.beginPath(); ctx.moveTo(x + 15, y - 6); ctx.lineTo(x + 28, y - 10); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + 28, y - 10); ctx.lineTo(x + 38, y - 5); ctx.stroke();
-  const cg1 = 3 + 2.5 * Math.abs(Math.sin(t * 3.2));
-  ctx.beginPath(); ctx.moveTo(x + 28, y - 10); ctx.lineTo(x + 38, y - 10 - cg1); ctx.stroke();
-
-  // Right chelae (lower claw)
-  ctx.beginPath(); ctx.moveTo(x + 15, y + 5); ctx.lineTo(x + 28, y + 10); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + 28, y + 10); ctx.lineTo(x + 38, y + 5); ctx.stroke();
-  const cg2 = 3 + 2.5 * Math.abs(Math.sin(t * 3.2 + 0.5));
-  ctx.beginPath(); ctx.moveTo(x + 28, y + 10); ctx.lineTo(x + 38, y + 10 + cg2); ctx.stroke();
-
-  // 8 walking legs along opisthosoma
-  ctx.lineWidth = 1.7;
   const legs: [number,number, number,number, number,number][] = [
-    [x - 3,  y - 7,  x - 8,  y - 19 + cyc, x - 20, y - 13],
-    [x - 11, y - 8,  x - 16, y - 21 - cyc, x - 28, y - 15],
-    [x - 19, y - 8,  x - 23, y - 19 + cyc, x - 36, y - 13],
-    [x - 25, y - 7,  x - 30, y - 17 - cyc, x - 42, y - 11],
-    [x - 3,  y + 8,  x - 8,  y + 21 - cyc, x - 20, y + 15],
-    [x - 11, y + 9,  x - 16, y + 23 + cyc, x - 28, y + 17],
-    [x - 19, y + 9,  x - 23, y + 21 - cyc, x - 36, y + 15],
-    [x - 25, y + 8,  x - 30, y + 19 + cyc, x - 42, y + 13],
+    [x-2,  y-6,  x-7,  y-16+walk, x-16, y-11],
+    [x-9,  y-7,  x-13, y-18-walk, x-23, y-13],
+    [x-16, y-7,  x-19, y-17+walk, x-29, y-12],
+    [x-22, y-6,  x-25, y-15-walk, x-35, y-10],
+    [x-2,  y+6,  x-7,  y+16-walk, x-16, y+11],
+    [x-9,  y+7,  x-13, y+18+walk, x-23, y+13],
+    [x-16, y+7,  x-19, y+17-walk, x-29, y+12],
+    [x-22, y+6,  x-25, y+15+walk, x-35, y+10],
   ];
   for (const [ax,ay,kx,ky,tx,ty] of legs) {
     ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(kx,ky); ctx.lineTo(tx,ty); ctx.stroke();
@@ -275,7 +277,7 @@ export default function GamePage() {
   const [status,  setStatus]  = useState<Status>("idle");
   const [score,   setScore]   = useState(0);
   const [best,    setBest]    = useState(() => {
-    const v = parseInt(localStorage.getItem("arachnrun_best") || "0");
+    const v = parseInt(localStorage.getItem("sting_exe_best") || "0");
     bestRef.current = v;
     return v;
   });
@@ -395,7 +397,7 @@ export default function GamePage() {
           if (final > bestRef.current) {
             bestRef.current = final;
             setBest(final);
-            localStorage.setItem("arachnrun_best", String(final));
+            localStorage.setItem("sting_exe_best", String(final));
           }
           if (user) submitMut.mutate(final);
           setStatus("dead");
@@ -476,7 +478,7 @@ export default function GamePage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <span className="text-2xl font-black tracking-tight text-primary font-mono">ARACHN.RUN</span>
+            <span className="text-2xl font-black tracking-tight text-primary font-mono">STING.EXE</span>
             <span className="text-[10px] font-bold bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded uppercase tracking-widest">Mini-Jeu</span>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -506,7 +508,7 @@ export default function GamePage() {
             {status === "idle" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-black/65 backdrop-blur-[1px]">
                 <div className="text-center space-y-2">
-                  <div className="text-primary font-black text-3xl font-mono tracking-tight">ARACHN.RUN</div>
+                  <div className="text-primary font-black text-3xl font-mono tracking-tight">STING.EXE</div>
                   <div className="text-muted-foreground text-sm max-w-xs leading-relaxed text-center">
                     Évite les pièges au sol, passe dans<br />les brèches des firewalls.
                   </div>
@@ -613,7 +615,7 @@ export default function GamePage() {
       <div className="border border-primary/20 rounded-xl overflow-hidden bg-card/30">
         <div className="flex items-center gap-2 px-5 py-3 border-b border-border/25">
           <Coins className="w-4 h-4 text-primary" />
-          <span className="font-bold text-sm">Crédits ARACHN.RUN</span>
+          <span className="font-bold text-sm">Crédits STING.EXE</span>
         </div>
 
         {!user ? (

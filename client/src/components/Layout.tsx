@@ -125,7 +125,7 @@ const NAV_SECTIONS: NavSection[] = [
     key: "community",
     labelKey: "nav.section.community",
     items: [
-      { label: "ARACHN.RUN",  href: "/game",  icon: Sword, badge: "JEU", badgeColor: "gold" },
+      { label: "STING.EXE",   href: "/game",  icon: Sword, badge: "JEU", badgeColor: "gold" },
       { label: "nav.reviews", labelKey: "nav.reviews", href: "/avis",  icon: Star },
       { label: "nav.dof",     labelKey: "nav.dof",     href: "/users", icon: Users },
     ],
