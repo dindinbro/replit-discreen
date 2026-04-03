@@ -4352,16 +4352,31 @@ Règles :
         }
       }
 
-      // Also search Wanted profiles
+      // Detect if user is specifically asking about Wanted profiles
+      const isWantedQuery = /wanted|recherché|signalé|fiché|liste noire/i.test(message);
+
+      // Also search Wanted profiles — map DisX criterion types to Wanted schema field names
+      let wantedFoundCount = 0;
       try {
+        const TYPE_TO_WANTED: Record<string, string> = {
+          username:   "pseudo",
+          firstName:  "prenom",
+          lastName:   "nom",
+          email:      "email",
+          phone:      "phone",
+          discordId:  "discordId",
+          city:       "adresse",
+          address:    "address",
+          ipAddress:  "ip",
+        };
         const wantedCriteriaMap: Record<string, string> = {};
         for (const c of criteria) {
-          if (["firstName", "lastName", "email", "phone", "username", "city", "discordId"].includes(c.type)) {
-            wantedCriteriaMap[c.type] = c.value.trim();
-          }
+          const mapped = TYPE_TO_WANTED[c.type];
+          if (mapped) wantedCriteriaMap[mapped] = c.value.trim();
         }
         if (Object.keys(wantedCriteriaMap).length > 0) {
           const wantedResults = await storage.searchWantedProfiles(wantedCriteriaMap);
+          wantedFoundCount = wantedResults.length;
           if (wantedResults.length > 0) {
             const wantedMapped = wantedResults.slice(0, 5).map((w: any) => ({ ...w, _wantedProfile: true }));
             searchResult = {
@@ -4381,20 +4396,33 @@ Règles :
 
 Règles :
 - Sois direct et factuel
-- Si des résultats sont trouvés, résume les informations clés disponibles (données personnelles, localisation, contacts...)
-- Si des profils "Wanted" (_wantedProfile: true) apparaissent, mentionne-les clairement comme des profils recherchés/signalés
-- Si aucun résultat, suggère d'affiner la recherche (plus de critères)
-- Ne jamais inventer d'informations qui ne sont pas dans les résultats
-- Maximum 3-4 phrases`;
+- Commence toujours par indiquer si la cible est trouvée dans les PROFILS WANTED ou non (même si la réponse est négative)
+- Si des profils "_wantedProfile: true" sont présents dans les données : détaille leurs informations (pseudo, notes, raison du signalement, contacts) et signale-les clairement comme WANTED ⚠️
+- Si aucun profil Wanted correspondant, dis-le explicitement : "Aucun profil Wanted trouvé pour [cible]"
+- Si des résultats de bases de données normales sont trouvés, résume les infos clés (identité, contacts, localisation)
+- Ne jamais inventer d'informations absentes des résultats
+- Maximum 4-5 phrases`;
 
-      const resultsSummary = searchResult.results.length > 0
-        ? `${searchResult.total} résultat(s) trouvé(s). Données : ${JSON.stringify(searchResult.results.slice(0, 3))}`
-        : "Aucun résultat trouvé dans les bases de données.";
+      const wantedSummary = wantedFoundCount > 0
+        ? `${wantedFoundCount} profil(s) WANTED trouvé(s) correspondant aux critères.`
+        : "Aucun profil dans la liste Wanted ne correspond aux critères.";
+      const dbSummary = searchResult.results.filter((r: any) => !r._wantedProfile).length > 0
+        ? `${searchResult.total - wantedFoundCount} résultat(s) trouvé(s) dans les bases de données.`
+        : "Aucun résultat dans les bases de données.";
+
+      const resultsSummary = `
+[Wanted] ${wantedSummary}
+[Bases de données] ${dbSummary}
+${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.results.slice(0, 5))}` : ""}`.trim();
+
+      const wantedFocusHint = isWantedQuery
+        ? "\n⚠️ L'utilisateur interroge SPÉCIFIQUEMENT les profils Wanted. Concentre ta réponse sur ce point."
+        : "";
 
       const summaryStream = await openai.chat.completions.create({
         model: dixModel,
         messages: [
-          { role: "system", content: SUMMARY_PROMPT },
+          { role: "system", content: SUMMARY_PROMPT + wantedFocusHint },
           { role: "user", content: `Requête : "${message}"\nCritères utilisés : ${JSON.stringify(criteria)}\n${resultsSummary}` },
         ],
         stream: true,
