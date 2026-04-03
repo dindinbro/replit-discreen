@@ -54,6 +54,10 @@ import {
   Monitor,
   Globe,
   ScanLine,
+  Tag,
+  ToggleLeft,
+  ToggleRight,
+  RefreshCw,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -84,7 +88,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -95,6 +99,7 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "dof", label: "D.O.F - Disques", icon: Disc3 },
   { key: "ipblock", label: "IP Blacklist", icon: Ban },
   { key: "logs", label: "Logs Connexions", icon: Activity },
+  { key: "discounts", label: "Codes Promo", icon: Tag },
 ];
 
 interface CategoryFormData {
@@ -2817,6 +2822,225 @@ function LoginLogsSection({ getAccessToken }: { getAccessToken: () => string | n
   );
 }
 
+function DiscountCodesSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newCode, setNewCode] = useState("");
+  const [newPercent, setNewPercent] = useState(10);
+  const [newMaxUses, setNewMaxUses] = useState<string>("");
+  const [newExpiresAt, setNewExpiresAt] = useState<string>("");
+  const [creating, setCreating] = useState(false);
+
+  const { data: codes = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/discount-codes"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/discount-codes", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erreur chargement");
+      return res.json();
+    },
+  });
+
+  async function handleCreate() {
+    if (!newCode.trim() || newPercent < 1 || newPercent > 100) return;
+    setCreating(true);
+    const token = getAccessToken();
+    try {
+      const body: any = { code: newCode.trim(), discountPercent: newPercent };
+      if (newMaxUses.trim()) body.maxUses = parseInt(newMaxUses);
+      if (newExpiresAt.trim()) body.expiresAt = newExpiresAt;
+      const res = await fetch("/api/admin/discount-codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast({ title: "Code créé", description: `Code ${data.code} créé avec succès` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+      setCreateOpen(false);
+      setNewCode(""); setNewPercent(10); setNewMaxUses(""); setNewExpiresAt("");
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleToggle(id: number, active: boolean) {
+    const token = getAccessToken();
+    try {
+      await fetch(`/api/admin/discount-codes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ active: !active }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  }
+
+  async function handleDelete(id: number, code: string) {
+    if (!confirm(`Supprimer le code "${code}" ?`)) return;
+    const token = getAccessToken();
+    try {
+      const res = await fetch(`/api/admin/discount-codes/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erreur suppression");
+      toast({ title: "Code supprimé" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
+  }
+
+  return (
+    <div className="space-y-4" data-testid="section-discounts">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Gérez les codes de réduction pour les abonnements.</p>
+        <Button size="sm" onClick={() => setCreateOpen(true)} data-testid="button-create-discount">
+          <Plus className="w-4 h-4 mr-2" />
+          Nouveau code
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : codes.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">Aucun code promo créé</div>
+      ) : (
+        <div className="space-y-2">
+          {codes.map((dc: any) => {
+            const isExpired = dc.expiresAt && new Date(dc.expiresAt) < new Date();
+            const isExhausted = dc.maxUses !== null && dc.usedCount >= dc.maxUses;
+            return (
+              <Card key={dc.id} className={`p-4 ${!dc.active || isExpired || isExhausted ? "opacity-60" : ""}`} data-testid={`card-discount-${dc.id}`}>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <Tag className="w-4 h-4 text-primary shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-sm" data-testid={`text-code-${dc.id}`}>{dc.code}</span>
+                        <Badge variant={dc.active && !isExpired && !isExhausted ? "default" : "secondary"} className="text-xs">
+                          {!dc.active ? "Désactivé" : isExpired ? "Expiré" : isExhausted ? "Épuisé" : "Actif"}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs font-mono">-{dc.discountPercent}%</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 space-x-3">
+                        <span>Utilisations : <strong>{dc.usedCount}</strong>{dc.maxUses !== null ? ` / ${dc.maxUses}` : " (illimité)"}</span>
+                        {dc.expiresAt && <span>Expire : {new Date(dc.expiresAt).toLocaleDateString("fr-FR")}</span>}
+                        <span>Par : {dc.createdBy}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      title={dc.active ? "Désactiver" : "Activer"}
+                      onClick={() => handleToggle(dc.id, dc.active)}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      data-testid={`button-toggle-discount-${dc.id}`}
+                    >
+                      {dc.active ? <ToggleRight className="w-5 h-5 text-green-500" /> : <ToggleLeft className="w-5 h-5" />}
+                    </button>
+                    <button
+                      title="Supprimer"
+                      onClick={() => handleDelete(dc.id, dc.code)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                      data-testid={`button-delete-discount-${dc.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="w-5 h-5 text-primary" />
+              Nouveau code promo
+            </DialogTitle>
+            <DialogDescription>Créer un code de réduction pour les abonnements.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="dc-code">Code</Label>
+              <Input
+                id="dc-code"
+                data-testid="input-new-discount-code"
+                placeholder="PROMO2024"
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+                className="font-mono"
+                maxLength={20}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="dc-percent">Réduction (%)</Label>
+              <Input
+                id="dc-percent"
+                data-testid="input-discount-percent"
+                type="number"
+                min={1}
+                max={100}
+                value={newPercent}
+                onChange={(e) => setNewPercent(parseInt(e.target.value) || 1)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="dc-maxuses">Utilisations max (laisser vide = illimité)</Label>
+              <Input
+                id="dc-maxuses"
+                data-testid="input-discount-maxuses"
+                type="number"
+                min={1}
+                placeholder="ex: 50"
+                value={newMaxUses}
+                onChange={(e) => setNewMaxUses(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="dc-expires">Date d'expiration (optionnel)</Label>
+              <Input
+                id="dc-expires"
+                data-testid="input-discount-expires"
+                type="date"
+                value={newExpiresAt}
+                onChange={(e) => setNewExpiresAt(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
+              <Button
+                data-testid="button-confirm-create-discount"
+                onClick={handleCreate}
+                disabled={creating || !newCode.trim()}
+                className="gap-2"
+              >
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Créer
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user, role, loading: authLoading, getAccessToken } = useAuth();
   const [, navigate] = useLocation();
@@ -2933,6 +3157,10 @@ export default function AdminPage() {
 
             {activeTab === "logs" && (
               <LoginLogsSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "discounts" && (
+              <DiscountCodesSection getAccessToken={getAccessToken} />
             )}
           </main>
         </div>

@@ -2,7 +2,7 @@ import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
-  blockedIps, referralCodes, referralEvents, loginLogs, gameScores,
+  blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -12,6 +12,7 @@ import {
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
   type ActiveSession, type BlockedIp,
   type ReferralCode, type ReferralEvent, type LoginLog,
+  type DiscountCode,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -117,6 +118,14 @@ export interface IStorage {
   getGameLeaderboard(): Promise<Array<{ userId: string; username: string; score: number; rank: number }>>;
   getUserBestScore(userId: string): Promise<number>;
   getUserGameCredits(userId: string): Promise<{ total: number; gamesPlayed: number }>;
+  getAllDiscountCodes(): Promise<DiscountCode[]>;
+  getDiscountCodeByCode(code: string): Promise<DiscountCode | null>;
+  createDiscountCode(data: { code: string; discountPercent: number; maxUses?: number | null; createdBy: string; active?: boolean; expiresAt?: Date | null }): Promise<DiscountCode>;
+  updateDiscountCode(id: number, data: Partial<{ active: boolean; maxUses: number | null; expiresAt: Date | null; discountPercent: number }>): Promise<DiscountCode | null>;
+  deleteDiscountCode(id: number): Promise<boolean>;
+  incrementDiscountCodeUsage(id: number): Promise<void>;
+  storeDiscountForOrder(orderId: string, codeId: number, discountPercent: number): Promise<void>;
+  getDiscountForOrder(orderId: string): Promise<{ codeId: number; code: string; discountPercent: number } | null>;
 }
 
 function hashKey(key: string): string {
@@ -1053,6 +1062,65 @@ export class DatabaseStorage implements IStorage {
       .where(eq(gameScores.userId, userId));
     const total = rows.reduce((acc, r) => acc + Math.min(20, Math.floor(r.score / 60)), 0);
     return { total, gamesPlayed: rows.length };
+  }
+
+  async getAllDiscountCodes(): Promise<DiscountCode[]> {
+    return db.select().from(discountCodes).orderBy(desc(discountCodes.createdAt));
+  }
+
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | null> {
+    const rows = await db.select().from(discountCodes).where(eq(discountCodes.code, code.toUpperCase()));
+    return rows[0] ?? null;
+  }
+
+  async createDiscountCode(data: { code: string; discountPercent: number; maxUses?: number | null; createdBy: string; active?: boolean; expiresAt?: Date | null }): Promise<DiscountCode> {
+    const [row] = await db.insert(discountCodes).values({
+      code: data.code.toUpperCase(),
+      discountPercent: data.discountPercent,
+      maxUses: data.maxUses ?? null,
+      createdBy: data.createdBy,
+      active: data.active ?? true,
+      expiresAt: data.expiresAt ?? null,
+    }).returning();
+    return row;
+  }
+
+  async updateDiscountCode(id: number, data: Partial<{ active: boolean; maxUses: number | null; expiresAt: Date | null; discountPercent: number }>): Promise<DiscountCode | null> {
+    const [row] = await db.update(discountCodes).set(data).where(eq(discountCodes.id, id)).returning();
+    return row ?? null;
+  }
+
+  async deleteDiscountCode(id: number): Promise<boolean> {
+    const result = await db.delete(discountCodes).where(eq(discountCodes.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async incrementDiscountCodeUsage(id: number): Promise<void> {
+    await db.update(discountCodes)
+      .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
+      .where(eq(discountCodes.id, id));
+  }
+
+  async storeDiscountForOrder(orderId: string, codeId: number, discountPercent: number): Promise<void> {
+    const settingKey = `discount_order_${orderId}`;
+    await db.insert(siteSettings).values({
+      key: settingKey,
+      value: JSON.stringify({ codeId, discountPercent }),
+    }).onConflictDoUpdate({ target: siteSettings.key, set: { value: JSON.stringify({ codeId, discountPercent }) } });
+  }
+
+  async getDiscountForOrder(orderId: string): Promise<{ codeId: number; code: string; discountPercent: number } | null> {
+    const settingKey = `discount_order_${orderId}`;
+    const rows = await db.select().from(siteSettings).where(eq(siteSettings.key, settingKey));
+    if (!rows[0]) return null;
+    try {
+      const parsed = JSON.parse(rows[0].value);
+      const dc = await db.select().from(discountCodes).where(eq(discountCodes.id, parsed.codeId));
+      if (!dc[0]) return null;
+      return { codeId: parsed.codeId, code: dc[0].code, discountPercent: parsed.discountPercent };
+    } catch {
+      return null;
+    }
   }
 }
 

@@ -960,6 +960,101 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/discount/validate — validate a discount code
+  app.post("/api/discount/validate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+      if (!code || typeof code !== "string") {
+        return res.status(400).json({ valid: false, message: "Code requis" });
+      }
+      const dc = await storage.getDiscountCodeByCode(code.trim());
+      if (!dc) return res.json({ valid: false, message: "Code invalide" });
+      if (!dc.active) return res.json({ valid: false, message: "Code désactivé" });
+      if (dc.expiresAt && new Date(dc.expiresAt) < new Date()) {
+        return res.json({ valid: false, message: "Code expiré" });
+      }
+      if (dc.maxUses !== null && dc.usedCount >= dc.maxUses) {
+        return res.json({ valid: false, message: "Code épuisé" });
+      }
+      res.json({ valid: true, discountPercent: dc.discountPercent, code: dc.code });
+    } catch (err) {
+      console.error("POST /api/discount/validate error:", err);
+      res.status(500).json({ valid: false, message: "Internal server error" });
+    }
+  });
+
+  // GET /api/admin/discount-codes — list all discount codes
+  app.get("/api/admin/discount-codes", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const codes = await storage.getAllDiscountCodes();
+      res.json(codes);
+    } catch (err) {
+      console.error("GET /api/admin/discount-codes error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/admin/discount-codes — create a discount code
+  app.post("/api/admin/discount-codes", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { code, discountPercent, maxUses, expiresAt } = req.body;
+      if (!code || typeof code !== "string" || !code.trim()) {
+        return res.status(400).json({ message: "Code requis" });
+      }
+      if (typeof discountPercent !== "number" || discountPercent < 1 || discountPercent > 100) {
+        return res.status(400).json({ message: "Réduction entre 1% et 100%" });
+      }
+      const adminEmail = (req as any).user?.email || "admin";
+      const existing = await storage.getDiscountCodeByCode(code.trim());
+      if (existing) return res.status(409).json({ message: "Ce code existe déjà" });
+      const dc = await storage.createDiscountCode({
+        code: code.trim(),
+        discountPercent,
+        maxUses: maxUses ?? null,
+        createdBy: adminEmail,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+      res.json(dc);
+    } catch (err) {
+      console.error("POST /api/admin/discount-codes error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // PATCH /api/admin/discount-codes/:id — toggle active / update
+  app.patch("/api/admin/discount-codes/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const { active, maxUses, expiresAt, discountPercent } = req.body;
+      const updates: any = {};
+      if (typeof active === "boolean") updates.active = active;
+      if (maxUses !== undefined) updates.maxUses = maxUses;
+      if (expiresAt !== undefined) updates.expiresAt = expiresAt ? new Date(expiresAt) : null;
+      if (typeof discountPercent === "number") updates.discountPercent = discountPercent;
+      const dc = await storage.updateDiscountCode(id, updates);
+      if (!dc) return res.status(404).json({ message: "Code introuvable" });
+      res.json(dc);
+    } catch (err) {
+      console.error("PATCH /api/admin/discount-codes/:id error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // DELETE /api/admin/discount-codes/:id — delete a discount code
+  app.delete("/api/admin/discount-codes/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const ok = await storage.deleteDiscountCode(id);
+      if (!ok) return res.status(404).json({ message: "Code introuvable" });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("DELETE /api/admin/discount-codes/:id error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.get("/api/site-status", async (_req, res) => {
     try {
       const val = await storage.getSiteSetting("maintenance_mode");
@@ -2107,7 +2202,7 @@ export async function registerRoutes(
 
   app.post("/api/create-invoice", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { plan, referralCode, billing } = req.body;
+      const { plan, referralCode, billing, discountCode } = req.body;
       const planInfo = PLAN_LIMITS[plan as PlanTier];
       if (!planInfo || plan === "free") {
         return res.status(400).json({ message: "Plan invalide" });
@@ -2124,7 +2219,20 @@ export async function registerRoutes(
         ? `order_${plan}_lifetime_${Date.now()}`
         : `order_${plan}_${Date.now()}`;
 
-      const priceAmount = isLifetime ? planInfo.lifetimePrice : planInfo.price;
+      let priceAmount = isLifetime ? planInfo.lifetimePrice : planInfo.price;
+      let appliedDiscount: { id: number; code: string; percent: number } | null = null;
+
+      if (discountCode && typeof discountCode === "string") {
+        const dc = await storage.getDiscountCodeByCode(discountCode.trim());
+        if (dc && dc.active && !(dc.expiresAt && new Date(dc.expiresAt) < new Date()) && (dc.maxUses === null || dc.usedCount < dc.maxUses)) {
+          const discountedPrice = Math.round(priceAmount * (1 - dc.discountPercent / 100) * 100) / 100;
+          priceAmount = discountedPrice;
+          appliedDiscount = { id: dc.id, code: dc.code, percent: dc.discountPercent };
+          await storage.storeDiscountForOrder(orderId, dc.id, dc.discountPercent);
+          await storage.incrementDiscountCodeUsage(dc.id);
+          console.log(`Discount code ${dc.code} (${dc.discountPercent}%) applied to order ${orderId}, new price: ${priceAmount}`);
+        }
+      }
 
       if (referralCode && typeof referralCode === "string") {
         const refCode = await storage.getReferralCodeByCode(referralCode.trim());
@@ -2133,6 +2241,13 @@ export async function registerRoutes(
           console.log(`Referral code ${referralCode} stored for order ${orderId}`);
         }
       }
+
+      const user = (req as any).user;
+      const userPseudo = user?.user_metadata?.username || user?.email || "Inconnu";
+      const userEmail = user?.email || "Inconnu";
+      const userId = user?.id || "Inconnu";
+      const userDiscord = user?.user_metadata?.discord_id || null;
+
       const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
       const orderToken = signOrderId(orderId);
       const successUrl = `${baseUrl}/payment-success?order=${orderId}&token=${orderToken}`;
@@ -2165,9 +2280,16 @@ export async function registerRoutes(
         return res.status(502).json({ message: "Failed to create invoice" });
       }
 
-      webhookInvoiceCreated(plan, orderId, priceAmount);
+      webhookInvoiceCreated(plan, orderId, priceAmount, {
+        pseudo: userPseudo,
+        email: userEmail,
+        userId,
+        discordId: userDiscord,
+        discountCode: appliedDiscount ? appliedDiscount.code : null,
+        discountPercent: appliedDiscount ? appliedDiscount.percent : null,
+      });
 
-      res.json({ invoice_url: data.invoice_url });
+      res.json({ invoice_url: data.invoice_url, discountApplied: appliedDiscount ? { code: appliedDiscount.code, percent: appliedDiscount.percent } : null });
     } catch (err) {
       console.error("POST /api/create-invoice error:", err);
       res.status(500).json({ message: "Internal server error" });
@@ -2252,7 +2374,18 @@ export async function registerRoutes(
           if (tier) {
             const license = await storage.createLicenseKey(tier, orderStr, isLifetimeOrder);
             console.log(`License key for order ${orderStr}: ${license.key} (lifetime: ${isLifetimeOrder})`);
-            webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"));
+
+            let discountInfo: { codeId: number; code: string; discountPercent: number } | null = null;
+            try {
+              discountInfo = await storage.getDiscountForOrder(orderStr);
+            } catch (dErr) {
+              console.error("Discount lookup error:", dErr);
+            }
+
+            webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"), discountInfo ? {
+              discountCode: discountInfo.code,
+              discountPercent: discountInfo.discountPercent,
+            } : undefined);
 
             try {
               const credited = await storage.creditReferral(orderStr);

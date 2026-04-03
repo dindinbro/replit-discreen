@@ -28,6 +28,7 @@ import {
   Key,
   Clock,
   Gift,
+  Tag,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -164,6 +165,9 @@ export default function PricingPage() {
   const [referralCode, setReferralCode] = useState("");
   const [referralValidating, setReferralValidating] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<typeof PLANS[number] | null>(null);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountValidating, setDiscountValidating] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; percent: number } | null>(null);
   const { toast } = useToast();
   const { getAccessToken, refreshRole, role, expiresAt } = useAuth();
 
@@ -221,6 +225,32 @@ export default function PricingPage() {
     }
   }
 
+  async function handleDiscountValidate() {
+    if (!discountCode.trim()) return;
+    const token = getAccessToken();
+    if (!token) return;
+    setDiscountValidating(true);
+    try {
+      const res = await fetch("/api/discount/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ code: discountCode.trim() }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAppliedDiscount({ code: data.code, percent: data.discountPercent });
+        toast({ title: `Code promo appliqué !`, description: `-${data.discountPercent}% sur votre commande` });
+      } else {
+        setAppliedDiscount(null);
+        toast({ title: "Code invalide", description: data.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de valider le code", variant: "destructive" });
+    } finally {
+      setDiscountValidating(false);
+    }
+  }
+
   function handleSubscribe(plan: typeof PLANS[number]) {
     if (plan.price === 0) {
       toast({
@@ -242,6 +272,8 @@ export default function PricingPage() {
 
     setPendingPlan(plan);
     setReferralCode("");
+    setDiscountCode("");
+    setAppliedDiscount(null);
     setReferralOpen(true);
   }
 
@@ -256,6 +288,9 @@ export default function PricingPage() {
       const body: any = { plan: pendingPlan.id, billing: pricingMode };
       if (withReferralCode && withReferralCode.trim()) {
         body.referralCode = withReferralCode.trim().toUpperCase();
+      }
+      if (appliedDiscount) {
+        body.discountCode = appliedDiscount.code;
       }
 
       const res = await fetch("/api/create-invoice", {
@@ -641,27 +676,66 @@ export default function PricingPage() {
         </motion.div>
       </div>
 
-      <Dialog open={referralOpen} onOpenChange={(open) => { if (!open) { setReferralOpen(false); setPendingPlan(null); } }}>
+      <Dialog open={referralOpen} onOpenChange={(open) => { if (!open) { setReferralOpen(false); setPendingPlan(null); setAppliedDiscount(null); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Gift className="w-5 h-5 text-primary" />
-              Code de parrainage
+              Codes de réduction
             </DialogTitle>
             <DialogDescription>
-              Avez-vous un code de parrainage ? Entrez-le ci-dessous. Sinon, cliquez sur "Continuer sans code".
+              Entrez un code de parrainage et/ou un code promo (optionnels).
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <Input
-              data-testid="input-referral-code"
-              placeholder="DS-XXXXXX"
-              value={referralCode}
-              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && handleReferralSubmit()}
-              className="font-mono text-sm text-center tracking-widest"
-              maxLength={10}
-            />
+          <div className="space-y-5 pt-2">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Gift className="w-3.5 h-3.5" /> Code de parrainage
+              </p>
+              <Input
+                data-testid="input-referral-code"
+                placeholder="DS-XXXXXX"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && handleReferralSubmit()}
+                className="font-mono text-sm text-center tracking-widest"
+                maxLength={10}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" /> Code promo
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  data-testid="input-discount-code"
+                  placeholder="PROMO2024"
+                  value={discountCode}
+                  onChange={(e) => { setDiscountCode(e.target.value.toUpperCase()); setAppliedDiscount(null); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleDiscountValidate()}
+                  className="font-mono text-sm text-center tracking-widest"
+                  maxLength={20}
+                />
+                <Button
+                  data-testid="button-validate-discount"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDiscountValidate}
+                  disabled={discountValidating || !discountCode.trim()}
+                  className="shrink-0"
+                >
+                  {discountValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                </Button>
+              </div>
+              {appliedDiscount && (
+                <p className="text-xs text-green-500 font-medium flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" />
+                  Code <span className="font-mono">{appliedDiscount.code}</span> — -{appliedDiscount.percent}% appliqué
+                </p>
+              )}
+            </div>
+
             <div className="flex flex-col gap-2">
               <Button
                 data-testid="button-apply-referral"
@@ -671,14 +745,12 @@ export default function PricingPage() {
               >
                 {referralValidating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
-                ) : referralCode.trim() ? (
-                  <Check className="w-4 h-4" />
                 ) : (
                   <ArrowRight className="w-4 h-4" />
                 )}
-                {referralCode.trim() ? "Appliquer et continuer" : "Continuer sans code"}
+                {referralCode.trim() ? "Appliquer et continuer" : "Continuer"}
               </Button>
-              {referralCode.trim() && (
+              {(referralCode.trim() || appliedDiscount) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -686,7 +758,7 @@ export default function PricingPage() {
                   className="text-xs text-muted-foreground"
                   data-testid="button-skip-referral"
                 >
-                  Passer sans code
+                  Continuer sans code de parrainage
                 </Button>
               )}
             </div>

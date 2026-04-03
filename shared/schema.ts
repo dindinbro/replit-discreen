@@ -547,6 +547,22 @@ export function getReferralRank(credits: number): { current: ReferralRankInfo; n
 
 export * from "./models/chat";
 
+export const discountCodes = pgTable("discount_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  discountPercent: integer("discount_percent").notNull(),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").notNull().default(0),
+  createdBy: text("created_by").notNull(),
+  active: boolean("active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type DiscountCode = typeof discountCodes.$inferSelect;
+export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({ id: true, usedCount: true, createdAt: true });
+export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
+
 export const gameScores = pgTable("game_scores", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),

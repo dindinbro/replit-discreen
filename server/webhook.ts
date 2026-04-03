@@ -249,32 +249,57 @@ export function webhookFreeze(adminEmail: string, targetEmail: string, targetUse
   });
 }
 
-export function webhookInvoiceCreated(plan: string, orderId: string, amount: number) {
-  const desc = [
+export interface InvoiceUserInfo {
+  pseudo?: string;
+  email?: string;
+  userId?: string;
+  discordId?: string | null;
+  discountCode?: string | null;
+  discountPercent?: number | null;
+}
+
+export function webhookInvoiceCreated(plan: string, orderId: string, amount: number, userInfo?: InvoiceUserInfo) {
+  const lines = [
     `>>> **Details Facture**`,
     `**Plan** : \`${plan.toUpperCase()}\``,
     `**Montant** : ${amount} EUR`,
     `**Commande** : \`${orderId}\``,
-  ].join("\n");
+  ];
+
+  if (userInfo) {
+    if (userInfo.pseudo) lines.push(`**Pseudo** : \`${userInfo.pseudo}\``);
+    if (userInfo.email) lines.push(`**Email** : \`${userInfo.email}\``);
+    if (userInfo.userId) lines.push(`**ID Unique** : \`${userInfo.userId}\``);
+    if (userInfo.discordId) lines.push(`**Discord** : <@${userInfo.discordId}> (\`${userInfo.discordId}\`)`);
+    if (userInfo.discountCode) lines.push(`**Code Promo** : \`${userInfo.discountCode}\` (-${userInfo.discountPercent}%)`);
+  }
 
   sendWebhook({
     title: "\u{1F4C4} Facture Creee",
-    description: desc,
+    description: lines.join("\n"),
     color: COLORS.payment,
   });
 }
 
-export function webhookPaymentCompleted(orderId: string, tier: string, amount: string, currency: string) {
-  const desc = [
+export function webhookPaymentCompleted(orderId: string, tier: string, amount: string, currency: string, userInfo?: InvoiceUserInfo) {
+  const lines = [
     `>>> **Details Paiement**`,
     `**Commande** : \`${orderId}\``,
     `**Tier** : \`${tier.toUpperCase()}\``,
     `**Montant** : ${amount} ${currency}`,
-  ].join("\n");
+  ];
+
+  if (userInfo) {
+    if (userInfo.pseudo) lines.push(`**Pseudo** : \`${userInfo.pseudo}\``);
+    if (userInfo.email) lines.push(`**Email** : \`${userInfo.email}\``);
+    if (userInfo.userId) lines.push(`**ID Unique** : \`${userInfo.userId}\``);
+    if (userInfo.discordId) lines.push(`**Discord** : <@${userInfo.discordId}> (\`${userInfo.discordId}\`)`);
+    if (userInfo.discountCode) lines.push(`**Code Promo** : \`${userInfo.discountCode}\` (-${userInfo.discountPercent}%)`);
+  }
 
   sendWebhook({
     title: "\u{1F4B3} Paiement Complete",
-    description: desc,
+    description: lines.join("\n"),
     color: COLORS.payment,
   });
 }
