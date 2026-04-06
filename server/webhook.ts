@@ -798,7 +798,7 @@ export function webhookSuspiciousSession(user: UserInfo, sessionIPs: string[], s
 }
 
 function getSessionWebhookUrl(): string | undefined {
-  return process.env.DISCORD_SESSION_WEBHOOK_URL;
+  return process.env.DISCORD_SESSION_WEBHOOK_URL ?? process.env.DISCORD_WEBHOOK_URL;
 }
 
 async function sendSessionWebhook(options: WebhookOptions): Promise<void> {
