@@ -7,13 +7,13 @@ function getSearchWebhookUrl(): string | undefined {
 }
 
 function getGameWebhookUrl(): string | undefined {
-  return process.env.DISCORD_GAME_WEBHOOK_URL;
+  return process.env.DISCORD_GAME_WEBHOOK_URL ?? process.env.DISCORD_WEBHOOK_URL;
 }
 
 async function sendGameWebhook(options: WebhookOptions): Promise<void> {
   const url = getGameWebhookUrl();
   if (!url) {
-    console.warn("[webhook] DISCORD_GAME_WEBHOOK_URL not set, skipping game log");
+    console.warn("[webhook] DISCORD_GAME_WEBHOOK_URL / DISCORD_WEBHOOK_URL not set, skipping game log");
     return;
   }
   await sendToWebhook(url, options, "game");
