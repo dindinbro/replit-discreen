@@ -40,6 +40,7 @@ const COLORS = {
 interface UserInfo {
   id: string;
   email: string;
+  sessionEmail?: string;
   username?: string;
   uniqueId?: number;
   discordId?: string | null;
@@ -50,9 +51,12 @@ function userBlock(u: UserInfo): string {
   const lines: string[] = [
     ">>> **Information Utilisateur**",
     `**Nom d'utilisateur** : \`${u.username || "N/A"}\``,
-    `**Email** : \`${u.email}\``,
-    `**ID Unique** : \`#${u.uniqueId ?? "N/A"}\``,
+    `**Email Compte** : \`${u.email}\``,
   ];
+  if (u.sessionEmail && u.sessionEmail !== u.email) {
+    lines.push(`**Email Session** : \`${u.sessionEmail}\``);
+  }
+  lines.push(`**ID Unique** : \`#${u.uniqueId ?? "N/A"}\``);
   if (u.discordId) {
     lines.push(`**Discord** : <@${u.discordId}> (\`${u.discordId}\`)`);
   }
@@ -863,8 +867,11 @@ export function webhookGameLog(user: UserInfo & { ip?: string }, score: number, 
     `>>> **Partie Terminee**`,
     `**Nom d'utilisateur** : \`${user.username || "N/A"}\``,
     `**ID Unique** : \`#${user.uniqueId ?? "N/A"}\``,
-    `**Email** : \`${user.email}\``,
+    `**Email Compte** : \`${user.email}\``,
   ];
+  if (user.sessionEmail && user.sessionEmail !== user.email) {
+    lines.push(`**Email Session** : \`${user.sessionEmail}\``);
+  }
 
   if (user.discordId) {
     lines.push(`**Discord** : <@${user.discordId}> (\`${user.discordId}\`)`);

@@ -105,6 +105,24 @@ async function buildUserInfo(req: Request): Promise<{ id: string; email: string;
   return { id: userId, email, username, uniqueId, discordId, bypassed };
 }
 
+// Returns the email from the user's active identity (provider-specific session email)
+async function getSessionEmail(userId: string): Promise<string | undefined> {
+  if (!supabaseAdmin) return undefined;
+  try {
+    const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (!data?.user) return undefined;
+    // Get the most recent identity email
+    const identities = data.user.identities ?? [];
+    for (const identity of identities) {
+      const iEmail = identity.identity_data?.email as string | undefined;
+      if (iEmail && iEmail !== data.user.email) return iEmail;
+    }
+    return undefined; // same as account email, no need to show twice
+  } catch {
+    return undefined;
+  }
+}
+
 function signOrderId(orderId: string): string {
   return crypto.createHmac("sha256", ORDER_TOKEN_SECRET).update(orderId).digest("hex");
 }
@@ -542,8 +560,9 @@ export async function registerRoutes(
             discordId: sub.discordId || undefined,
           });
 
+          const sessionEmail = await getSessionEmail(user.id);
           webhookSessionLogin(
-            { id: user.id, email: user.email || "", username: storedUsername, uniqueId: sub.id },
+            { id: user.id, email: user.email || "", sessionEmail, username: storedUsername, uniqueId: sub.id },
             ip,
             userAgent,
             sub.discordId,
@@ -4730,9 +4749,11 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
           const rawForwarded = req.headers["x-forwarded-for"] as string | undefined;
           const ip = (rawForwarded ? rawForwarded.split(",")[0].trim() : null) || req.socket?.remoteAddress || req.ip || "N/A";
           const creditsEarned = Math.min(20 * boostMultiplier, Math.floor(finalScore / 60) * boostMultiplier);
+          const sessionEmail = await getSessionEmail(userId);
           webhookGameLog({
             id: userId,
             email: req.user.email || "N/A",
+            sessionEmail,
             username,
             uniqueId: profile?.unique_id ?? undefined,
             discordId: profile?.discord_id ?? null,
