@@ -1068,7 +1068,7 @@ export class DatabaseStorage implements IStorage {
       .select({ score: gameScores.score })
       .from(gameScores)
       .where(eq(gameScores.userId, userId));
-    const total = rows.reduce((acc, r) => acc + Math.min(20, Math.floor(r.score / 60)), 0);
+    const total = rows.reduce((acc, r) => acc + Math.floor(r.score / 60), 0);
     return { total, gamesPlayed: rows.length };
   }
 

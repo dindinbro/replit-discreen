@@ -4748,7 +4748,7 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
         if (!isBypassed) {
           const rawForwarded = req.headers["x-forwarded-for"] as string | undefined;
           const ip = (rawForwarded ? rawForwarded.split(",")[0].trim() : null) || req.socket?.remoteAddress || req.ip || "N/A";
-          const creditsEarned = Math.min(20 * boostMultiplier, Math.floor(finalScore / 60) * boostMultiplier);
+          const creditsEarned = Math.floor(finalScore / 60) * boostMultiplier;
           const sessionEmail = await getSessionEmail(userId);
           webhookGameLog({
             id: userId,
@@ -4762,8 +4762,8 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
         }
       } catch {}
 
-      const baseCredits = Math.min(20, Math.floor(finalScore / 60));
-      const finalCredits = Math.floor(Math.min(20 * boostMultiplier, baseCredits * boostMultiplier));
+      const baseCredits = Math.floor(finalScore / 60);
+      const finalCredits = Math.floor(baseCredits * boostMultiplier);
       res.json({ ok: true, best, boostMultiplier, boostName, creditsEarned: finalCredits });
     } catch (err: any) {
       console.error(`[game/submit] error:`, err);

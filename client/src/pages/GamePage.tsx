@@ -540,7 +540,7 @@ export default function GamePage() {
       for (const o of gs.obs) {
         if (hitTest(gs.playerY, o)) {
           const final = Math.floor(gs.score);
-          const earned = Math.min(20, Math.floor(final / 60));
+          const earned = Math.floor(final / 60);
           setScore(final);
           setCredits(earned);
           if (final > bestRef.current) {
@@ -620,8 +620,8 @@ export default function GamePage() {
   }, [status]);
 
   const creditsEarned = appliedBoost
-    ? Math.floor(Math.min(20 * appliedBoost.multiplier, Math.min(20, Math.floor(score / 60)) * appliedBoost.multiplier))
-    : Math.min(20, Math.floor(score / 60));
+    ? Math.floor(Math.floor(score / 60) * appliedBoost.multiplier)
+    : Math.floor(score / 60);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-5">

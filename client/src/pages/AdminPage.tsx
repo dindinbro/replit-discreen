@@ -1059,7 +1059,7 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
                       <Button size="sm" className="h-7 text-xs" onClick={() => setGameScore(u.id, displayName)} disabled={gameSetLoadingId === u.id} data-testid={`button-game-set-save-${u.id}`}>
                         {gameSetLoadingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Save className="w-3 h-3 mr-1" /> Appliquer</>}
                       </Button>
-                      <span className="text-xs text-muted-foreground">Credits = score / 60 (max 20 par partie)</span>
+                      <span className="text-xs text-muted-foreground">Credits = score / 60 (sans limite)</span>
                     </div>
                   )}
                 </div>
