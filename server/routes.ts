@@ -262,6 +262,20 @@ export async function registerRoutes(
     try {
       await db.execute(sql`ALTER TABLE referral_codes ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`);
     } catch (_) {}
+    // Ensure discount_codes table exists
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS discount_codes (
+        id SERIAL PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        discount_percent INTEGER NOT NULL,
+        max_uses INTEGER,
+        used_count INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT NOT NULL,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     console.log("[referral] Tables ensured OK");
   } catch (err) {
     console.error("[referral] Failed to ensure referral tables:", err);
@@ -4616,7 +4630,8 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
       // Game log webhook
       try {
         const { data: profile } = await supabaseAdmin.from("profiles").select("unique_id, discord_id").eq("id", userId).single();
-        const ip = req.ip || req.headers["x-forwarded-for"] as string || "N/A";
+        const rawForwarded = req.headers["x-forwarded-for"] as string | undefined;
+        const ip = (rawForwarded ? rawForwarded.split(",")[0].trim() : null) || req.socket?.remoteAddress || req.ip || "N/A";
         const creditsEarned = Math.min(20, Math.floor(finalScore / 60));
         webhookGameLog({
           id: userId,

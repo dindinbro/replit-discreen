@@ -467,6 +467,14 @@ export async function startDiscordBot() {
       opt.setName("idunique").setDescription("ID unique de l'utilisateur").setRequired(true).setMinValue(1)
     );
 
+  const resetGameCommand = new SlashCommandBuilder()
+    .setName("resetgame")
+    .setDescription("Remettre à zéro le score et les crédits STING.EXE d'un utilisateur")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addIntegerOption((opt) =>
+      opt.setName("idunique").setDescription("ID unique de l'utilisateur").setRequired(true).setMinValue(1)
+    );
+
   const setrankCommand = new SlashCommandBuilder()
     .setName("setrank")
     .setDescription("Definir le rang de parrainage (Eclats) d'un utilisateur")
@@ -522,6 +530,7 @@ export async function startDiscordBot() {
         setrankCommand.toJSON(),
         setPseudoCommand.toJSON(),
         resetPseudoCommand.toJSON(),
+        resetGameCommand.toJSON(),
       ],
     });
     log("Discord slash commands registered", "discord");
@@ -561,6 +570,7 @@ export async function startDiscordBot() {
       setrankCommand.toJSON(),
       setPseudoCommand.toJSON(),
       resetPseudoCommand.toJSON(),
+      resetGameCommand.toJSON(),
     ];
     const guilds = client?.guilds.cache;
     if (guilds) {
@@ -1386,6 +1396,62 @@ export async function startDiscordBot() {
           await interaction.editReply({ content: "Erreur lors de la reinitialisation des recherches." });
         } else if (!interaction.replied) {
           await interaction.reply({ content: "Erreur lors de la reinitialisation des recherches.", ephemeral: true });
+        }
+      }
+    }
+
+    if (interaction.commandName === "resetgame") {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const uniqueId = interaction.options.getInteger("idunique", true);
+        const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+
+        if (!sub) {
+          await interaction.editReply({ content: `Aucun utilisateur trouvé avec l'ID unique \`${uniqueId}\`.` });
+          return;
+        }
+
+        await storage.adminResetUserGameData(sub.userId);
+
+        let email = "Inconnu";
+        let username = "Inconnu";
+        try {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseKey) {
+            const supaAdmin = createClient(supabaseUrl, supabaseKey);
+            const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+            if (data?.user) {
+              email = data.user.email || "Inconnu";
+              username = data.user.user_metadata?.display_name || data.user.user_metadata?.full_name || data.user.email?.split("@")[0] || "Inconnu";
+            }
+          }
+        } catch (supaErr) {
+          log(`/resetgame: Supabase lookup failed: ${supaErr}`, "discord");
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(0xf59e0b)
+          .setTitle("🎮 Score STING.EXE Réinitialisé")
+          .setDescription("Le score et les crédits de jeu ont été remis à zéro.")
+          .addFields(
+            { name: "Reset par", value: `<@${interaction.user.id}>`, inline: true },
+            { name: "ID Unique", value: `\`${uniqueId}\``, inline: true },
+            { name: "Email", value: email, inline: true },
+            { name: "Nom d'utilisateur", value: username, inline: true },
+            { name: "Discord", value: sub.discordId ? `<@${sub.discordId}>` : "Non lié", inline: true },
+            { name: "Score", value: "0", inline: true }
+          )
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        log(`/resetgame: User #${uniqueId} game data reset by ${interaction.user.username}`, "discord");
+      } catch (err) {
+        log(`Error in /resetgame: ${err}`, "discord");
+        if (interaction.deferred) {
+          await interaction.editReply({ content: "Erreur lors de la réinitialisation du jeu." });
+        } else if (!interaction.replied) {
+          await interaction.reply({ content: "Erreur lors de la réinitialisation du jeu.", ephemeral: true });
         }
       }
     }
