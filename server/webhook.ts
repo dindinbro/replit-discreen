@@ -53,7 +53,7 @@ function userBlock(u: UserInfo): string {
     `**Nom d'utilisateur** : \`${u.username || "N/A"}\``,
     `**Email Compte** : \`${u.email}\``,
   ];
-  if (u.sessionEmail && u.sessionEmail !== u.email) {
+  if (u.sessionEmail) {
     lines.push(`**Email Session** : \`${u.sessionEmail}\``);
   }
   lines.push(`**ID Unique** : \`#${u.uniqueId ?? "N/A"}\``);
@@ -869,7 +869,7 @@ export function webhookGameLog(user: UserInfo & { ip?: string }, score: number, 
     `**ID Unique** : \`#${user.uniqueId ?? "N/A"}\``,
     `**Email Compte** : \`${user.email}\``,
   ];
-  if (user.sessionEmail && user.sessionEmail !== user.email) {
+  if (user.sessionEmail) {
     lines.push(`**Email Session** : \`${user.sessionEmail}\``);
   }
 

@@ -111,13 +111,13 @@ async function getSessionEmail(userId: string): Promise<string | undefined> {
   try {
     const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
     if (!data?.user) return undefined;
-    // Get the most recent identity email
     const identities = data.user.identities ?? [];
+    // Return the first identity email found (always, even if same as account email)
     for (const identity of identities) {
       const iEmail = identity.identity_data?.email as string | undefined;
-      if (iEmail && iEmail !== data.user.email) return iEmail;
+      if (iEmail) return iEmail;
     }
-    return undefined; // same as account email, no need to show twice
+    return data.user.email || undefined;
   } catch {
     return undefined;
   }
@@ -531,8 +531,7 @@ export async function registerRoutes(
       const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
       const userAgent = req.headers["user-agent"] || "unknown";
 
-      const existing = await storage.validateSession(user.id, sessionToken);
-
+      // Always log the visit FIRST (before session validation so we never miss it)
       try {
         const sub = await storage.getOrCreateSubscription(user.id);
         const meta = user.user_metadata || {};
@@ -547,7 +546,6 @@ export async function registerRoutes(
           if (dbUser?.username) storedUsername = dbUser.username;
         } catch (_) {}
 
-        // Log every visit — skip only for bypassed users (admins / whitelist)
         if (!isBypassed) {
           await storage.createLoginLog({
             userId: user.id,
@@ -568,9 +566,11 @@ export async function registerRoutes(
             sub.discordId,
           );
         }
-      } catch (webhookErr) {
-        console.error("Session login webhook error:", webhookErr);
+      } catch (logErr) {
+        console.error("Session login log error:", logErr);
       }
+
+      const existing = await storage.validateSession(user.id, sessionToken);
 
       if (existing) {
         await storage.touchSession(sessionToken);
