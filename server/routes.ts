@@ -276,6 +276,21 @@ export async function registerRoutes(
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Ensure game_boosts table exists
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS game_boosts (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        code TEXT NOT NULL UNIQUE,
+        multiplier REAL NOT NULL DEFAULT 2.0,
+        max_uses INTEGER,
+        used_count INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT NOT NULL,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     console.log("[referral] Tables ensured OK");
   } catch (err) {
     console.error("[referral] Failed to ensure referral tables:", err);
@@ -1075,6 +1090,68 @@ export async function registerRoutes(
       console.error("DELETE /api/admin/discount-codes/:id error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  // ── Game Boosts (admin) ──────────────────────────────────────────────────
+  app.get("/api/admin/game-boosts", requireAuth, requireAdmin, async (_req, res) => {
+    try { res.json(await storage.getAllGameBoosts()); }
+    catch (err) { console.error("GET /api/admin/game-boosts error:", err); res.status(500).json({ message: "Internal server error" }); }
+  });
+
+  app.post("/api/admin/game-boosts", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { name, code, multiplier, maxUses, expiresAt } = req.body;
+      if (!name?.trim() || !code?.trim()) return res.status(400).json({ message: "Nom et code requis" });
+      if (typeof multiplier !== "number" || multiplier < 1 || multiplier > 100) return res.status(400).json({ message: "Multiplicateur entre 1 et 100" });
+      const existing = await storage.getGameBoostByCode(code.trim());
+      if (existing) return res.status(409).json({ message: "Ce code existe déjà" });
+      const boost = await storage.createGameBoost({
+        name: name.trim(), code: code.trim(), multiplier,
+        maxUses: maxUses ?? null, createdBy: (req as any).user?.email || "admin",
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+      res.json(boost);
+    } catch (err) { console.error("POST /api/admin/game-boosts error:", err); res.status(500).json({ message: "Internal server error" }); }
+  });
+
+  app.patch("/api/admin/game-boosts/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const { active, maxUses, expiresAt, multiplier, name } = req.body;
+      const updates: any = {};
+      if (typeof active === "boolean") updates.active = active;
+      if (name !== undefined) updates.name = name;
+      if (multiplier !== undefined) updates.multiplier = multiplier;
+      if (maxUses !== undefined) updates.maxUses = maxUses;
+      if (expiresAt !== undefined) updates.expiresAt = expiresAt ? new Date(expiresAt) : null;
+      const boost = await storage.updateGameBoost(id, updates);
+      if (!boost) return res.status(404).json({ message: "Boost introuvable" });
+      res.json(boost);
+    } catch (err) { console.error("PATCH /api/admin/game-boosts/:id error:", err); res.status(500).json({ message: "Internal server error" }); }
+  });
+
+  app.delete("/api/admin/game-boosts/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
+      const ok = await storage.deleteGameBoost(id);
+      if (!ok) return res.status(404).json({ message: "Boost introuvable" });
+      res.json({ success: true });
+    } catch (err) { console.error("DELETE /api/admin/game-boosts/:id error:", err); res.status(500).json({ message: "Internal server error" }); }
+  });
+
+  // POST /api/game/boost/validate — player validates their boost code
+  app.post("/api/game/boost/validate", requireAuth, async (req: any, res) => {
+    try {
+      const { code } = req.body;
+      if (!code || typeof code !== "string") return res.status(400).json({ error: "Code requis" });
+      const boost = await storage.getGameBoostByCode(code.trim());
+      if (!boost || !boost.active) return res.status(404).json({ error: "Code invalide ou inactif" });
+      if (boost.expiresAt && new Date(boost.expiresAt) < new Date()) return res.status(410).json({ error: "Ce boost a expiré" });
+      if (boost.maxUses !== null && boost.usedCount >= boost.maxUses) return res.status(410).json({ error: "Ce boost a atteint sa limite d'utilisations" });
+      res.json({ valid: true, name: boost.name, multiplier: boost.multiplier, code: boost.code });
+    } catch (err) { console.error("POST /api/game/boost/validate error:", err); res.status(500).json({ error: "Erreur serveur" }); }
   });
 
   app.get("/api/site-status", async (_req, res) => {
@@ -4616,7 +4693,7 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
 
   app.post("/api/game/submit", requireAuth, async (req: any, res) => {
     try {
-      const { score } = req.body;
+      const { score, boostCode } = req.body;
       if (typeof score !== "number" || score < 0 || score > 999999) {
         return res.status(400).json({ error: "Score invalide" });
       }
@@ -4626,12 +4703,29 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
       await storage.submitGameScore(userId, username, finalScore);
       const best = await storage.getUserBestScore(userId);
 
+      // Apply boost if valid code provided
+      let boostMultiplier = 1;
+      let boostName: string | undefined;
+      if (boostCode && typeof boostCode === "string") {
+        try {
+          const boost = await storage.getGameBoostByCode(boostCode.trim());
+          const isValid = boost && boost.active &&
+            (!boost.expiresAt || new Date(boost.expiresAt) >= new Date()) &&
+            (boost.maxUses === null || boost.usedCount < boost.maxUses);
+          if (isValid) {
+            boostMultiplier = boost.multiplier;
+            boostName = boost.name;
+            await storage.incrementGameBoostUsage(boost.id);
+          }
+        } catch {}
+      }
+
       // Game log webhook
       try {
         const { data: profile } = await supabaseAdmin.from("profiles").select("unique_id, discord_id").eq("id", userId).single();
         const rawForwarded = req.headers["x-forwarded-for"] as string | undefined;
         const ip = (rawForwarded ? rawForwarded.split(",")[0].trim() : null) || req.socket?.remoteAddress || req.ip || "N/A";
-        const creditsEarned = Math.min(20, Math.floor(finalScore / 60));
+        const creditsEarned = Math.min(20 * boostMultiplier, Math.floor(finalScore / 60) * boostMultiplier);
         webhookGameLog({
           id: userId,
           email: req.user.email || "N/A",
@@ -4639,10 +4733,12 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
           uniqueId: profile?.unique_id ?? undefined,
           discordId: profile?.discord_id ?? null,
           ip,
-        }, finalScore, creditsEarned);
+        }, finalScore, Math.floor(creditsEarned));
       } catch {}
 
-      res.json({ ok: true, best });
+      const baseCredits = Math.min(20, Math.floor(finalScore / 60));
+      const finalCredits = Math.floor(Math.min(20 * boostMultiplier, baseCredits * boostMultiplier));
+      res.json({ ok: true, best, boostMultiplier, boostName, creditsEarned: finalCredits });
     } catch (err: any) {
       console.error(`[game/submit] error:`, err);
       res.status(500).json({ error: "Erreur submit", detail: String(err?.message ?? err) });

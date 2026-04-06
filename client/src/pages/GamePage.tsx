@@ -411,9 +411,29 @@ export default function GamePage() {
     },
   });
 
+  const [boostInput, setBoostInput] = useState("");
+  const [appliedBoost, setAppliedBoost] = useState<{ name: string; multiplier: number; code: string } | null>(null);
+  const [boostError, setBoostError] = useState<string | null>(null);
+
+  const validateBoostMut = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/game/boost/validate", { code });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Code invalide"); }
+      return res.json() as Promise<{ valid: boolean; name: string; multiplier: number; code: string }>;
+    },
+    onSuccess: (data) => {
+      setAppliedBoost({ name: data.name, multiplier: data.multiplier, code: data.code });
+      setBoostError(null);
+    },
+    onError: (err: Error) => {
+      setAppliedBoost(null);
+      setBoostError(err.message);
+    },
+  });
+
   const submitMut = useMutation({
     mutationFn: async (s: number) => {
-      const res = await apiRequest("POST", "/api/game/submit", { score: s });
+      const res = await apiRequest("POST", "/api/game/submit", { score: s, boostCode: appliedBoost?.code ?? undefined });
       return res.json();
     },
     onSuccess: () => {
@@ -599,7 +619,9 @@ export default function GamePage() {
     drawScorpion(ctx, GROUND_Y - 22, 1.2, false);
   }, [status]);
 
-  const creditsEarned = Math.min(20, Math.floor(score / 60));
+  const creditsEarned = appliedBoost
+    ? Math.floor(Math.min(20 * appliedBoost.multiplier, Math.min(20, Math.floor(score / 60)) * appliedBoost.multiplier))
+    : Math.min(20, Math.floor(score / 60));
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-5">
@@ -667,9 +689,14 @@ export default function GamePage() {
                   )}
                   {user ? (
                     creditsEarned > 0 && (
-                      <div className="flex items-center gap-1.5 justify-center text-sm text-yellow-400/90 mt-1">
-                        <Coins className="w-4 h-4" />
-                        <span className="font-bold">+{creditsEarned} crédit{creditsEarned > 1 ? "s" : ""} gagnés</span>
+                      <div className="flex flex-col items-center gap-0.5 mt-1">
+                        <div className="flex items-center gap-1.5 justify-center text-sm text-yellow-400/90">
+                          <Coins className="w-4 h-4" />
+                          <span className="font-bold">+{creditsEarned} crédit{creditsEarned > 1 ? "s" : ""} gagnés</span>
+                          {appliedBoost && (
+                            <span className="text-xs text-green-400/80 font-mono">×{appliedBoost.multiplier} {appliedBoost.name}</span>
+                          )}
+                        </div>
                       </div>
                     )
                   ) : (
@@ -696,6 +723,44 @@ export default function GamePage() {
               </div>
             )}
           </div>
+
+          {/* Boost code input */}
+          {user && (
+            <div className="flex items-center gap-2">
+              {appliedBoost ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-mono flex-1">
+                  <span className="font-bold">⚡ {appliedBoost.name}</span>
+                  <span className="opacity-70">×{appliedBoost.multiplier} actif</span>
+                  <button
+                    className="ml-auto text-green-400/50 hover:text-green-400 transition-colors"
+                    data-testid="button-remove-boost"
+                    onClick={() => { setAppliedBoost(null); setBoostInput(""); setBoostError(null); }}
+                  >✕</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={boostInput}
+                    onChange={e => { setBoostInput(e.target.value.toUpperCase()); setBoostError(null); }}
+                    onKeyDown={e => { if (e.key === "Enter" && boostInput.trim()) validateBoostMut.mutate(boostInput.trim()); }}
+                    placeholder="CODE BOOST (optionnel)"
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-card/60 border border-border/40 text-xs font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50"
+                    data-testid="input-boost-code"
+                  />
+                  <button
+                    disabled={!boostInput.trim() || validateBoostMut.isPending}
+                    onClick={() => validateBoostMut.mutate(boostInput.trim())}
+                    className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-mono hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    data-testid="button-validate-boost"
+                  >
+                    {validateBoostMut.isPending ? "..." : "VALIDER"}
+                  </button>
+                </>
+              )}
+              {boostError && <span className="text-xs text-red-400 font-mono">{boostError}</span>}
+            </div>
+          )}
 
           {/* Controls bar */}
           <div className="flex items-center gap-5 text-xs text-muted-foreground/55 flex-wrap">

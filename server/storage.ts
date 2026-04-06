@@ -2,7 +2,7 @@ import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
-  blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes,
+  blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes, gameBoosts,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -12,7 +12,7 @@ import {
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
   type ActiveSession, type BlockedIp,
   type ReferralCode, type ReferralEvent, type LoginLog,
-  type DiscountCode,
+  type DiscountCode, type GameBoost,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -128,6 +128,12 @@ export interface IStorage {
   incrementDiscountCodeUsage(id: number): Promise<void>;
   storeDiscountForOrder(orderId: string, codeId: number, discountPercent: number): Promise<void>;
   getDiscountForOrder(orderId: string): Promise<{ codeId: number; code: string; discountPercent: number } | null>;
+  getAllGameBoosts(): Promise<GameBoost[]>;
+  getGameBoostByCode(code: string): Promise<GameBoost | null>;
+  createGameBoost(data: { name: string; code: string; multiplier: number; maxUses?: number | null; createdBy: string; active?: boolean; expiresAt?: Date | null }): Promise<GameBoost>;
+  updateGameBoost(id: number, data: Partial<{ name: string; active: boolean; maxUses: number | null; expiresAt: Date | null; multiplier: number }>): Promise<GameBoost | null>;
+  deleteGameBoost(id: number): Promise<boolean>;
+  incrementGameBoostUsage(id: number): Promise<void>;
 }
 
 function hashKey(key: string): string {
@@ -1135,6 +1141,44 @@ export class DatabaseStorage implements IStorage {
     } catch {
       return null;
     }
+  }
+
+  async getAllGameBoosts(): Promise<GameBoost[]> {
+    return db.select().from(gameBoosts).orderBy(desc(gameBoosts.createdAt));
+  }
+
+  async getGameBoostByCode(code: string): Promise<GameBoost | null> {
+    const rows = await db.select().from(gameBoosts).where(eq(gameBoosts.code, code.toUpperCase()));
+    return rows[0] ?? null;
+  }
+
+  async createGameBoost(data: { name: string; code: string; multiplier: number; maxUses?: number | null; createdBy: string; active?: boolean; expiresAt?: Date | null }): Promise<GameBoost> {
+    const [row] = await db.insert(gameBoosts).values({
+      name: data.name,
+      code: data.code.toUpperCase(),
+      multiplier: data.multiplier,
+      maxUses: data.maxUses ?? null,
+      createdBy: data.createdBy,
+      active: data.active ?? true,
+      expiresAt: data.expiresAt ?? null,
+    }).returning();
+    return row;
+  }
+
+  async updateGameBoost(id: number, data: Partial<{ name: string; active: boolean; maxUses: number | null; expiresAt: Date | null; multiplier: number }>): Promise<GameBoost | null> {
+    const [row] = await db.update(gameBoosts).set(data).where(eq(gameBoosts.id, id)).returning();
+    return row ?? null;
+  }
+
+  async deleteGameBoost(id: number): Promise<boolean> {
+    const result = await db.delete(gameBoosts).where(eq(gameBoosts.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async incrementGameBoostUsage(id: number): Promise<void> {
+    await db.update(gameBoosts)
+      .set({ usedCount: sql`${gameBoosts.usedCount} + 1` })
+      .where(eq(gameBoosts.id, id));
   }
 }
 

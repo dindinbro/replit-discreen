@@ -59,6 +59,7 @@ import {
   ToggleRight,
   RefreshCw,
   Gamepad2,
+  Zap,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -89,7 +90,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -101,6 +102,7 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "ipblock", label: "IP Blacklist", icon: Ban },
   { key: "logs", label: "Logs Connexions", icon: Activity },
   { key: "discounts", label: "Codes Promo", icon: Tag },
+  { key: "game-boosts", label: "Boosts Jeu", icon: Zap },
 ];
 
 interface CategoryFormData {
@@ -3140,6 +3142,239 @@ function DiscountCodesSection({ getAccessToken }: { getAccessToken: () => string
   );
 }
 
+function GameBoostsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCode, setNewCode] = useState("");
+  const [newMultiplier, setNewMultiplier] = useState(2);
+  const [newMaxUses, setNewMaxUses] = useState<string>("");
+  const [newExpiresAt, setNewExpiresAt] = useState<string>("");
+  const [creating, setCreating] = useState(false);
+
+  const { data: boosts = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/game-boosts"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/game-boosts", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Erreur chargement");
+      return res.json();
+    },
+  });
+
+  async function handleCreate() {
+    if (!newName.trim() || !newCode.trim()) return;
+    setCreating(true);
+    const token = getAccessToken();
+    try {
+      const body: any = { name: newName.trim(), code: newCode.trim(), multiplier: newMultiplier };
+      if (newMaxUses.trim()) body.maxUses = parseInt(newMaxUses);
+      if (newExpiresAt.trim()) body.expiresAt = newExpiresAt;
+      const res = await fetch("/api/admin/game-boosts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast({ title: "Boost créé", description: `Code ${data.code} actif (×${data.multiplier})` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/game-boosts"] });
+      setCreateOpen(false);
+      setNewName(""); setNewCode(""); setNewMultiplier(2); setNewMaxUses(""); setNewExpiresAt("");
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleToggle(id: number, active: boolean) {
+    const token = getAccessToken();
+    try {
+      await fetch(`/api/admin/game-boosts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ active: !active }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/game-boosts"] });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  }
+
+  async function handleDelete(id: number, code: string) {
+    if (!confirm(`Supprimer le boost "${code}" ?`)) return;
+    const token = getAccessToken();
+    try {
+      const res = await fetch(`/api/admin/game-boosts/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erreur suppression");
+      toast({ title: "Boost supprimé" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/game-boosts"] });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
+  }
+
+  return (
+    <div className="space-y-4" data-testid="section-game-boosts">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Gérez les codes boost pour multiplier les crédits gagnés dans STING.EXE.</p>
+        <Button size="sm" onClick={() => setCreateOpen(true)} data-testid="button-create-boost">
+          <Plus className="w-4 h-4 mr-2" />
+          Nouveau boost
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : boosts.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">Aucun boost créé</div>
+      ) : (
+        <div className="space-y-2">
+          {boosts.map((b: any) => {
+            const isExpired = b.expiresAt && new Date(b.expiresAt) < new Date();
+            const isExhausted = b.maxUses !== null && b.usedCount >= b.maxUses;
+            const isEffectivelyActive = b.active && !isExpired && !isExhausted;
+            return (
+              <Card key={b.id} className={`p-4 ${!isEffectivelyActive ? "opacity-60" : ""}`} data-testid={`card-boost-${b.id}`}>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <Zap className={`w-4 h-4 shrink-0 ${isEffectivelyActive ? "text-yellow-400" : "text-muted-foreground"}`} />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm" data-testid={`text-boost-name-${b.id}`}>{b.name}</span>
+                        <span className="font-mono font-bold text-xs text-primary/80" data-testid={`text-boost-code-${b.id}`}>{b.code}</span>
+                        <Badge variant={isEffectivelyActive ? "default" : "secondary"} className="text-xs">
+                          {!b.active ? "Désactivé" : isExpired ? "Expiré" : isExhausted ? "Épuisé" : "Actif"}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs font-mono text-yellow-400/80 border-yellow-400/30">×{b.multiplier}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 space-x-3">
+                        <span>Utilisations : <strong>{b.usedCount}</strong>{b.maxUses !== null ? ` / ${b.maxUses}` : " (illimité)"}</span>
+                        {b.expiresAt && <span>Expire : {new Date(b.expiresAt).toLocaleDateString("fr-FR")}</span>}
+                        <span>Par : {b.createdBy}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      title={b.active ? "Désactiver" : "Activer"}
+                      onClick={() => handleToggle(b.id, b.active)}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      data-testid={`button-toggle-boost-${b.id}`}
+                    >
+                      {b.active ? <ToggleRight className="w-5 h-5 text-green-500" /> : <ToggleLeft className="w-5 h-5" />}
+                    </button>
+                    <button
+                      title="Supprimer"
+                      onClick={() => handleDelete(b.id, b.code)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                      data-testid={`button-delete-boost-${b.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-400" />
+              Nouveau boost jeu
+            </DialogTitle>
+            <DialogDescription>Créer un code boost qui multiplie les crédits gagnés dans STING.EXE.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="gb-name">Nom du boost</Label>
+              <Input
+                id="gb-name"
+                data-testid="input-boost-name"
+                placeholder="Double Crédit Weekend"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                maxLength={50}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="gb-code">Code</Label>
+              <Input
+                id="gb-code"
+                data-testid="input-new-boost-code"
+                placeholder="BOOST2X"
+                value={newCode}
+                onChange={e => setNewCode(e.target.value.toUpperCase())}
+                className="font-mono"
+                maxLength={20}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="gb-multiplier">Multiplicateur</Label>
+              <Input
+                id="gb-multiplier"
+                data-testid="input-boost-multiplier"
+                type="number"
+                min={1}
+                max={100}
+                step={0.5}
+                value={newMultiplier}
+                onChange={e => setNewMultiplier(parseFloat(e.target.value) || 1)}
+              />
+              <p className="text-xs text-muted-foreground">Ex : 2 = double les crédits gagnés (base max 20 × multiplicateur)</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="gb-max">Nb max d'utilisations (optionnel)</Label>
+              <Input
+                id="gb-max"
+                data-testid="input-boost-max-uses"
+                type="number"
+                min={1}
+                placeholder="Illimité"
+                value={newMaxUses}
+                onChange={e => setNewMaxUses(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="gb-expires">Date d'expiration (optionnel)</Label>
+              <Input
+                id="gb-expires"
+                data-testid="input-boost-expires"
+                type="datetime-local"
+                value={newExpiresAt}
+                onChange={e => setNewExpiresAt(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setCreateOpen(false)}>Annuler</Button>
+            <Button
+              className="flex-1"
+              onClick={handleCreate}
+              disabled={creating || !newName.trim() || !newCode.trim()}
+              data-testid="button-confirm-create-boost"
+            >
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Créer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user, role, loading: authLoading, getAccessToken } = useAuth();
   const [, navigate] = useLocation();
@@ -3260,6 +3495,10 @@ export default function AdminPage() {
 
             {activeTab === "discounts" && (
               <DiscountCodesSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "game-boosts" && (
+              <GameBoostsSection getAccessToken={getAccessToken} />
             )}
           </main>
         </div>

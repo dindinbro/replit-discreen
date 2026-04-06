@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, date, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, date, boolean, uniqueIndex, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -562,6 +562,23 @@ export const discountCodes = pgTable("discount_codes", {
 export type DiscountCode = typeof discountCodes.$inferSelect;
 export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({ id: true, usedCount: true, createdAt: true });
 export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
+
+export const gameBoosts = pgTable("game_boosts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  multiplier: real("multiplier").notNull().default(2.0),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").notNull().default(0),
+  createdBy: text("created_by").notNull(),
+  active: boolean("active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type GameBoost = typeof gameBoosts.$inferSelect;
+export const insertGameBoostSchema = createInsertSchema(gameBoosts).omit({ id: true, usedCount: true, createdAt: true });
+export type InsertGameBoost = z.infer<typeof insertGameBoostSchema>;
 
 export const gameScores = pgTable("game_scores", {
   id: serial("id").primaryKey(),
