@@ -226,6 +226,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ avatar_url: dataUrl }),
       });
       if (res.ok) {
+        // Refresh the Supabase session so the JWT picks up new user_metadata (avatar_url)
+        if (supabase) {
+          await supabase.auth.refreshSession();
+        }
         await refreshRole();
       }
     } catch {

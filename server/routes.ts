@@ -514,18 +514,6 @@ export async function registerRoutes(
       const userAgent = req.headers["user-agent"] || "unknown";
 
       const existing = await storage.validateSession(user.id, sessionToken);
-      if (existing) {
-        await storage.touchSession(sessionToken);
-        return res.json({ ok: true, status: "existing" });
-      }
-
-      const currentSessions = await storage.getActiveSessions(user.id);
-      if (currentSessions.length >= MAX_SESSIONS) {
-        await storage.removeOldestSession(user.id);
-      }
-
-      const normalizedSessionIp = normalizeIp(ip);
-      await storage.createSession(user.id, sessionToken, normalizedSessionIp, userAgent);
 
       try {
         const sub = await storage.getOrCreateSubscription(user.id);
@@ -541,7 +529,7 @@ export async function registerRoutes(
           if (dbUser?.username) storedUsername = dbUser.username;
         } catch (_) {}
 
-        // No logs at all for bypassed users (admins / whitelist)
+        // Log every visit — skip only for bypassed users (admins / whitelist)
         if (!isBypassed) {
           await storage.createLoginLog({
             userId: user.id,
@@ -564,6 +552,19 @@ export async function registerRoutes(
       } catch (webhookErr) {
         console.error("Session login webhook error:", webhookErr);
       }
+
+      if (existing) {
+        await storage.touchSession(sessionToken);
+        return res.json({ ok: true, status: "existing" });
+      }
+
+      const currentSessions = await storage.getActiveSessions(user.id);
+      if (currentSessions.length >= MAX_SESSIONS) {
+        await storage.removeOldestSession(user.id);
+      }
+
+      const normalizedSessionIp = normalizeIp(ip);
+      await storage.createSession(user.id, sessionToken, normalizedSessionIp, userAgent);
 
       const sessions = await storage.getActiveSessions(user.id);
       const ips = sessions.map(s => s.ipAddress).filter(Boolean) as string[];
@@ -4720,20 +4721,24 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
         } catch {}
       }
 
-      // Game log webhook
+      // Game log webhook (skip for bypassed/admin users)
       try {
         const { data: profile } = await supabaseAdmin.from("profiles").select("unique_id, discord_id").eq("id", userId).single();
-        const rawForwarded = req.headers["x-forwarded-for"] as string | undefined;
-        const ip = (rawForwarded ? rawForwarded.split(",")[0].trim() : null) || req.socket?.remoteAddress || req.ip || "N/A";
-        const creditsEarned = Math.min(20 * boostMultiplier, Math.floor(finalScore / 60) * boostMultiplier);
-        webhookGameLog({
-          id: userId,
-          email: req.user.email || "N/A",
-          username,
-          uniqueId: profile?.unique_id ?? undefined,
-          discordId: profile?.discord_id ?? null,
-          ip,
-        }, finalScore, Math.floor(creditsEarned));
+        const sub = await storage.getOrCreateSubscription(userId);
+        const isBypassed = sub.id ? await isUserBypassed(sub.id) : false;
+        if (!isBypassed) {
+          const rawForwarded = req.headers["x-forwarded-for"] as string | undefined;
+          const ip = (rawForwarded ? rawForwarded.split(",")[0].trim() : null) || req.socket?.remoteAddress || req.ip || "N/A";
+          const creditsEarned = Math.min(20 * boostMultiplier, Math.floor(finalScore / 60) * boostMultiplier);
+          webhookGameLog({
+            id: userId,
+            email: req.user.email || "N/A",
+            username,
+            uniqueId: profile?.unique_id ?? undefined,
+            discordId: profile?.discord_id ?? null,
+            ip,
+          }, finalScore, Math.floor(creditsEarned));
+        }
       } catch {}
 
       const baseCredits = Math.min(20, Math.floor(finalScore / 60));

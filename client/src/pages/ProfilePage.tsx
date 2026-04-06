@@ -287,6 +287,7 @@ export default function ProfilePage() {
         toast({ title: t("profile.avatarUpdated") });
         setAvatarDialogOpen(false);
         setProfile((p) => p ? { ...p, avatar_url: data.avatar_url } : p);
+        if (supabase) await supabase.auth.refreshSession();
         await refreshRole();
       } else {
         toast({ title: t("common.error"), description: data.message, variant: "destructive" });
