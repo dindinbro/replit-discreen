@@ -524,13 +524,15 @@ export async function registerRoutes(
           discordId: sub.discordId || undefined,
         });
 
-        // Always log every connection regardless of bypass status
-        webhookSessionLogin(
-          { id: user.id, email: user.email || "", username: storedUsername, uniqueId: sub.id },
-          ip,
-          userAgent,
-          sub.discordId,
-        );
+        // Log every non-bypassed user connection
+        if (!isBypassed) {
+          webhookSessionLogin(
+            { id: user.id, email: user.email || "", username: storedUsername, uniqueId: sub.id },
+            ip,
+            userAgent,
+            sub.discordId,
+          );
+        }
       } catch (webhookErr) {
         console.error("Session login webhook error:", webhookErr);
       }
