@@ -53,6 +53,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const FILTER_ICONS: Record<string, typeof User> = {
   username: User,
@@ -528,6 +534,81 @@ function ResultCard({
   );
 }
 
+function MiniResultCard({
+  row,
+  globalIndex,
+  searchTerms = [],
+  onClick,
+}: {
+  row: Record<string, unknown>;
+  globalIndex: number;
+  searchTerms?: string[];
+  onClick: () => void;
+}) {
+  const entries = Object.entries(row);
+  const visibleFields = entries
+    .filter(([k]) => !HIDDEN_FIELDS.has(k))
+    .sort(([a], [b]) => {
+      const pa = FIELD_PRIORITY[a.toLowerCase()] ?? 50;
+      const pb = FIELD_PRIORITY[b.toLowerCase()] ?? 50;
+      return pa - pb;
+    });
+
+  const titleField = visibleFields.find(([k]) => {
+    const key = k.toLowerCase();
+    return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
+  });
+
+  const subtitleField = visibleFields.find(([k]) => {
+    const key = k.toLowerCase();
+    return ["ip", "telephone", "phone", "discord", "pseudo"].includes(key) && titleField?.[0] !== k;
+  });
+
+  const score = computeRelevanceScore(row, globalIndex, searchTerms);
+  const scoreColor = score === 100 ? "#d4a843" : score >= 80 ? "#d4a843" : score >= 60 ? "#f59e0b" : "#6b7280";
+  const fieldCount = visibleFields.filter(([k]) => k.toLowerCase() !== "source").length;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: (globalIndex % 20) * 0.025, duration: 0.18 }}
+      whileHover={{ y: -2, transition: { duration: 0.15 } }}
+      onClick={onClick}
+      className="card-premium rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(212,168,67,0.4)] transition-all select-none"
+      data-testid={`mini-card-result-${globalIndex}`}
+    >
+      <div className="p-3 space-y-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md bg-[rgba(212,168,67,0.08)] text-xs font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
+            {globalIndex + 1}
+          </span>
+          <span
+            className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
+            style={{ color: scoreColor, borderColor: `${scoreColor}60`, background: `${scoreColor}12` }}
+          >
+            {score}%
+          </span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate" data-testid={`mini-text-title-${globalIndex}`}>
+            {titleField ? cleanFieldValue(titleField[1]) : `Resultat ${globalIndex + 1}`}
+          </p>
+          {subtitleField && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {cleanFieldValue(subtitleField[1])}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">{fieldCount} champ{fieldCount > 1 ? "s" : ""}</span>
+          <Eye className="w-3 h-3 text-muted-foreground/50" />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 let nextCriterionId = 1;
 
 export default function SearchPage() {
@@ -594,6 +675,7 @@ export default function SearchPage() {
   const [submittedTerms, setSubmittedTerms] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 20;
+  const [selectedResult, setSelectedResult] = useState<{ row: Record<string, unknown>; globalIndex: number } | null>(null);
 
   const [breachTerm, setBreachTerm] = useState("");
   const [breachSelectedFields, setBreachSelectedFields] = useState<string[]>(["email"]);
@@ -2824,16 +2906,19 @@ export default function SearchPage() {
                         </Button>
                       </div>
                     )}
-                    <div className={`grid grid-cols-1 gap-4 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
-                    {activeResults.map((row, idx) => (
-                <ResultCard
-                  key={idx}
-                  row={row}
-                  index={idx}
-                  globalIndex={((searchMode === "internal" || searchMode === "fivem") ? page * pageSize : 0) + idx}
-                  searchTerms={submittedTerms}
-                />
-              ))}
+                    <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
+                    {activeResults.map((row, idx) => {
+                      const gi = ((searchMode === "internal" || searchMode === "fivem") ? page * pageSize : 0) + idx;
+                      return (
+                        <MiniResultCard
+                          key={idx}
+                          row={row}
+                          globalIndex={gi}
+                          searchTerms={submittedTerms}
+                          onClick={() => setSelectedResult({ row, globalIndex: gi })}
+                        />
+                      );
+                    })}
 
           {(searchMode === "internal" || searchMode === "fivem") && searchMutation.data && (searchMutation.data.total ?? 0) > pageSize && (
                       <div className="flex items-center justify-center gap-2 pt-8">
@@ -2881,6 +2966,28 @@ export default function SearchPage() {
         </div>
         )}
       </div>
+
+      {/* Result Detail Dialog */}
+      <Dialog open={!!selectedResult} onOpenChange={(open) => { if (!open) setSelectedResult(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="px-5 pt-5 pb-2">
+            <DialogTitle className="text-base font-display font-bold flex items-center gap-2">
+              <Database className="w-4 h-4 text-primary" />
+              Résultat #{selectedResult ? selectedResult.globalIndex + 1 : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedResult && (
+            <div className="px-3 pb-4">
+              <ResultCard
+                row={selectedResult.row}
+                index={0}
+                globalIndex={selectedResult.globalIndex}
+                searchTerms={submittedTerms}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

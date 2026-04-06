@@ -58,6 +58,7 @@ import {
   ToggleLeft,
   ToggleRight,
   RefreshCw,
+  Gamepad2,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -747,6 +748,11 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [gameResetConfirmId, setGameResetConfirmId] = useState<string | null>(null);
+  const [gameResetLoadingId, setGameResetLoadingId] = useState<string | null>(null);
+  const [gameSetOpenId, setGameSetOpenId] = useState<string | null>(null);
+  const [gameSetScore, setGameSetScore] = useState("");
+  const [gameSetLoadingId, setGameSetLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -846,6 +852,59 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
+    }
+  };
+
+  const resetGameData = async (uid: string) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setGameResetLoadingId(uid);
+    try {
+      const res = await fetch(`/api/admin/game/reset/${uid}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        toast({ title: "Jeu reinitialise", description: "Score et credits remis a zero." });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Erreur", description: err.message || "Echec de la reinitialisation", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    } finally {
+      setGameResetLoadingId(null);
+      setGameResetConfirmId(null);
+    }
+  };
+
+  const setGameScore = async (uid: string, username: string) => {
+    const token = getAccessToken();
+    if (!token) return;
+    const score = parseInt(gameSetScore, 10);
+    if (isNaN(score) || score < 0) {
+      toast({ title: "Erreur", description: "Score invalide", variant: "destructive" });
+      return;
+    }
+    setGameSetLoadingId(uid);
+    try {
+      const res = await fetch(`/api/admin/game/set/${uid}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ score, username }),
+      });
+      if (res.ok) {
+        toast({ title: "Score defini", description: `Score et credits mis a jour pour ${username}.` });
+        setGameSetOpenId(null);
+        setGameSetScore("");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Erreur", description: err.message || "Echec", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    } finally {
+      setGameSetLoadingId(null);
     }
   };
 
@@ -961,6 +1020,46 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
                       )
                     )}
                   </div>
+                </div>
+                {/* Game Management Row */}
+                <div className="border-t border-border/30 pt-2 mt-1 flex flex-col gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1"><Gamepad2 className="w-3 h-3" /> Jeu :</span>
+                    {gameResetConfirmId === u.id ? (
+                      <div className="flex items-center gap-1">
+                        <Button variant="destructive" size="sm" onClick={() => resetGameData(u.id)} disabled={gameResetLoadingId === u.id} data-testid={`button-confirm-game-reset-${u.id}`}>
+                          {gameResetLoadingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><RefreshCw className="w-3 h-3 mr-1" /> Confirmer reset</>}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setGameResetConfirmId(null)} data-testid={`button-cancel-game-reset-${u.id}`}>
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => { setGameResetConfirmId(u.id); setGameSetOpenId(null); }} data-testid={`button-game-reset-${u.id}`}>
+                        <RefreshCw className="w-3 h-3 mr-1" /> Reset Score & Credits
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" className="text-xs h-7 px-2" onClick={() => { setGameSetOpenId(gameSetOpenId === u.id ? null : u.id); setGameResetConfirmId(null); setGameSetScore(""); }} data-testid={`button-game-set-${u.id}`}>
+                      <Wrench className="w-3 h-3 mr-1" /> {gameSetOpenId === u.id ? "Fermer" : "Définir Score & Credits"}
+                    </Button>
+                  </div>
+                  {gameSetOpenId === u.id && (
+                    <div className="flex items-center gap-2 pl-16 flex-wrap">
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="Score (ex: 500)"
+                        value={gameSetScore}
+                        onChange={(e) => setGameSetScore(e.target.value)}
+                        className="w-40 h-7 text-xs"
+                        data-testid={`input-game-score-${u.id}`}
+                      />
+                      <Button size="sm" className="h-7 text-xs" onClick={() => setGameScore(u.id, displayName)} disabled={gameSetLoadingId === u.id} data-testid={`button-game-set-save-${u.id}`}>
+                        {gameSetLoadingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Save className="w-3 h-3 mr-1" /> Appliquer</>}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">Credits = score / 60 (max 20 par partie)</span>
+                    </div>
+                  )}
                 </div>
               </Card>
             );

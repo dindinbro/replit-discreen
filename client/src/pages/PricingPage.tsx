@@ -89,7 +89,29 @@ const PLANS = [
       "Username OSINT illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
+      { text: "Agent DisX IA", excluded: true },
+    ],
+  },
+  {
+    id: "business",
+    name: "Business",
+    subtitle: "Pour les equipes et pros",
+    price: 24.99,
+    lifetimePrice: 249.99,
+    icon: Shield,
+    popular: false,
+    features: [
+      "500 recherches par jour",
+      "Gaming, Email/IP",
+      "Recherches Discord / Externes",
+      "Acces toutes les bases",
+      "Recherche avancee Discreen",
+      "Google OSINT illimite",
+      "Username OSINT illimite",
+      "Moteur de recherche Wanted",
+      "Parrainage",
       { text: "Agent DisX IA", available: true, isNew: true },
+      "Support prioritaire",
     ],
   },
   {
@@ -443,7 +465,7 @@ export default function PricingPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className={`grid grid-cols-1 sm:grid-cols-2 ${isLifetime ? "lg:grid-cols-3 max-w-4xl mx-auto" : "lg:grid-cols-4"} gap-5 mb-16`}
+          className={`grid grid-cols-1 sm:grid-cols-2 ${isLifetime ? "lg:grid-cols-4" : "lg:grid-cols-3 xl:grid-cols-5"} gap-5 mb-16`}
         >
           {PLANS.filter((plan) => !(isLifetime && plan.price === 0)).map((plan) => {
             const Icon = plan.icon;

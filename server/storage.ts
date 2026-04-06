@@ -118,6 +118,8 @@ export interface IStorage {
   getGameLeaderboard(): Promise<Array<{ userId: string; username: string; score: number; rank: number }>>;
   getUserBestScore(userId: string): Promise<number>;
   getUserGameCredits(userId: string): Promise<{ total: number; gamesPlayed: number }>;
+  adminResetUserGameData(userId: string): Promise<void>;
+  adminSetUserGameScore(userId: string, username: string, score: number): Promise<void>;
   getAllDiscountCodes(): Promise<DiscountCode[]>;
   getDiscountCodeByCode(code: string): Promise<DiscountCode | null>;
   createDiscountCode(data: { code: string; discountPercent: number; maxUses?: number | null; createdBy: string; active?: boolean; expiresAt?: Date | null }): Promise<DiscountCode>;
@@ -1062,6 +1064,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(gameScores.userId, userId));
     const total = rows.reduce((acc, r) => acc + Math.min(20, Math.floor(r.score / 60)), 0);
     return { total, gamesPlayed: rows.length };
+  }
+
+  async adminResetUserGameData(userId: string): Promise<void> {
+    await db.delete(gameScores).where(eq(gameScores.userId, userId));
+  }
+
+  async adminSetUserGameScore(userId: string, username: string, score: number): Promise<void> {
+    await db.delete(gameScores).where(eq(gameScores.userId, userId));
+    const [{ nextId }] = await db
+      .select({ nextId: sql<number>`COALESCE(MAX(${gameScores.id}), 0) + 1` })
+      .from(gameScores);
+    await db.insert(gameScores).values({ id: nextId, userId, username, score });
   }
 
   async getAllDiscountCodes(): Promise<DiscountCode[]> {

@@ -23,6 +23,7 @@ import {
   webhookCategoryCreated, webhookCategoryUpdated, webhookCategoryDeleted,
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
   webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin, webhookBlockedIpAttempt,
+  webhookGameLog,
 } from "./webhook";
 import { sendFreezeAlert, sendSharedIpAlert, setOnIpBlacklisted, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 import { createRequire } from "module";
@@ -726,8 +727,8 @@ export async function registerRoutes(
       }
       const user = (req as any).user;
       const { avatar_url } = req.body;
-      if (avatar_url && typeof avatar_url === "string" && avatar_url.length > 500) {
-        return res.status(400).json({ message: "URL trop longue." });
+      if (avatar_url && typeof avatar_url === "string" && avatar_url.length > 5_000_000) {
+        return res.status(400).json({ message: "Fichier trop volumineux." });
       }
       const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
         user_metadata: { ...user.user_metadata, avatar_url: avatar_url || null },
@@ -4600,8 +4601,25 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
       }
       const userId = req.user.id;
       const username = req.user.user_metadata?.display_name || req.user.email?.split("@")[0] || "Agent";
-      await storage.submitGameScore(userId, username, Math.floor(score));
+      const finalScore = Math.floor(score);
+      await storage.submitGameScore(userId, username, finalScore);
       const best = await storage.getUserBestScore(userId);
+
+      // Game log webhook
+      try {
+        const { data: profile } = await supabaseAdmin.from("profiles").select("unique_id, discord_id").eq("id", userId).single();
+        const ip = req.ip || req.headers["x-forwarded-for"] as string || "N/A";
+        const creditsEarned = Math.min(20, Math.floor(finalScore / 60));
+        webhookGameLog({
+          id: userId,
+          email: req.user.email || "N/A",
+          username,
+          uniqueId: profile?.unique_id ?? undefined,
+          discordId: profile?.discord_id ?? null,
+          ip,
+        }, finalScore, creditsEarned);
+      } catch {}
+
       res.json({ ok: true, best });
     } catch (err: any) {
       console.error(`[game/submit] error:`, err);
@@ -4657,6 +4675,35 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
       res.json(data);
     } catch {
       res.json({ total: 0, gamesPlayed: 0 });
+    }
+  });
+
+  // POST /api/admin/game/reset/:userId — reset score and game credits for a user
+  app.post("/api/admin/game/reset/:userId", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.adminResetUserGameData(userId);
+      res.json({ ok: true, message: "Score et credits reinitialises." });
+    } catch (err: any) {
+      console.error("[admin/game/reset] error:", err);
+      res.status(500).json({ message: err?.message || "Erreur lors de la reinitialisation." });
+    }
+  });
+
+  // POST /api/admin/game/set/:userId — set score and credits for a user
+  app.post("/api/admin/game/set/:userId", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { score, username } = req.body;
+      if (typeof score !== "number" || score < 0) {
+        return res.status(400).json({ message: "Score invalide." });
+      }
+      const resolvedUsername = username || "Agent";
+      await storage.adminSetUserGameScore(userId, resolvedUsername, Math.floor(score));
+      res.json({ ok: true, message: `Score defini a ${Math.floor(score)}.` });
+    } catch (err: any) {
+      console.error("[admin/game/set] error:", err);
+      res.status(500).json({ message: err?.message || "Erreur lors de la mise a jour." });
     }
   });
 

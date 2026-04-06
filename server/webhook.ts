@@ -6,6 +6,19 @@ function getSearchWebhookUrl(): string | undefined {
   return process.env.DISCORD_SEARCH_WEBHOOK_URL;
 }
 
+function getGameWebhookUrl(): string | undefined {
+  return process.env.DISCORD_GAME_WEBHOOK_URL;
+}
+
+async function sendGameWebhook(options: WebhookOptions): Promise<void> {
+  const url = getGameWebhookUrl();
+  if (!url) {
+    console.warn("[webhook] DISCORD_GAME_WEBHOOK_URL not set, skipping game log");
+    return;
+  }
+  await sendToWebhook(url, options, "game");
+}
+
 interface WebhookOptions {
   title: string;
   description?: string;
@@ -842,5 +855,34 @@ export function webhookAbnormalActivity(user: UserInfo, searchCount: number, lim
     description: desc,
     color: COLORS.security,
     content: `<@&${ALERT_ROLE_ID}>`,
+  });
+}
+
+export function webhookGameLog(user: UserInfo & { ip?: string }, score: number, creditsEarned: number) {
+  const lines = [
+    `>>> **Partie Terminee**`,
+    `**Nom d'utilisateur** : \`${user.username || "N/A"}\``,
+    `**ID Unique** : \`#${user.uniqueId ?? "N/A"}\``,
+    `**Email** : \`${user.email}\``,
+  ];
+
+  if (user.discordId) {
+    lines.push(`**Discord** : <@${user.discordId}> (\`${user.discordId}\`)`);
+  } else {
+    lines.push(`**Discord** : Non lie`);
+  }
+
+  if (user.ip) {
+    lines.push(`**IP** : \`${user.ip}\``);
+  }
+
+  lines.push(`\u200B`);
+  lines.push(`**Score** : **${score}**`);
+  lines.push(`**Credits gagnes** : **${creditsEarned}**`);
+
+  sendGameWebhook({
+    title: "\u{1F3AE} STING.EXE — Log de Jeu",
+    description: lines.join("\n"),
+    color: 0xd4a843,
   });
 }

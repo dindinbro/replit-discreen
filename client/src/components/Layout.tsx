@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -10,6 +10,7 @@ import {
   Key, FileText, Menu, X, Star, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
   Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen, BotMessageSquare, Sword,
+  Camera,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -177,11 +178,62 @@ function navigateSearchMode(href: string) {
 
 /* ── Layout ──────────────────────────────────────────────── */
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, role, frozen, signOut, displayName, avatarUrl, uniqueId } = useAuth();
+  const { user, role, frozen, signOut, displayName, avatarUrl, uniqueId, getAccessToken, refreshRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleAvatarFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image trop volumineuse (max 5MB)");
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const canvas = document.createElement("canvas");
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          const maxSize = 256;
+          let { width, height } = img;
+          if (width > height) {
+            if (width > maxSize) { height = Math.round((height * maxSize) / width); width = maxSize; }
+          } else {
+            if (height > maxSize) { width = Math.round((width * maxSize) / height); height = maxSize; }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve();
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+      URL.revokeObjectURL(objectUrl);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+      const token = getAccessToken();
+      if (!token) return;
+      const res = await fetch("/api/profile/avatar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ avatar_url: dataUrl }),
+      });
+      if (res.ok) {
+        await refreshRole();
+      }
+    } catch {
+    } finally {
+      setAvatarUploading(false);
+      if (avatarFileInputRef.current) avatarFileInputRef.current.value = "";
+    }
+  }, [getAccessToken, refreshRole]);
 
   // Track window.location.search reactively so sidebar active state updates on popstate
   const [currentSearch, setCurrentSearch] = useState(() =>
@@ -336,6 +388,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Profile card */}
       {user ? (
+        <>
+          <input
+            ref={avatarFileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarFileChange}
+            data-testid="input-avatar-file"
+          />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -346,8 +407,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               {!collapsed ? (
                 <>
-                  <div className="w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden">
+                  <div
+                    className="relative w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden group cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); avatarFileInputRef.current?.click(); }}
+                    title="Changer la photo de profil"
+                    data-testid="button-avatar-change"
+                  >
                     {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-6 h-6 text-primary" />}
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                      {avatarUploading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Camera className="w-5 h-5 text-white" />
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
@@ -363,8 +436,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {userHandle && <span className="text-[11px] text-muted-foreground/60">@{userHandle}</span>}
                 </>
               ) : (
-                <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden">
+                <div
+                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden group cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); avatarFileInputRef.current?.click(); }}
+                  title="Changer la photo de profil"
+                >
                   {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-primary" />}
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                    <Camera className="w-3 h-3 text-white" />
+                  </div>
                 </div>
               )}
             </button>
@@ -390,6 +470,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </>
       ) : (
         <div className={`shrink-0 border-b border-border/20 ${collapsed ? "py-3 flex justify-center" : "py-4 px-4"}`}>
           <Link href="/login">
