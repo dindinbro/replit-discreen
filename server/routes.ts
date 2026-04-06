@@ -505,11 +505,18 @@ export async function registerRoutes(
         const username = meta.display_name || meta.full_name || user.email?.split("@")[0];
         const isBypassed = sub.id ? await isUserBypassed(sub.id) : false;
 
+        // Fetch stored username from users table for accurate display name
+        let storedUsername = username;
+        try {
+          const dbUser = await storage.getUserByUserId(user.id);
+          if (dbUser?.username) storedUsername = dbUser.username;
+        } catch (_) {}
+
         // Persist login log to database
         await storage.createLoginLog({
           userId: user.id,
           email: user.email || undefined,
-          username,
+          username: storedUsername,
           ip,
           userAgent,
           provider,
@@ -517,14 +524,13 @@ export async function registerRoutes(
           discordId: sub.discordId || undefined,
         });
 
-        if (!isBypassed) {
-          webhookSessionLogin(
-            { id: user.id, email: user.email || "", username, uniqueId: sub.id },
-            ip,
-            userAgent,
-            sub.discordId,
-          );
-        }
+        // Always log every connection regardless of bypass status
+        webhookSessionLogin(
+          { id: user.id, email: user.email || "", username: storedUsername, uniqueId: sub.id },
+          ip,
+          userAgent,
+          sub.discordId,
+        );
       } catch (webhookErr) {
         console.error("Session login webhook error:", webhookErr);
       }
