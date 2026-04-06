@@ -87,10 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (userData?.user) setUser(userData.user);
         }
 
-        if (!sessionRegisteredRef.current) {
-          const ok = await registerSession(accessToken);
-          if (ok) sessionRegisteredRef.current = true;
-        }
+        // Session registration is handled directly in onAuthStateChange
       } else {
         setRole("user");
         setFrozen(false);
@@ -128,6 +125,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.access_token) {
+        // Register session here, independently of /api/me — ensures logs fire
+        // even if /api/me fails (e.g. brand new account, race condition)
+        if (!sessionRegisteredRef.current) {
+          registerSession(newSession.access_token).then(ok => {
+            if (ok) sessionRegisteredRef.current = true;
+          });
+        }
         fetchRole(newSession.access_token).then(resolveLoading);
       } else {
         setRole(null);
