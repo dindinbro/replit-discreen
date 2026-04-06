@@ -526,20 +526,19 @@ export async function registerRoutes(
           if (dbUser?.username) storedUsername = dbUser.username;
         } catch (_) {}
 
-        // Persist login log to database
-        await storage.createLoginLog({
-          userId: user.id,
-          email: user.email || undefined,
-          username: storedUsername,
-          ip,
-          userAgent,
-          provider,
-          tier: sub.tier || "free",
-          discordId: sub.discordId || undefined,
-        });
-
-        // Log every non-bypassed user connection
+        // No logs at all for bypassed users (admins / whitelist)
         if (!isBypassed) {
+          await storage.createLoginLog({
+            userId: user.id,
+            email: user.email || undefined,
+            username: storedUsername,
+            ip,
+            userAgent,
+            provider,
+            tier: sub.tier || "free",
+            discordId: sub.discordId || undefined,
+          });
+
           webhookSessionLogin(
             { id: user.id, email: user.email || "", username: storedUsername, uniqueId: sub.id },
             ip,

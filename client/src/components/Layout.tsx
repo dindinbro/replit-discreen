@@ -390,6 +390,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {user ? (
         <>
           <input
+            id="avatar-file-upload"
             ref={avatarFileInputRef}
             type="file"
             accept="image/*"
@@ -407,9 +408,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               {!collapsed ? (
                 <>
-                  <div
+                  <label
+                    htmlFor="avatar-file-upload"
                     className="relative w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden group cursor-pointer"
-                    onClick={(e) => { e.stopPropagation(); avatarFileInputRef.current?.click(); }}
+                    onClick={(e) => e.stopPropagation()}
                     title="Changer la photo de profil"
                     data-testid="button-avatar-change"
                   >
@@ -421,7 +423,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         <Camera className="w-5 h-5 text-white" />
                       )}
                     </div>
-                  </div>
+                  </label>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
                     {uniqueId && (
@@ -436,16 +438,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {userHandle && <span className="text-[11px] text-muted-foreground/60">@{userHandle}</span>}
                 </>
               ) : (
-                <div
+                <label
+                  htmlFor="avatar-file-upload"
                   className="relative w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden group cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); avatarFileInputRef.current?.click(); }}
+                  onClick={(e) => e.stopPropagation()}
                   title="Changer la photo de profil"
                 >
                   {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-primary" />}
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
                     <Camera className="w-3 h-3 text-white" />
                   </div>
-                </div>
+                </label>
               )}
             </button>
           </DropdownMenuTrigger>
