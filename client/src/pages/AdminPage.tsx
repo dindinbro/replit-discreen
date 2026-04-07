@@ -3273,24 +3273,47 @@ function NotificationsSection({ getAccessToken }: { getAccessToken: () => string
       </Card>
 
       <Card className="p-5 space-y-4">
-        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Aperçu des notifications</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Aperçu & test</h3>
+          <p className="text-[10px] text-muted-foreground">Cliquez "Tester" pour déclencher un popup en direct</p>
+        </div>
         <div className="space-y-2">
           {TIER_PREVIEW.map(({ tier, label, color }) => (
             <div
               key={tier}
-              className="flex items-center gap-3 px-4 py-2.5 rounded-xl max-w-xs"
-              style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${color}40` }}
+              className="flex items-center gap-3"
             >
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}15`, border: `1px solid ${color}40` }}>
-                <Sparkles className="w-3.5 h-3.5" style={{ color }} />
+              <div
+                className="flex items-center gap-3 px-4 py-2.5 rounded-xl flex-1"
+                style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${color}40` }}
+              >
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}15`, border: `1px solid ${color}40` }}>
+                  <Sparkles className="w-3.5 h-3.5" style={{ color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground leading-tight">
+                    Nouveau membre <span style={{ color }}>{label}</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">À l'instant · discreen.site</p>
+                </div>
+                <span className="text-[10px] text-muted-foreground shrink-0">il y a 1 min</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-foreground leading-tight">
-                  Nouveau membre <span style={{ color }}>{label}</span>
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">À l'instant · discreen.site</p>
-              </div>
-              <span className="text-[10px] text-muted-foreground shrink-0">il y a 1 min</span>
+              <button
+                onClick={async () => {
+                  const token = getAccessToken();
+                  await fetch("/api/admin/test-toast", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ tier }),
+                  });
+                  window.dispatchEvent(new CustomEvent("discreen:refetch-activity"));
+                  toast({ title: `Notification ${label} envoyée`, description: "Le popup devrait apparaître dans quelques secondes." });
+                }}
+                className="shrink-0 text-xs font-semibold px-3 py-2 rounded-lg transition-all hover:opacity-80"
+                style={{ background: `${color}15`, color, border: `1px solid ${color}35` }}
+              >
+                Tester
+              </button>
             </div>
           ))}
         </div>

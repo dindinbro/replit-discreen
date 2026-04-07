@@ -144,7 +144,15 @@ export default function SubscriptionToastProvider() {
     fetchActivity();
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(fetchActivity, config.pollIntervalSec * 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+
+    // Listen for admin test trigger → immediate refetch
+    const onTestTrigger = () => fetchActivity();
+    window.addEventListener("discreen:refetch-activity", onTestTrigger);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      window.removeEventListener("discreen:refetch-activity", onTestTrigger);
+    };
   }, [config.enabled, config.pollIntervalSec, config.maxVisible]);
 
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));

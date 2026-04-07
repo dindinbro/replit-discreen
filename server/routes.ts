@@ -1254,12 +1254,28 @@ export async function registerRoutes(
     } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
   });
 
+  // In-memory test toast queue (expires after 90s)
+  const testToastQueue: { tier: string; createdAt: Date; expiresAt: number }[] = [];
+
   // Public: GET /api/status/recent-activity — recent subscription activity for popups
   app.get("/api/status/recent-activity", async (_req, res) => {
     try {
       const activity = await storage.getRecentSubscriptionActivity();
-      res.json(activity);
+      const now = Date.now();
+      const testItems = testToastQueue.filter(t => t.expiresAt > now).map(t => ({ tier: t.tier, createdAt: t.createdAt }));
+      // Remove expired
+      for (let i = testToastQueue.length - 1; i >= 0; i--) {
+        if (testToastQueue[i].expiresAt <= now) testToastQueue.splice(i, 1);
+      }
+      res.json([...testItems, ...activity]);
     } catch { res.json([]); }
+  });
+
+  // Admin: POST /api/admin/test-toast — inject a test notification
+  app.post("/api/admin/test-toast", requireAuth, requireAdmin, async (req, res) => {
+    const tier = req.body.tier ?? "vip";
+    testToastQueue.push({ tier, createdAt: new Date(), expiresAt: Date.now() + 90_000 });
+    res.json({ ok: true, tier });
   });
 
   // Admin CRUD: service status
