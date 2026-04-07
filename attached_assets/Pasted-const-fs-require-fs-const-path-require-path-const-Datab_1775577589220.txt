@@ -1,0 +1,92 @@
+const fs = require("fs");
+const path = require("path");
+const Database = require("better-sqlite3");
+
+const INPUT_DIR = "D:\\DB\\off";
+const OUTPUT_DB = "D:\\DB\\off\\indexed.db";
+
+const db = new Database(OUTPUT_DB);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS players (
+    id          INTEGER PRIMARY KEY,
+    license     TEXT,
+    steam_id    TEXT,
+    steam_url   TEXT,
+    discord_id  TEXT,
+    live_id     TEXT,
+    username    TEXT,
+    ip          TEXT,
+    date        TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_license    ON players(license);
+  CREATE INDEX IF NOT EXISTS idx_discord_id ON players(discord_id);
+  CREATE INDEX IF NOT EXISTS idx_username   ON players(username);
+  CREATE INDEX IF NOT EXISTS idx_ip         ON players(ip);
+  CREATE INDEX IF NOT EXISTS idx_steam_id   ON players(steam_id);
+`);
+
+const insert = db.prepare(`
+  INSERT OR IGNORE INTO players (id, license, steam_id, steam_url, discord_id, live_id, username, ip, date)
+  VALUES (@id, @license, @steam_id, @steam_url, @discord_id, @live_id, @username, @ip, @date)
+`);
+
+const insertMany = db.transaction((rows) => {
+  for (const row of rows) insert.run(row);
+});
+
+const files = fs.readdirSync(INPUT_DIR).filter(f => f.endsWith(".txt"));
+console.log(`📂 ${files.length} fichier(s) trouvé(s) dans ${INPUT_DIR}\n`);
+
+let totalCount = 0;
+
+for (const file of files) {
+  const filePath = path.join(INPUT_DIR, file);
+  const lines = fs.readFileSync(filePath, "utf8").split("\n");
+  let batch = [], fileCount = 0;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("(")) continue;
+
+    const tokens = [];
+    const re = /(\d+)|'((?:[^'\\]|\\.)*)'/g;
+    let m;
+    while ((m = re.exec(trimmed)) !== null) {
+      tokens.push(m[1] !== undefined ? m[1] : m[2]);
+    }
+    if (tokens.length < 11) continue;
+
+    const [id, license, steamRaw, , discordRaw, live, , username, ipRaw, , date] = tokens;
+
+    batch.push({
+      id:         parseInt(id),
+      license:    license,
+      steam_id:   (steamRaw.match(/^\[([^\]]+)\]/) || [])[1] || steamRaw,
+      steam_url:  (steamRaw.match(/\(([^)]+)\)$/) || [])[1] || "",
+      discord_id: (discordRaw.match(/<@(\d+)>/) || [])[1] || discordRaw,
+      live_id:    live === "unknown" ? "" : live,
+      username:   username,
+      ip:         (ipRaw.match(/^\[([^\]]+)\]/) || [])[1] || ipRaw,
+      date:       date,
+    });
+
+    if (batch.length >= 5000) {
+      insertMany(batch);
+      fileCount += batch.length;
+      batch = [];
+      process.stdout.write(`\r  ⏳ [${file}] ${fileCount} lignes...`);
+    }
+  }
+
+  if (batch.length) {
+    insertMany(batch);
+    fileCount += batch.length;
+  }
+
+  totalCount += fileCount;
+  console.log(`\r  ✅ [${file}] ${fileCount} lignes indexées`);
+}
+
+db.close();
+console.log(`\n🎉 Total : ${totalCount} lignes → ${OUTPUT_DB}`);
