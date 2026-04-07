@@ -554,68 +554,77 @@ function MiniResultCard({
       return pa - pb;
     });
 
-  const titleField = visibleFields.find(([k]) => {
-    const key = k.toLowerCase();
-    return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
-  });
-
-  const subtitleField = visibleFields.find(([k]) => {
-    const key = k.toLowerCase();
-    return ["ip", "telephone", "phone", "discord", "pseudo"].includes(key) && titleField?.[0] !== k;
-  });
-
   const score = computeRelevanceScore(row, globalIndex, searchTerms);
   const scoreColor = score === 100 ? "#d4a843" : score >= 80 ? "#d4a843" : score >= 60 ? "#f59e0b" : "#6b7280";
   const fieldCount = visibleFields.filter(([k]) => k.toLowerCase() !== "source").length;
 
+  // Pick up to 3 meaningful fields to show inline
+  const LABEL_MAP: Record<string, string> = {
+    email: "Email", mail: "Email", identifiant: "ID",
+    username: "Pseudo", nom: "Nom", name: "Nom", last_name: "Nom", lastname: "Nom", surname: "Nom",
+    telephone: "Tél.", phone: "Tél.", ip: "IP",
+    discord: "Discord", pseudo: "Pseudo", password: "Pass", hash: "Hash",
+    date: "Date", created_at: "Date",
+  };
+  const PRIORITY_KEYS = ["email","mail","username","nom","name","identifiant","pseudo","telephone","phone","ip","discord","date","created_at","hash","password"];
+  const inlineFields = visibleFields
+    .filter(([k]) => PRIORITY_KEYS.includes(k.toLowerCase()) && cleanFieldValue((row as any)[k]))
+    .sort(([a],[b]) => PRIORITY_KEYS.indexOf(a.toLowerCase()) - PRIORITY_KEYS.indexOf(b.toLowerCase()))
+    .slice(0, 3);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: (globalIndex % 20) * 0.025, duration: 0.2 }}
-      whileHover={{ y: -3, transition: { duration: 0.15 } }}
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: (globalIndex % 20) * 0.03, duration: 0.22, ease: [0.22,1,0.36,1] }}
       onClick={onClick}
-      className="card-premium rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(212,168,67,0.45)] transition-all select-none group relative"
+      className="group relative flex items-stretch rounded-xl border border-[rgba(255,255,255,0.06)] bg-[rgba(8,8,10,0.6)] hover:border-[rgba(212,168,67,0.3)] hover:bg-[rgba(212,168,67,0.025)] transition-all duration-200 cursor-pointer overflow-hidden select-none"
       data-testid={`mini-card-result-${globalIndex}`}
     >
-      {/* top accent line on hover */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[rgba(212,168,67,0)] to-transparent group-hover:via-[rgba(212,168,67,0.6)] transition-all duration-300" />
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-[rgba(212,168,67,0)] via-[rgba(212,168,67,0)] to-[rgba(212,168,67,0)] group-hover:from-[rgba(212,168,67,0.7)] group-hover:via-[rgba(212,168,67,0.35)] group-hover:to-[rgba(212,168,67,0)] transition-all duration-300" />
 
-      <div className="p-5 flex flex-col gap-4">
-        {/* Header: index + score */}
-        <div className="flex items-center justify-between gap-2">
-          <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(212,168,67,0.08)] text-xs font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
-            {globalIndex + 1}
-          </span>
-          <span
-            className="text-[11px] font-mono font-bold px-2 py-1 rounded-md border"
-            style={{ color: scoreColor, borderColor: `${scoreColor}55`, background: `${scoreColor}10` }}
-          >
-            {score}%
-          </span>
-        </div>
+      <div className="flex items-center gap-4 px-5 py-4 w-full pl-6">
+        {/* Index badge */}
+        <span className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-[#d4a843] bg-[rgba(212,168,67,0.07)] border border-[rgba(212,168,67,0.18)]">
+          {globalIndex + 1}
+        </span>
 
-        {/* Main info */}
-        <div className="min-w-0 space-y-1.5">
-          <p className="text-sm font-semibold text-foreground truncate leading-snug" data-testid={`mini-text-title-${globalIndex}`}>
-            {titleField ? cleanFieldValue(titleField[1]) : `Résultat ${globalIndex + 1}`}
-          </p>
-          {subtitleField && (
-            <p className="text-xs text-muted-foreground/80 truncate font-mono">
-              {cleanFieldValue(subtitleField[1])}
-            </p>
+        {/* Fields */}
+        <div className="flex-1 min-w-0 flex flex-wrap gap-x-6 gap-y-1.5">
+          {inlineFields.length > 0 ? inlineFields.map(([key, val]) => {
+            const label = LABEL_MAP[key.toLowerCase()] ?? key;
+            const value = cleanFieldValue(val);
+            return (
+              <div key={key} className="min-w-0 flex-shrink-0" style={{ maxWidth: "220px" }}>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/40 mb-0.5">{label}</p>
+                <p className="text-[13px] font-medium text-foreground/90 truncate font-mono leading-snug" data-testid={`mini-text-title-${globalIndex}`}>
+                  {value}
+                </p>
+              </div>
+            );
+          }) : (
+            <div className="min-w-0">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/40 mb-0.5">Résultat</p>
+              <p className="text-[13px] font-medium text-foreground/90 font-mono">{globalIndex + 1}</p>
+            </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-[rgba(255,255,255,0.06)]">
-          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
-            <span className="w-1.5 h-1.5 rounded-full bg-[rgba(212,168,67,0.5)]" />
+        {/* Right side */}
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
             {fieldCount} champ{fieldCount > 1 ? "s" : ""}
           </span>
-          <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50 group-hover:text-[#d4a843] transition-colors duration-200">
+          <span
+            className="text-[11px] font-mono font-bold px-2 py-1 rounded border min-w-[46px] text-center"
+            style={{ color: scoreColor, borderColor: `${scoreColor}40`, background: `${scoreColor}0e` }}
+          >
+            {score}%
+          </span>
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground/35 group-hover:text-[#d4a843] transition-colors duration-200 whitespace-nowrap">
             <Eye className="w-3.5 h-3.5" />
-            Voir tout
+            <span className="hidden md:inline">Voir</span>
           </span>
         </div>
       </div>
@@ -2920,7 +2929,7 @@ export default function SearchPage() {
                         </Button>
                       </div>
                     )}
-                    <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
+                    <div className={`grid grid-cols-1 xl:grid-cols-2 gap-2.5 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
                     {activeResults.map((row, idx) => {
                       const gi = ((searchMode === "internal" || searchMode === "fivem") ? page * pageSize : 0) + idx;
                       return (

@@ -106,14 +106,14 @@ const SEARCH_MODULES: NavItem[] = [
   { label: "Gaming",         href: "/search?mode=fivem",     icon: Gamepad2,       badge: "VIP", badgeColor: "blue" },
   { label: "Google OSINT",   href: "/search?mode=xeuledoc",  icon: FileSearch,     badge: "PRO", badgeColor: "red" },
   { label: "Wanted",         href: "/search?mode=wanted",    icon: ShieldAlert,    badge: "PRO", badgeColor: "red" },
-  { label: "DisX IA",        href: "/disx",                  icon: BotMessageSquare, badge: "PRO", badgeColor: "red" },
+  { label: "DisX IA",        href: "/disx",                  icon: BotMessageSquare, badge: "PRO",  badgeColor: "red" },
+  { label: "Telegram Lookup", href: "/search?mode=telegram", icon: Send,             disabled: true, comingSoon: true, adminOnly: true },
 ];
 
 const LOOKUP_MODULES: NavItem[] = [
-  { label: "Téléphone",        href: "/search?mode=phone",     icon: Phone },
-  { label: "GeoIP",            href: "/search?mode=geoip",     icon: MapPin },
-  { label: "NIR",              href: "/search?mode=nir",       icon: Hash },
-  { label: "Telegram Lookup",  href: "/search?mode=telegram",  icon: Send, disabled: true, comingSoon: true, adminOnly: true },
+  { label: "Téléphone", href: "/search?mode=phone", icon: Phone },
+  { label: "GeoIP",     href: "/search?mode=geoip", icon: MapPin },
+  { label: "NIR",       href: "/search?mode=nir",   icon: Hash },
 ];
 
 const NAV_SECTIONS: NavSection[] = [
