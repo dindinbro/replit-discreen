@@ -1,4 +1,3 @@
-import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +37,8 @@ import {
   ScanLine,
   AlertTriangle,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -153,6 +153,18 @@ const HIGHLIGHTS = [
   { icon: Shield, label: "Paiements securises" },
 ];
 
+const OSINT_TOOLS = [
+  { icon: Database,   name: "LeakOSINT",          price: 29,  note: "30M+ fuites de données indexées",  highlight: false },
+  { icon: Lock,       name: "Dehashed",            price: 20,  note: "Moteur de recherche de leaks",     highlight: false },
+  { icon: Globe,      name: "IntelligenceX",       price: 50,  note: "OSINT multi-sources avancé",       highlight: true  },
+  { icon: UserSearch, name: "Maltego Pro",         price: 125, note: "Graphe de connexions OSINT",       highlight: true  },
+  { icon: Eye,        name: "Sherlock API Pro",    price: 15,  note: "Username · 400+ plateformes",      highlight: false },
+  { icon: Wifi,       name: "Shodan Pro",          price: 49,  note: "Intelligence IP & infrastructure", highlight: false },
+  { icon: ScanLine,   name: "NumVerify Pro",       price: 25,  note: "Lookup téléphone international",   highlight: false },
+  { icon: FileSearch, name: "Hunter.io Pro",       price: 30,  note: "Recherche email & domaine",        highlight: false },
+];
+const OSINT_TOTAL = OSINT_TOOLS.reduce((s, t) => s + t.price, 0);
+
 const containerVariants = {
   hidden: {},
   visible: {
@@ -169,6 +181,172 @@ const cardVariants = {
     transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
   },
 };
+
+function PricingIntro({ onDone }: { onDone: () => void }) {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [phase, setPhase] = useState<"scanning" | "revealed" | "done">("scanning");
+  const doneRef = useRef(false);
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    OSINT_TOOLS.forEach((tool, i) => {
+      timers.push(setTimeout(() => {
+        setVisibleCount(i + 1);
+        setTotal(prev => prev + tool.price);
+      }, 500 + i * 420));
+    });
+    timers.push(setTimeout(() => setPhase("revealed"), 500 + OSINT_TOOLS.length * 420 + 300));
+    timers.push(setTimeout(() => {
+      setPhase("done");
+      if (!doneRef.current) { doneRef.current = true; onDone(); }
+    }, 500 + OSINT_TOOLS.length * 420 + 2200));
+    return () => timers.forEach(clearTimeout);
+  }, [onDone]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -60, scale: 0.97 }}
+      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      className="relative rounded-2xl overflow-hidden mb-8"
+      style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#050507", minHeight: 420 }}
+    >
+      {/* Scanline overlay */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px)",
+      }} />
+
+      <div className="relative px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-7">
+          <div className="flex gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-red-500/80" />
+            <span className="w-3 h-3 rounded-full bg-yellow-500/60" />
+            <span className="w-3 h-3 rounded-full bg-green-500/40" />
+          </div>
+          <span className="font-mono text-xs text-muted-foreground tracking-widest uppercase select-none">
+            discreen · analyse des coûts
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+            <span className="font-mono text-[10px] text-red-400/80 uppercase tracking-wide">Sans abonnement</span>
+          </div>
+        </div>
+
+        {/* Tool rows */}
+        <div className="space-y-0 font-mono">
+          <div className="flex items-center text-[11px] text-muted-foreground/50 uppercase tracking-wider pb-2 mb-1" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            <span className="w-5" />
+            <span className="flex-1">Outil / Service</span>
+            <span className="w-48 hidden sm:block text-right pr-6">Fonction</span>
+            <span className="w-24 text-right">Coût/mois</span>
+          </div>
+
+          <AnimatePresence>
+            {OSINT_TOOLS.slice(0, visibleCount).map((tool, i) => {
+              const Icon = tool.icon;
+              return (
+                <motion.div
+                  key={tool.name}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="flex items-center py-2.5 text-[13px]"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                >
+                  <div className="w-5 mr-3 shrink-0">
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.15 }}
+                      className="text-[10px] text-muted-foreground/40 font-mono"
+                    >{String(i + 1).padStart(2, "0")}</motion.span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: tool.highlight ? "#ef4444" : "rgba(255,255,255,0.4)" }} />
+                    <span className="font-semibold truncate" style={{ color: tool.highlight ? "#ef4444" : "rgba(255,255,255,0.85)" }}>
+                      {tool.name}
+                    </span>
+                  </div>
+                  <span className="hidden sm:block w-48 text-right pr-6 text-[11px] text-muted-foreground/50 truncate">{tool.note}</span>
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="w-24 text-right font-bold tabular-nums"
+                    style={{ color: tool.highlight ? "#ef4444" : "rgba(255,255,255,0.7)" }}
+                  >
+                    {tool.price}€
+                  </motion.span>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+
+        {/* Running total */}
+        <AnimatePresence>
+          {visibleCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-4 flex items-center justify-between"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 14 }}
+            >
+              <span className="font-mono text-xs text-muted-foreground/60 uppercase tracking-widest">Total mensuel</span>
+              <motion.span
+                key={total}
+                initial={{ scale: 1.15, color: "#ef4444" }}
+                animate={{ scale: 1, color: phase === "revealed" ? "#ef4444" : "rgba(255,255,255,0.9)" }}
+                transition={{ duration: 0.3 }}
+                className="font-mono font-bold text-2xl tabular-nums"
+              >
+                {total}€
+              </motion.span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Discreen reveal */}
+        <AnimatePresence>
+          {phase === "revealed" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl px-5 py-4"
+              style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.25)" }}
+            >
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4" style={{ color: "#d4a843" }} />
+                <span className="font-mono text-sm font-semibold" style={{ color: "#d4a843" }}>
+                  Avec Discreen — tout ça inclus
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="font-mono text-lg font-bold line-through text-red-400/70">{OSINT_TOTAL}€/mois</span>
+                <ArrowRight className="w-4 h-4 text-muted-foreground/40 hidden sm:block" />
+                <span className="font-mono text-2xl font-bold" style={{ color: "#d4a843" }}>6,99€/mois</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Skip button */}
+        <div className="mt-5 flex justify-center">
+          <button
+            onClick={() => { if (!doneRef.current) { doneRef.current = true; onDone(); } }}
+            className="font-mono text-[11px] text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors uppercase tracking-widest"
+          >
+            Passer → voir les tarifs
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function PricingPage() {
   const { t } = useTranslation();
@@ -188,6 +366,7 @@ export default function PricingPage() {
   const handleTiltLeave = useCallback((planId: string) => {
     setTiltStyles(prev => ({ ...prev, [planId]: { rotateX: 0, rotateY: 0, scale: 1 } }));
   }, []);
+  const [showIntro, setShowIntro] = useState(true);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemKey, setRedeemKey] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -469,77 +648,83 @@ export default function PricingPage() {
           </div>
         </motion.div>
 
-        {/* Cost comparison section */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-16 rounded-2xl overflow-hidden"
-          style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(8,8,10,0.7)" }}
-        >
-          <div className="px-6 pt-7 pb-5 text-center">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Pourquoi s'abonner ?</p>
-            <h2 className="text-2xl md:text-3xl font-display font-bold text-white">
-              Coût d'une recherche{" "}
-              <span className="text-muted-foreground line-through decoration-red-500/70">sans Discreen</span>
-            </h2>
-            <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
-              Voilà ce que vous payeriez en accédant à chaque outil séparément.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-[rgba(255,255,255,0.05)]">
-            {[
-              { icon: UserSearch,  name: "Détective privé",           price: "150€/h",   note: "Sans garantie de résultat",  highlight: true },
-              { icon: Globe,       name: "Pipl / Spokeo",             price: "25€/mois",  note: "Base US, limitée en Europe" },
-              { icon: FileSearch,  name: "LinkedIn Premium",          price: "40€/mois",  note: "Profils uniquement" },
-              { icon: Database,    name: "HaveIBeenPwned Pro",        price: "40€/an",    note: "Fuites de données seulement" },
-              { icon: Wifi,        name: "OSINT Framework (outils)",  price: "~30€/mois", note: "Configurations manuelles" },
-              { icon: ScanLine,    name: "Recherche judiciaire",      price: "30€/acte",  note: "Par demande individuelle",   highlight: true },
-              { icon: Lock,        name: "Bases de données privées",  price: "50€/mois",  note: "Accès restreint" },
-              { icon: Eye,         name: "Surveillance réseaux",      price: "35€/mois",  note: "Suivi manuel" },
-            ].map(({ icon: Icon, name, price, note, highlight }) => (
-              <div
-                key={name}
-                className="flex flex-col items-center text-center gap-2 py-5 px-4"
-                style={{ background: highlight ? "rgba(255,60,60,0.04)" : "rgba(8,8,10,0.7)" }}
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-1"
-                  style={{
-                    background: highlight ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.05)",
-                    border: `1px solid ${highlight ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.07)"}`,
-                  }}
-                >
-                  <Icon className="w-4.5 h-4.5" style={{ color: highlight ? "#ef4444" : "rgba(255,255,255,0.45)", width: 18, height: 18 }} />
-                </div>
-                <p className="text-xs text-muted-foreground font-medium leading-tight">{name}</p>
-                <p className="text-lg font-bold" style={{ color: highlight ? "#ef4444" : "rgba(255,255,255,0.85)" }}>{price}</p>
-                <p className="text-[10px] text-muted-foreground/60 leading-tight">{note}</p>
+        {/* Intro animation OR static grid */}
+        <AnimatePresence mode="wait">
+          {showIntro ? (
+            <PricingIntro key="intro" onDone={() => setShowIntro(false)} />
+          ) : (
+            <motion.div
+              key="cost-grid"
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="mb-16 rounded-2xl overflow-hidden"
+              style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(8,8,10,0.7)" }}
+            >
+              <div className="px-6 pt-7 pb-5 text-center">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Pourquoi s'abonner ?</p>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-white">
+                  Ce que ça coûte{" "}
+                  <span className="text-red-400/90 line-through decoration-red-500/40">sans Discreen</span>
+                </h2>
+                <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
+                  Ces outils utilisés séparément, c'est ce que vous payez sans nous.
+                </p>
               </div>
-            ))}
-          </div>
 
-          <div
-            className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4"
-            style={{ background: "rgba(0,0,0,0.4)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
-          >
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-4 h-4 text-red-400/80 shrink-0" />
-              <p className="text-sm text-muted-foreground">
-                Sans Discreen :{" "}
-                <span className="font-bold text-red-400 line-through decoration-red-400/50">+400€/mois</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Shield className="w-4 h-4 shrink-0" style={{ color: "#d4a843" }} />
-              <p className="text-sm font-bold" style={{ color: "#d4a843" }}>
-                Discreen · dès 6,99€/mois — tout inclus
-              </p>
-            </div>
-          </div>
-        </motion.div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-[rgba(255,255,255,0.05)]">
+                {OSINT_TOOLS.map(({ icon: Icon, name, price, note, highlight }) => (
+                  <div
+                    key={name}
+                    className="flex flex-col items-center text-center gap-2 py-5 px-4"
+                    style={{ background: highlight ? "rgba(255,40,40,0.04)" : "rgba(8,8,10,0.7)" }}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center mb-1"
+                      style={{
+                        background: highlight ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.05)",
+                        border: `1px solid ${highlight ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.07)"}`,
+                      }}
+                    >
+                      <Icon style={{ color: highlight ? "#ef4444" : "rgba(255,255,255,0.45)", width: 18, height: 18 }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground font-medium leading-tight">{name}</p>
+                    <p className="text-lg font-bold" style={{ color: highlight ? "#ef4444" : "rgba(255,255,255,0.85)" }}>{price}€/mois</p>
+                    <p className="text-[10px] text-muted-foreground/60 leading-tight">{note}</p>
+                  </div>
+                ))}
+              </div>
 
+              <div
+                className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4"
+                style={{ background: "rgba(0,0,0,0.4)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-4 h-4 text-red-400/80 shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Sans Discreen :{" "}
+                    <span className="font-bold text-red-400">{OSINT_TOTAL}€/mois</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 shrink-0" style={{ color: "#d4a843" }} />
+                  <p className="text-sm font-bold" style={{ color: "#d4a843" }}>
+                    Discreen · dès 6,99€/mois — tout inclus
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {!showIntro && (
+            <motion.div
+              key="plans"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+            >
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -775,6 +960,9 @@ export default function PricingPage() {
             </Button>
           </Card>
         </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <Dialog open={referralOpen} onOpenChange={(open) => { if (!open) { setReferralOpen(false); setPendingPlan(null); setAppliedDiscount(null); } }}>
