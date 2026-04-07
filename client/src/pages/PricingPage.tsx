@@ -97,29 +97,7 @@ const PLANS = [
       "Username OSINT illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
-      { text: "Agent DisX IA", excluded: true },
-    ],
-  },
-  {
-    id: "business",
-    name: "Business",
-    subtitle: "Pour les equipes et pros",
-    price: 24.99,
-    lifetimePrice: 249.99,
-    icon: Shield,
-    popular: false,
-    features: [
-      "500 recherches par jour",
-      "Gaming, Email/IP",
-      "Recherches Discord / Externes",
-      "Acces toutes les bases",
-      "Recherche avancee Discreen",
-      "Google OSINT illimite",
-      "Username OSINT illimite",
-      "Moteur de recherche Wanted",
-      "Parrainage",
       { text: "Agent DisX IA", available: true, isNew: true },
-      "Support prioritaire",
     ],
   },
   {
@@ -351,7 +329,7 @@ function PricingIntro({ onDone }: { onDone: () => void }) {
 export default function PricingPage() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState<string | null>(null);
-  const [pricingMode, setPricingMode] = useState<"monthly" | "lifetime">("monthly");
+  const pricingMode = "monthly" as const;
   const [tiltStyles, setTiltStyles] = useState<Record<string, { rotateX: number; rotateY: number; scale: number }>>({});
 
   const handleTiltMove = useCallback((planId: string, e: React.MouseEvent<HTMLDivElement>) => {
@@ -559,15 +537,9 @@ export default function PricingPage() {
     }
   }
 
-  const isLifetime = pricingMode === "lifetime";
-
   return (
     <main className="relative">
-      <div className={`absolute inset-0 pointer-events-none transition-all duration-700 ${
-        isLifetime
-          ? "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/8 via-background to-background"
-          : "bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background"
-      }`} />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/8 via-background to-background" />
 
       <div className="relative container max-w-7xl mx-auto px-4 py-16 md:py-24">
         <motion.div
@@ -602,50 +574,6 @@ export default function PricingPage() {
               </div>
             ))}
           </motion.div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.4 }}
-          className="flex justify-center mb-10"
-        >
-          <div className="relative flex items-center">
-            <div
-              onClick={() => setPricingMode("monthly")}
-              className={`relative z-10 px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
-                pricingMode === "monthly"
-                  ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105"
-                  : "bg-card text-muted-foreground border-border/50 -mr-3"
-              }`}
-              data-testid="button-pricing-monthly"
-            >
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                <div>
-                  <p className="text-sm font-bold">Mensuel</p>
-                  <p className="text-[10px] opacity-80">Paiement chaque mois</p>
-                </div>
-              </div>
-            </div>
-            <div
-              onClick={() => setPricingMode("lifetime")}
-              className={`relative px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
-                pricingMode === "lifetime"
-                  ? "z-10 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-lg shadow-amber-500/20 scale-105"
-                  : "z-0 bg-card text-muted-foreground border-border/50 -ml-3"
-              }`}
-              data-testid="button-pricing-lifetime"
-            >
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4" />
-                <div>
-                  <p className="text-sm font-bold">Lifetime</p>
-                  <p className="text-[10px] opacity-80">Paiement unique</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </motion.div>
 
         {/* Intro animation OR static grid */}
@@ -729,9 +657,9 @@ export default function PricingPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className={`grid grid-cols-1 sm:grid-cols-2 ${isLifetime ? "lg:grid-cols-4" : "lg:grid-cols-3 xl:grid-cols-5"} gap-5 mb-16`}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-16"
         >
-          {PLANS.filter((plan) => !(isLifetime && plan.price === 0)).map((plan) => {
+          {PLANS.map((plan) => {
             const Icon = plan.icon;
             const isLoading = loading === plan.id;
             const tilt = tiltStyles[plan.id] || { rotateX: 0, rotateY: 0, scale: 1 };
@@ -748,12 +676,10 @@ export default function PricingPage() {
               >
                 <Card
                   className={`relative flex flex-col p-5 h-full overflow-visible transition-all duration-300 ${
-                    plan.popular && isLifetime
+                    plan.popular
                       ? "border-amber-500/50 shadow-[0_0_24px_-6px] shadow-amber-500/15"
-                      : plan.popular
-                      ? "border-primary/50 shadow-[0_0_24px_-6px] shadow-primary/15"
                       : ""
-                  } ${isTilted && isLifetime ? "shadow-xl shadow-amber-500/20 border-amber-500/40" : isTilted ? "shadow-xl shadow-primary/25 border-primary/40" : ""}`}
+                  } ${isTilted ? "shadow-xl shadow-amber-500/20 border-amber-500/40" : ""}`}
                   style={{
                     transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(${tilt.scale}, ${tilt.scale}, ${tilt.scale})`,
                     transition: "transform 0.15s ease-out",
@@ -763,24 +689,16 @@ export default function PricingPage() {
                   data-testid={`card-plan-${plan.id}`}
                 >
                   {plan.popular && (
-                    <Badge
-                      className={`absolute -top-2.5 right-4 text-xs no-default-hover-elevate no-default-active-elevate transition-colors duration-300 ${
-                        isLifetime
-                          ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0"
-                          : "bg-primary text-primary-foreground"
-                      }`}
-                    >
-                      {isLifetime ? "Lifetime" : t("pricing.popular")}
+                    <Badge className="absolute -top-2.5 right-4 text-xs no-default-hover-elevate no-default-active-elevate bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
+                      {t("pricing.popular")}
                     </Badge>
                   )}
 
                   <div className="space-y-3 mb-5">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-300 ${
-                      isLifetime && plan.price > 0 ? "bg-amber-500/10" : "bg-primary/10"
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                      plan.price > 0 ? "bg-amber-500/10" : "bg-primary/10"
                     }`}>
-                      <Icon className={`w-4.5 h-4.5 transition-colors duration-300 ${
-                        isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"
-                      }`} />
+                      <Icon className={`w-4.5 h-4.5 ${plan.price > 0 ? "text-amber-500" : "text-primary"}`} />
                     </div>
 
                     <div>
@@ -789,45 +707,13 @@ export default function PricingPage() {
                     </div>
 
                     <div className="flex items-baseline gap-1.5 flex-wrap">
-                      <span className={`text-2xl font-display font-bold transition-colors duration-300 ${
-                        isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"
-                      }`}>
-                        {plan.price === 0
-                          ? t("pricing.free")
-                          : pricingMode === "monthly"
-                          ? `€${plan.price.toFixed(2)}`
-                          : `€${plan.lifetimePrice.toFixed(2)}`}
+                      <span className={`text-2xl font-display font-bold ${plan.price > 0 ? "text-amber-500" : "text-primary"}`}>
+                        {plan.price === 0 ? t("pricing.free") : `€${plan.price.toFixed(2)}`}
                       </span>
                       {plan.price > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {pricingMode === "monthly" ? t("pricing.perMonth") : "unique"}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{t("pricing.perMonth")}</span>
                       )}
                     </div>
-
-                    {isLifetime && plan.price > 0 && (() => {
-                      const yearlyIfMonthly = plan.price * 12;
-                      const savedPerYear = yearlyIfMonthly - plan.lifetimePrice;
-                      const discountPct = Math.round((1 - plan.lifetimePrice / yearlyIfMonthly) * 100);
-                      return (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-muted-foreground line-through">
-                              €{plan.price.toFixed(2)}/mois
-                            </span>
-                            <span className="text-xs font-bold text-amber-500">
-                              -{discountPct}%
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            €{yearlyIfMonthly.toFixed(2)}/an si mensuel
-                          </p>
-                          <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px] px-2 py-0.5 no-default-hover-elevate no-default-active-elevate">
-                            Économisez €{savedPerYear.toFixed(2)}/an
-                          </Badge>
-                        </div>
-                      );
-                    })()}
                   </div>
 
                   <ul className="space-y-2 mb-6 flex-1">

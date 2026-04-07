@@ -10,7 +10,7 @@ import {
   Key, FileText, Menu, X, Star, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
   Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen, BotMessageSquare, Sword,
-  Camera, Activity,
+  Camera, Activity, Send,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -86,26 +86,34 @@ interface NavItem {
   icon: React.ElementType;
   badge?: string;
   badgeColor?: "gold" | "red" | "blue";
+  disabled?: boolean;
+  comingSoon?: boolean;
+  adminOnly?: boolean;
 }
 
 interface NavSection {
   key: string;
   labelKey?: string;
+  label?: string;
   collapsible?: boolean;
   defaultOpen?: boolean;
   items: NavItem[];
 }
 
 const SEARCH_MODULES: NavItem[] = [
-  { label: "Paramétrique",  href: "/search?mode=internal",  icon: Sparkles },
-  { label: "Téléphone",     href: "/search?mode=phone",     icon: Phone },
-  { label: "GeoIP",         href: "/search?mode=geoip",     icon: MapPin },
-  { label: "NIR",           href: "/search?mode=nir",       icon: Hash },
-  { label: "Username OSINT",href: "/search?mode=sherlock",  icon: Eye,        badge: "VIP", badgeColor: "blue" },
-  { label: "Gaming",        href: "/search?mode=fivem",     icon: Gamepad2,   badge: "VIP", badgeColor: "blue" },
-  { label: "Google OSINT",  href: "/search?mode=xeuledoc",  icon: FileSearch, badge: "PRO", badgeColor: "red" },
-  { label: "Wanted",        href: "/search?mode=wanted",    icon: ShieldAlert,badge: "PRO", badgeColor: "red" },
-  { label: "DisX IA",       href: "/disx",                  icon: BotMessageSquare, badge: "Business",  badgeColor: "gold" },
+  { label: "Paramétrique",   href: "/search?mode=internal",  icon: Sparkles },
+  { label: "Username OSINT", href: "/search?mode=sherlock",  icon: Eye,            badge: "VIP", badgeColor: "blue" },
+  { label: "Gaming",         href: "/search?mode=fivem",     icon: Gamepad2,       badge: "VIP", badgeColor: "blue" },
+  { label: "Google OSINT",   href: "/search?mode=xeuledoc",  icon: FileSearch,     badge: "PRO", badgeColor: "red" },
+  { label: "Wanted",         href: "/search?mode=wanted",    icon: ShieldAlert,    badge: "PRO", badgeColor: "red" },
+  { label: "DisX IA",        href: "/disx",                  icon: BotMessageSquare, badge: "PRO", badgeColor: "red" },
+];
+
+const LOOKUP_MODULES: NavItem[] = [
+  { label: "Téléphone",        href: "/search?mode=phone",     icon: Phone },
+  { label: "GeoIP",            href: "/search?mode=geoip",     icon: MapPin },
+  { label: "NIR",              href: "/search?mode=nir",       icon: Hash },
+  { label: "Telegram Lookup",  href: "/search?mode=telegram",  icon: Send, disabled: true, comingSoon: true, adminOnly: true },
 ];
 
 const NAV_SECTIONS: NavSection[] = [
@@ -121,6 +129,13 @@ const NAV_SECTIONS: NavSection[] = [
     collapsible: true,
     defaultOpen: true,
     items: SEARCH_MODULES,
+  },
+  {
+    key: "lookup",
+    label: "Données & Lookup",
+    collapsible: true,
+    defaultOpen: true,
+    items: LOOKUP_MODULES,
   },
   {
     key: "community",
@@ -312,18 +327,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const active = isActive(item.href);
     const Icon = item.icon;
     const label = itemLabel(item);
-    const isQueryNav = item.href.includes("?"); // search module items use popstate trick
+    const isQueryNav = item.href.includes("?");
 
-    const itemClass = `flex items-center rounded-lg cursor-pointer transition-all duration-150 select-none
+    // Disabled/coming-soon logic: blocked unless admin (or not adminOnly)
+    const isBlocked = item.disabled && !(item.adminOnly && role === "admin");
+
+    const itemClass = `flex items-center rounded-lg transition-all duration-150 select-none
       ${collapsed ? "justify-center px-0 py-2.5 mx-1 gap-0" : indent ? "gap-2.5 px-3 py-2 ml-2" : "gap-3 px-3 py-2.5"}
-      ${active
-        ? "bg-primary/10 text-primary border-l-2 border-primary"
-        : "text-muted-foreground hover:text-foreground hover:bg-accent/50 border-l-2 border-transparent"
+      ${isBlocked
+        ? "cursor-not-allowed opacity-40 border-l-2 border-transparent text-muted-foreground"
+        : active
+        ? "cursor-pointer bg-primary/10 text-primary border-l-2 border-primary"
+        : "cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent/50 border-l-2 border-transparent"
       }`;
 
     const innerContent = (
       <>
-        <Icon className={`shrink-0 ${collapsed ? "w-5 h-5" : indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active ? "text-primary" : ""}`} />
+        <Icon className={`shrink-0 ${collapsed ? "w-5 h-5" : indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active && !isBlocked ? "text-primary" : ""}`} />
         <span
           className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12.5px]" : "text-sm"}`}
           style={{
@@ -334,13 +354,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         >
           {label}
         </span>
-        {item.badge && !collapsed && (
+        {!collapsed && (item.comingSoon ? (
+          <span className="ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 bg-muted/60 text-muted-foreground border border-border/40">
+            SOON
+          </span>
+        ) : item.badge ? (
           <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${badgeClass(item.badgeColor)}`}>
             {item.badge}
           </span>
-        )}
+        ) : null)}
       </>
     );
+
+    if (isBlocked) {
+      const disabledEl = (
+        <div
+          key={item.href}
+          className={itemClass}
+          data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+        >
+          {innerContent}
+        </div>
+      );
+      if (collapsed) {
+        return (
+          <Tooltip key={item.href}>
+            <TooltipTrigger asChild>{disabledEl}</TooltipTrigger>
+            <TooltipContent side="right" className="font-medium">
+              {label} — Bientôt disponible
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+      return disabledEl;
+    }
 
     const inner = isQueryNav ? (
       <a
@@ -364,7 +411,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <Tooltip key={item.href}>
           <TooltipTrigger asChild>{inner}</TooltipTrigger>
           <TooltipContent side="right" className="font-medium">
-            {label}{item.badge && ` (${item.badge})`}
+            {label}{item.badge && ` (${item.badge})`}{item.comingSoon && " — Bientôt"}
           </TooltipContent>
         </Tooltip>
       );
@@ -503,13 +550,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           return (
             <div key={section.key} className={si > 0 ? "mt-1" : ""}>
               {/* Section header */}
-              {section.labelKey && !collapsed && (
+              {(section.labelKey || section.label) && !collapsed && (
                 <div
                   className={`flex items-center justify-between px-4 py-1.5 mt-1 ${section.collapsible ? "cursor-pointer hover:text-foreground" : ""}`}
                   onClick={section.collapsible ? () => toggleSection(section.key) : undefined}
                 >
                   <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 select-none">
-                    {t(section.labelKey, { defaultValue: section.key.toUpperCase() })}
+                    {section.label ?? (section.labelKey ? t(section.labelKey, { defaultValue: section.key.toUpperCase() }) : section.key.toUpperCase())}
                   </span>
                   {section.collapsible && (
                     <ChevronDown
@@ -518,12 +565,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
               )}
-              {section.labelKey && collapsed && <div className="my-1 mx-3 border-t border-border/20" />}
+              {(section.labelKey || section.label) && collapsed && <div className="my-1 mx-3 border-t border-border/20" />}
 
               {/* Items */}
               {(isOpen || collapsed) && (
                 <div className="px-2 flex flex-col gap-0.5">
-                  {section.items.map(item => renderNavItem(item, section.key === "recherche"))}
+                  {section.items.map(item => renderNavItem(item, section.key === "recherche" || section.key === "lookup"))}
                 </div>
               )}
             </div>
@@ -654,21 +701,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     const active = isActive(item.href);
                     const Icon = item.icon;
                     const label = itemLabel(item);
+                    const mobileBlocked = item.disabled && !(item.adminOnly && role === "admin");
+                    const btn = (
+                      <Button
+                        key={item.href}
+                        variant={active ? "secondary" : "ghost"}
+                        className={`w-full justify-start gap-2 ${mobileBlocked ? "opacity-40 cursor-not-allowed" : ""}`}
+                        data-testid={`nav-mobile-${label.toLowerCase().replace(/\s+/g, "-")}`}
+                        onClick={mobileBlocked ? undefined : () => setMobileOpen(false)}
+                        disabled={mobileBlocked}
+                      >
+                        <Icon className="w-4 h-4" />{label}
+                        {!mobileBlocked && item.comingSoon ? (
+                          <span className="ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+                            SOON
+                          </span>
+                        ) : item.badge ? (
+                          <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full ${badgeClass(item.badgeColor)}`}>
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </Button>
+                    );
+                    if (mobileBlocked) return btn;
                     return (
                       <Link key={item.href} href={item.href}>
-                        <Button
-                          variant={active ? "secondary" : "ghost"}
-                          className="w-full justify-start gap-2"
-                          data-testid={`nav-mobile-${label.toLowerCase().replace(/\s+/g, "-")}`}
-                          onClick={() => setMobileOpen(false)}
-                        >
-                          <Icon className="w-4 h-4" />{label}
-                          {item.badge && (
-                            <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full ${badgeClass(item.badgeColor)}`}>
-                              {item.badge}
-                            </span>
-                          )}
-                        </Button>
+                        {btn}
                       </Link>
                     );
                   })}
