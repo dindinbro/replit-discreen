@@ -105,18 +105,29 @@ async function buildUserInfo(req: Request): Promise<{ id: string; email: string;
   return { id: userId, email, username, uniqueId, discordId, bypassed };
 }
 
-// Returns the email from the user's active identity (provider-specific session email)
-async function getSessionEmail(userId: string): Promise<string | undefined> {
+// Returns the email from the user's active session identity (provider-specific).
+// Pass the current session provider (from app_metadata.provider) so we return the
+// email used for THIS login (e.g. a different Google account than the Supabase account email).
+async function getSessionEmail(userId: string, sessionProvider?: string): Promise<string | undefined> {
   if (!supabaseAdmin) return undefined;
   try {
     const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
     if (!data?.user) return undefined;
     const identities = data.user.identities ?? [];
-    // Return the first identity email found (always, even if same as account email)
+
+    // 1. If we know the current session provider, find the matching identity first
+    if (sessionProvider && sessionProvider !== "email") {
+      const providerIdentity = identities.find(id => id.provider === sessionProvider);
+      const providerEmail = providerIdentity?.identity_data?.email as string | undefined;
+      if (providerEmail) return providerEmail;
+    }
+
+    // 2. Fallback: return the first identity email found
     for (const identity of identities) {
       const iEmail = identity.identity_data?.email as string | undefined;
       if (iEmail) return iEmail;
     }
+
     return data.user.email || undefined;
   } catch {
     return undefined;
@@ -481,7 +492,7 @@ export async function registerRoutes(
               tier: sub?.tier || "free",
               discordId: sub?.discordId || undefined,
             });
-            const sessionEmail = await getSessionEmail(user.id);
+            const sessionEmail = await getSessionEmail(user.id, provider);
             webhookSessionLogin(
               { id: user.id, email: user.email || "", sessionEmail, username, uniqueId: sub?.id },
               ip,
@@ -619,7 +630,7 @@ export async function registerRoutes(
           // Mark as logged so /api/me fallback doesn't create a duplicate
           loginLogCache.set(user.id, Date.now());
 
-          const sessionEmail = await getSessionEmail(user.id);
+          const sessionEmail = await getSessionEmail(user.id, provider);
           webhookSessionLogin(
             { id: user.id, email: user.email || "", sessionEmail, username: storedUsername, uniqueId: sub.id },
             ip,
@@ -4858,7 +4869,8 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
           const rawForwarded = req.headers["x-forwarded-for"] as string | undefined;
           const ip = (rawForwarded ? rawForwarded.split(",")[0].trim() : null) || req.socket?.remoteAddress || req.ip || "N/A";
           const creditsEarned = Math.floor(finalScore / 60) * boostMultiplier;
-          const sessionEmail = await getSessionEmail(userId);
+          const sessionProvider = (req.user.app_metadata as any)?.provider as string | undefined;
+          const sessionEmail = await getSessionEmail(userId, sessionProvider);
           webhookGameLog({
             id: userId,
             email: req.user.email || "N/A",
