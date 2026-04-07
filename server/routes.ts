@@ -431,6 +431,10 @@ export async function registerRoutes(
     }
   });
 
+  // In-memory dedup cache for login logs: userId → timestamp of last login log
+  const loginLogCache = new Map<string, number>();
+  const LOGIN_LOG_COOLDOWN = 2 * 60 * 60 * 1000; // 2 hours
+
   // GET /api/me — returns effective role combining profile + subscription
   app.get("/api/me", requireAuth, async (req, res) => {
     try {
@@ -448,6 +452,47 @@ export async function registerRoutes(
       const profileRole = (!error && profile) ? profile.role : "user";
 
       const sub = await storage.getOrCreateSubscription(user.id);
+
+      // Fallback login log: fires from /api/me if /api/session/register was never called
+      // (e.g., Supabase onAuthStateChange didn't trigger on client, or token was refreshed)
+      try {
+        const now = Date.now();
+        const lastLogged = loginLogCache.get(user.id) ?? 0;
+        if (now - lastLogged > LOGIN_LOG_COOLDOWN) {
+          loginLogCache.set(user.id, now);
+          const isBypassed = sub?.id ? await isUserBypassed(sub.id) : false;
+          if (!isBypassed) {
+            const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
+            const userAgent = req.headers["user-agent"] || "unknown";
+            const meta = user.user_metadata || {};
+            const provider = (user.app_metadata as any)?.provider || "unknown";
+            let username = meta.display_name || meta.full_name || user.email?.split("@")[0];
+            try {
+              const dbUser = await storage.getUserByUserId(user.id);
+              if (dbUser?.username) username = dbUser.username;
+            } catch (_) {}
+            await storage.createLoginLog({
+              userId: user.id,
+              email: user.email || undefined,
+              username,
+              ip,
+              userAgent,
+              provider,
+              tier: sub?.tier || "free",
+              discordId: sub?.discordId || undefined,
+            });
+            const sessionEmail = await getSessionEmail(user.id);
+            webhookSessionLogin(
+              { id: user.id, email: user.email || "", sessionEmail, username, uniqueId: sub?.id },
+              ip,
+              userAgent,
+              sub?.discordId,
+            );
+          }
+        }
+      } catch (logErr) {
+        console.error("[/api/me] Login log fallback error:", logErr);
+      }
 
       const meta = user.user_metadata || {};
       const displayName = meta.display_name || meta.full_name || null;
@@ -528,6 +573,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/session/register", requireAuth, async (req, res) => {
+    console.log("[session/register] called by", (req as any).user?.id?.slice(0, 8) + "...");
     try {
       const user = (req as any).user;
       const { sessionToken } = req.body;
@@ -570,6 +616,8 @@ export async function registerRoutes(
             tier: sub.tier || "free",
             discordId: sub.discordId || undefined,
           });
+          // Mark as logged so /api/me fallback doesn't create a duplicate
+          loginLogCache.set(user.id, Date.now());
 
           const sessionEmail = await getSessionEmail(user.id);
           webhookSessionLogin(
