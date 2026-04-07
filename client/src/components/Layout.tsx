@@ -105,7 +105,7 @@ const SEARCH_MODULES: NavItem[] = [
   { label: "Gaming",        href: "/search?mode=fivem",     icon: Gamepad2,   badge: "VIP", badgeColor: "blue" },
   { label: "Google OSINT",  href: "/search?mode=xeuledoc",  icon: FileSearch, badge: "PRO", badgeColor: "red" },
   { label: "Wanted",        href: "/search?mode=wanted",    icon: ShieldAlert,badge: "PRO", badgeColor: "red" },
-  { label: "DisX IA",       href: "/disx",                  icon: BotMessageSquare, badge: "NEW",  badgeColor: "gold" },
+  { label: "DisX IA",       href: "/disx",                  icon: BotMessageSquare, badge: "Business",  badgeColor: "gold" },
 ];
 
 const NAV_SECTIONS: NavSection[] = [
