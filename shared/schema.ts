@@ -591,3 +591,18 @@ export const gameScores = pgTable("game_scores", {
 export type GameScore = typeof gameScores.$inferSelect;
 export const insertGameScoreSchema = createInsertSchema(gameScores).omit({ id: true, createdAt: true });
 export type InsertGameScore = z.infer<typeof insertGameScoreSchema>;
+
+export const serviceStatus = pgTable("service_status", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status").notNull().default("operational"),
+  latencyMs: integer("latency_ms"),
+  uptime: text("uptime").notNull().default("99.99%"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type ServiceStatus = typeof serviceStatus.$inferSelect;
+export const insertServiceStatusSchema = createInsertSchema(serviceStatus).omit({ id: true, updatedAt: true });
+export type InsertServiceStatus = z.infer<typeof insertServiceStatusSchema>;

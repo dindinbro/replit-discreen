@@ -26,6 +26,8 @@ import InfoRequestPage from "@/pages/InfoRequestPage";
 import UsersPage from "@/pages/UsersPage";
 import MaintenancePage from "@/pages/MaintenancePage";
 import GamePage from "@/pages/GamePage";
+import StatusPage from "@/pages/StatusPage";
+import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
 import Layout from "@/components/Layout";
 import { Loader2, UserCircle2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -261,6 +263,9 @@ function Router() {
       <Route path="/game">
         <PublicRoute component={GamePage} />
       </Route>
+      <Route path="/status">
+        <PublicRoute component={StatusPage} />
+      </Route>
       <Route path="/payment-success">
         <PublicRoute component={PaymentSuccessPage} />
       </Route>
@@ -311,6 +316,7 @@ function App() {
         <ThemeProvider>
           <AuthProvider>
             <Toaster />
+            <SubscriptionToastProvider />
             <UsernameSetupModal />
             <MaintenanceGate>
               <Router />

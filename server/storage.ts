@@ -12,7 +12,8 @@ import {
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
   type ActiveSession, type BlockedIp,
   type ReferralCode, type ReferralEvent, type LoginLog,
-  type DiscountCode, type GameBoost,
+  type DiscountCode, type GameBoost, type ServiceStatus,
+  serviceStatus,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
@@ -134,6 +135,11 @@ export interface IStorage {
   updateGameBoost(id: number, data: Partial<{ name: string; active: boolean; maxUses: number | null; expiresAt: Date | null; multiplier: number }>): Promise<GameBoost | null>;
   deleteGameBoost(id: number): Promise<boolean>;
   incrementGameBoostUsage(id: number): Promise<void>;
+  getAllServiceStatus(): Promise<ServiceStatus[]>;
+  createServiceStatus(data: { name: string; description?: string; status?: string; latencyMs?: number | null; uptime?: string; sortOrder?: number }): Promise<ServiceStatus>;
+  updateServiceStatus(id: number, data: Partial<{ name: string; description: string; status: string; latencyMs: number | null; uptime: string; sortOrder: number }>): Promise<ServiceStatus | null>;
+  deleteServiceStatus(id: number): Promise<boolean>;
+  getRecentSubscriptionActivity(): Promise<{ tier: string; createdAt: Date }[]>;
 }
 
 function hashKey(key: string): string {
@@ -1179,6 +1185,46 @@ export class DatabaseStorage implements IStorage {
     await db.update(gameBoosts)
       .set({ usedCount: sql`${gameBoosts.usedCount} + 1` })
       .where(eq(gameBoosts.id, id));
+  }
+
+  async getAllServiceStatus(): Promise<ServiceStatus[]> {
+    return db.select().from(serviceStatus).orderBy(serviceStatus.sortOrder);
+  }
+
+  async createServiceStatus(data: { name: string; description?: string; status?: string; latencyMs?: number | null; uptime?: string; sortOrder?: number }): Promise<ServiceStatus> {
+    const [row] = await db.insert(serviceStatus).values({
+      name: data.name,
+      description: data.description ?? "",
+      status: data.status ?? "operational",
+      latencyMs: data.latencyMs ?? null,
+      uptime: data.uptime ?? "99.99%",
+      sortOrder: data.sortOrder ?? 0,
+      updatedAt: new Date(),
+    }).returning();
+    return row;
+  }
+
+  async updateServiceStatus(id: number, data: Partial<{ name: string; description: string; status: string; latencyMs: number | null; uptime: string; sortOrder: number }>): Promise<ServiceStatus | null> {
+    const [row] = await db.update(serviceStatus)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(serviceStatus.id, id))
+      .returning();
+    return row ?? null;
+  }
+
+  async deleteServiceStatus(id: number): Promise<boolean> {
+    const result = await db.delete(serviceStatus).where(eq(serviceStatus.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getRecentSubscriptionActivity(): Promise<{ tier: string; createdAt: Date }[]> {
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const rows = await db.select({ tier: subscriptions.tier, createdAt: subscriptions.createdAt })
+      .from(subscriptions)
+      .where(sql`${subscriptions.createdAt} >= ${cutoff} AND ${subscriptions.tier} != 'free'`)
+      .orderBy(sql`${subscriptions.createdAt} DESC`)
+      .limit(10);
+    return rows.map(r => ({ tier: r.tier ?? "free", createdAt: r.createdAt }));
   }
 }
 

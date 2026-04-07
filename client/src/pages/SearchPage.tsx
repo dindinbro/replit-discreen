@@ -506,7 +506,7 @@ function ResultCard({
             </Button>
           </div>
         </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
           {dataFields.map(([col, val]) => {
             const Icon = getFieldIcon(col);
             const cssVar = getFieldColorVar(col);
@@ -575,12 +575,12 @@ function MiniResultCard({
       transition={{ delay: (globalIndex % 20) * 0.025, duration: 0.18 }}
       whileHover={{ y: -2, transition: { duration: 0.15 } }}
       onClick={onClick}
-      className="card-premium rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(212,168,67,0.4)] transition-all select-none"
+      className="card-premium rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(212,168,67,0.4)] transition-all select-none group"
       data-testid={`mini-card-result-${globalIndex}`}
     >
-      <div className="p-3 space-y-1.5">
+      <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md bg-[rgba(212,168,67,0.08)] text-xs font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
+          <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-md bg-[rgba(212,168,67,0.08)] text-xs font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
             {globalIndex + 1}
           </span>
           <span
@@ -595,14 +595,17 @@ function MiniResultCard({
             {titleField ? cleanFieldValue(titleField[1]) : `Resultat ${globalIndex + 1}`}
           </p>
           {subtitleField && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
+            <p className="text-xs text-muted-foreground truncate mt-1">
               {cleanFieldValue(subtitleField[1])}
             </p>
           )}
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-t border-[rgba(255,255,255,0.05)] pt-2.5">
           <span className="text-[10px] text-muted-foreground">{fieldCount} champ{fieldCount > 1 ? "s" : ""}</span>
-          <Eye className="w-3 h-3 text-muted-foreground/50" />
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60 group-hover:text-[#d4a843] transition-colors">
+            <Eye className="w-3 h-3" />
+            Voir tout
+          </span>
         </div>
       </div>
     </motion.div>

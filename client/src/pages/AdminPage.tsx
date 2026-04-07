@@ -90,7 +90,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "services";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -103,6 +103,7 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "logs", label: "Logs Connexions", icon: Activity },
   { key: "discounts", label: "Codes Promo", icon: Tag },
   { key: "game-boosts", label: "Boosts Jeu", icon: Zap },
+  { key: "services", label: "Statut Services", icon: Monitor },
 ];
 
 interface CategoryFormData {
@@ -3142,6 +3143,126 @@ function DiscountCodesSection({ getAccessToken }: { getAccessToken: () => string
   );
 }
 
+function ServiceStatusSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [form, setForm] = useState({ name: "", description: "", status: "operational", latencyMs: "", uptime: "99.99%" });
+
+  const { data: services = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/service-status"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/service-status", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Erreur chargement");
+      return res.json();
+    },
+  });
+
+  function resetForm() { setForm({ name: "", description: "", status: "operational", latencyMs: "", uptime: "99.99%" }); setEditId(null); }
+
+  async function handleSave() {
+    if (!form.name.trim()) return;
+    setCreating(true);
+    const token = getAccessToken();
+    const body: any = { name: form.name.trim(), description: form.description.trim(), status: form.status, uptime: form.uptime.trim() };
+    if (form.latencyMs.trim()) body.latencyMs = parseInt(form.latencyMs);
+    try {
+      const url = editId ? `/api/admin/service-status/${editId}` : "/api/admin/service-status";
+      const method = editId ? "PATCH" : "POST";
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast({ title: editId ? "Service mis à jour" : "Service créé" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/service-status"] });
+      resetForm();
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    } finally { setCreating(false); }
+  }
+
+  async function handleDelete(id: number) {
+    const token = getAccessToken();
+    try {
+      await fetch(`/api/admin/service-status/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/service-status"] });
+      toast({ title: "Service supprimé" });
+    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+  }
+
+  const STATUS_OPTS = [
+    { value: "operational", label: "Opérationnel" },
+    { value: "degraded", label: "Dégradé" },
+    { value: "outage", label: "Panne" },
+  ];
+
+  const statusColor: Record<string, string> = { operational: "#10b981", degraded: "#f59e0b", outage: "#ef4444" };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">Statut des Services</h2>
+      </div>
+
+      <Card className="p-5 space-y-4">
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">{editId ? "Modifier le service" : "Ajouter un service"}</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><label className="text-xs text-muted-foreground mb-1 block">Nom *</label><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Moteur de Recherche" /></div>
+          <div><label className="text-xs text-muted-foreground mb-1 block">Description</label><Input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Description courte" /></div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Statut</label>
+            <Select value={form.status} onValueChange={v => setForm(p => ({ ...p, status: v }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{STATUS_OPTS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div><label className="text-xs text-muted-foreground mb-1 block">Latence (ms)</label><Input value={form.latencyMs} onChange={e => setForm(p => ({ ...p, latencyMs: e.target.value }))} placeholder="45" type="number" /></div>
+          <div><label className="text-xs text-muted-foreground mb-1 block">Uptime</label><Input value={form.uptime} onChange={e => setForm(p => ({ ...p, uptime: e.target.value }))} placeholder="99.99%" /></div>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={handleSave} disabled={creating || !form.name.trim()} size="sm">
+            {creating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+            {editId ? "Mettre à jour" : "Créer"}
+          </Button>
+          {editId && <Button variant="outline" size="sm" onClick={resetForm}><X className="w-3 h-3 mr-1" />Annuler</Button>}
+        </div>
+      </Card>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+      ) : services.length === 0 ? (
+        <p className="text-center text-muted-foreground py-8 text-sm">Aucun service configuré — créez le premier ci-dessus.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3">
+          {services.map((svc: any) => (
+            <Card key={svc.id} className="p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="shrink-0 w-2.5 h-2.5 rounded-full" style={{ background: statusColor[svc.status] ?? "#10b981" }} />
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm truncate">{svc.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{svc.description} · {svc.uptime}{svc.latencyMs ? ` · ${svc.latencyMs}ms` : ""}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge variant="outline" style={{ color: statusColor[svc.status] ?? "#10b981", borderColor: statusColor[svc.status] ?? "#10b981" }} className="text-xs">
+                  {STATUS_OPTS.find(o => o.value === svc.status)?.label ?? svc.status}
+                </Badge>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setEditId(svc.id); setForm({ name: svc.name, description: svc.description || "", status: svc.status, latencyMs: svc.latencyMs?.toString() ?? "", uptime: svc.uptime }); }}>
+                  <Pencil className="w-3 h-3" />
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10" onClick={() => handleDelete(svc.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GameBoostsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -3499,6 +3620,10 @@ export default function AdminPage() {
 
             {activeTab === "game-boosts" && (
               <GameBoostsSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "services" && (
+              <ServiceStatusSection getAccessToken={getAccessToken} />
             )}
           </main>
         </div>

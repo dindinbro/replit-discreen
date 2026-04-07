@@ -10,7 +10,7 @@ import {
   Key, FileText, Menu, X, Star, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
   Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen, BotMessageSquare, Sword,
-  Camera,
+  Camera, Activity,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -138,6 +138,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "nav.pricing",  labelKey: "nav.pricing",  href: "/pricing",  icon: CreditCard },
       { label: "nav.tutorial", labelKey: "nav.tutorial", href: "/tuto",    icon: BookOpen },
       { label: "nav.contact",  labelKey: "nav.contact",  href: "/contact",  icon: MessageSquare },
+      { label: "Statut", href: "/status", icon: Activity },
     ],
   },
 ];

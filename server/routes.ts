@@ -309,6 +309,19 @@ export async function registerRoutes(
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Ensure service_status table exists
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS service_status (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'operational',
+        latency_ms INTEGER,
+        uptime TEXT NOT NULL DEFAULT '99.99%',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     console.log("[referral] Tables ensured OK");
   } catch (err) {
     console.error("[referral] Failed to ensure referral tables:", err);
@@ -1172,6 +1185,54 @@ export async function registerRoutes(
       if (boost.maxUses !== null && boost.usedCount >= boost.maxUses) return res.status(410).json({ error: "Ce boost a atteint sa limite d'utilisations" });
       res.json({ valid: true, name: boost.name, multiplier: boost.multiplier, code: boost.code });
     } catch (err) { console.error("POST /api/game/boost/validate error:", err); res.status(500).json({ error: "Erreur serveur" }); }
+  });
+
+  // Public: GET /api/status — service status page
+  app.get("/api/status", async (_req, res) => {
+    try {
+      const services = await storage.getAllServiceStatus();
+      res.json(services);
+    } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
+  });
+
+  // Public: GET /api/status/recent-activity — recent subscription activity for popups
+  app.get("/api/status/recent-activity", async (_req, res) => {
+    try {
+      const activity = await storage.getRecentSubscriptionActivity();
+      res.json(activity);
+    } catch { res.json([]); }
+  });
+
+  // Admin CRUD: service status
+  app.get("/api/admin/service-status", requireAuth, requireAdmin, async (_req, res) => {
+    try { res.json(await storage.getAllServiceStatus()); }
+    catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
+  });
+
+  app.post("/api/admin/service-status", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { name, description, status, latencyMs, uptime, sortOrder } = req.body;
+      if (!name) return res.status(400).json({ message: "Nom requis" });
+      const row = await storage.createServiceStatus({ name, description, status, latencyMs, uptime, sortOrder });
+      res.json(row);
+    } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
+  });
+
+  app.patch("/api/admin/service-status/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const row = await storage.updateServiceStatus(id, req.body);
+      if (!row) return res.status(404).json({ message: "Service introuvable" });
+      res.json(row);
+    } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
+  });
+
+  app.delete("/api/admin/service-status/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const ok = await storage.deleteServiceStatus(id);
+      res.json({ ok });
+    } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
   });
 
   app.get("/api/site-status", async (_req, res) => {
