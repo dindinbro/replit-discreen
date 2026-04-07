@@ -303,11 +303,17 @@ function drawPtero(ctx: CanvasRenderingContext2D, pt: PteroObs, t: number) {
 function spawnObs(score: number): Obs {
   const prog = Math.min(1, score / 500);
 
-  // Ptero: unlocks at score 80, probability grows with progress
-  if (score >= 80 && Math.random() > 0.68 - prog * 0.18) {
+  // Ptero: unlocks at score 80, probability grows with progress (capped at ~38%)
+  if (score >= 80 && Math.random() > 0.72 - prog * 0.10) {
     // 3 heights: low (must jump over), mid, high (walk under)
-    const heights = [GROUND_Y - 38, GROUND_Y - 72, GROUND_Y - 108];
-    const y = heights[Math.floor(Math.random() * heights.length)];
+    // At high scores reduce low-ptero frequency so it doesn't combine unfairly with cactus
+    const lowWeight = Math.max(0.10, 0.33 - prog * 0.18);
+    const r = Math.random();
+    const y = r < lowWeight
+      ? GROUND_Y - 38
+      : r < lowWeight + 0.34
+        ? GROUND_Y - 72
+        : GROUND_Y - 108;
     return { kind: "ptero", x: CW + 80, y };
   }
 
@@ -532,8 +538,10 @@ export default function GamePage() {
       gs.nextObs -= gs.speed * dt;
       if (gs.nextObs <= 0) {
         gs.obs.push(spawnObs(gs.score));
-        // Spacing shrinks slightly as game speeds up
-        gs.nextObs = 380 + Math.random() * 340 - Math.min(120, gs.score * 0.12);
+        // Gap shrinks with score but enforces a safe minimum so the game stays fair at high speed
+        const baseGap = 460 + Math.random() * 320;
+        const reduction = Math.min(80, gs.score * 0.06);
+        gs.nextObs = Math.max(380, baseGap - reduction);
       }
 
       /* Collision */
