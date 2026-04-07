@@ -29,6 +29,14 @@ import {
   Clock,
   Gift,
   Tag,
+  UserSearch,
+  Globe,
+  FileSearch,
+  Wifi,
+  Lock,
+  Eye,
+  ScanLine,
+  AlertTriangle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -457,6 +465,77 @@ export default function PricingPage() {
                   <p className="text-[10px] opacity-80">Paiement unique</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Cost comparison section */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-16 rounded-2xl overflow-hidden"
+          style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(8,8,10,0.7)" }}
+        >
+          <div className="px-6 pt-7 pb-5 text-center">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Pourquoi s'abonner ?</p>
+            <h2 className="text-2xl md:text-3xl font-display font-bold text-white">
+              Coût d'une recherche{" "}
+              <span className="text-muted-foreground line-through decoration-red-500/70">sans Discreen</span>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
+              Voilà ce que vous payeriez en accédant à chaque outil séparément.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-[rgba(255,255,255,0.05)]">
+            {[
+              { icon: UserSearch,  name: "Détective privé",           price: "150€/h",   note: "Sans garantie de résultat",  highlight: true },
+              { icon: Globe,       name: "Pipl / Spokeo",             price: "25€/mois",  note: "Base US, limitée en Europe" },
+              { icon: FileSearch,  name: "LinkedIn Premium",          price: "40€/mois",  note: "Profils uniquement" },
+              { icon: Database,    name: "HaveIBeenPwned Pro",        price: "40€/an",    note: "Fuites de données seulement" },
+              { icon: Wifi,        name: "OSINT Framework (outils)",  price: "~30€/mois", note: "Configurations manuelles" },
+              { icon: ScanLine,    name: "Recherche judiciaire",      price: "30€/acte",  note: "Par demande individuelle",   highlight: true },
+              { icon: Lock,        name: "Bases de données privées",  price: "50€/mois",  note: "Accès restreint" },
+              { icon: Eye,         name: "Surveillance réseaux",      price: "35€/mois",  note: "Suivi manuel" },
+            ].map(({ icon: Icon, name, price, note, highlight }) => (
+              <div
+                key={name}
+                className="flex flex-col items-center text-center gap-2 py-5 px-4"
+                style={{ background: highlight ? "rgba(255,60,60,0.04)" : "rgba(8,8,10,0.7)" }}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-1"
+                  style={{
+                    background: highlight ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${highlight ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.07)"}`,
+                  }}
+                >
+                  <Icon className="w-4.5 h-4.5" style={{ color: highlight ? "#ef4444" : "rgba(255,255,255,0.45)", width: 18, height: 18 }} />
+                </div>
+                <p className="text-xs text-muted-foreground font-medium leading-tight">{name}</p>
+                <p className="text-lg font-bold" style={{ color: highlight ? "#ef4444" : "rgba(255,255,255,0.85)" }}>{price}</p>
+                <p className="text-[10px] text-muted-foreground/60 leading-tight">{note}</p>
+              </div>
+            ))}
+          </div>
+
+          <div
+            className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4"
+            style={{ background: "rgba(0,0,0,0.4)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-4 h-4 text-red-400/80 shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                Sans Discreen :{" "}
+                <span className="font-bold text-red-400 line-through decoration-red-400/50">+400€/mois</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Shield className="w-4 h-4 shrink-0" style={{ color: "#d4a843" }} />
+              <p className="text-sm font-bold" style={{ color: "#d4a843" }}>
+                Discreen · dès 6,99€/mois — tout inclus
+              </p>
             </div>
           </div>
         </motion.div>
