@@ -60,6 +60,10 @@ import {
   RefreshCw,
   Gamepad2,
   Zap,
+  Bell,
+  Sparkles,
+  Timer,
+  EyeOff,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -90,7 +94,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "services";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "services" | "notifications";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -104,6 +108,7 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "discounts", label: "Codes Promo", icon: Tag },
   { key: "game-boosts", label: "Boosts Jeu", icon: Zap },
   { key: "services", label: "Statut Services", icon: Monitor },
+  { key: "notifications", label: "Notifications Pop-up", icon: Bell },
 ];
 
 interface CategoryFormData {
@@ -3143,6 +3148,157 @@ function DiscountCodesSection({ getAccessToken }: { getAccessToken: () => string
   );
 }
 
+type ToastConfig = { enabled: boolean; pollIntervalSec: number; dismissAfterSec: number; maxVisible: number };
+
+function NotificationsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: cfg, isLoading } = useQuery<ToastConfig>({
+    queryKey: ["/api/settings/toast"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/toast");
+      return res.json();
+    },
+  });
+
+  async function update(patch: Partial<ToastConfig>) {
+    const token = getAccessToken();
+    try {
+      const res = await fetch("/api/admin/settings/toast", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error("Erreur");
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/toast"] });
+      toast({ title: "Paramètres mis à jour" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  }
+
+  const TIER_PREVIEW = [
+    { tier: "vip", label: "VIP", color: "#d4a843" },
+    { tier: "pro", label: "PRO", color: "#818cf8" },
+    { tier: "business", label: "Business", color: "#34d399" },
+    { tier: "api", label: "API", color: "#f472b6" },
+  ];
+
+  if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
+
+  const c = cfg ?? { enabled: true, pollIntervalSec: 30, dismissAfterSec: 6, maxVisible: 3 };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">Notifications Pop-up</h2>
+      </div>
+
+      <Card className="p-5 space-y-5">
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Configuration</h3>
+
+        <div className="flex items-center justify-between py-3 border-b border-[rgba(255,255,255,0.06)]">
+          <div>
+            <p className="font-semibold text-sm">Activer les popups</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Afficher ou masquer toutes les notifications</p>
+          </div>
+          <button
+            onClick={() => update({ enabled: !c.enabled })}
+            className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-all"
+            style={{
+              background: c.enabled ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.05)",
+              color: c.enabled ? "#10b981" : "#6b7280",
+              border: `1px solid ${c.enabled ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.1)"}`,
+            }}
+          >
+            {c.enabled ? <Bell className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            {c.enabled ? "Activé" : "Désactivé"}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Timer className="w-3 h-3" />Intervalle de vérification
+            </label>
+            <Select value={String(c.pollIntervalSec)} onValueChange={v => update({ pollIntervalSec: Number(v) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10 secondes</SelectItem>
+                <SelectItem value="30">30 secondes</SelectItem>
+                <SelectItem value="60">1 minute</SelectItem>
+                <SelectItem value="120">2 minutes</SelectItem>
+                <SelectItem value="300">5 minutes</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Fréquence de vérification des nouveaux abonnés</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />Durée d'affichage
+            </label>
+            <Select value={String(c.dismissAfterSec)} onValueChange={v => update({ dismissAfterSec: Number(v) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2">2 secondes</SelectItem>
+                <SelectItem value="4">4 secondes</SelectItem>
+                <SelectItem value="6">6 secondes</SelectItem>
+                <SelectItem value="8">8 secondes</SelectItem>
+                <SelectItem value="10">10 secondes</SelectItem>
+                <SelectItem value="15">15 secondes</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Avant fermeture automatique</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3" />Max simultanés
+            </label>
+            <Select value={String(c.maxVisible)} onValueChange={v => update({ maxVisible: Number(v) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 popup</SelectItem>
+                <SelectItem value="2">2 popups</SelectItem>
+                <SelectItem value="3">3 popups</SelectItem>
+                <SelectItem value="4">4 popups</SelectItem>
+                <SelectItem value="5">5 popups</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Empilés en bas à gauche</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5 space-y-4">
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Aperçu des notifications</h3>
+        <div className="space-y-2">
+          {TIER_PREVIEW.map(({ tier, label, color }) => (
+            <div
+              key={tier}
+              className="flex items-center gap-3 px-4 py-2.5 rounded-xl max-w-xs"
+              style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${color}40` }}
+            >
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${color}15`, border: `1px solid ${color}40` }}>
+                <Sparkles className="w-3.5 h-3.5" style={{ color }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground leading-tight">
+                  Nouveau membre <span style={{ color }}>{label}</span>
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">À l'instant · discreen.site</p>
+              </div>
+              <span className="text-[10px] text-muted-foreground shrink-0">il y a 1 min</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function ServiceStatusSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -3624,6 +3780,10 @@ export default function AdminPage() {
 
             {activeTab === "services" && (
               <ServiceStatusSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "notifications" && (
+              <NotificationsSection getAccessToken={getAccessToken} />
             )}
           </main>
         </div>

@@ -1294,6 +1294,34 @@ export async function registerRoutes(
     } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
   });
 
+  // Toast notification config — public read, admin write
+  const DEFAULT_TOAST_CONFIG = { enabled: true, pollIntervalSec: 30, dismissAfterSec: 6, maxVisible: 3 };
+
+  app.get("/api/settings/toast", async (_req, res) => {
+    try {
+      const raw = await storage.getSiteSetting("toast_config");
+      const cfg = raw ? { ...DEFAULT_TOAST_CONFIG, ...JSON.parse(raw) } : DEFAULT_TOAST_CONFIG;
+      res.json(cfg);
+    } catch { res.json(DEFAULT_TOAST_CONFIG); }
+  });
+
+  app.patch("/api/admin/settings/toast", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { enabled, pollIntervalSec, dismissAfterSec, maxVisible } = req.body;
+      const current = await storage.getSiteSetting("toast_config");
+      const base = current ? JSON.parse(current) : DEFAULT_TOAST_CONFIG;
+      const updated = {
+        ...base,
+        ...(enabled !== undefined && { enabled: Boolean(enabled) }),
+        ...(pollIntervalSec !== undefined && { pollIntervalSec: Math.max(10, Math.min(3600, Number(pollIntervalSec))) }),
+        ...(dismissAfterSec !== undefined && { dismissAfterSec: Math.max(2, Math.min(60, Number(dismissAfterSec))) }),
+        ...(maxVisible !== undefined && { maxVisible: Math.max(1, Math.min(5, Number(maxVisible))) }),
+      };
+      await storage.setSiteSetting("toast_config", JSON.stringify(updated));
+      res.json(updated);
+    } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
+  });
+
   app.get("/api/site-status", async (_req, res) => {
     try {
       const val = await storage.getSiteSetting("maintenance_mode");
