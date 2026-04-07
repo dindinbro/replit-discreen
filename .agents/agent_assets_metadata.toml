@@ -17,3 +17,9 @@ id = "TKWdsLrCrZe-Nvkya1FNL"
 uri = "file://client/public/favicon.png"
 type = "image"
 title = "Logo Discreen"
+
+[[outputs]]
+id = "cHGH8JdaCys29CNgpG1fW"
+uri = "file://scripts/index_telegram.txt"
+type = "text"
+title = "index_telegram.js"
