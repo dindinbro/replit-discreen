@@ -63,10 +63,13 @@ function UptimeBar({ services }: { services: ServiceStatus[] }) {
   const hasOutage = services.some(s => s.status === "outage");
   const hasDegraded = services.some(s => s.status === "degraded");
 
+  const currentStatus = hasOutage ? "outage" : hasDegraded ? "degraded" : "operational";
+
   const bars = Array.from({ length: 90 }, (_, i) => {
     const daysFromEnd = 89 - i;
-    if (daysFromEnd === 0 && hasOutage) return "outage";
-    if (daysFromEnd <= 2 && hasDegraded && !hasOutage) return "degraded";
+    // Today's bar always mirrors the exact admin-set status
+    if (daysFromEnd === 0) return currentStatus;
+    // Historical simulation for past days
     const rand = (i * 7 + 13) % 100;
     if (rand < 2) return "degraded";
     if (rand < 1) return "outage";
