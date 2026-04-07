@@ -570,40 +570,51 @@ function MiniResultCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: (globalIndex % 20) * 0.025, duration: 0.18 }}
-      whileHover={{ y: -2, transition: { duration: 0.15 } }}
+      transition={{ delay: (globalIndex % 20) * 0.025, duration: 0.2 }}
+      whileHover={{ y: -3, transition: { duration: 0.15 } }}
       onClick={onClick}
-      className="card-premium rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(212,168,67,0.4)] transition-all select-none group"
+      className="card-premium rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(212,168,67,0.45)] transition-all select-none group relative"
       data-testid={`mini-card-result-${globalIndex}`}
     >
-      <div className="p-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-md bg-[rgba(212,168,67,0.08)] text-xs font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
+      {/* top accent line on hover */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[rgba(212,168,67,0)] to-transparent group-hover:via-[rgba(212,168,67,0.6)] transition-all duration-300" />
+
+      <div className="p-5 flex flex-col gap-4">
+        {/* Header: index + score */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(212,168,67,0.08)] text-xs font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
             {globalIndex + 1}
           </span>
           <span
-            className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
-            style={{ color: scoreColor, borderColor: `${scoreColor}60`, background: `${scoreColor}12` }}
+            className="text-[11px] font-mono font-bold px-2 py-1 rounded-md border"
+            style={{ color: scoreColor, borderColor: `${scoreColor}55`, background: `${scoreColor}10` }}
           >
             {score}%
           </span>
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate" data-testid={`mini-text-title-${globalIndex}`}>
-            {titleField ? cleanFieldValue(titleField[1]) : `Resultat ${globalIndex + 1}`}
+
+        {/* Main info */}
+        <div className="min-w-0 space-y-1.5">
+          <p className="text-sm font-semibold text-foreground truncate leading-snug" data-testid={`mini-text-title-${globalIndex}`}>
+            {titleField ? cleanFieldValue(titleField[1]) : `Résultat ${globalIndex + 1}`}
           </p>
           {subtitleField && (
-            <p className="text-xs text-muted-foreground truncate mt-1">
+            <p className="text-xs text-muted-foreground/80 truncate font-mono">
               {cleanFieldValue(subtitleField[1])}
             </p>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-[rgba(255,255,255,0.05)] pt-2.5">
-          <span className="text-[10px] text-muted-foreground">{fieldCount} champ{fieldCount > 1 ? "s" : ""}</span>
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60 group-hover:text-[#d4a843] transition-colors">
-            <Eye className="w-3 h-3" />
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-3 border-t border-[rgba(255,255,255,0.06)]">
+          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
+            <span className="w-1.5 h-1.5 rounded-full bg-[rgba(212,168,67,0.5)]" />
+            {fieldCount} champ{fieldCount > 1 ? "s" : ""}
+          </span>
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50 group-hover:text-[#d4a843] transition-colors duration-200">
+            <Eye className="w-3.5 h-3.5" />
             Voir tout
           </span>
         </div>
@@ -2909,7 +2920,7 @@ export default function SearchPage() {
                         </Button>
                       </div>
                     )}
-                    <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
                     {activeResults.map((row, idx) => {
                       const gi = ((searchMode === "internal" || searchMode === "fivem") ? page * pageSize : 0) + idx;
                       return (
