@@ -180,15 +180,27 @@ export function usePerformSearch(getAccessToken: () => string | null) {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const res = await fetch(api.search.perform.path, {
-        method: api.search.perform.method,
-        headers,
-        body: JSON.stringify(validatedReq),
-      });
+      let res: Response;
+      try {
+        res = await fetch(api.search.perform.path, {
+          method: api.search.perform.method,
+          headers,
+          body: JSON.stringify(validatedReq),
+          signal: AbortSignal.timeout(40000),
+        });
+      } catch (fetchErr: any) {
+        if (fetchErr?.name === "TimeoutError" || fetchErr?.name === "AbortError") {
+          throw new Error("Recherche trop lente — aucune réponse après 40s. Essayez un terme plus précis.");
+        }
+        throw fetchErr;
+      }
 
       if (!res.ok) {
         if (res.status === 401) {
           throw new Error("Non authentifie. Veuillez vous reconnecter.");
+        }
+        if (res.status === 504) {
+          throw new Error("Recherche trop lente — les serveurs n'ont pas répondu à temps. Essayez un terme plus précis.");
         }
         const err = await res.json().catch(() => ({ message: "Erreur inconnue" }));
         if (res.status === 429) {

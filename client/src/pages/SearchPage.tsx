@@ -648,6 +648,7 @@ export default function SearchPage() {
   const [scanning, setScanning] = useState(false);
   const [searchTime, setSearchTime] = useState<number | null>(null);
   const searchStartRef = useRef<number>(0);
+  const [searchElapsed, setSearchElapsed] = useState(0);
   const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
@@ -664,6 +665,15 @@ export default function SearchPage() {
       window.history.replaceState(null, "", `/search?${newParams.toString()}`);
     }
   }, [searchMode]);
+
+  // Track elapsed time while search is pending
+  useEffect(() => {
+    const isPending = searchMutation.isPending || scanning;
+    if (!isPending) { setSearchElapsed(0); return; }
+    setSearchElapsed(0);
+    const interval = setInterval(() => setSearchElapsed(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [searchMutation.isPending, scanning]);
 
   // Sync mode when sidebar dispatches a popstate event (pushState + manual popstate dispatch)
   useEffect(() => {
@@ -2877,7 +2887,37 @@ export default function SearchPage() {
                 )}
 
                 {isLoading ? (
-                  <SearchLoader variant="primary" />
+                  <div className="space-y-4">
+                    <SearchLoader variant="primary" />
+                    {searchElapsed >= 15 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
+                          searchElapsed >= 30
+                            ? "border-red-500/30 bg-red-500/5 text-red-400"
+                            : "border-amber-500/25 bg-amber-500/05 text-amber-400/80"
+                        }`}
+                      >
+                        <span className="text-base leading-none mt-0.5">
+                          {searchElapsed >= 30 ? "🔴" : "🟡"}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold">
+                            {searchElapsed >= 30
+                              ? "Recherche trop lente — les serveurs ne répondent pas"
+                              : "Recherche lente en cours…"}
+                          </p>
+                          <p className="text-xs opacity-70 mt-0.5">
+                            {searchElapsed >= 30
+                              ? "La requête sera annulée automatiquement. Essayez un terme plus précis ou réessayez dans quelques instants."
+                              : `${searchElapsed}s écoulées — interrogation des bases de données en cours…`}
+                          </p>
+                        </div>
+                        <span className="shrink-0 font-mono text-xs opacity-50 mt-0.5">{searchElapsed}s</span>
+                      </motion.div>
+                    )}
+                  </div>
                 ) : blacklistMatch?.blacklisted && (!activeResults || activeResults.length === 0) ? (
                   <Card className="p-12 text-center space-y-6 border-destructive/20 bg-destructive/5">
                     <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
