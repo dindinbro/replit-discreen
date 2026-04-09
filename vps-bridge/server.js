@@ -34,7 +34,21 @@ function loadDatabases() {
     const key = file.replace(/\.db$/, "");
 
     try {
-      const db = new Database(filePath, { readonly: true });
+      let db;
+      try {
+        // Try strict readonly first (fastest, no write access needed on dir)
+        db = new Database(filePath, { readonly: true });
+      } catch (roErr) {
+        // WAL-mode databases need write access to the -shm file even in readonly mode.
+        // Fallback: open readwrite + PRAGMA query_only so we can never accidentally write.
+        if (roErr.message && roErr.message.includes("readonly")) {
+          console.warn(`[bridge] ${file}: readonly open failed (WAL mode?), retrying with query_only…`);
+          db = new Database(filePath);
+          db.pragma("query_only = ON");
+        } else {
+          throw roErr;
+        }
+      }
       db.pragma("busy_timeout = 10000");
       const info = detectMainTable(db);
       dbCache[key] = { db, ...info, sourceKey: key, filename: file };

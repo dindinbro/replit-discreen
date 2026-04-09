@@ -841,7 +841,12 @@ export class DatabaseStorage implements IStorage {
       sessionToken,
       ipAddress: ipAddress || null,
       userAgent: userAgent || null,
-    }).returning();
+    })
+    .onConflictDoUpdate({
+      target: activeSessions.sessionToken,
+      set: { lastActiveAt: new Date() },
+    })
+    .returning();
     return session;
   }
 
