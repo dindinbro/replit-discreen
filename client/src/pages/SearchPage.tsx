@@ -53,6 +53,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
+import { SiTelegram } from "react-icons/si";
 import {
   Dialog,
   DialogContent,
@@ -2765,6 +2766,123 @@ export default function SearchPage() {
                   )}
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {searchMode === "telegram" && (
+            <motion.div
+              key="telegram"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="rounded-2xl overflow-hidden border border-[rgba(34,158,217,0.2)] bg-[rgba(34,158,217,0.03)]"
+            >
+              {/* Coming soon top banner */}
+              <div className="flex items-center gap-2.5 px-6 py-3 bg-[rgba(34,158,217,0.08)] border-b border-[rgba(34,158,217,0.18)]">
+                <Lock className="w-3.5 h-3.5 text-[#229ED9]" />
+                <span className="text-sm font-medium text-[#229ED9]">Fonctionnalité en cours de développement — bientôt disponible</span>
+                <Badge className="ml-auto bg-[rgba(34,158,217,0.15)] text-[#229ED9] border-[rgba(34,158,217,0.3)] text-[10px] font-bold tracking-widest px-2 py-0.5 hover:bg-[rgba(34,158,217,0.15)]">SOON</Badge>
+              </div>
+
+              <div className="p-6 md:p-8 space-y-8 relative">
+                {/* Blur overlay over the form */}
+                <div className="absolute inset-0 z-10 rounded-b-2xl flex flex-col items-center justify-center gap-4 backdrop-blur-[2px] bg-background/40">
+                  <div className="text-center space-y-4 max-w-sm px-6">
+                    <div className="w-20 h-20 rounded-2xl bg-[rgba(34,158,217,0.1)] border border-[rgba(34,158,217,0.25)] flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(34,158,217,0.12)]">
+                      <SiTelegram className="w-10 h-10 text-[#229ED9]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-xl font-bold">Bientôt disponible</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        La base Telegram est en cours d'indexation.<br />Cette fonctionnalité sera débloquée prochainement.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground/60 font-mono bg-muted/30 border border-border/40 rounded-lg px-4 py-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#229ED9] animate-pulse" />
+                      Indexation en cours…
+                    </div>
+                  </div>
+                </div>
+
+                {/* Panel content (blurred behind overlay) */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(34,158,217,0.1)] border border-[rgba(34,158,217,0.2)] flex items-center justify-center shrink-0">
+                    <SiTelegram className="w-5 h-5 text-[#229ED9]" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold">Telegram Lookup</h2>
+                    <p className="text-xs text-muted-foreground">Recherche dans la base de données Telegram indexée</p>
+                  </div>
+                </div>
+
+                {/* Search type tabs */}
+                <div className="space-y-5">
+                  <div className="flex gap-2">
+                    <button disabled className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-[rgba(34,158,217,0.12)] text-[#229ED9] border border-[rgba(34,158,217,0.3)] cursor-not-allowed opacity-70">
+                      ID Telegram
+                    </button>
+                    <button disabled className="px-4 py-1.5 rounded-lg text-sm font-medium text-muted-foreground border border-border/50 cursor-not-allowed opacity-50">
+                      Numéro de téléphone
+                    </button>
+                  </div>
+
+                  {/* Search by Telegram ID */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Hash className="w-4 h-4 text-[#229ED9]" />
+                      <label className="text-sm font-medium">ID Telegram</label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Identifiant numérique unique du compte (ex: 123456789)</p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Input
+                        disabled
+                        placeholder="Ex: 123456789"
+                        className="max-w-xs font-mono opacity-50 cursor-not-allowed"
+                        data-testid="input-telegram-id"
+                      />
+                      <Button disabled className="gap-2 opacity-50 cursor-not-allowed" data-testid="button-telegram-search-id">
+                        <Search className="w-4 h-4" />
+                        Rechercher
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Search by phone */}
+                  <div className="space-y-2 pt-2 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-[#229ED9]" />
+                      <label className="text-sm font-medium">Numéro de téléphone</label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Retrouvez un compte Telegram associé à un numéro</p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Input
+                        disabled
+                        placeholder="Ex: +33 6 12 34 56 78"
+                        className="max-w-xs font-mono opacity-50 cursor-not-allowed"
+                        data-testid="input-telegram-phone"
+                      />
+                      <Button disabled className="gap-2 opacity-50 cursor-not-allowed" data-testid="button-telegram-search-phone">
+                        <Search className="w-4 h-4" />
+                        Rechercher
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  {[
+                    { title: "ID → Profil", desc: "Retrouvez un profil à partir de son identifiant unique Telegram" },
+                    { title: "Téléphone → Compte", desc: "Associez un numéro de téléphone à un compte Telegram" },
+                    { title: "Base indexée", desc: "Milliards d'entrées issues de groupes publics et leaks Telegram" },
+                  ].map(({ title, desc }) => (
+                    <div key={title} className="rounded-xl border border-[rgba(34,158,217,0.12)] bg-[rgba(34,158,217,0.04)] p-4 space-y-1.5">
+                      <p className="text-[#229ED9] font-semibold text-sm">{title}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
