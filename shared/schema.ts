@@ -641,6 +641,25 @@ export const reviews = pgTable("reviews", {
 });
 
 export type Review = typeof reviews.$inferSelect;
+
+export const gameLogs = pgTable("game_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  email: text("email"),
+  sessionEmail: text("session_email"),
+  username: text("username"),
+  uniqueId: integer("unique_id"),
+  discordId: text("discord_id"),
+  ipAddress: text("ip_address"),
+  score: integer("score").notNull(),
+  creditsEarned: integer("credits_earned").notNull().default(0),
+  boostMultiplier: real("boost_multiplier").notNull().default(1),
+  boostName: text("boost_name"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type GameLog = typeof gameLogs.$inferSelect;
+export type InsertGameLog = typeof gameLogs.$inferInsert;
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, status: true, verified: true, reviewedAt: true, reviewedBy: true, createdAt: true }).extend({
   rating: z.number().int().min(1).max(5),
   comment: z.string().min(10).max(1000),

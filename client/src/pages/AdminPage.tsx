@@ -2,7 +2,7 @@ import { useState, useEffect, Component, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest, WantedProfile, InsertWantedProfile, InsertBlacklistEntry, LoginLog, SearchLog, Review } from "@shared/schema";
+import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest, WantedProfile, InsertWantedProfile, InsertBlacklistEntry, LoginLog, SearchLog, Review, GameLog } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -104,7 +104,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "services" | "notifications" | "search-logs" | "reviews";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -116,6 +116,7 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "ipblock", label: "IP Blacklist", icon: Ban },
   { key: "logs", label: "Logs Connexions", icon: Activity },
   { key: "search-logs", label: "Logs Recherches", icon: DatabaseZap },
+  { key: "game-logs", label: "Logs de Jeu", icon: Gamepad2 },
   { key: "reviews", label: "Avis Clients", icon: MessageSquare },
   { key: "discounts", label: "Codes Promo", icon: Tag },
   { key: "game-boosts", label: "Boosts Jeu", icon: Zap },
@@ -3996,6 +3997,125 @@ function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => Promise
   );
 }
 
+function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<string | null> }) {
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({ userId: "", dateFrom: "", dateTo: "" });
+  const [applied, setApplied] = useState({ userId: "", dateFrom: "", dateTo: "" });
+
+  const { data, isLoading } = useQuery<{ rows: GameLog[]; total: number }>({
+    queryKey: ["/api/admin/game-logs", applied, page],
+    queryFn: async () => {
+      const token = await getAccessToken();
+      const params = new URLSearchParams({ page: String(page), limit: "50" });
+      if (applied.userId) params.set("userId", applied.userId);
+      if (applied.dateFrom) params.set("dateFrom", applied.dateFrom);
+      if (applied.dateTo) params.set("dateTo", applied.dateTo);
+      const res = await fetch(`/api/admin/game-logs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      return res.json();
+    },
+  });
+
+  const totalPages = data ? Math.ceil(data.total / 50) : 1;
+  const totalScore = data?.rows.reduce((a, r) => a + r.score, 0) ?? 0;
+  const totalCredits = data?.rows.reduce((a, r) => a + r.creditsEarned, 0) ?? 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">User ID</Label>
+            <Input data-testid="input-gamelog-userid" placeholder="UUID" value={filters.userId} onChange={e => setFilters(f => ({ ...f, userId: e.target.value }))} className="h-8 text-sm font-mono" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Date début</Label>
+            <Input data-testid="input-gamelog-datefrom" type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Date fin</Label>
+            <Input data-testid="input-gamelog-dateto" type="date" value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} className="h-8 text-sm" />
+          </div>
+          <div className="flex items-end gap-2">
+            <Button data-testid="button-gamelog-filter" size="sm" className="h-8 flex-1" onClick={() => { setApplied({ ...filters }); setPage(1); }}>
+              <Filter className="w-3.5 h-3.5 mr-1.5" />Filtrer
+            </Button>
+            <Button data-testid="button-gamelog-reset" size="sm" variant="outline" className="h-8" onClick={() => { const e = { userId: "", dateFrom: "", dateTo: "" }; setFilters(e); setApplied(e); setPage(1); }}>
+              <RotateCcw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Stats + pagination */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground flex-wrap gap-2">
+        <div className="flex items-center gap-4">
+          <span>{data?.total ?? 0} partie(s)</span>
+          {data && data.rows.length > 0 && (
+            <>
+              <span className="text-amber-400 font-medium">Score total : {totalScore.toLocaleString("fr-FR")}</span>
+              <span className="text-primary font-medium">Crédits : {totalCredits.toLocaleString("fr-FR")}</span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-gamelog-prev">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <span className="text-xs">Page {page}/{totalPages || 1}</span>
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-gamelog-next">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Rows */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+      ) : !data?.rows.length ? (
+        <Card className="p-8 text-center text-muted-foreground text-sm">Aucun log de jeu pour ces filtres.</Card>
+      ) : (
+        <div className="space-y-1.5">
+          {data.rows.map(log => (
+            <Card key={log.id} className="px-4 py-2.5 hover:bg-muted/30 transition-colors" data-testid={`row-gamelog-${log.id}`}>
+              <div className="flex items-start gap-3 flex-wrap">
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge className="text-[10px] px-1.5 py-0 font-mono bg-amber-500/20 text-amber-400 border-amber-500/30">
+                    {log.score.toLocaleString("fr-FR")} pts
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-primary font-mono">
+                    +{log.creditsEarned} cr
+                  </Badge>
+                  {log.boostMultiplier > 1 && (
+                    <Badge className="text-[10px] px-1.5 py-0 bg-purple-500/20 text-purple-400 border-purple-500/30">
+                      x{log.boostMultiplier} {log.boostName ?? "Boost"}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium truncate max-w-[160px]" data-testid={`text-gamelog-user-${log.id}`}>{log.username || "Agent"}</span>
+                    {log.email && <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]" data-testid={`text-gamelog-email-${log.id}`}>{log.email}</span>}
+                    {log.sessionEmail && log.sessionEmail !== log.email && (
+                      <span className="text-xs text-muted-foreground/60 font-mono truncate max-w-[180px]">({log.sessionEmail})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
+                    {log.ipAddress && <span className="font-mono" data-testid={`text-gamelog-ip-${log.id}`}>{log.ipAddress}</span>}
+                    {log.discordId && <span className="text-indigo-400 font-mono">@{log.discordId}</span>}
+                    {log.uniqueId && <span className="font-mono">#{log.uniqueId}</span>}
+                    <span>{new Date(log.createdAt).toLocaleString("fr-FR")}</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 class AdminErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error?: Error }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -4162,6 +4282,10 @@ function AdminPageInner() {
 
             {activeTab === "search-logs" && (
               <SearchLogsSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "game-logs" && (
+              <GameLogsSection getAccessToken={getAccessToken} />
             )}
 
             {activeTab === "reviews" && (

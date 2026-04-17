@@ -3,7 +3,7 @@ import {
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
   blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes, gameBoosts,
-  searchLogs, reviews,
+  searchLogs, reviews, gameLogs,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -15,6 +15,7 @@ import {
   type ReferralCode, type ReferralEvent, type LoginLog,
   type DiscountCode, type GameBoost, type ServiceStatus,
   type SearchLog, type InsertSearchLog, type Review, type InsertReview,
+  type GameLog, type InsertGameLog,
   serviceStatus,
   PLAN_LIMITS,
 } from "@shared/schema";
@@ -150,6 +151,8 @@ export interface IStorage {
   updateReviewStatus(id: number, status: string, reviewedBy?: string): Promise<Review | undefined>;
   deleteReview(id: number): Promise<boolean>;
   getUserReview(userId: string): Promise<Review | undefined>;
+  createGameLog(data: InsertGameLog): Promise<void>;
+  getGameLogs(filters: { userId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ rows: GameLog[]; total: number }>;
 }
 
 function hashKey(key: string): string {
@@ -1329,6 +1332,34 @@ export class DatabaseStorage implements IStorage {
   async getUserReview(userId: string): Promise<Review | undefined> {
     const rows = await db.select().from(reviews).where(eq(reviews.userId, userId)).limit(1);
     return rows[0];
+  }
+
+  async createGameLog(data: InsertGameLog): Promise<void> {
+    try {
+      await db.insert(gameLogs).values(data);
+    } catch (e) {
+      console.error("[createGameLog] error:", e);
+    }
+  }
+
+  async getGameLogs(filters: { userId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ rows: GameLog[]; total: number }> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 50;
+    const offset = (page - 1) * limit;
+    const conditions: ReturnType<typeof eq>[] = [];
+    if (filters.userId) conditions.push(eq(gameLogs.userId, filters.userId));
+    if (filters.dateFrom) conditions.push(gte(gameLogs.createdAt, new Date(filters.dateFrom)));
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      conditions.push(lte(gameLogs.createdAt, to));
+    }
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const [rows, [{ value: total }]] = await Promise.all([
+      db.select().from(gameLogs).where(where).orderBy(desc(gameLogs.createdAt)).limit(limit).offset(offset),
+      db.select({ value: count() }).from(gameLogs).where(where),
+    ]);
+    return { rows, total: Number(total) };
   }
 }
 

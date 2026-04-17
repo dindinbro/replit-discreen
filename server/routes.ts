@@ -4947,6 +4947,7 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
           const creditsEarned = Math.floor(finalScore / 60) * boostMultiplier;
           const sessionProvider = (req.user.app_metadata as any)?.provider as string | undefined;
           const sessionEmail = await getSessionEmail(userId, sessionProvider);
+          const creditsInt = Math.floor(creditsEarned);
           webhookGameLog({
             id: userId,
             email: req.user.email || "N/A",
@@ -4955,7 +4956,20 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
             uniqueId: profile?.unique_id ?? undefined,
             discordId: profile?.discord_id ?? null,
             ip,
-          }, finalScore, Math.floor(creditsEarned));
+          }, finalScore, creditsInt);
+          storage.createGameLog({
+            userId,
+            email: req.user.email ?? null,
+            sessionEmail: sessionEmail ?? null,
+            username,
+            uniqueId: profile?.unique_id ?? null,
+            discordId: profile?.discord_id ?? null,
+            ipAddress: ip !== "N/A" ? ip : null,
+            score: finalScore,
+            creditsEarned: creditsInt,
+            boostMultiplier,
+            boostName: boostName ?? null,
+          });
         }
       } catch {}
 
@@ -5194,6 +5208,24 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
     } catch (err: any) {
       console.error("[admin/reviews/delete] error:", err);
       res.status(500).json({ message: "Erreur lors de la suppression de l'avis." });
+    }
+  });
+
+  // ─── GAME LOGS ──────────────────────────────────────────────────────────────
+
+  app.get("/api/admin/game-logs", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const page = req.query.page ? Number(req.query.page) : 1;
+      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const filters: { userId?: string; dateFrom?: string; dateTo?: string; page: number; limit: number } = { page, limit };
+      if (req.query.userId) filters.userId = String(req.query.userId);
+      if (req.query.dateFrom) filters.dateFrom = String(req.query.dateFrom);
+      if (req.query.dateTo) filters.dateTo = String(req.query.dateTo);
+      const result = await storage.getGameLogs(filters);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[admin/game-logs] error:", err);
+      res.status(500).json({ message: "Erreur interne." });
     }
   });
 
