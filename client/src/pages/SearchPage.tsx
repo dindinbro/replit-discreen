@@ -819,10 +819,10 @@ export default function SearchPage() {
   const [searchTime, setSearchTime] = useState<number | null>(null);
   const searchStartRef = useRef<number>(0);
   const [searchElapsed, setSearchElapsed] = useState(0);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock">(() => {
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock" | "telegram">(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    const valid = ["internal", "external", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock"];
+    const valid = ["internal", "external", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
     return (m && valid.includes(m) ? m : "internal") as any;
   });
 
@@ -850,7 +850,7 @@ export default function SearchPage() {
     const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      const valid = ["internal", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock"];
+      const valid = ["internal", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
       if (m && valid.includes(m)) {
         setSearchMode(current => {
           if (current !== m) {
