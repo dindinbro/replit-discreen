@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -3996,7 +3996,37 @@ function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => Promise
   );
 }
 
-export default function AdminPage() {
+class AdminErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error?: Error }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-6">
+          <div className="max-w-xl w-full space-y-4 text-center">
+            <ShieldAlert className="w-12 h-12 text-destructive mx-auto" />
+            <h2 className="text-xl font-semibold">Erreur dans le panel admin</h2>
+            <p className="text-sm text-muted-foreground">Une erreur JavaScript s'est produite. Vérifiez la console du navigateur pour plus de détails.</p>
+            <pre className="text-xs text-left bg-muted p-4 rounded-lg overflow-auto max-h-48 text-red-400 border border-destructive/20">
+              {this.state.error?.message}
+              {"\n"}
+              {this.state.error?.stack}
+            </pre>
+            <Button onClick={() => this.setState({ hasError: false })}>Réessayer</Button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AdminPageInner() {
   const { user, role, loading: authLoading, getAccessToken } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<AdminTab>("users");
@@ -4141,5 +4171,13 @@ export default function AdminPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <AdminErrorBoundary>
+      <AdminPageInner />
+    </AdminErrorBoundary>
   );
 }
