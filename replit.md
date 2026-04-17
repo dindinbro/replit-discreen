@@ -42,8 +42,22 @@ The project is organized as a monorepo containing a React frontend (`client/`), 
 - **Bypass Whitelist**: Accounts added via Discord `/abypass add <idunique>` are exempt from all restrictions (freeze, daily quotas, cooldowns, abnormal activity alerts). Stored in `site_settings` as `bypass_whitelist` (JSON array of unique IDs). Cached for 60s. Managed with `/abypass add`, `/abypass remove`, `/abypass list` (admin-only).
 
 ### Data Storage
-- **PostgreSQL (via Drizzle ORM)**: Used for core application data such as users, subscriptions, and vouches.
+- **PostgreSQL (via Drizzle ORM)**: Used for core application data such as users, subscriptions, vouches, search logs, and reviews.
 - **SQLite (via better-sqlite3)**: Dedicated FTS5 databases for the primary search functionality.
+
+### Search Logging System (NEW)
+- Every search (interne, externe, breach, leakosint, dalton, phone, geoip) is now stored in the `search_logs` DB table.
+- Captures: userId, email, username, discordId, searchType, searchQuery, resultCount, ipAddress, userAgent, subscriptionTier, timestamp.
+- Admin endpoint: `GET /api/admin/search-logs` — paginated, filterable by userId, type, date range, query string.
+- Discord webhooks are kept for alerts; DB is the primary log store.
+
+### Reviews System (NEW)
+- Users can submit reviews via `POST /api/reviews` (one per account). Reviews start with `status: pending`.
+- Admin moderation via `GET/PATCH/DELETE /api/admin/reviews` — approve/reject/delete.
+- `verified` flag auto-set for users with an active non-free subscription.
+- Discord notification sent to `DISCORD_WEBHOOK_URL` on new review submission.
+- Public endpoint: `GET /api/reviews` — returns approved reviews only.
+- Legacy Discord vouches (`/api/vouches`) remain intact and displayed separately.
 
 ### Core Features
 - **Dynamic Search Criteria**: Users can add various search filters (e.g., username, email, IP), which the backend uses for full-text search.

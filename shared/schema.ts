@@ -606,3 +606,43 @@ export const serviceStatus = pgTable("service_status", {
 export type ServiceStatus = typeof serviceStatus.$inferSelect;
 export const insertServiceStatusSchema = createInsertSchema(serviceStatus).omit({ id: true, updatedAt: true });
 export type InsertServiceStatus = z.infer<typeof insertServiceStatusSchema>;
+
+export const searchLogs = pgTable("search_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  email: text("email"),
+  username: text("username"),
+  discordId: text("discord_id"),
+  searchType: text("search_type").notNull(),
+  searchQuery: text("search_query").notNull(),
+  resultCount: integer("result_count").notNull().default(0),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  subscriptionTier: text("subscription_tier").notNull().default("free"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type SearchLog = typeof searchLogs.$inferSelect;
+export type InsertSearchLog = typeof searchLogs.$inferInsert;
+
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  username: text("username"),
+  email: text("email"),
+  subscriptionTier: text("subscription_tier").notNull().default("free"),
+  rating: integer("rating").notNull(),
+  comment: text("comment").notNull(),
+  status: text("status").notNull().default("pending"),
+  verified: boolean("verified").notNull().default(false),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: text("reviewed_by"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type Review = typeof reviews.$inferSelect;
+export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, status: true, verified: true, reviewedAt: true, reviewedBy: true, createdAt: true }).extend({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().min(10).max(1000),
+});
+export type InsertReview = z.infer<typeof insertReviewSchema>;

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest, WantedProfile, InsertWantedProfile, InsertBlacklistEntry, LoginLog } from "@shared/schema";
+import type { Category, BlacklistRequest, BlacklistEntry, InfoRequest, WantedProfile, InsertWantedProfile, InsertBlacklistEntry, LoginLog, SearchLog, Review } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,16 @@ import {
   Sparkles,
   Timer,
   EyeOff,
+  Star,
+  MessageSquare,
+  DatabaseZap,
+  Filter,
+  ChevronLeft,
+  CheckCircle2,
+  XCircle,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -94,7 +104,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "services" | "notifications";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "services" | "notifications" | "search-logs" | "reviews";
 
 const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "users", label: "Gestion des utilisateurs", icon: Users },
@@ -105,6 +115,8 @@ const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
   { key: "dof", label: "D.O.F - Disques", icon: Disc3 },
   { key: "ipblock", label: "IP Blacklist", icon: Ban },
   { key: "logs", label: "Logs Connexions", icon: Activity },
+  { key: "search-logs", label: "Logs Recherches", icon: DatabaseZap },
+  { key: "reviews", label: "Avis Clients", icon: MessageSquare },
   { key: "discounts", label: "Codes Promo", icon: Tag },
   { key: "game-boosts", label: "Boosts Jeu", icon: Zap },
   { key: "services", label: "Statut Services", icon: Monitor },
@@ -3675,6 +3687,315 @@ function GameBoostsSection({ getAccessToken }: { getAccessToken: () => string | 
   );
 }
 
+const SEARCH_TYPE_LABELS: Record<string, string> = {
+  interne: "Interne",
+  externe: "Externe",
+  breach: "Breach",
+  phone: "Téléphone",
+  geoip: "GeoIP",
+  leakosint: "LeakOSINT",
+  dalton: "Dalton",
+  nir: "NIR",
+  sherlock: "Sherlock",
+  xeuledoc: "Xeuledoc",
+  fivem: "FiveM",
+  wanted: "Wanted",
+};
+
+const TIER_COLORS: Record<string, string> = {
+  free: "bg-muted text-muted-foreground",
+  vip: "bg-amber-500/20 text-amber-400",
+  pro: "bg-blue-500/20 text-blue-400",
+  business: "bg-purple-500/20 text-purple-400",
+  api: "bg-green-500/20 text-green-400",
+};
+
+function SearchLogsSection({ getAccessToken }: { getAccessToken: () => Promise<string | null> }) {
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
+  const [applied, setApplied] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
+
+  const { data, isLoading } = useQuery<{ rows: SearchLog[]; total: number }>({
+    queryKey: ["/api/admin/search-logs", applied, page],
+    queryFn: async () => {
+      const token = await getAccessToken();
+      const params = new URLSearchParams({ page: String(page), limit: "50" });
+      if (applied.userId) params.set("userId", applied.userId);
+      if (applied.searchType) params.set("searchType", applied.searchType);
+      if (applied.dateFrom) params.set("dateFrom", applied.dateFrom);
+      if (applied.dateTo) params.set("dateTo", applied.dateTo);
+      if (applied.query) params.set("query", applied.query);
+      const res = await fetch(`/api/admin/search-logs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      return res.json();
+    },
+  });
+
+  const totalPages = data ? Math.ceil(data.total / 50) : 1;
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">User ID</Label>
+            <Input data-testid="input-log-filter-userid" placeholder="UUID utilisateur" value={filters.userId} onChange={e => setFilters(f => ({ ...f, userId: e.target.value }))} className="h-8 text-sm font-mono" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Type de recherche</Label>
+            <Select value={filters.searchType || "all"} onValueChange={v => setFilters(f => ({ ...f, searchType: v === "all" ? "" : v }))}>
+              <SelectTrigger className="h-8 text-sm" data-testid="select-log-filter-type">
+                <SelectValue placeholder="Tous les types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                {Object.entries(SEARCH_TYPE_LABELS).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Terme recherché</Label>
+            <Input data-testid="input-log-filter-query" placeholder="email, ip, nom…" value={filters.query} onChange={e => setFilters(f => ({ ...f, query: e.target.value }))} className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Date début</Label>
+            <Input data-testid="input-log-filter-datefrom" type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Date fin</Label>
+            <Input data-testid="input-log-filter-dateto" type="date" value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} className="h-8 text-sm" />
+          </div>
+          <div className="flex items-end gap-2">
+            <Button data-testid="button-log-apply-filters" size="sm" className="h-8 flex-1" onClick={() => { setApplied({ ...filters }); setPage(1); }}>
+              <Filter className="w-3.5 h-3.5 mr-1.5" />Filtrer
+            </Button>
+            <Button data-testid="button-log-reset-filters" size="sm" variant="outline" className="h-8" onClick={() => { const e = { userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" }; setFilters(e); setApplied(e); setPage(1); }}>
+              <RotateCcw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>{data?.total ?? 0} log(s) trouvé(s)</span>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-log-prev">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <span className="text-xs">Page {page}/{totalPages || 1}</span>
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-log-next">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : data?.rows.length === 0 ? (
+        <Card className="p-8 text-center text-muted-foreground text-sm">Aucun log pour ces filtres.</Card>
+      ) : (
+        <div className="space-y-1.5">
+          {data?.rows.map(log => (
+            <Card key={log.id} className="px-4 py-2.5 hover:bg-muted/30 transition-colors" data-testid={`row-log-${log.id}`}>
+              <div className="flex items-start gap-3 flex-wrap">
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge className={`text-[10px] px-1.5 py-0 font-mono uppercase ${TIER_COLORS[log.subscriptionTier] ?? "bg-muted text-muted-foreground"}`}>
+                    {log.subscriptionTier}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                    {SEARCH_TYPE_LABELS[log.searchType] ?? log.searchType}
+                  </Badge>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium truncate max-w-[200px]" data-testid={`text-log-user-${log.id}`}>{log.username || log.email || log.userId}</span>
+                    <span className="text-xs text-muted-foreground font-mono truncate max-w-[300px]" data-testid={`text-log-query-${log.id}`}>{log.searchQuery}</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
+                    <span data-testid={`text-log-results-${log.id}`}>{log.resultCount} résultat(s)</span>
+                    {log.ipAddress && <span className="font-mono">{log.ipAddress}</span>}
+                    <span>{new Date(log.createdAt).toLocaleString("fr-FR")}</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StarsRating({ rating, onChange }: { rating: number; onChange?: (r: number) => void }) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(n => (
+        <Star
+          key={n}
+          className={`w-5 h-5 cursor-pointer transition-colors ${(onChange ? (hover || rating) : rating) >= n ? "text-amber-400 fill-amber-400" : "text-muted-foreground"}`}
+          onMouseEnter={() => onChange && setHover(n)}
+          onMouseLeave={() => onChange && setHover(0)}
+          onClick={() => onChange?.(n)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => Promise<string | null> }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = useQuery<{ rows: Review[]; total: number }>({
+    queryKey: ["/api/admin/reviews", statusFilter, page],
+    queryFn: async () => {
+      const token = await getAccessToken();
+      const params = new URLSearchParams({ status: statusFilter, page: String(page), limit: "20" });
+      const res = await fetch(`/api/admin/reviews?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      return res.json();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/admin/reviews/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Erreur lors de la mise à jour");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
+      toast({ title: "Avis mis à jour" });
+    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de mettre à jour l'avis.", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/admin/reviews/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erreur lors de la suppression");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
+      toast({ title: "Avis supprimé" });
+    },
+    onError: () => toast({ title: "Erreur", description: "Impossible de supprimer l'avis.", variant: "destructive" }),
+  });
+
+  const totalPages = data ? Math.ceil(data.total / 20) : 1;
+
+  const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+    pending: { label: "En attente", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+    approved: { label: "Approuvé", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+    rejected: { label: "Refusé", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        {["all", "pending", "approved", "rejected"].map(s => (
+          <button
+            key={s}
+            data-testid={`button-review-filter-${s}`}
+            onClick={() => { setStatusFilter(s); setPage(1); }}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+              statusFilter === s
+                ? "bg-primary/10 text-primary border-primary/30"
+                : "text-muted-foreground border-border/50 hover:bg-muted/50"
+            }`}
+          >
+            {s === "all" ? "Tous" : STATUS_CONFIG[s]?.label}
+          </button>
+        ))}
+        <span className="text-sm text-muted-foreground ml-auto">{data?.total ?? 0} avis</span>
+      </div>
+
+      <div className="flex justify-end">
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-reviews-prev">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <span className="text-xs text-muted-foreground">Page {page}/{totalPages || 1}</span>
+          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-reviews-next">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : data?.rows.length === 0 ? (
+        <Card className="p-8 text-center text-muted-foreground text-sm">Aucun avis pour ce filtre.</Card>
+      ) : (
+        <div className="space-y-3">
+          {data?.rows.map(review => (
+            <Card key={review.id} className="p-4 space-y-3" data-testid={`card-review-${review.id}`}>
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm" data-testid={`text-review-user-${review.id}`}>{review.username || review.email || review.userId}</span>
+                    <Badge className={`text-[10px] px-1.5 py-0 border ${TIER_COLORS[review.subscriptionTier] ?? "bg-muted text-muted-foreground"}`}>
+                      {review.subscriptionTier}
+                    </Badge>
+                    {review.verified && (
+                      <Badge className="text-[10px] px-1.5 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30">
+                        <CheckCircle2 className="w-2.5 h-2.5 mr-1" />Vérifié
+                      </Badge>
+                    )}
+                    <Badge className={`text-[10px] px-1.5 py-0 border ml-auto ${STATUS_CONFIG[review.status]?.color ?? ""}`}>
+                      {STATUS_CONFIG[review.status]?.label ?? review.status}
+                    </Badge>
+                  </div>
+                  <StarsRating rating={review.rating} />
+                  <p className="text-sm text-muted-foreground leading-relaxed" data-testid={`text-review-comment-${review.id}`}>{review.comment}</p>
+                  <p className="text-[11px] text-muted-foreground/60">{new Date(review.createdAt).toLocaleString("fr-FR")}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1 border-t border-border/30">
+                {review.status !== "approved" && (
+                  <Button size="sm" variant="outline" className="h-7 text-green-400 border-green-500/30 hover:bg-green-500/10 gap-1" onClick={() => updateMutation.mutate({ id: review.id, status: "approved" })} disabled={updateMutation.isPending} data-testid={`button-review-approve-${review.id}`}>
+                    <ThumbsUp className="w-3.5 h-3.5" />Approuver
+                  </Button>
+                )}
+                {review.status !== "rejected" && (
+                  <Button size="sm" variant="outline" className="h-7 text-amber-400 border-amber-500/30 hover:bg-amber-500/10 gap-1" onClick={() => updateMutation.mutate({ id: review.id, status: "rejected" })} disabled={updateMutation.isPending} data-testid={`button-review-reject-${review.id}`}>
+                    <ThumbsDown className="w-3.5 h-3.5" />Refuser
+                  </Button>
+                )}
+                {review.status !== "pending" && (
+                  <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => updateMutation.mutate({ id: review.id, status: "pending" })} disabled={updateMutation.isPending} data-testid={`button-review-pending-${review.id}`}>
+                    <RotateCcw className="w-3.5 h-3.5" />En attente
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" className="h-7 text-destructive border-destructive/30 hover:bg-destructive/10 gap-1 ml-auto" onClick={() => deleteMutation.mutate(review.id)} disabled={deleteMutation.isPending} data-testid={`button-review-delete-${review.id}`}>
+                  <Trash2 className="w-3.5 h-3.5" />Supprimer
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user, role, loading: authLoading, getAccessToken } = useAuth();
   const [, navigate] = useLocation();
@@ -3807,6 +4128,14 @@ export default function AdminPage() {
 
             {activeTab === "notifications" && (
               <NotificationsSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "search-logs" && (
+              <SearchLogsSection getAccessToken={getAccessToken} />
+            )}
+
+            {activeTab === "reviews" && (
+              <AdminReviewsSection getAccessToken={getAccessToken} />
             )}
           </main>
         </div>

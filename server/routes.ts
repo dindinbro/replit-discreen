@@ -105,6 +105,32 @@ async function buildUserInfo(req: Request): Promise<{ id: string; email: string;
   return { id: userId, email, username, uniqueId, discordId, bypassed };
 }
 
+async function logSearchToDb(req: Request, wUser: Awaited<ReturnType<typeof buildUserInfo>>, searchType: string, searchQuery: string, resultCount: number): Promise<void> {
+  try {
+    const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket?.remoteAddress || null;
+    const userAgent = req.headers["user-agent"] || null;
+    let tier = "free";
+    try {
+      const sub = await storage.getSubscription(wUser.id);
+      tier = sub?.tier ?? "free";
+    } catch {}
+    await storage.createSearchLog({
+      userId: wUser.id,
+      email: wUser.email || null,
+      username: wUser.username || null,
+      discordId: wUser.discordId || null,
+      searchType,
+      searchQuery: searchQuery.slice(0, 500),
+      resultCount,
+      ipAddress: ip ?? null,
+      userAgent: userAgent ?? null,
+      subscriptionTier: tier,
+    });
+  } catch (e) {
+    console.error("[logSearchToDb] error:", e);
+  }
+}
+
 // Returns the email from the user's active session identity (provider-specific).
 // Pass the current session provider (from app_metadata.provider) so we return the
 // email used for THIS login (e.g. a different Google account than the Supabase account email).
@@ -2360,6 +2386,7 @@ export async function registerRoutes(
           webhookExternalProxySearch(wUser, criteriaStr, externalResults.length);
         }
       }
+      logSearchToDb(req, wUser, externalResults.length > 0 ? "externe" : "interne", criteriaStr, total ?? 0);
 
       if (!userBypassed) {
         const alertKey = `${userId}_${today}`;
@@ -2971,6 +2998,7 @@ export async function registerRoutes(
       if (!wUser.bypassed) {
         webhookBreachSearch(wUser, term, fields, resultCount);
       }
+      logSearchToDb(req, wUser, "breach", term, resultCount);
 
       res.json({
         results: data.results || [],
@@ -3183,6 +3211,7 @@ export async function registerRoutes(
       if (!wUser.bypassed) {
         webhookPhoneLookup(wUser, normalized);
       }
+      logSearchToDb(req, wUser, "phone", normalized, 1);
     } catch (err) {
       console.error("POST /api/phone/lookup error:", err);
       res.status(500).json({ ok: false, message: "Erreur interne" });
@@ -3215,6 +3244,7 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       if (!wUser.bypassed) webhookGeoIP(wUser, trimmed);
+      logSearchToDb(req, wUser, "geoip", trimmed, 1);
 
       res.json({
         ok: true,
@@ -3557,6 +3587,7 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
+      logSearchToDb(req, wUser, "leakosint", String(searchRequest), results.length);
 
       releaseApiSlot("leakosint");
 
@@ -3722,6 +3753,7 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), results.length, "ok");
+      logSearchToDb(req, wUser, "dalton", String(searchRequest), results.length);
 
       res.json({
         results,
@@ -5013,6 +5045,155 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
     } catch (err: any) {
       console.error("[admin/game/set] error:", err);
       res.status(500).json({ message: err?.message || "Erreur lors de la mise a jour." });
+    }
+  });
+
+  // ─── SEARCH LOGS ───────────────────────────────────────────────────────────
+
+  app.get("/api/admin/search-logs", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const { userId, searchType, dateFrom, dateTo, query, page, limit } = req.query;
+      const result = await storage.getSearchLogs({
+        userId: userId as string | undefined,
+        searchType: searchType as string | undefined,
+        dateFrom: dateFrom as string | undefined,
+        dateTo: dateTo as string | undefined,
+        query: query as string | undefined,
+        page: page ? Number(page) : 1,
+        limit: limit ? Number(limit) : 50,
+      });
+      res.json(result);
+    } catch (err: any) {
+      console.error("[admin/search-logs] error:", err);
+      res.status(500).json({ message: "Erreur lors de la récupération des logs." });
+    }
+  });
+
+  // ─── REVIEWS ───────────────────────────────────────────────────────────────
+
+  app.get("/api/reviews/me", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Non authentifié." });
+      const review = await storage.getUserReview(userId);
+      if (!review) return res.status(404).json(null);
+      res.json(review);
+    } catch (err: any) {
+      res.status(500).json({ message: "Erreur interne." });
+    }
+  });
+
+  app.get("/api/reviews", async (req: any, res) => {
+    try {
+      const page = req.query.page ? Number(req.query.page) : 1;
+      const limit = req.query.limit ? Number(req.query.limit) : 20;
+      const result = await storage.getApprovedReviews(page, limit);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[reviews/get] error:", err);
+      res.status(500).json({ message: "Erreur lors de la récupération des avis." });
+    }
+  });
+
+  app.post("/api/reviews", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Non authentifié." });
+      const existing = await storage.getUserReview(userId);
+      if (existing) {
+        return res.status(409).json({ message: "Vous avez déjà soumis un avis." });
+      }
+      const { rating, comment } = req.body;
+      if (!rating || !comment) return res.status(400).json({ message: "Note et commentaire requis." });
+      if (typeof rating !== "number" || rating < 1 || rating > 5) return res.status(400).json({ message: "Note invalide (1-5)." });
+      if (typeof comment !== "string" || comment.trim().length < 10) return res.status(400).json({ message: "Le commentaire doit faire au moins 10 caractères." });
+      if (comment.trim().length > 1000) return res.status(400).json({ message: "Le commentaire ne peut pas dépasser 1000 caractères." });
+      const email = req.user?.email || null;
+      const username = req.user?.user_metadata?.username || req.user?.user_metadata?.display_name || email?.split("@")[0] || null;
+      let tier = "free";
+      let verified = false;
+      try {
+        const sub = await storage.getSubscription(userId);
+        tier = sub?.tier ?? "free";
+        verified = tier !== "free" && (!sub?.expiresAt || new Date(sub.expiresAt) > new Date());
+      } catch {}
+      const review = await storage.createReview({
+        userId,
+        username,
+        email,
+        subscriptionTier: tier,
+        rating,
+        comment: comment.trim(),
+        verified,
+      });
+      const discordWebhook = process.env.DISCORD_WEBHOOK_URL;
+      if (discordWebhook) {
+        fetch(discordWebhook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            embeds: [{
+              title: "⭐ Nouvel avis client",
+              color: 0xf59e0b,
+              fields: [
+                { name: "Utilisateur", value: username || userId, inline: true },
+                { name: "Note", value: `${"⭐".repeat(rating)} (${rating}/5)`, inline: true },
+                { name: "Abonnement", value: tier, inline: true },
+                { name: "Commentaire", value: comment.trim().slice(0, 1000) },
+              ],
+              timestamp: new Date().toISOString(),
+            }],
+          }),
+        }).catch(() => {});
+      }
+      res.json({ ok: true, review });
+    } catch (err: any) {
+      console.error("[reviews/post] error:", err);
+      res.status(500).json({ message: "Erreur lors de la soumission de l'avis." });
+    }
+  });
+
+  app.get("/api/admin/reviews", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const { status, page, limit } = req.query;
+      const result = await storage.getAdminReviews({
+        status: status as string | undefined,
+        page: page ? Number(page) : 1,
+        limit: limit ? Number(limit) : 20,
+      });
+      res.json(result);
+    } catch (err: any) {
+      console.error("[admin/reviews] error:", err);
+      res.status(500).json({ message: "Erreur lors de la récupération des avis." });
+    }
+  });
+
+  app.patch("/api/admin/reviews/:id", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { status } = req.body;
+      if (!["approved", "rejected", "pending"].includes(status)) {
+        return res.status(400).json({ message: "Statut invalide." });
+      }
+      const adminId = req.user?.id;
+      const updated = await storage.updateReviewStatus(id, status, adminId);
+      if (!updated) return res.status(404).json({ message: "Avis introuvable." });
+      res.json({ ok: true, review: updated });
+    } catch (err: any) {
+      console.error("[admin/reviews/patch] error:", err);
+      res.status(500).json({ message: "Erreur lors de la mise à jour de l'avis." });
+    }
+  });
+
+  app.delete("/api/admin/reviews/:id", requireAuth, requireAdmin, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const deleted = await storage.deleteReview(id);
+      if (!deleted) return res.status(404).json({ message: "Avis introuvable." });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[admin/reviews/delete] error:", err);
+      res.status(500).json({ message: "Erreur lors de la suppression de l'avis." });
     }
   });
 

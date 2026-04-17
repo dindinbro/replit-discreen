@@ -3,6 +3,7 @@ import {
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
   blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes, gameBoosts,
+  searchLogs, reviews,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -13,11 +14,12 @@ import {
   type ActiveSession, type BlockedIp,
   type ReferralCode, type ReferralEvent, type LoginLog,
   type DiscountCode, type GameBoost, type ServiceStatus,
+  type SearchLog, type InsertSearchLog, type Review, type InsertReview,
   serviceStatus,
   PLAN_LIMITS,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, ilike, asc, desc, sql, lte } from "drizzle-orm";
+import { eq, and, or, ilike, asc, desc, sql, lte, gte, count } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface IStorage {
@@ -140,6 +142,14 @@ export interface IStorage {
   updateServiceStatus(id: number, data: Partial<{ name: string; description: string; status: string; latencyMs: number | null; uptime: string; sortOrder: number }>): Promise<ServiceStatus | null>;
   deleteServiceStatus(id: number): Promise<boolean>;
   getRecentSubscriptionActivity(): Promise<{ tier: string; createdAt: Date }[]>;
+  createSearchLog(data: InsertSearchLog): Promise<void>;
+  getSearchLogs(filters: { userId?: string; searchType?: string; dateFrom?: string; dateTo?: string; query?: string; page?: number; limit?: number }): Promise<{ rows: SearchLog[]; total: number }>;
+  createReview(data: InsertReview & { userId: string; username?: string; email?: string; subscriptionTier?: string; verified?: boolean }): Promise<Review>;
+  getApprovedReviews(page?: number, limit?: number): Promise<{ rows: Review[]; total: number }>;
+  getAdminReviews(filters: { status?: string; page?: number; limit?: number }): Promise<{ rows: Review[]; total: number }>;
+  updateReviewStatus(id: number, status: string, reviewedBy?: string): Promise<Review | undefined>;
+  deleteReview(id: number): Promise<boolean>;
+  getUserReview(userId: string): Promise<Review | undefined>;
 }
 
 function hashKey(key: string): string {
@@ -1230,6 +1240,95 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`${subscriptions.createdAt} DESC`)
       .limit(10);
     return rows.map(r => ({ tier: r.tier ?? "free", createdAt: r.createdAt }));
+  }
+
+  async createSearchLog(data: InsertSearchLog): Promise<void> {
+    try {
+      await db.insert(searchLogs).values({
+        userId: data.userId,
+        email: data.email ?? null,
+        username: data.username ?? null,
+        discordId: data.discordId ?? null,
+        searchType: data.searchType,
+        searchQuery: data.searchQuery,
+        resultCount: data.resultCount ?? 0,
+        ipAddress: data.ipAddress ?? null,
+        userAgent: data.userAgent ?? null,
+        subscriptionTier: data.subscriptionTier ?? "free",
+      });
+    } catch (e) {
+      console.error("[searchLog] Failed to write log:", e);
+    }
+  }
+
+  async getSearchLogs(filters: { userId?: string; searchType?: string; dateFrom?: string; dateTo?: string; query?: string; page?: number; limit?: number }): Promise<{ rows: SearchLog[]; total: number }> {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, filters.limit ?? 50);
+    const offset = (page - 1) * limit;
+    const conditions: ReturnType<typeof eq>[] = [];
+    if (filters.userId) conditions.push(eq(searchLogs.userId, filters.userId));
+    if (filters.searchType) conditions.push(eq(searchLogs.searchType, filters.searchType));
+    if (filters.dateFrom) conditions.push(gte(searchLogs.createdAt, new Date(filters.dateFrom)));
+    if (filters.dateTo) {
+      const d = new Date(filters.dateTo);
+      d.setHours(23, 59, 59, 999);
+      conditions.push(lte(searchLogs.createdAt, d));
+    }
+    if (filters.query) conditions.push(ilike(searchLogs.searchQuery, `%${filters.query}%`));
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const [totalRow] = await db.select({ c: count() }).from(searchLogs).where(where);
+    const rows = await db.select().from(searchLogs).where(where).orderBy(desc(searchLogs.createdAt)).limit(limit).offset(offset);
+    return { rows, total: Number(totalRow?.c ?? 0) };
+  }
+
+  async createReview(data: InsertReview & { userId: string; username?: string; email?: string; subscriptionTier?: string; verified?: boolean }): Promise<Review> {
+    const [row] = await db.insert(reviews).values({
+      userId: data.userId,
+      username: data.username ?? null,
+      email: data.email ?? null,
+      subscriptionTier: data.subscriptionTier ?? "free",
+      rating: data.rating,
+      comment: data.comment,
+      status: "pending",
+      verified: data.verified ?? false,
+    }).returning();
+    return row;
+  }
+
+  async getApprovedReviews(page = 1, limit = 20): Promise<{ rows: Review[]; total: number }> {
+    const offset = (page - 1) * limit;
+    const [totalRow] = await db.select({ c: count() }).from(reviews).where(eq(reviews.status, "approved"));
+    const rows = await db.select().from(reviews).where(eq(reviews.status, "approved")).orderBy(desc(reviews.createdAt)).limit(limit).offset(offset);
+    return { rows, total: Number(totalRow?.c ?? 0) };
+  }
+
+  async getAdminReviews(filters: { status?: string; page?: number; limit?: number }): Promise<{ rows: Review[]; total: number }> {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, filters.limit ?? 20);
+    const offset = (page - 1) * limit;
+    const where = filters.status && filters.status !== "all" ? eq(reviews.status, filters.status) : undefined;
+    const [totalRow] = await db.select({ c: count() }).from(reviews).where(where);
+    const rows = await db.select().from(reviews).where(where).orderBy(desc(reviews.createdAt)).limit(limit).offset(offset);
+    return { rows, total: Number(totalRow?.c ?? 0) };
+  }
+
+  async updateReviewStatus(id: number, status: string, reviewedBy?: string): Promise<Review | undefined> {
+    const [row] = await db.update(reviews).set({
+      status,
+      reviewedAt: new Date(),
+      reviewedBy: reviewedBy ?? null,
+    }).where(eq(reviews.id, id)).returning();
+    return row;
+  }
+
+  async deleteReview(id: number): Promise<boolean> {
+    const result = await db.delete(reviews).where(eq(reviews.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getUserReview(userId: string): Promise<Review | undefined> {
+    const rows = await db.select().from(reviews).where(eq(reviews.userId, userId)).limit(1);
+    return rows[0];
   }
 }
 
