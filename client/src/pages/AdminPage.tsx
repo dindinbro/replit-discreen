@@ -44,6 +44,7 @@ import {
   Crosshair,
   FileText,
   ChevronRight,
+  ChevronDown,
   Wrench,
   KeyRound,
   Ban,
@@ -74,6 +75,11 @@ import {
   ThumbsUp,
   ThumbsDown,
   RotateCcw,
+  Menu,
+  BarChart3,
+  Settings,
+  Shield,
+  BookOpen,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -106,22 +112,48 @@ const PRESET_COLORS = [
 
 type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews";
 
-const ADMIN_TABS: { key: AdminTab; label: string; icon: typeof Users }[] = [
-  { key: "users", label: "Gestion des utilisateurs", icon: Users },
-  { key: "keys", label: "Cles & Abonnements", icon: KeyRound },
-  { key: "blacklist", label: "Demandes de blacklist", icon: ShieldBan },
-  { key: "info", label: "Demandes d'information", icon: FileText },
-  { key: "wanted", label: "Wanted", icon: Crosshair },
-  { key: "dof", label: "D.O.F - Disques", icon: Disc3 },
-  { key: "ipblock", label: "IP Blacklist", icon: Ban },
-  { key: "logs", label: "Logs Connexions", icon: Activity },
-  { key: "search-logs", label: "Logs Recherches", icon: DatabaseZap },
-  { key: "game-logs", label: "Logs de Jeu", icon: Gamepad2 },
-  { key: "reviews", label: "Avis Clients", icon: MessageSquare },
-  { key: "discounts", label: "Codes Promo", icon: Tag },
-  { key: "game-boosts", label: "Boosts Jeu", icon: Zap },
-  { key: "services", label: "Statut Services", icon: Monitor },
-  { key: "notifications", label: "Notifications Pop-up", icon: Bell },
+interface AdminTabDef {
+  key: AdminTab;
+  label: string;
+  shortLabel: string;
+  description: string;
+  icon: typeof Users;
+  group: string;
+}
+
+interface AdminGroupDef {
+  key: string;
+  label: string;
+  icon: typeof Users;
+  color: string;
+}
+
+const ADMIN_GROUPS: AdminGroupDef[] = [
+  { key: "users",      label: "Utilisateurs",   icon: Users,     color: "text-blue-400" },
+  { key: "moderation", label: "Modération",     icon: Shield,    color: "text-red-400" },
+  { key: "osint",      label: "OSINT / Data",   icon: BookOpen,  color: "text-amber-400" },
+  { key: "logs",       label: "Logs",           icon: BarChart3, color: "text-emerald-400" },
+  { key: "community",  label: "Communauté",     icon: MessageSquare, color: "text-purple-400" },
+  { key: "game",       label: "Jeu (STING.EXE)",icon: Gamepad2,  color: "text-orange-400" },
+  { key: "system",     label: "Système",        icon: Settings,  color: "text-slate-400" },
+];
+
+const ADMIN_TABS: AdminTabDef[] = [
+  { key: "users",          label: "Comptes utilisateurs",   shortLabel: "Utilisateurs",  description: "Gestion des comptes, rôles et accès",                 icon: Users,       group: "users" },
+  { key: "keys",           label: "Clés & Abonnements",     shortLabel: "Clés",          description: "Licences, plans et souscriptions actives",            icon: KeyRound,    group: "users" },
+  { key: "blacklist",      label: "Demandes de blacklist",  shortLabel: "Blacklist",     description: "Requêtes de suppression de données",                  icon: ShieldBan,   group: "moderation" },
+  { key: "info",           label: "Demandes d'information", shortLabel: "Info req.",     description: "Formulaires de demande d'information reçus",           icon: FileText,    group: "moderation" },
+  { key: "ipblock",        label: "IP Blacklist",           shortLabel: "IP Block",      description: "Adresses IP bloquées sur la plateforme",               icon: Ban,         group: "moderation" },
+  { key: "wanted",         label: "Profils Wanted",         shortLabel: "Wanted",        description: "Fiches de personnes recherchées",                     icon: Crosshair,   group: "osint" },
+  { key: "dof",            label: "D.O.F — Disques",       shortLabel: "DOF",           description: "Gestion des disques optiques forensiques",             icon: Disc3,       group: "osint" },
+  { key: "logs",           label: "Logs Connexions",        shortLabel: "Connexions",    description: "Historique des connexions et authentifications",       icon: Activity,    group: "logs" },
+  { key: "search-logs",    label: "Logs Recherches",        shortLabel: "Recherches",    description: "Requêtes de recherche effectuées par les utilisateurs", icon: DatabaseZap, group: "logs" },
+  { key: "game-logs",      label: "Logs de Jeu",            shortLabel: "Parties",       description: "Scores, crédits et sessions STING.EXE",               icon: BarChart3,   group: "logs" },
+  { key: "reviews",        label: "Avis Clients",           shortLabel: "Avis",          description: "Modération des avis et témoignages publics",           icon: Star,        group: "community" },
+  { key: "notifications",  label: "Notifications Pop-up",   shortLabel: "Notifs",        description: "Messages d'alerte affichés aux utilisateurs",          icon: Bell,        group: "community" },
+  { key: "game-boosts",    label: "Boosts de Jeu",          shortLabel: "Boosts",        description: "Multiplicateurs de score et avantages temporaires",   icon: Zap,         group: "game" },
+  { key: "discounts",      label: "Codes Promo",            shortLabel: "Promo",         description: "Bons de réduction et codes de réduction",             icon: Tag,         group: "game" },
+  { key: "services",       label: "Statut des Services",    shortLabel: "Services",      description: "Moniteur de santé des APIs et services externes",     icon: Monitor,     group: "system" },
 ];
 
 interface CategoryFormData {
@@ -4177,122 +4209,203 @@ function AdminPageInner() {
     );
   }
 
+  const activeTabDef = ADMIN_TABS.find(t => t.key === activeTab)!;
+  const activeGroup = ADMIN_GROUPS.find(g => g.key === activeTabDef.group)!;
+
   return (
-    <div className="min-h-screen bg-background text-foreground bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-7xl mx-auto h-16 flex items-center justify-between gap-2 px-4">
-          <div className="flex items-center gap-2">
-            <img src="/favicon.png" alt="Discreen" className="w-8 h-8 rounded-lg object-contain shrink-0" />
-            <span className="font-display font-bold text-2xl tracking-tight">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* ── Top Header ── */}
+      <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="max-w-[1440px] mx-auto h-14 flex items-center justify-between gap-2 px-4">
+          <div className="flex items-center gap-2.5">
+            <img src="/favicon.png" alt="Discreen" className="w-7 h-7 rounded-md object-contain shrink-0" />
+            <span className="font-display font-bold text-xl tracking-tight hidden sm:block">
               Di<span className="text-primary">screen</span>
             </span>
-            <Badge variant="destructive" className="ml-2" data-testid="badge-admin">Admin</Badge>
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4" data-testid="badge-admin">ADMIN</Badge>
+            <span className="text-border mx-1 hidden sm:block">|</span>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
+              <activeGroup.icon className={`w-3.5 h-3.5 ${activeGroup.color}`} />
+              <span className={activeGroup.color}>{activeGroup.label}</span>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-foreground font-medium">{activeTabDef.shortLabel}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
             <MaintenanceToggle getAccessToken={getAccessToken} />
-            <Button variant="ghost" onClick={() => navigate("/")} data-testid="button-back-home">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Retour
+            <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-back-home" className="h-8">
+              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+              <span className="hidden sm:inline">Retour</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="container max-w-7xl mx-auto px-4 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          <nav className="lg:w-64 shrink-0">
-            <div className="lg:sticky lg:top-24 space-y-1">
-              {ADMIN_TABS.map(tab => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-colors text-left ${
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover-elevate"
-                    }`}
-                    data-testid={`button-tab-${tab.key}`}
-                  >
-                    <Icon className="w-5 h-5 shrink-0" />
-                    <span className="flex-1">{tab.label}</span>
-                    {isActive && <ChevronRight className="w-4 h-4 shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
+      {/* ── Mobile Tab Strip ── */}
+      <div className="lg:hidden border-b border-border/40 bg-background/80 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-0.5 px-3 py-1.5 min-w-max">
+          {ADMIN_GROUPS.map(group => {
+            const groupTabs = ADMIN_TABS.filter(t => t.group === group.key);
+            const isGroupActive = groupTabs.some(t => t.key === activeTab);
+            const GroupIcon = group.icon;
+            return (
+              <div key={group.key} className="relative">
+                <button
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                    isGroupActive ? "bg-primary/15 text-primary" : "text-muted-foreground"
+                  }`}
+                  onClick={() => {
+                    const first = groupTabs[0];
+                    if (first) setActiveTab(first.key);
+                  }}
+                  data-testid={`button-mobile-group-${group.key}`}
+                >
+                  <GroupIcon className={`w-3.5 h-3.5 ${isGroupActive ? "text-primary" : group.color}`} />
+                  {group.label}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {/* Sub-tabs for active group */}
+        <div className="flex items-center gap-0.5 px-3 pb-1.5 min-w-max border-t border-border/20 mt-0.5 pt-1">
+          {ADMIN_TABS.filter(t => t.group === activeTabDef.group).map(tab => {
+            const Icon = tab.icon;
+            const isActive = tab.key === activeTab;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-colors whitespace-nowrap ${
+                  isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={`button-mobile-tab-${tab.key}`}
+              >
+                <Icon className="w-3 h-3" />
+                {tab.shortLabel}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-          <main className="flex-1 min-w-0">
-            <div className="mb-6">
-              <h1 className="text-2xl font-display font-bold" data-testid="text-section-title">
-                {ADMIN_TABS.find(t => t.key === activeTab)?.label}
-              </h1>
-            </div>
+      {/* ── Body ── */}
+      <div className="max-w-[1440px] mx-auto flex min-h-[calc(100vh-3.5rem)]">
 
+        {/* ── Sidebar ── */}
+        <nav className="hidden lg:flex flex-col w-56 xl:w-64 shrink-0 border-r border-border/40 bg-background/50">
+          <div className="flex-1 overflow-y-auto py-3 space-y-4 sticky top-14 max-h-[calc(100vh-3.5rem)]">
+            {ADMIN_GROUPS.map(group => {
+              const groupTabs = ADMIN_TABS.filter(t => t.group === group.key);
+              const GroupIcon = group.icon;
+              return (
+                <div key={group.key}>
+                  {/* Group header */}
+                  <div className={`flex items-center gap-2 px-3 mb-1`}>
+                    <GroupIcon className={`w-3.5 h-3.5 ${group.color}`} />
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${group.color} opacity-80`}>{group.label}</span>
+                  </div>
+                  {/* Group tabs */}
+                  <div className="space-y-0.5 px-1.5">
+                    {groupTabs.map(tab => {
+                      const Icon = tab.icon;
+                      const isActive = tab.key === activeTab;
+                      return (
+                        <button
+                          key={tab.key}
+                          onClick={() => setActiveTab(tab.key)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all text-left group relative ${
+                            isActive
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                          }`}
+                          data-testid={`button-tab-${tab.key}`}
+                        >
+                          {isActive && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
+                          )}
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
+                          <span className="flex-1 truncate text-[13px]">{tab.shortLabel}</span>
+                          {isActive && <ChevronRight className="w-3.5 h-3.5 shrink-0 text-primary/60" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* ── Main Content ── */}
+        <main className="flex-1 min-w-0 flex flex-col">
+          {/* Section header */}
+          <div className="border-b border-border/40 px-5 xl:px-8 py-4 bg-background/30">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`p-2 rounded-lg bg-muted/60 shrink-0`}>
+                  <activeTabDef.icon className={`w-5 h-5 ${activeGroup.color}`} />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-lg font-bold leading-tight truncate" data-testid="text-section-title">{activeTabDef.label}</h1>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-snug hidden sm:block">{activeTabDef.description}</p>
+                </div>
+              </div>
+              <Badge variant="outline" className={`text-[10px] shrink-0 ${activeGroup.color} border-current/30`}>
+                {activeGroup.label}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Section body */}
+          <div className="flex-1 px-5 xl:px-8 py-5">
             {activeTab === "users" && (
               <UsersSection getAccessToken={getAccessToken} userId={user.id} />
             )}
-
             {activeTab === "keys" && (
               <KeysSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "blacklist" && (
               <BlacklistSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "info" && (
               <InfoRequestsSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "wanted" && (
               <WantedSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "dof" && (
               <DofSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "ipblock" && (
               <IpBlacklistSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "logs" && (
               <LoginLogsSection getAccessToken={getAccessToken} />
             )}
-
-            {activeTab === "discounts" && (
-              <DiscountCodesSection getAccessToken={getAccessToken} />
-            )}
-
-            {activeTab === "game-boosts" && (
-              <GameBoostsSection getAccessToken={getAccessToken} />
-            )}
-
-            {activeTab === "services" && (
-              <ServiceStatusSection getAccessToken={getAccessToken} />
-            )}
-
-            {activeTab === "notifications" && (
-              <NotificationsSection getAccessToken={getAccessToken} />
-            )}
-
             {activeTab === "search-logs" && (
               <SearchLogsSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "game-logs" && (
               <GameLogsSection getAccessToken={getAccessToken} />
             )}
-
             {activeTab === "reviews" && (
               <AdminReviewsSection getAccessToken={getAccessToken} />
             )}
-          </main>
-        </div>
+            {activeTab === "notifications" && (
+              <NotificationsSection getAccessToken={getAccessToken} />
+            )}
+            {activeTab === "game-boosts" && (
+              <GameBoostsSection getAccessToken={getAccessToken} />
+            )}
+            {activeTab === "discounts" && (
+              <DiscountCodesSection getAccessToken={getAccessToken} />
+            )}
+            {activeTab === "services" && (
+              <ServiceStatusSection getAccessToken={getAccessToken} />
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );
