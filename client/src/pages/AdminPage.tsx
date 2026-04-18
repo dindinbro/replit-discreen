@@ -2835,7 +2835,7 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: logs = [], isLoading } = useQuery<LoginLog[]>({
+  const { data: logs = [], isLoading, isFetching, refetch } = useQuery<LoginLog[]>({
     queryKey: ["/api/admin/login-logs"],
     queryFn: async () => {
       const token = getAccessToken();
@@ -2845,7 +2845,8 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
       if (!res.ok) throw new Error("Erreur lors du chargement des logs");
       return res.json();
     },
-    refetchInterval: 30000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true,
   });
 
   async function handleDeleteLog(id: number) {
@@ -2911,7 +2912,7 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
             Logs de Connexion
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {logs.length} entrée{logs.length !== 1 ? "s" : ""} — actualisé toutes les 30s
+            {logs.length} entrée{logs.length !== 1 ? "s" : ""} — actualisé toutes les 15s
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -2921,6 +2922,9 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
               Tout supprimer
             </Button>
           )}
+          <Button size="sm" variant="outline" className="px-2 h-9" onClick={() => refetch()} disabled={isFetching} title="Rafraîchir" data-testid="button-loginlog-refresh">
+            <RotateCcw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+          </Button>
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -4181,7 +4185,8 @@ function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () 
       }
       return res.json();
     },
-    refetchInterval: 30000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: 2,
   });
