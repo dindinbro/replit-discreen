@@ -4034,7 +4034,7 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
   const [filters, setFilters] = useState({ userId: "", dateFrom: "", dateTo: "" });
   const [applied, setApplied] = useState({ userId: "", dateFrom: "", dateTo: "" });
 
-  const { data, isLoading } = useQuery<{ rows: GameLog[]; total: number }>({
+  const { data, isLoading, isError, error } = useQuery<{ rows: GameLog[]; total: number }>({
     queryKey: ["/api/admin/game-logs", applied, page],
     queryFn: async () => {
       const token = await getAccessToken();
@@ -4043,13 +4043,19 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
       if (applied.dateFrom) params.set("dateFrom", applied.dateFrom);
       if (applied.dateTo) params.set("dateTo", applied.dateTo);
       const res = await fetch(`/api/admin/game-logs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message ?? `Erreur ${res.status}`);
+      }
       return res.json();
     },
   });
 
-  const totalPages = data ? Math.ceil(data.total / 50) : 1;
-  const totalScore = data?.rows.reduce((a, r) => a + r.score, 0) ?? 0;
-  const totalCredits = data?.rows.reduce((a, r) => a + r.creditsEarned, 0) ?? 0;
+  const rows: GameLog[] = Array.isArray(data?.rows) ? data.rows : [];
+  const total: number = typeof data?.total === "number" ? data.total : 0;
+  const totalPages = Math.max(1, Math.ceil(total / 50));
+  const totalScore = rows.reduce((a, r) => a + (r.score ?? 0), 0);
+  const totalCredits = rows.reduce((a, r) => a + (r.creditsEarned ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -4082,8 +4088,8 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
       {/* Stats + pagination */}
       <div className="flex items-center justify-between text-sm text-muted-foreground flex-wrap gap-2">
         <div className="flex items-center gap-4">
-          <span>{data?.total ?? 0} partie(s)</span>
-          {data && data.rows.length > 0 && (
+          <span>{total} partie(s)</span>
+          {rows.length > 0 && (
             <>
               <span className="text-amber-400 font-medium">Score total : {totalScore.toLocaleString("fr-FR")}</span>
               <span className="text-primary font-medium">Crédits : {totalCredits.toLocaleString("fr-FR")}</span>
@@ -4094,7 +4100,7 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
           <Button size="sm" variant="outline" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-gamelog-prev">
             <ChevronLeft className="w-3.5 h-3.5" />
           </Button>
-          <span className="text-xs">Page {page}/{totalPages || 1}</span>
+          <span className="text-xs">Page {page}/{totalPages}</span>
           <Button size="sm" variant="outline" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-gamelog-next">
             <ChevronRight className="w-3.5 h-3.5" />
           </Button>
@@ -4104,7 +4110,20 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
       {/* Rows */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-      ) : !data?.rows.length ? (
+      ) : isError ? (
+        <Card className="p-6 border-destructive/40 bg-destructive/5">
+          <div className="flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Erreur lors du chargement des logs de jeu</p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">{(error as Error)?.message}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Si la table <code className="bg-muted px-1 rounded text-[11px]">game_logs</code> n'existe pas encore sur le VPS, exécuter <code className="bg-muted px-1 rounded text-[11px]">npm run db:push</code> puis redémarrer.
+              </p>
+            </div>
+          </div>
+        </Card>
+      ) : rows.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground text-sm">Aucun log de jeu pour ces filtres.</Card>
       ) : (
         <div className="space-y-1.5">
