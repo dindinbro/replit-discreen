@@ -1028,7 +1028,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLoginLog(data: { userId: string; email?: string; username?: string; ip: string; userAgent?: string; provider: string; tier: string; discordId?: string }): Promise<void> {
+    const [{ nextId }] = await db
+      .select({ nextId: sql<number>`COALESCE(MAX(${loginLogs.id}), 0) + 1` })
+      .from(loginLogs);
     await db.insert(loginLogs).values({
+      id: nextId,
       userId: data.userId,
       email: data.email ?? null,
       username: data.username ?? null,
@@ -1247,7 +1251,11 @@ export class DatabaseStorage implements IStorage {
 
   async createSearchLog(data: InsertSearchLog): Promise<void> {
     try {
+      const [{ nextId }] = await db
+        .select({ nextId: sql<number>`COALESCE(MAX(${searchLogs.id}), 0) + 1` })
+        .from(searchLogs);
       await db.insert(searchLogs).values({
+        id: nextId,
         userId: data.userId,
         email: data.email ?? null,
         username: data.username ?? null,
@@ -1285,7 +1293,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReview(data: InsertReview & { userId: string; username?: string; email?: string; subscriptionTier?: string; verified?: boolean }): Promise<Review> {
+    const [{ nextId }] = await db
+      .select({ nextId: sql<number>`COALESCE(MAX(${reviews.id}), 0) + 1` })
+      .from(reviews);
     const [row] = await db.insert(reviews).values({
+      id: nextId,
       userId: data.userId,
       username: data.username ?? null,
       email: data.email ?? null,
@@ -1335,7 +1347,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGameLog(data: InsertGameLog): Promise<void> {
-    await db.insert(gameLogs).values(data);
+    const [{ nextId }] = await db
+      .select({ nextId: sql<number>`COALESCE(MAX(${gameLogs.id}), 0) + 1` })
+      .from(gameLogs);
+    await db.insert(gameLogs).values({ ...data, id: nextId });
   }
 
   async getGameLogs(filters: { userId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ rows: GameLog[]; total: number }> {
