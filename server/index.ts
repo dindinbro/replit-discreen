@@ -169,6 +169,25 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // ── Auto-fix DB sequence permissions at startup ──────────────────────────
+  // New tables created by db:push may lack sequence grants for the app user.
+  // This runs at every startup and fixes it silently if possible.
+  try {
+    const { pool } = await import("./db");
+    const urlMatch = (process.env.DATABASE_URL ?? "").match(/postgresql?:\/\/([^:@]+)/);
+    const dbUser = urlMatch ? urlMatch[1] : null;
+    if (dbUser) {
+      await pool.query(`GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO "${dbUser}"`);
+      await pool.query(`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${dbUser}"`);
+      await pool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${dbUser}"`);
+      await pool.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${dbUser}"`);
+      log(`[db] sequence permissions ensured for user "${dbUser}"`);
+    }
+  } catch (e: any) {
+    log(`[db] could not auto-fix permissions: ${e?.message ?? e}`);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
