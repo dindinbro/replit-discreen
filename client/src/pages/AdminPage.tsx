@@ -3748,8 +3748,10 @@ function SearchLogsSection({ getAccessToken }: { getAccessToken: () => Promise<s
   const [filters, setFilters] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
   const [applied, setApplied] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
 
-  const { data, isLoading } = useQuery<{ rows: SearchLog[]; total: number }>({
+  const { data, isLoading, refetch } = useQuery<{ rows: SearchLog[]; total: number }>({
     queryKey: ["/api/admin/search-logs", applied, page],
+    staleTime: 0,
+    refetchOnMount: true,
     queryFn: async () => {
       const token = await getAccessToken();
       const params = new URLSearchParams({ page: String(page), limit: "50" });
@@ -3813,6 +3815,9 @@ function SearchLogsSection({ getAccessToken }: { getAccessToken: () => Promise<s
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{data?.total ?? 0} log(s) trouvé(s)</span>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => refetch()} disabled={isLoading} data-testid="button-searchlog-refresh" title="Rafraîchir">
+            <RotateCcw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
           <Button size="sm" variant="outline" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-log-prev">
             <ChevronLeft className="w-3.5 h-3.5" />
           </Button>
