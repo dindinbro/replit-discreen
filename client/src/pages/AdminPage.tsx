@@ -4354,7 +4354,7 @@ class AdminErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 }
 
 function AdminPageInner() {
-  const { user, role, loading: authLoading, getAccessToken } = useAuth();
+  const { user, role, loading: authLoading, getAccessToken, uniqueId } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<AdminTab>("users");
 
@@ -4556,13 +4556,13 @@ function AdminPageInner() {
               <IpBlacklistSection getAccessToken={getAccessToken} />
             )}
             {activeTab === "logs" && (
-              <LoginLogsSection getAccessToken={getAccessToken} isSuperAdmin={user?.unique_id === 1} />
+              <LoginLogsSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
             )}
             {activeTab === "search-logs" && (
-              <SearchLogsSection getAccessToken={getAccessToken} isSuperAdmin={user?.unique_id === 1} />
+              <SearchLogsSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
             )}
             {activeTab === "game-logs" && (
-              <GameLogsSection getAccessToken={getAccessToken} isSuperAdmin={user?.unique_id === 1} />
+              <GameLogsSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
             )}
             {activeTab === "reviews" && (
               <AdminReviewsSection getAccessToken={getAccessToken} />
