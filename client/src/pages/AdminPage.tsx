@@ -4522,7 +4522,7 @@ function AdminTicketsSection({ getAccessToken }: { getAccessToken: () => string 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [reply, setReply] = useState("");
 
-  const { data: ticketsData, isLoading } = useQuery<any[]>({
+  const { data: ticketsData, isLoading } = useQuery<{ rows: any[]; total: number }>({
     queryKey: ["/api/admin/tickets", statusFilter],
     queryFn: async () => {
       const token = getAccessToken();
@@ -4531,9 +4531,9 @@ function AdminTicketsSection({ getAccessToken }: { getAccessToken: () => string 
       if (!res.ok) throw new Error();
       return res.json();
     },
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
-  const tickets: any[] = Array.isArray(ticketsData) ? ticketsData : [];
+  const tickets: any[] = ticketsData?.rows ?? [];
 
   const { data: detail } = useQuery<{ ticket: any; replies: any[] }>({
     queryKey: ["/api/admin/tickets/detail", selectedId],

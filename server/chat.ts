@@ -46,6 +46,9 @@ export function initChatServer(httpServer: HttpServer) {
       }
       const user = data.user;
       const sub = await storage.getOrCreateSubscription(user.id);
+      // Fetch profile role from Supabase (admin role lives in profiles table, not subscriptions)
+      const { data: profileData } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      const isAdmin = profileData?.role === "admin";
       const username =
         user.user_metadata?.display_name ||
         user.user_metadata?.full_name ||
@@ -54,9 +57,10 @@ export function initChatServer(httpServer: HttpServer) {
       (socket as any).userId = user.id;
       (socket as any).username = username;
       (socket as any).avatarUrl = user.user_metadata?.avatar_url ?? null;
-      (socket as any).tier = (sub as any)?.tier ?? "free";
-      (socket as any).isAdmin = (sub as any)?.role === "admin";
-      console.log(`[chat] Auth OK: ${username} (${user.id}) tier=${(socket as any).tier}`);
+      // Use "admin" as tier if user has admin role so the badge displays correctly
+      (socket as any).tier = isAdmin ? "admin" : ((sub as any)?.tier ?? "free");
+      (socket as any).isAdmin = isAdmin;
+      console.log(`[chat] Auth OK: ${username} (${user.id}) tier=${(socket as any).tier} isAdmin=${isAdmin}`);
       next();
     } catch (err) {
       console.error("[chat] Auth error:", err);
