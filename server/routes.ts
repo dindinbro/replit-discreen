@@ -233,6 +233,22 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+const SUPERADMIN_UNIQUE_ID = 1;
+
+async function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ message: "Non authentifié" });
+
+  const effectiveRole = await getEffectiveRole(userId);
+  if (effectiveRole !== "admin") return res.status(403).json({ message: "Accès interdit" });
+
+  const sub = await storage.getOrCreateSubscription(userId);
+  if (sub?.id !== SUPERADMIN_UNIQUE_ID) {
+    return res.status(403).json({ message: "Accès réservé au superadmin" });
+  }
+  next();
+}
+
 function requireRole(...roles: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const userId = (req as any).user?.id;
@@ -5087,6 +5103,62 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
     } catch (err: any) {
       console.error("[admin/search-logs] error:", err);
       res.status(500).json({ message: "Erreur lors de la récupération des logs." });
+    }
+  });
+
+  // ─── SUPERADMIN — LOG DELETION ─────────────────────────────────────────────
+
+  app.delete("/api/superadmin/logs/clear", requireAuth, requireSuperAdmin, async (_req, res) => {
+    try {
+      const count = await storage.clearLoginLogs();
+      res.json({ deleted: count });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  app.delete("/api/superadmin/logs/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const ok = await storage.deleteLoginLog(Number(req.params.id));
+      ok ? res.json({ ok: true }) : res.status(404).json({ message: "Log introuvable" });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  app.delete("/api/superadmin/search-logs/clear", requireAuth, requireSuperAdmin, async (_req, res) => {
+    try {
+      const count = await storage.clearSearchLogs();
+      res.json({ deleted: count });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  app.delete("/api/superadmin/search-logs/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const ok = await storage.deleteSearchLog(Number(req.params.id));
+      ok ? res.json({ ok: true }) : res.status(404).json({ message: "Log introuvable" });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  app.delete("/api/superadmin/game-logs/clear", requireAuth, requireSuperAdmin, async (_req, res) => {
+    try {
+      const count = await storage.clearGameLogs();
+      res.json({ deleted: count });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  app.delete("/api/superadmin/game-logs/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const ok = await storage.deleteGameLog(Number(req.params.id));
+      ok ? res.json({ ok: true }) : res.status(404).json({ message: "Log introuvable" });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
     }
   });
 

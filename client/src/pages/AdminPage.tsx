@@ -2828,8 +2828,12 @@ function IpBlacklistSection({ getAccessToken }: { getAccessToken: () => string |
   );
 }
 
-function LoginLogsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin?: boolean }) {
   const [search, setSearch] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: logs = [], isLoading } = useQuery<LoginLog[]>({
     queryKey: ["/api/admin/login-logs"],
@@ -2843,6 +2847,31 @@ function LoginLogsSection({ getAccessToken }: { getAccessToken: () => string | n
     },
     refetchInterval: 30000,
   });
+
+  async function handleDeleteLog(id: number) {
+    setDeletingId(id);
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/superadmin/logs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Erreur suppression");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/login-logs"] });
+      toast({ title: "Log supprimé" });
+    } catch { toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" }); }
+    finally { setDeletingId(null); }
+  }
+
+  async function handleClearLogs() {
+    if (!confirm("Supprimer TOUS les logs de connexion ?")) return;
+    setClearing(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch("/api/superadmin/logs/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/login-logs"] });
+      toast({ title: `${data.deleted} log(s) supprimé(s)` });
+    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    finally { setClearing(false); }
+  }
 
   const filtered = logs.filter(log => {
     if (!search.trim()) return true;
@@ -2885,15 +2914,23 @@ function LoginLogsSection({ getAccessToken }: { getAccessToken: () => string | n
             {logs.length} entrée{logs.length !== 1 ? "s" : ""} — actualisé toutes les 30s
           </p>
         </div>
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Rechercher email, IP, pseudo..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            data-testid="input-logs-search"
-          />
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <Button size="sm" variant="destructive" onClick={handleClearLogs} disabled={clearing} data-testid="button-clear-login-logs">
+              {clearing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Trash2 className="w-4 h-4 mr-1" />}
+              Tout supprimer
+            </Button>
+          )}
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Rechercher email, IP, pseudo..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              data-testid="input-logs-search"
+            />
+          </div>
         </div>
       </div>
 
@@ -2965,6 +3002,18 @@ function LoginLogsSection({ getAccessToken }: { getAccessToken: () => string | n
                     minute: "2-digit",
                   })}
                 </span>
+                {isSuperAdmin && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="w-7 h-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDeleteLog(log.id)}
+                    disabled={deletingId === log.id}
+                    data-testid={`button-delete-login-log-${log.id}`}
+                  >
+                    {deletingId === log.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
@@ -3743,10 +3792,39 @@ const TIER_COLORS: Record<string, string> = {
   api: "bg-green-500/20 text-green-400",
 };
 
-function SearchLogsSection({ getAccessToken }: { getAccessToken: () => Promise<string | null> }) {
+function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => Promise<string | null>; isSuperAdmin?: boolean }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
   const [applied, setApplied] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  async function handleDeleteSearchLog(id: number) {
+    setDeletingId(id);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/superadmin/search-logs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search-logs"] });
+      toast({ title: "Log supprimé" });
+    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    finally { setDeletingId(null); }
+  }
+
+  async function handleClearSearchLogs() {
+    if (!confirm("Supprimer TOUS les logs de recherche ?")) return;
+    setClearing(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("/api/superadmin/search-logs/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search-logs"] });
+      toast({ title: `${data.deleted} log(s) supprimé(s)` });
+    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    finally { setClearing(false); }
+  }
 
   const { data, isLoading, refetch } = useQuery<{ rows: SearchLog[]; total: number }>({
     queryKey: ["/api/admin/search-logs", applied, page],
@@ -3813,7 +3891,15 @@ function SearchLogsSection({ getAccessToken }: { getAccessToken: () => Promise<s
       </Card>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{data?.total ?? 0} log(s) trouvé(s)</span>
+        <div className="flex items-center gap-2">
+          <span>{data?.total ?? 0} log(s) trouvé(s)</span>
+          {isSuperAdmin && (
+            <Button size="sm" variant="destructive" className="h-7" onClick={handleClearSearchLogs} disabled={clearing} data-testid="button-clear-search-logs">
+              {clearing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}
+              Tout supprimer
+            </Button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => refetch()} disabled={isLoading} data-testid="button-searchlog-refresh" title="Rafraîchir">
             <RotateCcw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -3858,6 +3944,18 @@ function SearchLogsSection({ getAccessToken }: { getAccessToken: () => Promise<s
                     <span>{new Date(log.createdAt).toLocaleString("fr-FR")}</span>
                   </div>
                 </div>
+                {isSuperAdmin && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="w-7 h-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDeleteSearchLog(log.id)}
+                    disabled={deletingId === log.id}
+                    data-testid={`button-delete-search-log-${log.id}`}
+                  >
+                    {deletingId === log.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
@@ -4034,10 +4132,39 @@ function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => Promise
   );
 }
 
-function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<string | null> }) {
+function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => Promise<string | null>; isSuperAdmin?: boolean }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ userId: "", dateFrom: "", dateTo: "" });
   const [applied, setApplied] = useState({ userId: "", dateFrom: "", dateTo: "" });
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  async function handleDeleteGameLog(id: number) {
+    setDeletingId(id);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`/api/superadmin/game-logs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/game-logs"] });
+      toast({ title: "Log supprimé" });
+    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    finally { setDeletingId(null); }
+  }
+
+  async function handleClearGameLogs() {
+    if (!confirm("Supprimer TOUS les logs de jeu ?")) return;
+    setClearing(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("/api/superadmin/game-logs/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/game-logs"] });
+      toast({ title: `${data.deleted} log(s) supprimé(s)` });
+    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    finally { setClearing(false); }
+  }
 
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery<{ rows: GameLog[]; total: number }>({
     queryKey: ["/api/admin/game-logs", applied, page],
@@ -4098,13 +4225,19 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
 
       {/* Stats + pagination */}
       <div className="flex items-center justify-between text-sm text-muted-foreground flex-wrap gap-2">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
           <span>{total} partie(s)</span>
           {rows.length > 0 && (
             <>
               <span className="text-amber-400 font-medium">Score total : {totalScore.toLocaleString("fr-FR")}</span>
               <span className="text-primary font-medium">Crédits : {totalCredits.toLocaleString("fr-FR")}</span>
             </>
+          )}
+          {isSuperAdmin && (
+            <Button size="sm" variant="destructive" className="h-7" onClick={handleClearGameLogs} disabled={clearing} data-testid="button-clear-game-logs">
+              {clearing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}
+              Tout supprimer
+            </Button>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -4169,6 +4302,18 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
                     <span>{new Date(log.createdAt).toLocaleString("fr-FR")}</span>
                   </div>
                 </div>
+                {isSuperAdmin && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="w-7 h-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDeleteGameLog(log.id)}
+                    disabled={deletingId === log.id}
+                    data-testid={`button-delete-game-log-${log.id}`}
+                  >
+                    {deletingId === log.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
@@ -4411,13 +4556,13 @@ function AdminPageInner() {
               <IpBlacklistSection getAccessToken={getAccessToken} />
             )}
             {activeTab === "logs" && (
-              <LoginLogsSection getAccessToken={getAccessToken} />
+              <LoginLogsSection getAccessToken={getAccessToken} isSuperAdmin={user?.unique_id === 1} />
             )}
             {activeTab === "search-logs" && (
-              <SearchLogsSection getAccessToken={getAccessToken} />
+              <SearchLogsSection getAccessToken={getAccessToken} isSuperAdmin={user?.unique_id === 1} />
             )}
             {activeTab === "game-logs" && (
-              <GameLogsSection getAccessToken={getAccessToken} />
+              <GameLogsSection getAccessToken={getAccessToken} isSuperAdmin={user?.unique_id === 1} />
             )}
             {activeTab === "reviews" && (
               <AdminReviewsSection getAccessToken={getAccessToken} />

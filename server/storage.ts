@@ -153,6 +153,12 @@ export interface IStorage {
   getUserReview(userId: string): Promise<Review | undefined>;
   createGameLog(data: InsertGameLog): Promise<void>;
   getGameLogs(filters: { userId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ rows: GameLog[]; total: number }>;
+  deleteLoginLog(id: number): Promise<boolean>;
+  clearLoginLogs(): Promise<number>;
+  deleteSearchLog(id: number): Promise<boolean>;
+  clearSearchLogs(): Promise<number>;
+  deleteGameLog(id: number): Promise<boolean>;
+  clearGameLogs(): Promise<number>;
 }
 
 function hashKey(key: string): string {
@@ -1351,6 +1357,36 @@ export class DatabaseStorage implements IStorage {
       .select({ nextId: sql<number>`COALESCE(MAX(${gameLogs.id}), 0) + 1` })
       .from(gameLogs);
     await db.insert(gameLogs).values({ ...data, id: nextId });
+  }
+
+  async deleteLoginLog(id: number): Promise<boolean> {
+    const result = await db.delete(loginLogs).where(eq(loginLogs.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async clearLoginLogs(): Promise<number> {
+    const result = await db.delete(loginLogs);
+    return result.rowCount ?? 0;
+  }
+
+  async deleteSearchLog(id: number): Promise<boolean> {
+    const result = await db.delete(searchLogs).where(eq(searchLogs.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async clearSearchLogs(): Promise<number> {
+    const result = await db.delete(searchLogs);
+    return result.rowCount ?? 0;
+  }
+
+  async deleteGameLog(id: number): Promise<boolean> {
+    const result = await db.delete(gameLogs).where(eq(gameLogs.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async clearGameLogs(): Promise<number> {
+    const result = await db.delete(gameLogs);
+    return result.rowCount ?? 0;
   }
 
   async getGameLogs(filters: { userId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ rows: GameLog[]; total: number }> {
