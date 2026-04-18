@@ -106,19 +106,20 @@ export default function ChatWidget() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="fixed bottom-6 right-6 z-50 rounded-full bg-primary shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all hover:scale-110 relative"
-        style={{ width: 52, height: 52 }}
-        data-testid="button-open-chat"
-      >
-        <MessageCircle className="w-6 h-6 text-primary-foreground" />
-        {unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
-      </button>
+      <div className="fixed bottom-6 right-6 z-50" style={{ width: 52, height: 52 }}>
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="relative w-full h-full rounded-full bg-primary shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all hover:scale-110"
+          data-testid="button-open-chat"
+        >
+          <MessageCircle className="w-6 h-6 text-primary-foreground" />
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </button>
+      </div>
 
       {open && (
         <div
