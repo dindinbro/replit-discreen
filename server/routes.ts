@@ -5162,6 +5162,70 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
     }
   });
 
+  // ─── BYPASS WHITELIST ──────────────────────────────────────────────────────
+  // GET — list of bypassed uniqueIds with user info
+  app.get("/api/superadmin/bypass", requireAuth, requireSuperAdmin, async (_req, res) => {
+    try {
+      const raw = await storage.getSiteSetting("bypass_whitelist");
+      const ids: number[] = raw ? JSON.parse(raw) : [];
+      // Fetch subscription info for each id
+      const users = await Promise.all(ids.map(async (uniqueId) => {
+        try {
+          const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+          if (!sub) return { uniqueId, userId: null, tier: null, username: null };
+          // Try to get email from Supabase
+          let email: string | null = null;
+          if (supabaseAdmin) {
+            const { data } = await supabaseAdmin.auth.admin.getUserById(sub.userId);
+            email = data?.user?.email ?? null;
+          }
+          return { uniqueId, userId: sub.userId, tier: sub.tier, email };
+        } catch {
+          return { uniqueId, userId: null, tier: null, email: null };
+        }
+      }));
+      res.json({ ids, users });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  // POST — add uniqueId to bypass whitelist
+  app.post("/api/superadmin/bypass", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const uniqueId = Number(req.body.uniqueId);
+      if (!uniqueId || isNaN(uniqueId) || uniqueId <= 0) return res.status(400).json({ message: "uniqueId invalide" });
+      // Verify user exists
+      const sub = await storage.getSubscriptionByUniqueId(uniqueId);
+      if (!sub) return res.status(404).json({ message: `Aucun utilisateur avec l'ID #${uniqueId}` });
+      const raw = await storage.getSiteSetting("bypass_whitelist");
+      const ids: number[] = raw ? JSON.parse(raw) : [];
+      if (ids.includes(uniqueId)) return res.status(409).json({ message: `#${uniqueId} est déjà en bypass` });
+      ids.push(uniqueId);
+      await storage.setSiteSetting("bypass_whitelist", JSON.stringify(ids));
+      bypassCache.loadedAt = 0; // invalidate cache
+      res.json({ ok: true, ids });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  // DELETE — remove uniqueId from bypass whitelist
+  app.delete("/api/superadmin/bypass/:uniqueId", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const uniqueId = Number(req.params.uniqueId);
+      const raw = await storage.getSiteSetting("bypass_whitelist");
+      let ids: number[] = raw ? JSON.parse(raw) : [];
+      if (!ids.includes(uniqueId)) return res.status(404).json({ message: `#${uniqueId} non trouvé dans le bypass` });
+      ids = ids.filter(id => id !== uniqueId);
+      await storage.setSiteSetting("bypass_whitelist", JSON.stringify(ids));
+      bypassCache.loadedAt = 0; // invalidate cache
+      res.json({ ok: true, ids });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
   // ─── SUPPORT TICKETS ───────────────────────────────────────────────────────
 
   // User: create ticket (with cooldown 1 ticket per 10 min)

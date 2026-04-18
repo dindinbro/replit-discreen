@@ -113,7 +113,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews" | "tickets" | "chat";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews" | "tickets" | "chat" | "bypass";
 
 interface AdminTabDef {
   key: AdminTab;
@@ -156,6 +156,7 @@ const ADMIN_TABS: AdminTabDef[] = [
   { key: "notifications",  label: "Notifications Pop-up",   shortLabel: "Notifs",        description: "Messages d'alerte affichés aux utilisateurs",          icon: Bell,        group: "community" },
   { key: "tickets",        label: "Tickets Support",        shortLabel: "Tickets",       description: "Gestion des demandes d'assistance utilisateurs",       icon: MessageSquare, group: "community" },
   { key: "chat",           label: "Chat Global",            shortLabel: "Chat",          description: "Modération du salon de chat en temps réel",            icon: MessageSquare, group: "community" },
+  { key: "bypass",         label: "Bypass Whitelist",       shortLabel: "Bypass",        description: "Utilisateurs exemptés des limites et cooldowns",        icon: ShieldCheck,   group: "moderation" },
   { key: "game-boosts",    label: "Boosts de Jeu",          shortLabel: "Boosts",        description: "Multiplicateurs de score et avantages temporaires",   icon: Zap,         group: "game" },
   { key: "discounts",      label: "Codes Promo",            shortLabel: "Promo",         description: "Bons de réduction et codes de réduction",             icon: Tag,         group: "game" },
   { key: "services",       label: "Statut des Services",    shortLabel: "Services",      description: "Moniteur de santé des APIs et services externes",     icon: Monitor,     group: "system" },
@@ -4363,6 +4364,156 @@ class AdminErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
   }
 }
 
+// ─── Bypass Section ──────────────────────────────────────────────────────────
+function BypassSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin: boolean }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [newId, setNewId] = useState("");
+
+  const { data, isLoading, refetch } = useQuery<{ ids: number[]; users: any[] }>({
+    queryKey: ["/api/superadmin/bypass"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/superadmin/bypass", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+    enabled: isSuperAdmin,
+  });
+
+  const addUser = useMutation({
+    mutationFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/superadmin/bypass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ uniqueId: Number(newId) }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.message);
+      return d;
+    },
+    onSuccess: () => {
+      toast({ title: `Utilisateur #${newId} ajouté au bypass` });
+      setNewId("");
+      queryClient.invalidateQueries({ queryKey: ["/api/superadmin/bypass"] });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const removeUser = useMutation({
+    mutationFn: async (uniqueId: number) => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/superadmin/bypass/${uniqueId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.message);
+    },
+    onSuccess: (_, uniqueId) => {
+      toast({ title: `Utilisateur #${uniqueId} retiré du bypass` });
+      queryClient.invalidateQueries({ queryKey: ["/api/superadmin/bypass"] });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex items-center gap-3 py-12 text-muted-foreground justify-center">
+        <ShieldCheck className="w-5 h-5" />
+        <span>Accès réservé au superadmin.</span>
+      </div>
+    );
+  }
+
+  const users: any[] = data?.users ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <ShieldCheck className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-bold flex-1">Bypass Whitelist</h2>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1">
+          <RefreshCw className="w-3.5 h-3.5" /> Rafraîchir
+        </Button>
+      </div>
+
+      <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 text-sm text-muted-foreground space-y-1">
+        <p className="font-medium text-foreground">Qu'est-ce que le bypass ?</p>
+        <p>Les utilisateurs en bypass sont exemptés des limites de recherche quotidiennes, des cooldowns, du logging de leurs recherches et des alertes de surveillance Discord.</p>
+      </div>
+
+      {/* Add form */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <label className="text-sm font-medium mb-1 block">Ajouter un utilisateur par son ID unique (#)</label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Ex: 42"
+              value={newId}
+              onChange={e => setNewId(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={e => e.key === "Enter" && newId && addUser.mutate()}
+              className="w-40"
+              data-testid="input-bypass-id"
+            />
+            <Button
+              onClick={() => addUser.mutate()}
+              disabled={addUser.isPending || !newId}
+              className="gap-2"
+              data-testid="button-add-bypass"
+            >
+              {addUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Ajouter
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* List */}
+      {isLoading ? (
+        <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+      ) : users.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground border border-dashed border-border rounded-xl">
+          Aucun utilisateur en bypass pour l'instant.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {users.map((u: any) => (
+            <div key={u.uniqueId} className="flex items-center gap-4 p-4 rounded-xl border border-border/40 bg-card" data-testid={`bypass-row-${u.uniqueId}`}>
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+                #{u.uniqueId}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-sm">{u.email ?? "(email inconnu)"}</span>
+                  {u.tier && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-primary/10 text-primary border-primary/30">
+                      {u.tier.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">{u.userId ?? "UUID inconnu"}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full border border-green-400/30">
+                  <ShieldCheck className="w-3 h-3" /> Bypassed
+                </span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => removeUser.mutate(u.uniqueId)}
+                  disabled={removeUser.isPending}
+                  data-testid={`button-remove-bypass-${u.uniqueId}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Tickets Section ────────────────────────────────────────────────────
 function AdminTicketsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const queryClient = useQueryClient();
@@ -4903,6 +5054,9 @@ function AdminPageInner() {
             )}
             {activeTab === "chat" && (
               <AdminChatSection getAccessToken={getAccessToken} />
+            )}
+            {activeTab === "bypass" && (
+              <BypassSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
             )}
           </div>
         </main>
