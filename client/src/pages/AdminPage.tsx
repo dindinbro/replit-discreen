@@ -80,6 +80,9 @@ import {
   Settings,
   Shield,
   BookOpen,
+  VolumeX,
+  Volume2,
+  Send,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -110,7 +113,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews" | "tickets" | "chat";
 
 interface AdminTabDef {
   key: AdminTab;
@@ -151,6 +154,8 @@ const ADMIN_TABS: AdminTabDef[] = [
   { key: "game-logs",      label: "Logs de Jeu",            shortLabel: "Parties",       description: "Scores, crédits et sessions STING.EXE",               icon: BarChart3,   group: "logs" },
   { key: "reviews",        label: "Avis Clients",           shortLabel: "Avis",          description: "Modération des avis et témoignages publics",           icon: Star,        group: "community" },
   { key: "notifications",  label: "Notifications Pop-up",   shortLabel: "Notifs",        description: "Messages d'alerte affichés aux utilisateurs",          icon: Bell,        group: "community" },
+  { key: "tickets",        label: "Tickets Support",        shortLabel: "Tickets",       description: "Gestion des demandes d'assistance utilisateurs",       icon: MessageSquare, group: "community" },
+  { key: "chat",           label: "Chat Global",            shortLabel: "Chat",          description: "Modération du salon de chat en temps réel",            icon: MessageSquare, group: "community" },
   { key: "game-boosts",    label: "Boosts de Jeu",          shortLabel: "Boosts",        description: "Multiplicateurs de score et avantages temporaires",   icon: Zap,         group: "game" },
   { key: "discounts",      label: "Codes Promo",            shortLabel: "Promo",         description: "Bons de réduction et codes de réduction",             icon: Tag,         group: "game" },
   { key: "services",       label: "Statut des Services",    shortLabel: "Services",      description: "Moniteur de santé des APIs et services externes",     icon: Monitor,     group: "system" },
@@ -4358,6 +4363,305 @@ class AdminErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
   }
 }
 
+// ─── Admin Tickets Section ────────────────────────────────────────────────────
+function AdminTicketsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [reply, setReply] = useState("");
+
+  const { data: ticketsData, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/tickets", statusFilter],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const params = statusFilter !== "all" ? `?status=${encodeURIComponent(statusFilter)}` : "";
+      const res = await fetch(`/api/admin/tickets${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+    refetchInterval: 30_000,
+  });
+  const tickets: any[] = Array.isArray(ticketsData) ? ticketsData : [];
+
+  const { data: detail } = useQuery<{ ticket: any; replies: any[] }>({
+    queryKey: ["/api/admin/tickets/detail", selectedId],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/tickets/${selectedId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+    enabled: selectedId !== null,
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/tickets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets/detail"] });
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const deleteTicket = useMutation({
+    mutationFn: async (id: number) => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/tickets/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
+      if (selectedId !== null) setSelectedId(null);
+      toast({ title: "Ticket supprimé" });
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const sendReply = useMutation({
+    mutationFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/tickets/${selectedId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: reply }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.message);
+    },
+    onSuccess: () => {
+      setReply("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets/detail", selectedId] });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const STATUS_COLORS: Record<string, string> = {
+    ouvert: "bg-green-500/15 text-green-400 border-green-500/30",
+    "en cours": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+    "fermé": "bg-muted text-muted-foreground border-border",
+  };
+  const PRIORITY_COLORS: Record<string, string> = {
+    faible: "bg-muted text-muted-foreground border-border",
+    moyen: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+    urgent: "bg-destructive/15 text-destructive border-destructive/30",
+  };
+
+  if (selectedId !== null && detail) {
+    const { ticket, replies } = detail;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedId(null)} className="gap-1">
+            <ChevronLeft className="w-4 h-4" /> Retour
+          </Button>
+          <h2 className="text-lg font-semibold flex-1 truncate">{ticket.subject}</h2>
+          <Select value={ticket.status} onValueChange={v => updateStatus.mutate({ id: ticket.id, status: v })}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ouvert">Ouvert</SelectItem>
+              <SelectItem value="en cours">En cours</SelectItem>
+              <SelectItem value="fermé">Fermé</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="destructive" onClick={() => { if (window.confirm("Supprimer ce ticket ?")) deleteTicket.mutate(ticket.id); }}>
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[ticket.status] ?? ""}`}>{ticket.status}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${PRIORITY_COLORS[ticket.priority] ?? ""}`}>{ticket.priority}</span>
+          <span className="text-xs text-muted-foreground">{ticket.category}</span>
+          <span className="text-xs text-muted-foreground">— {ticket.username} ({ticket.email})</span>
+        </div>
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {replies.map((r: any) => (
+            <div key={r.id} className={`flex gap-2 ${r.isAdmin ? "flex-row-reverse" : ""}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${r.isAdmin ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                {r.isAdmin ? "A" : (r.username?.[0] ?? "?").toUpperCase()}
+              </div>
+              <div className={`flex-1 max-w-[80%] ${r.isAdmin ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
+                <span className="text-xs text-muted-foreground">{r.isAdmin ? "Support" : r.username} · {new Date(r.createdAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                <div className={`rounded-xl px-3 py-2 text-sm ${r.isAdmin ? "bg-primary/10 border border-primary/20" : "bg-muted"}`}>{r.message}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {ticket.status !== "fermé" && (
+          <div className="flex gap-2">
+            <Textarea value={reply} onChange={e => setReply(e.target.value)} placeholder="Répondre au ticket..." rows={2} className="flex-1 resize-none" />
+            <Button onClick={() => sendReply.mutate()} disabled={sendReply.isPending || !reply.trim()}>
+              {sendReply.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <h2 className="text-xl font-bold flex-1">Tickets Support</h2>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous</SelectItem>
+            <SelectItem value="ouvert">Ouverts</SelectItem>
+            <SelectItem value="en cours">En cours</SelectItem>
+            <SelectItem value="fermé">Fermés</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+      ) : tickets.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">Aucun ticket.</div>
+      ) : (
+        <div className="space-y-2">
+          {tickets.map((t: any) => (
+            <div key={t.id} onClick={() => setSelectedId(t.id)} className="p-4 rounded-lg border border-border/40 bg-card hover:bg-muted/30 transition-colors cursor-pointer">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{t.subject}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t.username} ({t.email}) · {new Date(t.updatedAt).toLocaleDateString("fr-FR")}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${PRIORITY_COLORS[t.priority] ?? ""}`}>{t.priority}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[t.status] ?? ""}`}>{t.status}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Admin Chat Section ───────────────────────────────────────────────────────
+function AdminChatSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: messages = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ["/api/admin/chat"],
+    queryFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/chat", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+    refetchInterval: 15_000,
+  });
+
+  const deleteMsg = useMutation({
+    mutationFn: async (id: number) => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/chat/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/chat"] }),
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const clearAll = useMutation({
+    mutationFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/chat", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/chat"] });
+      toast({ title: "Chat effacé" });
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const muteUser = useMutation({
+    mutationFn: async ({ userId, durationMinutes, reason }: { userId: string; durationMinutes?: number; reason?: string }) => {
+      const token = getAccessToken();
+      const res = await fetch("/api/admin/chat/mute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId, durationMinutes, reason }),
+      });
+      if (!res.ok) throw new Error();
+    },
+    onSuccess: () => toast({ title: "Utilisateur muté" }),
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const unmuteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/chat/mute/${userId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+    },
+    onSuccess: () => toast({ title: "Utilisateur démuté" }),
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
+  const TIER_COLORS: Record<string, string> = {
+    admin: "text-destructive", pro: "text-yellow-400", vip: "text-primary",
+    business: "text-purple-400", api: "text-green-400", free: "text-muted-foreground",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-xl font-bold flex-1">Chat Global — Modération</h2>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1"><RefreshCw className="w-3.5 h-3.5" /> Rafraîchir</Button>
+        <Button size="sm" variant="destructive" onClick={() => { if (window.confirm("Effacer tous les messages ?")) clearAll.mutate(); }} className="gap-1">
+          <Trash2 className="w-3.5 h-3.5" /> Tout effacer
+        </Button>
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+      ) : (messages as any[]).length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">Aucun message dans le chat.</div>
+      ) : (
+        <div className="space-y-1 max-h-[600px] overflow-y-auto">
+          {(messages as any[]).map((m: any) => (
+            <div key={m.id} className="flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-muted/30 group transition-colors">
+              <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
+                {m.avatarUrl ? <img src={m.avatarUrl} alt="" className="w-full h-full object-cover rounded-full" /> : <span className={TIER_COLORS[m.tier] ?? ""}>{m.username?.[0]?.toUpperCase()}</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-semibold ${TIER_COLORS[m.tier] ?? ""}`}>{m.username}</span>
+                  <span className="text-[10px] text-muted-foreground">{m.tier.toUpperCase()}</span>
+                  <span className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <p className="text-sm break-all">{m.message}</p>
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <button onClick={() => deleteMsg.mutate(m.id)} className="text-muted-foreground hover:text-destructive p-1" title="Supprimer">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => { const d = window.prompt("Durée du mute (min, vide=perm):"); if (d === null) return; const r = window.prompt("Raison :") ?? undefined; muteUser.mutate({ userId: m.userId, durationMinutes: d ? parseInt(d) : undefined, reason: r || undefined }); }} className="text-muted-foreground hover:text-yellow-500 p-1" title="Muter">
+                  <VolumeX className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => unmuteUser.mutate(m.userId)} className="text-muted-foreground hover:text-green-500 p-1" title="Démuter">
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminPageInner() {
   const { user, role, loading: authLoading, getAccessToken, uniqueId } = useAuth();
   const [, navigate] = useLocation();
@@ -4583,6 +4887,12 @@ function AdminPageInner() {
             )}
             {activeTab === "services" && (
               <ServiceStatusSection getAccessToken={getAccessToken} />
+            )}
+            {activeTab === "tickets" && (
+              <AdminTicketsSection getAccessToken={getAccessToken} />
+            )}
+            {activeTab === "chat" && (
+              <AdminChatSection getAccessToken={getAccessToken} />
             )}
           </div>
         </main>

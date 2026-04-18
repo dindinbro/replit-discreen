@@ -5162,6 +5162,146 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
     }
   });
 
+  // ─── SUPPORT TICKETS ───────────────────────────────────────────────────────
+
+  // User: create ticket (with cooldown 1 ticket per 10 min)
+  const ticketCooldown = new Map<string, number>();
+  app.post("/api/tickets", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Non authentifié" });
+      const now = Date.now();
+      const last = ticketCooldown.get(userId) ?? 0;
+      if (now - last < 10 * 60 * 1000) {
+        const wait = Math.ceil((10 * 60 * 1000 - (now - last)) / 1000);
+        return res.status(429).json({ message: `Attends ${wait}s avant de créer un nouveau ticket.` });
+      }
+      const { subject, category, priority, message } = req.body;
+      if (!subject?.trim() || !message?.trim()) return res.status(400).json({ message: "Sujet et message requis." });
+      if (subject.length > 200) return res.status(400).json({ message: "Sujet trop long (200 car. max)." });
+      if (message.length > 4000) return res.status(400).json({ message: "Message trop long (4000 car. max)." });
+      const validCategories = ["bug", "paiement", "question", "autre"];
+      const validPriorities = ["faible", "moyen", "urgent"];
+      const cat = validCategories.includes(category) ? category : "autre";
+      const pri = validPriorities.includes(priority) ? priority : "moyen";
+      const sub = await storage.getOrCreateSubscription(userId);
+      const username = req.user?.user_metadata?.display_name || req.user?.user_metadata?.full_name || req.user?.email?.split("@")[0];
+      const ticket = await storage.createTicket({ userId, username, email: req.user?.email, subject: subject.trim(), category: cat, priority: pri });
+      // Auto-create first message as a reply
+      await storage.createReply({ ticketId: ticket.id, userId, username, isAdmin: false, message: message.trim() });
+      ticketCooldown.set(userId, now);
+      res.status(201).json(ticket);
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  // User: my tickets
+  app.get("/api/tickets", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const tickets = await storage.getTicketsByUser(userId);
+      res.json(tickets);
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  // User/Admin: get ticket + replies
+  app.get("/api/tickets/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const ticket = await storage.getTicketById(id);
+      if (!ticket) return res.status(404).json({ message: "Ticket introuvable" });
+      const userId = req.user?.id;
+      const effectiveRole = await getEffectiveRole(userId);
+      if (ticket.userId !== userId && effectiveRole !== "admin") return res.status(403).json({ message: "Accès refusé" });
+      const replies = await storage.getRepliesByTicket(id);
+      res.json({ ticket, replies });
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  // User/Admin: reply to ticket
+  app.post("/api/tickets/:id/reply", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const ticket = await storage.getTicketById(id);
+      if (!ticket) return res.status(404).json({ message: "Ticket introuvable" });
+      const userId = req.user?.id;
+      const effectiveRole = await getEffectiveRole(userId);
+      const isAdmin = effectiveRole === "admin";
+      if (ticket.userId !== userId && !isAdmin) return res.status(403).json({ message: "Accès refusé" });
+      if (ticket.status === "fermé" && !isAdmin) return res.status(400).json({ message: "Ce ticket est fermé." });
+      const { message } = req.body;
+      if (!message?.trim() || message.length > 4000) return res.status(400).json({ message: "Message invalide (1-4000 car.)" });
+      const username = req.user?.user_metadata?.display_name || req.user?.user_metadata?.full_name || req.user?.email?.split("@")[0];
+      const reply = await storage.createReply({ ticketId: id, userId, username, isAdmin, message: message.trim() });
+      res.status(201).json(reply);
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  // Admin: all tickets
+  app.get("/api/admin/tickets", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const category = req.query.category as string | undefined;
+      const page = Number(req.query.page) || 1;
+      const data = await storage.getAllTickets({ status, category, page, limit: 30 });
+      res.json(data);
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  // Admin: update ticket status
+  app.patch("/api/admin/tickets/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { status } = req.body;
+      const valid = ["ouvert", "en cours", "fermé"];
+      if (!valid.includes(status)) return res.status(400).json({ message: "Statut invalide" });
+      const ok = await storage.updateTicketStatus(id, status);
+      ok ? res.json({ ok: true }) : res.status(404).json({ message: "Ticket introuvable" });
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  // Admin: delete ticket
+  app.delete("/api/admin/tickets/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const ok = await storage.deleteTicket(Number(req.params.id));
+      ok ? res.json({ ok: true }) : res.status(404).json({ message: "Ticket introuvable" });
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  // Admin: chat history + moderation REST
+  app.get("/api/admin/chat", requireAuth, requireAdmin, async (_req, res) => {
+    try { res.json(await storage.getChatHistory(200)); }
+    catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  app.delete("/api/admin/chat/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const ok = await storage.deleteChatMessage(Number(req.params.id));
+      ok ? res.json({ ok: true }) : res.status(404).json({ message: "Message introuvable" });
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  app.delete("/api/admin/chat", requireAuth, requireAdmin, async (_req, res) => {
+    try { res.json({ deleted: await storage.clearChatMessages() }); }
+    catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  app.post("/api/admin/chat/mute", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { userId, reason, durationMinutes } = req.body;
+      if (!userId) return res.status(400).json({ message: "userId requis" });
+      const until = durationMinutes ? new Date(Date.now() + durationMinutes * 60 * 1000) : undefined;
+      await storage.setMute(userId, reason, until);
+      res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
+  app.delete("/api/admin/chat/mute/:userId", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      await storage.removeMute(req.params.userId);
+      res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
   // ─── REVIEWS ───────────────────────────────────────────────────────────────
 
   app.get("/api/reviews/me", requireAuth, async (req: any, res) => {

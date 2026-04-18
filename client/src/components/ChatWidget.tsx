@@ -1,457 +1,213 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { io, Socket } from "socket.io-client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { MessageCircle, X, Send, Loader2, ShieldCheck, ArrowLeft, RotateCcw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MessageCircle, X, Send, Trash2, VolumeX, ChevronDown } from "lucide-react";
+import type { ChatMessage } from "@shared/schema";
 
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
+const TIER_COLORS: Record<string, string> = {
+  admin: "text-destructive",
+  pro: "text-yellow-400",
+  vip: "text-primary",
+  business: "text-purple-400",
+  api: "text-green-400",
+  free: "text-muted-foreground",
+};
+
+const TIER_BADGE: Record<string, string> = {
+  admin: "bg-destructive/20 text-destructive border-destructive/30",
+  pro: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  vip: "bg-primary/20 text-primary border-primary/30",
+  business: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  api: "bg-green-500/20 text-green-400 border-green-500/30",
+};
+
+function formatTime(d: string | Date) {
+  return new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
-
-interface TopicNode {
-  label: string;
-  response?: string;
-  children?: TopicNode[];
-}
-
-const TOPIC_TREE: TopicNode[] = [
-  {
-    label: "Abonnements",
-    response: "Voici nos differents abonnements. Quel plan t'interesse ?",
-    children: [
-      {
-        label: "Free",
-        response: "Le plan Free est gratuit : 5 recherches par jour, bases de donnees limitees, recherche basique uniquement. Ideal pour decouvrir la plateforme.",
-      },
-      {
-        label: "VIP - 6,99\u20ac/mois",
-        response: "Le plan VIP a 6,99\u20ac/mois inclut : 50 recherches/jour, acces aux donnees Gaming, recherche par Email/IP, recherches Discord et externes, et acces a toutes les bases de donnees.",
-      },
-      {
-        label: "PRO - 14,99\u20ac/mois",
-        response: "Le plan PRO a 14,99\u20ac/mois inclut : 200 recherches/jour, toutes les fonctionnalites VIP + systeme de parrainage.",
-      },
-      {
-        label: "Business - 24,99\u20ac/mois",
-        response: "Le plan Business a 24,99\u20ac/mois inclut : 500 recherches/jour, toutes les fonctionnalites PRO + support prioritaire.",
-      },
-      {
-        label: "API - 49,99\u20ac/mois",
-        response: "Le plan API a 49,99\u20ac/mois inclut : recherches illimitees, cle API dediee, endpoint /api/v1/search, support premium et possibilite de revente. Gere tes cles depuis /api-keys.",
-      },
-    ],
-  },
-  {
-    label: "Paiement",
-    response: "Que veux-tu savoir sur le paiement ?",
-    children: [
-      {
-        label: "Comment payer ?",
-        response: "Les paiements sont traites via NOWPayments en crypto-monnaie. Rends-toi sur la page Tarifs (/pricing), choisis ton plan et suis le processus de paiement. Ton abonnement sera active automatiquement apres confirmation.",
-      },
-      {
-        label: "Cle de licence",
-        response: "Tu peux activer un abonnement avec une cle de licence. Sur la page Tarifs (/pricing), clique sur \"Utiliser une cle de licence\" et entre ta cle. Chaque cle est a usage unique.",
-      },
-      {
-        label: "Duree de l'abonnement",
-        response: "Les abonnements payants durent 30 jours et sont renouveles mensuellement. Les credits de recherche se renouvellent automatiquement chaque jour a minuit. Les recherches non utilisees ne sont pas cumulables.",
-      },
-    ],
-  },
-  {
-    label: "Probleme de cle",
-    response: "Quel probleme rencontres-tu avec ta cle ?",
-    children: [
-      {
-        label: "Cle invalide",
-        response: "Si ta cle de licence est invalide, verifie que tu l'as bien copiee sans espace supplementaire. Si le probleme persiste, ouvre un ticket sur Discord pour obtenir de l'aide.",
-      },
-      {
-        label: "Cle deja utilisee",
-        response: "Chaque cle de licence est a usage unique. Si ta cle a deja ete utilisee, tu devras en obtenir une nouvelle. Contacte le support via Discord.",
-      },
-      {
-        label: "Cle API",
-        response: "Pour les cles API (plan API uniquement), rends-toi sur /api-keys pour creer, lister ou revoquer tes cles. L'endpoint principal est /api/v1/search.",
-      },
-    ],
-  },
-  {
-    label: "Recherches",
-    response: "Que veux-tu savoir sur les recherches ?",
-    children: [
-      {
-        label: "Comment chercher ?",
-        response: "Connecte-toi, va sur la page d'accueil ou /search, selectionne un critere (email, pseudo, telephone, IP...) et lance ta recherche. Les resultats sont groupes par source.",
-      },
-      {
-        label: "Types de recherche",
-        response: "Les types disponibles : Recherche Paramétrique (interne), recherche globale (LeakOSINT), recherche Discord, decodeur NIR, recherche telephone, et GeoIP. Certains necessitent un plan VIP ou superieur.",
-      },
-      {
-        label: "Limite atteinte",
-        response: "Chaque plan a un nombre de recherches quotidiennes. Les credits se renouvellent chaque jour a minuit. Si tu as atteint ta limite, tu peux passer a un plan superieur sur /pricing.",
-      },
-    ],
-  },
-  {
-    label: "Mon compte",
-    response: "Que veux-tu savoir sur ton compte ?",
-    children: [
-      {
-        label: "Modifier mon profil",
-        response: "Rends-toi sur /profile (accessible via le menu sur ton nom dans l'en-tete). Tu peux y changer ton avatar (URL), ton nom d'affichage (Pro+ uniquement) et activer la 2FA avec Google Authenticator.",
-      },
-      {
-        label: "Compte gele",
-        response: "Si ton compte est gele, contacte le support via Discord. Un administrateur examinera ta situation et pourra degeler ton compte si necessaire.",
-      },
-      {
-        label: "Supprimer mon compte",
-        response: "Tu peux demander la suppression de ton compte a tout moment. Contacte le support via Discord ou la page /contact pour faire ta demande.",
-      },
-    ],
-  },
-  {
-    label: "Autre question",
-    response: "Pour toute autre question, tu peux :\n\n1. Ouvrir un ticket sur Discord\n2. Utiliser la page /contact\n3. Consulter la documentation sur /documentation\n\nTu peux aussi taper ta question ci-dessous et je ferai de mon mieux pour t'aider.",
-  },
-];
 
 export default function ChatWidget() {
+  const { user, getAccessToken, role } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentTopics, setCurrentTopics] = useState<TopicNode[]>(TOPIC_TREE);
-  const [topicStack, setTopicStack] = useState<{ label: string; topics: TopicNode[] }[]>([]);
-  const [atLeaf, setAtLeaf] = useState(false);
   const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [conversationId, setConversationId] = useState<number | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const socketRef = useRef<Socket | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const isAdmin = role === "admin";
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, currentTopics, atLeaf, scrollToBottom]);
+    if (!user) return;
+    const token = getAccessToken();
+    const socket = io(window.location.origin, {
+      path: "/socket.io",
+      auth: { token },
+      transports: ["websocket", "polling"],
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => setConnected(true));
+    socket.on("disconnect", () => setConnected(false));
+    socket.on("chat:history", (history: ChatMessage[]) => {
+      setMessages(history);
+      if (open) scrollToBottom();
+    });
+    socket.on("chat:message", (msg: ChatMessage) => {
+      setMessages(prev => [...prev.slice(-499), msg]);
+      if (!open) setUnread(u => u + 1);
+      else scrollToBottom();
+    });
+    socket.on("chat:deleted", ({ id }: { id: number }) => {
+      setMessages(prev => prev.filter(m => m.id !== id));
+    });
+    socket.on("chat:cleared", () => setMessages([]));
+    socket.on("chat:error", ({ message }: { message: string }) => {
+      setError(message);
+      setTimeout(() => setError(null), 4000);
+    });
+
+    return () => { socket.disconnect(); };
+  }, [user]);
 
   useEffect(() => {
-    if (open && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (open) { setUnread(0); scrollToBottom(); }
   }, [open]);
 
-  const handleClose = () => {
-    setOpen(false);
-    setMessages([]);
-    setCurrentTopics(TOPIC_TREE);
-    setTopicStack([]);
-    setAtLeaf(false);
-    setConversationId(null);
+  function sendMessage() {
+    if (!input.trim() || !socketRef.current) return;
+    socketRef.current.emit("chat:message", { message: input.trim() });
     setInput("");
-  };
+  }
 
-  const handleTopicClick = (topic: TopicNode) => {
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: topic.label },
-      { role: "assistant", content: topic.response || "" },
-    ]);
+  function deleteMessage(id: number) {
+    socketRef.current?.emit("chat:delete", { id });
+  }
 
-    if (topic.children && topic.children.length > 0) {
-      setTopicStack((prev) => [...prev, { label: topic.label, topics: currentTopics }]);
-      setCurrentTopics(topic.children);
-      setAtLeaf(false);
-    } else {
-      setAtLeaf(true);
-    }
-  };
-
-  const handleBack = () => {
-    if (topicStack.length > 0) {
-      const prev = topicStack[topicStack.length - 1];
-      setCurrentTopics(prev.topics);
-      setTopicStack((s) => s.slice(0, -1));
-      setAtLeaf(false);
-    }
-  };
-
-  const handleRestart = () => {
-    setCurrentTopics(TOPIC_TREE);
-    setTopicStack([]);
-    setAtLeaf(false);
-  };
-
-  const createConversation = async (): Promise<number> => {
-    const res = await fetch("/api/conversations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "Support Chat" }),
+  function muteUser(userId: string, username: string) {
+    const dur = window.prompt(`Durée du mute de ${username} en minutes (vide = permanent) :`);
+    if (dur === null) return;
+    const reason = window.prompt("Raison (optionnel) :") ?? undefined;
+    socketRef.current?.emit("chat:mute", {
+      userId,
+      reason: reason || undefined,
+      durationMinutes: dur ? parseInt(dur) : undefined,
     });
-    const data = await res.json();
-    setConversationId(data.id);
-    return data.id;
-  };
+  }
 
-  const sendMessage = async () => {
-    const trimmed = input.trim();
-    if (!trimmed || isStreaming) return;
-
-    const userMsg: ChatMessage = { role: "user", content: trimmed };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsStreaming(true);
-    setAtLeaf(false);
-
-    try {
-      let convId = conversationId;
-      if (!convId) {
-        convId = await createConversation();
-      }
-
-      const res = await fetch(`/api/conversations/${convId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: trimmed }),
-      });
-
-      if (!res.ok) throw new Error("Request failed");
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantContent = "";
-
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const text = decoder.decode(value, { stream: true });
-          const lines = text.split("\n").filter((l) => l.startsWith("data: "));
-
-          for (const line of lines) {
-            try {
-              const json = JSON.parse(line.slice(6));
-              if (json.done) break;
-              if (json.content) {
-                assistantContent += json.content;
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    role: "assistant",
-                    content: assistantContent,
-                  };
-                  return updated;
-                });
-              }
-            } catch {
-              // skip
-            }
-          }
-        }
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev.filter((m) => m.content !== ""),
-        {
-          role: "assistant",
-          content: "Desole, une erreur est survenue. Veuillez reessayer.",
-        },
-      ]);
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const showingTopics = !isStreaming && !atLeaf;
+  if (!user) return null;
 
   return (
     <>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="fixed bottom-6 right-6 z-50 rounded-full bg-primary shadow-lg flex items-center justify-center hover:bg-primary/90 transition-all hover:scale-110 relative"
+        style={{ width: 52, height: 52 }}
+        data-testid="button-open-chat"
+      >
+        <MessageCircle className="w-6 h-6 text-primary-foreground" />
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
       {open && (
-        <div className="fixed bottom-20 right-4 z-[1000] w-[380px] max-w-[calc(100vw-2rem)]">
-          <Card
-            className="flex flex-col overflow-visible shadow-2xl border border-border"
-            data-testid="card-chat-widget"
-          >
-            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-primary/10 rounded-t-md">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
-                  <ShieldCheck className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <div>
-                  <span className="font-semibold text-sm block leading-tight">
-                    Assistant Discreen
-                  </span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
-                    En ligne
-                  </span>
-                </div>
-              </div>
-              <Button
-                data-testid="button-chat-close"
-                variant="ghost"
-                size="icon"
-                onClick={handleClose}
-                title="Fermer"
-              >
+        <div
+          className="fixed bottom-20 right-6 z-50 w-[340px] sm:w-[380px] flex flex-col rounded-2xl border border-border/60 bg-background shadow-2xl overflow-hidden"
+          style={{ height: 480 }}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-muted/30">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full transition-colors ${connected ? "bg-green-400" : "bg-muted-foreground"}`} />
+              <span className="font-semibold text-sm">Chat Discreen</span>
+              <span className="text-xs text-muted-foreground">salon global</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="icon" variant="ghost" className="w-7 h-7" onClick={scrollToBottom}>
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+              <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setOpen(false)} data-testid="button-close-chat">
                 <X className="w-4 h-4" />
               </Button>
             </div>
+          </div>
 
-            <div className="flex flex-col h-[420px] overflow-y-auto p-3 space-y-3 bg-background/50">
-              <div className="flex items-start gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary flex-shrink-0 flex items-center justify-center mt-1">
-                  <ShieldCheck className="w-3 h-3 text-primary-foreground" />
-                </div>
-                <div
-                  className="bg-muted rounded-2xl rounded-tl-sm px-3 py-2 max-w-[85%] text-sm leading-relaxed"
-                  data-testid="text-chat-greeting"
-                >
-                  En quoi puis-je vous aider ?
-                </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {messages.length === 0 && (
+              <div className="text-center py-8 text-xs text-muted-foreground">
+                Aucun message pour l'instant. Sois le premier !
               </div>
-
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex items-end gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                  data-testid={`chat-message-${msg.role}-${i}`}
-                >
-                  {msg.role === "assistant" && (
-                    <div className="w-6 h-6 rounded-full bg-primary flex-shrink-0 flex items-center justify-center mb-0.5">
-                      <ShieldCheck className="w-3 h-3 text-primary-foreground" />
+            )}
+            {messages.map(msg => {
+              const isOwn = msg.userId === user?.id;
+              return (
+                <div key={msg.id} className={`flex gap-2 group ${isOwn ? "flex-row-reverse" : ""}`} data-testid={`chat-msg-${msg.id}`}>
+                  <div className="shrink-0 w-7 h-7 rounded-full overflow-hidden bg-muted flex items-center justify-center text-xs font-bold">
+                    {msg.avatarUrl
+                      ? <img src={msg.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      : <span className={TIER_COLORS[msg.tier] ?? ""}>{msg.username[0]?.toUpperCase()}</span>
+                    }
+                  </div>
+                  <div className={`flex flex-col gap-0.5 max-w-[75%] ${isOwn ? "items-end" : "items-start"}`}>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] font-semibold ${TIER_COLORS[msg.tier] ?? "text-muted-foreground"}`}>{msg.username}</span>
+                      {TIER_BADGE[msg.tier] && (
+                        <span className={`text-[9px] px-1 rounded border font-medium ${TIER_BADGE[msg.tier]}`}>{msg.tier.toUpperCase()}</span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                    </div>
+                    <div className={`rounded-xl px-3 py-1.5 text-sm break-words ${isOwn ? "bg-primary/15 border border-primary/20" : "bg-muted"}`}>
+                      {msg.message}
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity self-center">
+                      <button onClick={() => deleteMessage(msg.id)} title="Supprimer" className="text-muted-foreground hover:text-destructive p-0.5">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      {!isOwn && (
+                        <button onClick={() => muteUser(msg.userId, msg.username)} title="Muter" className="text-muted-foreground hover:text-yellow-500 p-0.5">
+                          <VolumeX className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   )}
-                  <div
-                    className={`rounded-2xl px-3 py-2 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
-                        : "bg-muted rounded-tl-sm"
-                    }`}
-                  >
-                    {msg.content || (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    )}
-                  </div>
                 </div>
-              ))}
+              );
+            })}
+            <div ref={bottomRef} />
+          </div>
 
-              {showingTopics && (
-                <div className="flex flex-col gap-1.5 pl-8" data-testid="chat-topic-bubbles">
-                  {topicStack.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleBack}
-                      className="justify-start gap-1 text-muted-foreground w-fit"
-                      data-testid="button-chat-back"
-                    >
-                      <ArrowLeft className="w-3 h-3" />
-                      Retour
-                    </Button>
-                  )}
-                  {currentTopics.map((topic, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleTopicClick(topic)}
-                      className="justify-start rounded-full w-fit"
-                      data-testid={`button-chat-topic-${i}`}
-                    >
-                      {topic.label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-
-              {atLeaf && !isStreaming && (
-                <div className="flex flex-col gap-1.5 pl-8" data-testid="chat-leaf-actions">
-                  {topicStack.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleBack}
-                      className="justify-start gap-1 w-fit text-muted-foreground"
-                      data-testid="button-chat-back-leaf"
-                    >
-                      <ArrowLeft className="w-3 h-3" />
-                      Retour
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRestart}
-                    className="justify-start gap-1 w-fit text-muted-foreground"
-                    data-testid="button-chat-restart"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    Menu principal
-                  </Button>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
+          {error && (
+            <div className="px-3 py-2 text-xs text-destructive bg-destructive/10 border-t border-destructive/20">
+              {error}
             </div>
+          )}
 
-            <div className="flex items-center gap-2 p-3 border-t border-border">
-              <input
-                ref={inputRef}
-                data-testid="input-chat-message"
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Posez votre question..."
-                disabled={isStreaming}
-                className="flex-1 bg-muted rounded-full px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-primary/50 disabled:opacity-50"
-              />
-              <Button
-                data-testid="button-chat-send"
-                size="icon"
-                onClick={sendMessage}
-                disabled={!input.trim() || isStreaming}
-                className="rounded-full flex-shrink-0"
-                title="Envoyer"
-              >
-                {isStreaming ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </Card>
+          <div className="flex items-center gap-2 px-3 py-3 border-t border-border/40 bg-muted/10">
+            <Input
+              className="h-8 text-sm"
+              placeholder="Écrire un message... (Entrée pour envoyer)"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              maxLength={500}
+              data-testid="input-chat-message"
+            />
+            <Button size="icon" className="h-8 w-8 shrink-0" onClick={sendMessage} disabled={!input.trim()} data-testid="button-send-chat">
+              <Send className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
       )}
-
-      <Button
-        data-testid="button-chat-toggle"
-        className="fixed bottom-4 right-4 z-[1000] rounded-full shadow-lg"
-        size="icon"
-        onClick={() => setOpen(!open)}
-        title={open ? "Fermer" : "Assistant"}
-      >
-        {open ? (
-          <X className="w-5 h-5" />
-        ) : (
-          <MessageCircle className="w-5 h-5" />
-        )}
-      </Button>
     </>
   );
 }

@@ -263,17 +263,25 @@ export default function ContactPage() {
                 <SiDiscord className="w-7 h-7 text-primary" />
               </div>
               <div className="flex-1 text-center sm:text-left">
-                <h3 className="text-lg font-bold mb-1">Besoin d'une reponse rapide ?</h3>
+                <h3 className="text-lg font-bold mb-1">Besoin d'une assistance personnalisée ?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Ouvrez un ticket sur notre Discord pour une assistance personnalisee. Notre equipe repond generalement en moins d'une heure.
+                  Ouvre un ticket depuis ton espace membre ou rejoint notre Discord. Notre équipe répond généralement en moins d'une heure.
                 </p>
               </div>
-              <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer" className="shrink-0">
-                <Button size="lg" className="gap-2" data-testid="button-discord-cta">
-                  Ouvrir un ticket
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              </a>
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                <Link href="/tickets">
+                  <Button size="lg" className="gap-2" data-testid="button-open-ticket">
+                    Ouvrir un ticket
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+                <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary/10" data-testid="button-discord-cta">
+                    Discord
+                    <SiDiscord className="w-4 h-4" />
+                  </Button>
+                </a>
+              </div>
             </div>
           </Card>
         </motion.div>

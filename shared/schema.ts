@@ -665,3 +665,61 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, s
   comment: z.string().min(10).max(1000),
 });
 export type InsertReview = z.infer<typeof insertReviewSchema>;
+
+// ─── SUPPORT TICKETS ────────────────────────────────────────────────────────
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  username: text("username"),
+  email: text("email"),
+  subject: text("subject").notNull(),
+  category: text("category").notNull().default("autre"),
+  priority: text("priority").notNull().default("moyen"),
+  status: text("status").notNull().default("ouvert"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const ticketReplies = pgTable("ticket_replies", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").notNull(),
+  userId: text("user_id").notNull(),
+  username: text("username"),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicket = typeof supportTickets.$inferInsert;
+export type TicketReply = typeof ticketReplies.$inferSelect;
+export type InsertTicketReply = typeof ticketReplies.$inferInsert;
+
+export const insertTicketSchema = createInsertSchema(supportTickets).omit({ id: true, userId: true, username: true, email: true, status: true, createdAt: true, updatedAt: true }).extend({
+  subject: z.string().min(5).max(200),
+  category: z.enum(["bug", "paiement", "question", "autre"]),
+  priority: z.enum(["faible", "moyen", "urgent"]),
+});
+export type InsertTicketInput = z.infer<typeof insertTicketSchema>;
+
+// ─── CHAT ────────────────────────────────────────────────────────────────────
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  username: text("username").notNull(),
+  avatarUrl: text("avatar_url"),
+  tier: text("tier").notNull().default("free"),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export const chatMutes = pgTable("chat_mutes", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  reason: text("reason"),
+  mutedUntil: timestamp("muted_until"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type ChatMute = typeof chatMutes.$inferSelect;

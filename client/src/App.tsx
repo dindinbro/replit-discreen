@@ -27,6 +27,7 @@ import UsersPage from "@/pages/UsersPage";
 import MaintenancePage from "@/pages/MaintenancePage";
 import GamePage from "@/pages/GamePage";
 import StatusPage from "@/pages/StatusPage";
+import TicketsPage from "@/pages/TicketsPage";
 import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
 import Layout from "@/components/Layout";
 import { Loader2, UserCircle2, Sparkles } from "lucide-react";
@@ -256,6 +257,9 @@ function Router() {
       </Route>
       <Route path="/contact">
         <PublicRoute component={ContactPage} />
+      </Route>
+      <Route path="/tickets">
+        <ProtectedRoute component={TicketsPage} />
       </Route>
       <Route path="/avis">
         <PublicRoute component={VouchesPage} />

@@ -3,7 +3,7 @@ import {
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
   blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes, gameBoosts,
-  searchLogs, reviews, gameLogs,
+  searchLogs, reviews, gameLogs, supportTickets, ticketReplies, chatMessages, chatMutes,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -16,6 +16,7 @@ import {
   type DiscountCode, type GameBoost, type ServiceStatus,
   type SearchLog, type InsertSearchLog, type Review, type InsertReview,
   type GameLog, type InsertGameLog,
+  type SupportTicket, type TicketReply, type ChatMessage, type ChatMute,
   serviceStatus,
   PLAN_LIMITS,
 } from "@shared/schema";
@@ -159,6 +160,23 @@ export interface IStorage {
   clearSearchLogs(): Promise<number>;
   deleteGameLog(id: number): Promise<boolean>;
   clearGameLogs(): Promise<number>;
+  // Tickets
+  createTicket(data: { userId: string; username?: string; email?: string; subject: string; category: string; priority: string }): Promise<SupportTicket>;
+  getTicketsByUser(userId: string): Promise<SupportTicket[]>;
+  getTicketById(id: number): Promise<SupportTicket | undefined>;
+  getAllTickets(filters: { status?: string; category?: string; page?: number; limit?: number }): Promise<{ rows: SupportTicket[]; total: number }>;
+  updateTicketStatus(id: number, status: string): Promise<boolean>;
+  deleteTicket(id: number): Promise<boolean>;
+  getRepliesByTicket(ticketId: number): Promise<TicketReply[]>;
+  createReply(data: { ticketId: number; userId: string; username?: string; isAdmin: boolean; message: string }): Promise<TicketReply>;
+  // Chat
+  getChatHistory(limit?: number): Promise<ChatMessage[]>;
+  saveChatMessage(data: { userId: string; username: string; avatarUrl?: string; tier?: string; message: string }): Promise<ChatMessage>;
+  getMute(userId: string): Promise<ChatMute | undefined>;
+  setMute(userId: string, reason?: string, mutedUntil?: Date): Promise<void>;
+  removeMute(userId: string): Promise<void>;
+  clearChatMessages(): Promise<number>;
+  deleteChatMessage(id: number): Promise<boolean>;
 }
 
 function hashKey(key: string): string {
@@ -1407,6 +1425,102 @@ export class DatabaseStorage implements IStorage {
       db.select({ value: count() }).from(gameLogs).where(where),
     ]);
     return { rows, total: Number(total) };
+  }
+
+  // ─── TICKETS ──────────────────────────────────────────────────────────────
+  async createTicket(data: { userId: string; username?: string; email?: string; subject: string; category: string; priority: string }): Promise<SupportTicket> {
+    const [{ nextId }] = await db.select({ nextId: sql<number>`COALESCE(MAX(${supportTickets.id}), 0) + 1` }).from(supportTickets);
+    const [ticket] = await db.insert(supportTickets).values({ id: nextId, ...data, status: "ouvert" }).returning();
+    return ticket;
+  }
+
+  async getTicketsByUser(userId: string): Promise<SupportTicket[]> {
+    return db.select().from(supportTickets).where(eq(supportTickets.userId, userId)).orderBy(desc(supportTickets.updatedAt));
+  }
+
+  async getTicketById(id: number): Promise<SupportTicket | undefined> {
+    const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
+    return ticket;
+  }
+
+  async getAllTickets(filters: { status?: string; category?: string; page?: number; limit?: number }): Promise<{ rows: SupportTicket[]; total: number }> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 30;
+    const offset = (page - 1) * limit;
+    const conditions = [];
+    if (filters.status && filters.status !== "all") conditions.push(eq(supportTickets.status, filters.status));
+    if (filters.category && filters.category !== "all") conditions.push(eq(supportTickets.category, filters.category));
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const [rows, [{ value: total }]] = await Promise.all([
+      db.select().from(supportTickets).where(where).orderBy(desc(supportTickets.updatedAt)).limit(limit).offset(offset),
+      db.select({ value: count() }).from(supportTickets).where(where),
+    ]);
+    return { rows, total: Number(total) };
+  }
+
+  async updateTicketStatus(id: number, status: string): Promise<boolean> {
+    const result = await db.update(supportTickets).set({ status, updatedAt: new Date() }).where(eq(supportTickets.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async deleteTicket(id: number): Promise<boolean> {
+    await db.delete(ticketReplies).where(eq(ticketReplies.ticketId, id));
+    const result = await db.delete(supportTickets).where(eq(supportTickets.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getRepliesByTicket(ticketId: number): Promise<TicketReply[]> {
+    return db.select().from(ticketReplies).where(eq(ticketReplies.ticketId, ticketId)).orderBy(asc(ticketReplies.createdAt));
+  }
+
+  async createReply(data: { ticketId: number; userId: string; username?: string; isAdmin: boolean; message: string }): Promise<TicketReply> {
+    const [{ nextId }] = await db.select({ nextId: sql<number>`COALESCE(MAX(${ticketReplies.id}), 0) + 1` }).from(ticketReplies);
+    const [reply] = await db.insert(ticketReplies).values({ id: nextId, ...data }).returning();
+    await db.update(supportTickets).set({ updatedAt: new Date(), status: data.isAdmin ? "en cours" : "ouvert" }).where(eq(supportTickets.id, data.ticketId));
+    return reply;
+  }
+
+  // ─── CHAT ─────────────────────────────────────────────────────────────────
+  async getChatHistory(limit = 60): Promise<ChatMessage[]> {
+    const rows = await db.select().from(chatMessages).orderBy(desc(chatMessages.createdAt)).limit(limit);
+    return rows.reverse();
+  }
+
+  async saveChatMessage(data: { userId: string; username: string; avatarUrl?: string; tier?: string; message: string }): Promise<ChatMessage> {
+    const [{ nextId }] = await db.select({ nextId: sql<number>`COALESCE(MAX(${chatMessages.id}), 0) + 1` }).from(chatMessages);
+    const [msg] = await db.insert(chatMessages).values({ id: nextId, ...data, tier: data.tier ?? "free", avatarUrl: data.avatarUrl ?? null }).returning();
+    // Keep only last 500 messages
+    const old = await db.select({ id: chatMessages.id }).from(chatMessages).orderBy(desc(chatMessages.createdAt)).offset(500).limit(1000);
+    if (old.length > 0) {
+      const ids = old.map(r => r.id);
+      await db.delete(chatMessages).where(sql`${chatMessages.id} = ANY(${ids})`);
+    }
+    return msg;
+  }
+
+  async getMute(userId: string): Promise<ChatMute | undefined> {
+    const [mute] = await db.select().from(chatMutes).where(eq(chatMutes.userId, userId)).orderBy(desc(chatMutes.createdAt)).limit(1);
+    return mute;
+  }
+
+  async setMute(userId: string, reason?: string, mutedUntil?: Date): Promise<void> {
+    await db.delete(chatMutes).where(eq(chatMutes.userId, userId));
+    const [{ nextId }] = await db.select({ nextId: sql<number>`COALESCE(MAX(${chatMutes.id}), 0) + 1` }).from(chatMutes);
+    await db.insert(chatMutes).values({ id: nextId, userId, reason: reason ?? null, mutedUntil: mutedUntil ?? null });
+  }
+
+  async removeMute(userId: string): Promise<void> {
+    await db.delete(chatMutes).where(eq(chatMutes.userId, userId));
+  }
+
+  async clearChatMessages(): Promise<number> {
+    const result = await db.delete(chatMessages);
+    return result.rowCount ?? 0;
+  }
+
+  async deleteChatMessage(id: number): Promise<boolean> {
+    const result = await db.delete(chatMessages).where(eq(chatMessages.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

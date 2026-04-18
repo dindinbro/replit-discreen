@@ -27,6 +27,7 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { initChatServer } from "./chat";
 import { startDiscordBot } from "./discord-bot";
 import { startTaskBot } from "./task-bot";
 import { startLinksBot } from "./links-bot";
@@ -189,6 +190,7 @@ app.use((req, res, next) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   await registerRoutes(httpServer, app);
+  initChatServer(httpServer);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
