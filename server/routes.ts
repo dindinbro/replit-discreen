@@ -4957,21 +4957,28 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
             discordId: profile?.discord_id ?? null,
             ip,
           }, finalScore, creditsInt);
-          storage.createGameLog({
-            userId,
-            email: req.user.email ?? null,
-            sessionEmail: sessionEmail ?? null,
-            username,
-            uniqueId: profile?.unique_id ?? null,
-            discordId: profile?.discord_id ?? null,
-            ipAddress: ip !== "N/A" ? ip : null,
-            score: finalScore,
-            creditsEarned: creditsInt,
-            boostMultiplier,
-            boostName: boostName ?? null,
-          });
+          try {
+            await storage.createGameLog({
+              userId,
+              email: req.user.email ?? null,
+              sessionEmail: sessionEmail ?? null,
+              username,
+              uniqueId: profile?.unique_id ?? null,
+              discordId: profile?.discord_id ?? null,
+              ipAddress: ip !== "N/A" ? ip : null,
+              score: finalScore,
+              creditsEarned: creditsInt,
+              boostMultiplier,
+              boostName: boostName ?? null,
+            });
+            console.log(`[game/submit] game log saved — user=${userId} score=${finalScore} credits=${creditsInt}`);
+          } catch (logErr: any) {
+            console.error(`[game/submit] FAILED to save game log:`, logErr?.message ?? logErr);
+          }
         }
-      } catch {}
+      } catch (profileErr: any) {
+        console.error(`[game/submit] profile fetch error:`, profileErr?.message ?? profileErr);
+      }
 
       const baseCredits = Math.floor(finalScore / 60);
       const finalCredits = Math.floor(baseCredits * boostMultiplier);

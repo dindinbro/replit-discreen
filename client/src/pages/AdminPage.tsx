@@ -4034,7 +4034,7 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
   const [filters, setFilters] = useState({ userId: "", dateFrom: "", dateTo: "" });
   const [applied, setApplied] = useState({ userId: "", dateFrom: "", dateTo: "" });
 
-  const { data, isLoading, isError, error } = useQuery<{ rows: GameLog[]; total: number }>({
+  const { data, isLoading, isError, error, isFetching, refetch } = useQuery<{ rows: GameLog[]; total: number }>({
     queryKey: ["/api/admin/game-logs", applied, page],
     queryFn: async () => {
       const token = await getAccessToken();
@@ -4049,6 +4049,9 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
       }
       return res.json();
     },
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 
   const rows: GameLog[] = Array.isArray(data?.rows) ? data.rows : [];
@@ -4080,6 +4083,9 @@ function GameLogsSection({ getAccessToken }: { getAccessToken: () => Promise<str
             </Button>
             <Button data-testid="button-gamelog-reset" size="sm" variant="outline" className="h-8" onClick={() => { const e = { userId: "", dateFrom: "", dateTo: "" }; setFilters(e); setApplied(e); setPage(1); }}>
               <RotateCcw className="w-3.5 h-3.5" />
+            </Button>
+            <Button data-testid="button-gamelog-refresh" size="sm" variant="outline" className="h-8" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </div>

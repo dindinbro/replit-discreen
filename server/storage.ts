@@ -1335,11 +1335,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGameLog(data: InsertGameLog): Promise<void> {
-    try {
-      await db.insert(gameLogs).values(data);
-    } catch (e) {
-      console.error("[createGameLog] error:", e);
-    }
+    await db.insert(gameLogs).values(data);
   }
 
   async getGameLogs(filters: { userId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ rows: GameLog[]; total: number }> {
