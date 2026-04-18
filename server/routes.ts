@@ -2386,7 +2386,7 @@ export async function registerRoutes(
           webhookExternalProxySearch(wUser, criteriaStr, externalResults.length);
         }
       }
-      logSearchToDb(req, wUser, externalResults.length > 0 ? "externe" : "interne", criteriaStr, total ?? 0);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, externalResults.length > 0 ? "externe" : "interne", criteriaStr, total ?? 0);
 
       if (!userBypassed) {
         const alertKey = `${userId}_${today}`;
@@ -2998,7 +2998,7 @@ export async function registerRoutes(
       if (!wUser.bypassed) {
         webhookBreachSearch(wUser, term, fields, resultCount);
       }
-      logSearchToDb(req, wUser, "breach", term, resultCount);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "breach", term, resultCount);
 
       res.json({
         results: data.results || [],
@@ -3211,7 +3211,7 @@ export async function registerRoutes(
       if (!wUser.bypassed) {
         webhookPhoneLookup(wUser, normalized);
       }
-      logSearchToDb(req, wUser, "phone", normalized, 1);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "phone", normalized, 1);
     } catch (err) {
       console.error("POST /api/phone/lookup error:", err);
       res.status(500).json({ ok: false, message: "Erreur interne" });
@@ -3244,7 +3244,7 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       if (!wUser.bypassed) webhookGeoIP(wUser, trimmed);
-      logSearchToDb(req, wUser, "geoip", trimmed, 1);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "geoip", trimmed, 1);
 
       res.json({
         ok: true,
@@ -3587,7 +3587,7 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
-      logSearchToDb(req, wUser, "leakosint", String(searchRequest), results.length);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "leakosint", String(searchRequest), results.length);
 
       releaseApiSlot("leakosint");
 
@@ -3753,7 +3753,7 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), results.length, "ok");
-      logSearchToDb(req, wUser, "dalton", String(searchRequest), results.length);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "dalton", String(searchRequest), results.length);
 
       res.json({
         results,
