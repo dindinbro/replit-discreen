@@ -138,24 +138,33 @@ function ReviewCard({ review, index, isAdmin, onDelete }: { review: Review; inde
 
 function ReviewForm({ onSubmitted }: { onSubmitted: () => void }) {
   const { toast } = useToast();
+  const { getAccessToken } = useAuth();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/reviews", { rating, comment });
+      const token = await getAccessToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ rating, comment }),
+      });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Erreur lors de la soumission");
+        throw new Error(data.detail || data.message || `Erreur ${res.status}`);
       }
-      return res.json();
+      return data;
     },
     onSuccess: () => {
-      toast({ title: "Avis envoyé", description: "Votre avis est en attente de validation par un administrateur." });
+      toast({ title: "Avis envoyé !", description: "Votre avis est en attente de validation par un administrateur." });
       onSubmitted();
     },
     onError: (err: Error) => {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      toast({ title: "Impossible d'envoyer l'avis", description: err.message, variant: "destructive" });
     },
   });
 

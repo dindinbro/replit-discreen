@@ -5169,8 +5169,8 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
       }
       res.json({ ok: true, review });
     } catch (err: any) {
-      console.error("[reviews/post] error:", err);
-      res.status(500).json({ message: "Erreur lors de la soumission de l'avis." });
+      console.error("[reviews/post] error:", err?.message ?? err);
+      res.status(500).json({ message: "Erreur lors de la soumission de l'avis.", detail: err?.message ?? String(err) });
     }
   });
 
