@@ -4611,8 +4611,16 @@ function AdminChatSection({ getAccessToken }: { getAccessToken: () => string | n
   });
 
   const TIER_COLORS: Record<string, string> = {
-    admin: "text-destructive", pro: "text-yellow-400", vip: "text-primary",
+    admin: "text-red-400", pro: "text-yellow-400", vip: "text-primary",
     business: "text-purple-400", api: "text-green-400", free: "text-muted-foreground",
+  };
+  const CHAT_TIER_BADGE: Record<string, { cls: string; label: string }> = {
+    admin:    { cls: "bg-red-500/20 text-red-400 border-red-500/40",          label: "ADMIN" },
+    pro:      { cls: "bg-yellow-500/20 text-yellow-400 border-yellow-500/40", label: "PRO" },
+    vip:      { cls: "bg-primary/20 text-primary border-primary/40",          label: "VIP" },
+    business: { cls: "bg-purple-500/20 text-purple-400 border-purple-500/40", label: "BUSINESS" },
+    api:      { cls: "bg-green-500/20 text-green-400 border-green-500/40",    label: "API" },
+    free:     { cls: "bg-muted/60 text-muted-foreground border-border",       label: "FREE" },
   };
 
   return (
@@ -4638,7 +4646,9 @@ function AdminChatSection({ getAccessToken }: { getAccessToken: () => string | n
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-xs font-semibold ${TIER_COLORS[m.tier] ?? ""}`}>{m.username}</span>
-                  <span className="text-[10px] text-muted-foreground">{m.tier.toUpperCase()}</span>
+                  <span className={`text-[9px] px-1.5 py-px rounded border font-bold tracking-wide ${CHAT_TIER_BADGE[m.tier]?.cls ?? CHAT_TIER_BADGE.free.cls}`}>
+                    {CHAT_TIER_BADGE[m.tier]?.label ?? "FREE"}
+                  </span>
                   <span className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
                 <p className="text-sm break-all">{m.message}</p>

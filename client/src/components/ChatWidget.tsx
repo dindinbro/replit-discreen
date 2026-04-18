@@ -7,20 +7,21 @@ import { MessageCircle, X, Send, Trash2, VolumeX, ChevronDown } from "lucide-rea
 import type { ChatMessage } from "@shared/schema";
 
 const TIER_COLORS: Record<string, string> = {
-  admin: "text-destructive",
-  pro: "text-yellow-400",
-  vip: "text-primary",
+  admin: "text-red-400",
+  pro:   "text-yellow-400",
+  vip:   "text-primary",
   business: "text-purple-400",
-  api: "text-green-400",
-  free: "text-muted-foreground",
+  api:   "text-green-400",
+  free:  "text-muted-foreground",
 };
 
-const TIER_BADGE: Record<string, string> = {
-  admin: "bg-destructive/20 text-destructive border-destructive/30",
-  pro: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  vip: "bg-primary/20 text-primary border-primary/30",
-  business: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  api: "bg-green-500/20 text-green-400 border-green-500/30",
+const TIER_BADGE: Record<string, { cls: string; label: string }> = {
+  admin:    { cls: "bg-red-500/20 text-red-400 border-red-500/40",         label: "ADMIN" },
+  pro:      { cls: "bg-yellow-500/20 text-yellow-400 border-yellow-500/40", label: "PRO" },
+  vip:      { cls: "bg-primary/20 text-primary border-primary/40",          label: "VIP" },
+  business: { cls: "bg-purple-500/20 text-purple-400 border-purple-500/40", label: "BUSINESS" },
+  api:      { cls: "bg-green-500/20 text-green-400 border-green-500/40",    label: "API" },
+  free:     { cls: "bg-muted/60 text-muted-foreground border-border",       label: "FREE" },
 };
 
 function formatTime(d: string | Date) {
@@ -159,9 +160,9 @@ export default function ChatWidget() {
                   <div className={`flex flex-col gap-0.5 max-w-[75%] ${isOwn ? "items-end" : "items-start"}`}>
                     <div className="flex items-center gap-1.5">
                       <span className={`text-[10px] font-semibold ${TIER_COLORS[msg.tier] ?? "text-muted-foreground"}`}>{msg.username}</span>
-                      {TIER_BADGE[msg.tier] && (
-                        <span className={`text-[9px] px-1 rounded border font-medium ${TIER_BADGE[msg.tier]}`}>{msg.tier.toUpperCase()}</span>
-                      )}
+                      <span className={`text-[9px] px-1.5 py-px rounded border font-bold tracking-wide ${TIER_BADGE[msg.tier]?.cls ?? TIER_BADGE.free.cls}`}>
+                        {TIER_BADGE[msg.tier]?.label ?? "FREE"}
+                      </span>
                       <span className="text-[10px] text-muted-foreground">{formatTime(msg.createdAt)}</span>
                     </div>
                     <div className={`rounded-xl px-3 py-1.5 text-sm break-words ${isOwn ? "bg-primary/15 border border-primary/20" : "bg-muted"}`}>
