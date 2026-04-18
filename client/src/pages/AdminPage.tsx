@@ -3312,7 +3312,7 @@ function NotificationsSection({ getAccessToken }: { getAccessToken: () => string
                 <SelectItem value="5">5 popups</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">Empilés en bas à gauche</p>
+            <p className="text-xs text-muted-foreground">Empilés en bas à droite (au-dessus du chat)</p>
           </div>
         </div>
       </Card>

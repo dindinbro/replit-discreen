@@ -102,10 +102,15 @@ export default function SubscriptionToastProvider() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    fetch("/api/settings/toast")
-      .then(r => r.ok ? r.json() : DEFAULT_CFG)
-      .then(setConfig)
-      .catch(() => setConfig(DEFAULT_CFG));
+    function loadConfig() {
+      fetch("/api/settings/toast")
+        .then(r => r.ok ? r.json() : DEFAULT_CFG)
+        .then(setConfig)
+        .catch(() => setConfig(DEFAULT_CFG));
+    }
+    loadConfig();
+    const refreshInterval = setInterval(loadConfig, 60_000);
+    return () => clearInterval(refreshInterval);
   }, []);
 
   useEffect(() => {
@@ -160,7 +165,7 @@ export default function SubscriptionToastProvider() {
   if (!config.enabled) return null;
 
   return (
-    <div className="fixed bottom-6 left-5 z-50 flex flex-col-reverse gap-2 pointer-events-none">
+    <div className="fixed bottom-20 right-5 z-[999] flex flex-col-reverse gap-2 pointer-events-none">
       <AnimatePresence mode="sync">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto">
