@@ -206,8 +206,8 @@ export type PlanTier = z.infer<typeof PlanTier>;
 export const PLAN_LIMITS: Record<PlanTier, { dailySearches: number; dailyLeakosintSearches: number; price: number; lifetimePrice: number; label: string }> = {
   free: { dailySearches: 2, dailyLeakosintSearches: 0, price: 0, lifetimePrice: 0, label: "Free" },
   vip: { dailySearches: 50, dailyLeakosintSearches: 10, price: 6.99, lifetimePrice: 69.99, label: "VIP" },
-  pro: { dailySearches: 200, dailyLeakosintSearches: 50, price: 14.99, lifetimePrice: 124.99, label: "PRO" },
-  business: { dailySearches: 500, dailyLeakosintSearches: 150, price: 24.99, lifetimePrice: 249.99, label: "Business" },
+  pro: { dailySearches: 125, dailyLeakosintSearches: 30, price: 14.99, lifetimePrice: 124.99, label: "PRO" },
+  business: { dailySearches: 300, dailyLeakosintSearches: 80, price: 24.99, lifetimePrice: 249.99, label: "Business" },
   api: { dailySearches: -1, dailyLeakosintSearches: 200, price: 49.99, lifetimePrice: 399.99, label: "API" },
 };
 

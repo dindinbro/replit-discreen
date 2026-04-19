@@ -66,7 +66,7 @@ const PLANS = [
     icon: Rocket,
     popular: true,
     features: [
-      "200 recherches par jour",
+      "125 recherches par jour",
       "Gaming, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
@@ -87,7 +87,7 @@ const PLANS = [
     icon: Database,
     popular: false,
     features: [
-      "500 recherches par jour",
+      "300 recherches par jour",
       "Gaming, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
