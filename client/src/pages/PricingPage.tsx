@@ -13,7 +13,6 @@ import {
 import {
   CreditCard,
   Zap,
-  Crown,
   Rocket,
   Code,
   Check,
@@ -59,27 +58,6 @@ const PLANS = [
     ],
   },
   {
-    id: "vip",
-    name: "VIP",
-    subtitle: "Pour les utilisateurs reguliers",
-    price: 6.99,
-    lifetimePrice: 69.99,
-    icon: Crown,
-    popular: false,
-    features: [
-      "50 recherches par jour",
-      "Gaming, Email/IP",
-      "Recherches Discord / Externes",
-      "Acces toutes les bases",
-      { text: "Recherche avancee Discreen", excluded: true },
-      { text: "Google OSINT illimite", excluded: true },
-      "Username OSINT illimite",
-      { text: "Moteur de recherche Wanted", excluded: true },
-      { text: "Parrainage", excluded: true },
-      { text: "Agent DisX IA", excluded: true },
-    ],
-  },
-  {
     id: "pro",
     name: "PRO",
     subtitle: "Puissance maximale",
@@ -89,6 +67,27 @@ const PLANS = [
     popular: true,
     features: [
       "200 recherches par jour",
+      "Gaming, Email/IP",
+      "Recherches Discord / Externes",
+      "Acces toutes les bases",
+      "Recherche avancee Discreen",
+      "Google OSINT illimite",
+      "Username OSINT illimite",
+      "Moteur de recherche Wanted",
+      "Parrainage",
+      { text: "Agent DisX IA", available: true, isNew: true },
+    ],
+  },
+  {
+    id: "business",
+    name: "BUSINESS",
+    subtitle: "Volume & performance",
+    price: 24.99,
+    lifetimePrice: 199.99,
+    icon: Database,
+    popular: false,
+    features: [
+      "500 recherches par jour",
       "Gaming, Email/IP",
       "Recherches Discord / Externes",
       "Acces toutes les bases",
@@ -306,7 +305,7 @@ function PricingIntro({ onDone }: { onDone: () => void }) {
               <div className="flex items-center gap-4">
                 <span className="font-mono text-lg font-bold line-through text-red-400/70">{OSINT_TOTAL}€/mois</span>
                 <ArrowRight className="w-4 h-4 text-muted-foreground/40 hidden sm:block" />
-                <span className="font-mono text-2xl font-bold" style={{ color: "#d4a843" }}>6,99€/mois</span>
+                <span className="font-mono text-2xl font-bold" style={{ color: "#d4a843" }}>14,99€/mois</span>
               </div>
             </motion.div>
           )}
@@ -637,7 +636,7 @@ export default function PricingPage() {
                 <div className="flex items-center gap-3">
                   <Shield className="w-4 h-4 shrink-0" style={{ color: "#d4a843" }} />
                   <p className="text-sm font-bold" style={{ color: "#d4a843" }}>
-                    Discreen · dès 6,99€/mois — tout inclus
+                    Discreen · dès 14,99€/mois — tout inclus
                   </p>
                 </div>
               </div>
@@ -955,7 +954,7 @@ export default function PricingPage() {
           <div className="space-y-4 pt-2">
             <Input
               data-testid="input-redeem-key"
-              placeholder="DSC-VIP-XXXXXXXXXXXX"
+              placeholder="DSC-PRO-XXXXXXXXXXXX"
               value={redeemKey}
               onChange={(e) => setRedeemKey(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleRedeem()}
