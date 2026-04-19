@@ -209,7 +209,7 @@ export default function BlacklistRequestPage() {
             <CreditCard className="w-12 h-12 mx-auto text-primary" />
             <h2 className="text-xl font-semibold">Paiement requis</h2>
             <p className="text-muted-foreground">
-              La demande de blacklist necessite un paiement de <span className="font-bold text-foreground">50,00 EUR</span> en crypto-monnaie.
+              La demande de blacklist necessite un paiement de <span className="font-bold text-foreground">30,00 EUR</span> en crypto-monnaie.
             </p>
 
             <Card className="p-4 bg-muted/50">
@@ -252,7 +252,7 @@ export default function BlacklistRequestPage() {
                 ) : (
                   <>
                     <CreditCard className="w-4 h-4 mr-2" />
-                    Payer 50,00 EUR
+                    Payer 30,00 EUR
                   </>
                 )}
               </Button>

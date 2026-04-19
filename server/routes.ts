@@ -1657,6 +1657,7 @@ export async function registerRoutes(
       await storage.createPendingServiceRequest(orderId, parsed.type, userId, JSON.stringify(parsed.formData));
 
       const label = parsed.type === "blacklist" ? "Demande de Blacklist" : "Demande d'Information";
+      const priceAmount = parsed.type === "blacklist" ? 30 : 25;
 
       const response = await fetch("https://api.nowpayments.io/v1/invoice", {
         method: "POST",
@@ -1665,7 +1666,7 @@ export async function registerRoutes(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          price_amount: 50,
+          price_amount: priceAmount,
           price_currency: "eur",
           order_id: orderId,
           order_description: label,
