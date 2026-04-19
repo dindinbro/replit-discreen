@@ -5300,6 +5300,19 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
     } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
   });
 
+  // User: close own ticket
+  app.patch("/api/tickets/:id/close", requireAuth, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const ticket = await storage.getTicketById(id);
+      if (!ticket) return res.status(404).json({ message: "Ticket introuvable" });
+      if (ticket.userId !== req.user?.id) return res.status(403).json({ message: "Accès refusé" });
+      if (ticket.status === "fermé") return res.status(400).json({ message: "Ce ticket est déjà fermé." });
+      await storage.updateTicketStatus(id, "fermé");
+      res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
+  });
+
   // Admin: all tickets
   app.get("/api/admin/tickets", requireAuth, requireAdmin, async (req, res) => {
     try {

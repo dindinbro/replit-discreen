@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Ticket, ChevronLeft, Send, RefreshCw, Lock } from "lucide-react";
+import { Loader2, Plus, Ticket, ChevronLeft, Send, RefreshCw, Lock, XCircle } from "lucide-react";
 import type { SupportTicket, TicketReply } from "@shared/schema";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -156,6 +156,24 @@ function TicketDetail({ ticketId, getAccessToken, onBack }: { ticketId: number; 
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
+  const closeMutation = useMutation({
+    mutationFn: async () => {
+      const token = getAccessToken();
+      const res = await fetch(`/api/tickets/${ticketId}/close`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.message);
+    },
+    onSuccess: () => {
+      toast({ title: "Ticket fermé" });
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   if (isLoading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
   const { ticket, replies } = data!;
@@ -177,9 +195,24 @@ function TicketDetail({ ticketId, getAccessToken, onBack }: { ticketId: number; 
               <span className="text-xs text-muted-foreground">{new Date(ticket.createdAt).toLocaleDateString("fr-FR")}</span>
             </div>
           </div>
-          <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1">
-            <RefreshCw className="w-3.5 h-3.5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {ticket.status !== "fermé" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => { if (window.confirm("Fermer ce ticket ? Tu ne pourras plus y répondre.")) closeMutation.mutate(); }}
+                disabled={closeMutation.isPending}
+                data-testid="button-close-ticket"
+              >
+                {closeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                Fermer le ticket
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
       </Card>
 
