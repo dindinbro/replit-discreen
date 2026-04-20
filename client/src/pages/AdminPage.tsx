@@ -83,6 +83,9 @@ import {
   VolumeX,
   Volume2,
   Send,
+  Bitcoin,
+  CreditCard,
+  ExternalLink,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -113,7 +116,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews" | "tickets" | "chat" | "bypass";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews" | "tickets" | "chat" | "bypass" | "crypto-payments";
 
 interface AdminTabDef {
   key: AdminTab;
@@ -160,6 +163,7 @@ const ADMIN_TABS: AdminTabDef[] = [
   { key: "game-boosts",    label: "Boosts de Jeu",          shortLabel: "Boosts",        description: "Multiplicateurs de score et avantages temporaires",   icon: Zap,         group: "game" },
   { key: "discounts",      label: "Codes Promo",            shortLabel: "Promo",         description: "Bons de réduction et codes de réduction",             icon: Tag,         group: "game" },
   { key: "services",       label: "Statut des Services",    shortLabel: "Services",      description: "Moniteur de santé des APIs et services externes",     icon: Monitor,     group: "system" },
+  { key: "crypto-payments", label: "Paiements Crypto",      shortLabel: "Paiements",     description: "Historique des paiements crypto NOWPayments",          icon: Bitcoin,     group: "system" },
 ];
 
 interface CategoryFormData {
@@ -5058,9 +5062,118 @@ function AdminPageInner() {
             {activeTab === "bypass" && (
               <BypassSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
             )}
+            {activeTab === "crypto-payments" && (
+              <CryptoPaymentsSection getAccessToken={getAccessToken} />
+            )}
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+function CryptoPaymentsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const token = getAccessToken();
+  const { data, isLoading, refetch } = useQuery<{ rows: any[]; total: number }>({
+    queryKey: ["/api/admin/crypto-payments", page],
+    queryFn: () => fetch(`/api/admin/crypto-payments?page=${page}&limit=50`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()),
+    refetchInterval: 30000,
+  });
+
+  const rows = data?.rows ?? [];
+  const filtered = statusFilter === "all" ? rows : rows.filter(r => r.status === statusFilter);
+
+  const STATUS_COLORS: Record<string, string> = {
+    pending: "text-muted-foreground", waiting: "text-yellow-500", confirming: "text-blue-500",
+    confirmed: "text-green-500", finished: "text-green-500", failed: "text-destructive",
+    expired: "text-destructive", partially_paid: "text-orange-500",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40 h-8 text-sm" data-testid="select-crypto-status-filter">
+              <SelectValue placeholder="Statut" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="waiting">Waiting</SelectItem>
+              <SelectItem value="confirming">Confirming</SelectItem>
+              <SelectItem value="finished">Finished</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">{filtered.length} résultats</span>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1.5 h-8">
+          <RefreshCw className="w-3.5 h-3.5" />
+          Rafraîchir
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-7 h-7 animate-spin text-primary" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground">
+          <Bitcoin className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p>Aucun paiement crypto enregistré</p>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((p: any) => (
+            <Card key={p.id} className="p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-muted-foreground truncate max-w-[180px]">{p.userId}</span>
+                    <Badge variant="outline" className="text-[10px] h-4">{p.orderType}</Badge>
+                    {p.tier && <Badge variant="secondary" className="text-[10px] h-4">{p.tier}</Badge>}
+                    {p.serviceType && <Badge className="text-[10px] h-4">{p.serviceType}</Badge>}
+                  </div>
+                  <p className="text-sm font-medium">{p.label ?? p.orderId}</p>
+                  <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground">{p.priceEur}€</span>
+                    {p.payCurrency && <span className="uppercase font-mono">{p.payAmount} {p.payCurrency}</span>}
+                    {p.discountCode && <span className="text-green-500">-{p.discountPercent}% ({p.discountCode})</span>}
+                    <span>{new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  {p.nowpaymentsPaymentId && (
+                    <p className="text-[11px] text-muted-foreground font-mono">ID: {p.nowpaymentsPaymentId}</p>
+                  )}
+                  {p.payAddress && (
+                    <p className="text-[11px] text-muted-foreground font-mono truncate max-w-sm">{p.payAddress}</p>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <span className={`text-sm font-medium ${STATUS_COLORS[p.status] ?? "text-muted-foreground"}`}>
+                    {p.status}
+                  </span>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {(data?.total ?? 0) > 50 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Préc.</Button>
+          <span className="text-sm text-muted-foreground">Page {page}</span>
+          <Button size="sm" variant="outline" disabled={rows.length < 50} onClick={() => setPage(p => p + 1)}>Suiv.</Button>
+        </div>
+      )}
     </div>
   );
 }

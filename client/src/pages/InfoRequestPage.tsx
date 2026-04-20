@@ -67,7 +67,6 @@ export default function InfoRequestPage() {
       const token = getAccessToken();
       if (!token) {
         toast({ title: "Erreur", description: "Non authentifie", variant: "destructive" });
-        setLoading(false);
         return;
       }
 
@@ -80,37 +79,19 @@ export default function InfoRequestPage() {
         additionalInfo: additionalInfo.trim() || null,
       };
 
-      const res = await fetch("/api/create-service-invoice", {
+      const res = await fetch("/api/payment/init", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ type: "info", formData }),
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "service", serviceType: "info", formData }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.invoice_url) {
-          window.open(data.invoice_url, "_blank");
-          toast({
-            title: "Facture creee",
-            description: "La facture a ete ouverte dans un nouvel onglet. Une fois le paiement effectue, votre demande sera automatiquement envoyee.",
-          });
-          setEmails([""]);
-          setPseudos([""]);
-          setDiscordIds([""]);
-          setIps([""]);
-          setPhones([""]);
-          setAdditionalInfo("");
-          setStep("form");
-        }
-      } else {
-        const data = await res.json();
-        toast({ title: "Erreur", description: data.message || "Impossible de creer la facture", variant: "destructive" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Impossible de créer le paiement");
+      if (data.orderId) {
+        window.location.href = `/checkout?orderId=${data.orderId}&token=${data.sessionToken}`;
       }
     } catch (error) {
-      toast({ title: "Erreur", description: "Une erreur est survenue", variant: "destructive" });
+      toast({ title: "Erreur", description: error instanceof Error ? error.message : "Une erreur est survenue", variant: "destructive" });
     } finally {
       setLoading(false);
     }

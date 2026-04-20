@@ -723,3 +723,28 @@ export const chatMutes = pgTable("chat_mutes", {
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type ChatMute = typeof chatMutes.$inferSelect;
+
+// ─── CRYPTO PAYMENTS ─────────────────────────────────────────────────────────
+export const cryptoPayments = pgTable("crypto_payments", {
+  id: serial("id").primaryKey(),
+  orderId: text("order_id").notNull().unique(),
+  nowpaymentsPaymentId: text("nowpayments_payment_id"),
+  userId: text("user_id").notNull(),
+  orderType: text("order_type").notNull(), // "subscription" | "service"
+  tier: text("tier"),
+  serviceType: text("service_type"),
+  billing: text("billing"),
+  priceEur: real("price_eur").notNull(),
+  payCurrency: text("pay_currency"),
+  payAmount: real("pay_amount"),
+  payAddress: text("pay_address"),
+  status: text("status").notNull().default("pending"),
+  label: text("label"),
+  discountCode: text("discount_code"),
+  discountPercent: real("discount_percent"),
+  referralCode: text("referral_code"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+});
+
+export type CryptoPayment = typeof cryptoPayments.$inferSelect;

@@ -1,0 +1,98 @@
+Je veux remplacer la redirection vers la page de paiement hébergée par NOWPayments par une **page de paiement crypto custom directement intégrée à Discreen**, tout en **gardant NOWPayments comme backend/API** pour la création et le suivi des paiements.
+
+### Objectif
+
+Créer une expérience de paiement totalement intégrée au design de Discreen, au lieu d’envoyer l’utilisateur sur la page blanche par défaut de NOWPayments.
+
+### Ce que je veux
+
+Quand un utilisateur clique sur un abonnement ou une offre à payer en crypto :
+
+1. **Ne plus rediriger vers la page checkout NOWPayments par défaut**
+2. **Afficher une page de paiement custom sur Discreen**
+3. Utiliser **l’API NOWPayments côté backend** pour :
+
+   * créer le paiement
+   * récupérer le montant exact en crypto
+   * récupérer l’adresse de dépôt
+   * récupérer l’ID du paiement
+   * suivre le statut du paiement
+4. Afficher sur la page custom :
+
+   * la **liste des cryptos disponibles** au choix
+   * le **montant à payer**
+   * l’**adresse wallet**
+   * un **QR code**
+   * un **bouton copier**
+   * un **timer / expiration**
+   * le **statut en temps réel** : waiting, confirming, finished, failed, expired
+5. Dès que le paiement est confirmé via **webhook NOWPayments**, activer automatiquement la licence / abonnement / achat concerné.
+
+### Design attendu
+
+Je veux un rendu moderne, premium, cohérent avec Discreen :
+
+* fond sombre
+* cartes propres
+* sélection de crypto élégante
+* page fluide
+* pas d’effet “prestataire externe”
+* UX similaire à un checkout crypto moderne
+
+### Important techniquement
+
+Je veux que toute la logique sensible reste **côté serveur** :
+
+* création du paiement via NOWPayments en backend
+* calcul du bon montant en backend
+* aucune confiance au front pour le prix
+* vérification sécurisée du webhook NOWPayments
+* mise à jour fiable du statut de paiement
+* attribution de la licence uniquement après confirmation valide
+
+### Flow souhaité
+
+* L’utilisateur choisit une offre
+* Il clique sur payer en crypto
+* Il arrive sur une **page Discreen custom**
+* Il choisit sa crypto
+* Le backend crée le paiement NOWPayments
+* La page affiche :
+
+  * crypto choisie
+  * montant exact
+  * adresse
+  * QR code
+  * statut
+* Le statut se met à jour automatiquement
+* Quand le paiement est confirmé, la commande passe en “paid” et le produit/licence est délivré automatiquement
+
+### En plus si possible
+
+* support de plusieurs réseaux propres quand nécessaire, par exemple :
+
+  * USDT TRC20
+  * USDT ERC20
+  * USDC ERC20
+  * LTC
+  * BTC
+* bouton “changer de crypto”
+* affichage clair du temps restant
+* message du style : “Votre licence sera affichée automatiquement après confirmation réseau”
+* historique/admin pour voir :
+
+  * user
+  * offre
+  * crypto choisie
+  * montant
+  * statut
+  * payment_id NOWPayments
+  * date
+
+### Ce que je ne veux pas
+
+* pas de redirection vers la page blanche NOWPayments
+* pas de logique prix côté client
+* pas de validation faible des webhooks
+
+Merci de me faire ça proprement, avec une structure maintenable, sécurisée, et facile à faire évoluer.

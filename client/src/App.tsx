@@ -28,6 +28,7 @@ import MaintenancePage from "@/pages/MaintenancePage";
 import GamePage from "@/pages/GamePage";
 import StatusPage from "@/pages/StatusPage";
 import TicketsPage from "@/pages/TicketsPage";
+import CheckoutPage from "@/pages/CheckoutPage";
 import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
 import Layout from "@/components/Layout";
 import { Loader2, UserCircle2, Sparkles } from "lucide-react";
@@ -269,6 +270,9 @@ function Router() {
       </Route>
       <Route path="/status">
         <PublicRoute component={StatusPage} />
+      </Route>
+      <Route path="/checkout">
+        <ProtectedRoute component={CheckoutPage} withLayout={false} />
       </Route>
       <Route path="/payment-success">
         <PublicRoute component={PaymentSuccessPage} />

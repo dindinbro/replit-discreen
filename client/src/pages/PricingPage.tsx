@@ -471,7 +471,11 @@ export default function PricingPage() {
     setReferralOpen(false);
     setLoading(pendingPlan.id);
     try {
-      const body: any = { plan: pendingPlan.id, billing: pricingMode };
+      const body: any = {
+        type: "subscription",
+        tier: pendingPlan.id,
+        billing: pricingMode,
+      };
       if (withReferralCode && withReferralCode.trim()) {
         body.referralCode = withReferralCode.trim().toUpperCase();
       }
@@ -479,9 +483,9 @@ export default function PricingPage() {
         body.discountCode = appliedDiscount.code;
       }
 
-      const res = await fetch("/api/create-invoice", {
+      const res = await fetch("/api/payment/init", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -494,8 +498,8 @@ export default function PricingPage() {
       }
 
       const data = await res.json();
-      if (data.invoice_url) {
-        window.open(data.invoice_url, "_blank");
+      if (data.orderId) {
+        window.location.href = `/checkout?orderId=${data.orderId}&token=${data.sessionToken}`;
       }
     } catch (err) {
       console.error("Payment error:", err);

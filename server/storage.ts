@@ -4,6 +4,7 @@ import {
   wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
   blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes, gameBoosts,
   searchLogs, reviews, gameLogs, supportTickets, ticketReplies, chatMessages, chatMutes,
+  cryptoPayments,
   type User, type InsertUser, type Category, type InsertCategory,
   type Subscription, type ApiKey, type PlanTier, type Vouch, type InsertVouch,
   type LicenseKey, type BlacklistRequest, type InsertBlacklistRequest,
@@ -17,6 +18,7 @@ import {
   type SearchLog, type InsertSearchLog, type Review, type InsertReview,
   type GameLog, type InsertGameLog,
   type SupportTicket, type TicketReply, type ChatMessage, type ChatMute,
+  type CryptoPayment,
   serviceStatus,
   PLAN_LIMITS,
 } from "@shared/schema";
@@ -177,6 +179,18 @@ export interface IStorage {
   removeMute(userId: string): Promise<void>;
   clearChatMessages(): Promise<number>;
   deleteChatMessage(id: number): Promise<boolean>;
+  // Crypto Payments
+  createCryptoPayment(data: {
+    orderId: string; userId: string; orderType: string; tier?: string; serviceType?: string;
+    billing?: string; priceEur: number; label?: string; discountCode?: string;
+    discountPercent?: number; referralCode?: string;
+  }): Promise<CryptoPayment>;
+  getCryptoPaymentByOrderId(orderId: string): Promise<CryptoPayment | undefined>;
+  updateCryptoPayment(orderId: string, data: Partial<{
+    nowpaymentsPaymentId: string; payCurrency: string; payAmount: number; payAddress: string;
+    status: string; expiresAt: Date;
+  }>): Promise<CryptoPayment | undefined>;
+  getCryptoPayments(page?: number, limit?: number): Promise<{ rows: CryptoPayment[]; total: number }>;
 }
 
 function hashKey(key: string): string {
@@ -1521,6 +1535,57 @@ export class DatabaseStorage implements IStorage {
   async deleteChatMessage(id: number): Promise<boolean> {
     const result = await db.delete(chatMessages).where(eq(chatMessages.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // ─── CRYPTO PAYMENTS ──────────────────────────────────────────────────────
+  async createCryptoPayment(data: {
+    orderId: string; userId: string; orderType: string; tier?: string; serviceType?: string;
+    billing?: string; priceEur: number; label?: string; discountCode?: string;
+    discountPercent?: number; referralCode?: string;
+  }): Promise<CryptoPayment> {
+    const [row] = await db.insert(cryptoPayments).values({
+      orderId: data.orderId,
+      userId: data.userId,
+      orderType: data.orderType,
+      tier: data.tier ?? null,
+      serviceType: data.serviceType ?? null,
+      billing: data.billing ?? null,
+      priceEur: data.priceEur,
+      label: data.label ?? null,
+      discountCode: data.discountCode ?? null,
+      discountPercent: data.discountPercent ?? null,
+      referralCode: data.referralCode ?? null,
+      status: "pending",
+    }).returning();
+    return row;
+  }
+
+  async getCryptoPaymentByOrderId(orderId: string): Promise<CryptoPayment | undefined> {
+    const [row] = await db.select().from(cryptoPayments).where(eq(cryptoPayments.orderId, orderId));
+    return row;
+  }
+
+  async updateCryptoPayment(orderId: string, data: Partial<{
+    nowpaymentsPaymentId: string; payCurrency: string; payAmount: number; payAddress: string;
+    status: string; expiresAt: Date;
+  }>): Promise<CryptoPayment | undefined> {
+    const update: Record<string, any> = {};
+    if (data.nowpaymentsPaymentId !== undefined) update.nowpaymentsPaymentId = data.nowpaymentsPaymentId;
+    if (data.payCurrency !== undefined) update.payCurrency = data.payCurrency;
+    if (data.payAmount !== undefined) update.payAmount = data.payAmount;
+    if (data.payAddress !== undefined) update.payAddress = data.payAddress;
+    if (data.status !== undefined) update.status = data.status;
+    if (data.expiresAt !== undefined) update.expiresAt = data.expiresAt;
+    if (Object.keys(update).length === 0) return this.getCryptoPaymentByOrderId(orderId);
+    const [row] = await db.update(cryptoPayments).set(update).where(eq(cryptoPayments.orderId, orderId)).returning();
+    return row;
+  }
+
+  async getCryptoPayments(page = 1, limit = 50): Promise<{ rows: CryptoPayment[]; total: number }> {
+    const offset = (page - 1) * limit;
+    const [{ total }] = await db.select({ total: count() }).from(cryptoPayments);
+    const rows = await db.select().from(cryptoPayments).orderBy(desc(cryptoPayments.createdAt)).limit(limit).offset(offset);
+    return { rows, total: Number(total) };
   }
 }
 

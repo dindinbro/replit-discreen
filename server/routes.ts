@@ -2655,6 +2655,15 @@ export async function registerRoutes(
       const source_amount = price_amount;
       const currency = pay_currency;
 
+      // Always sync crypto_payments table status
+      try {
+        const cpOrderStr = String(order_number || "");
+        if (cpOrderStr) {
+          const cpStatus = status === "finished" ? "finished" : status === "confirmed" ? "confirmed" : status;
+          await storage.updateCryptoPayment(cpOrderStr, { status: cpStatus }).catch(() => {});
+        }
+      } catch { /* non-blocking */ }
+
       if (status === "finished" || status === "partially_paid" || status === "confirmed") {
         const orderStr = String(order_number || "");
 
@@ -2730,6 +2739,284 @@ export async function registerRoutes(
     } catch (err) {
       console.error("NOWPayments IPN error:", err);
       res.json({ status: "ok" });
+    }
+  });
+
+  // ─── CUSTOM CRYPTO CHECKOUT ────────────────────────────────────────────────
+
+  // GET /api/nowpayments/currencies - list available crypto currencies
+  app.get("/api/nowpayments/currencies", async (req: Request, res: Response) => {
+    try {
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "Payment not configured" });
+      const r = await fetch("https://api.nowpayments.io/v1/currencies?isFiat=false", {
+        headers: { "x-api-key": apiKey },
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await r.json();
+      // Return a curated popular list + full list
+      const POPULAR = ["btc", "eth", "ltc", "usdt", "usdc", "bnb", "sol", "xmr", "trx", "doge"];
+      const all: string[] = Array.isArray(data.currencies) ? data.currencies : [];
+      const popular = POPULAR.filter(c => all.includes(c));
+      res.json({ popular, all });
+    } catch (err) {
+      console.error("GET /api/nowpayments/currencies error:", err);
+      res.status(502).json({ message: "Failed to fetch currencies" });
+    }
+  });
+
+  // POST /api/payment/init - initialize a crypto payment session
+  app.post("/api/payment/init", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+      const bodySchema = z.object({
+        type: z.enum(["subscription", "service"]),
+        // subscription fields
+        tier: z.string().optional(),
+        billing: z.enum(["monthly", "lifetime"]).optional(),
+        discountCode: z.string().optional(),
+        referralCode: z.string().optional(),
+        // service fields
+        serviceType: z.enum(["blacklist", "info"]).optional(),
+        formData: z.record(z.any()).optional(),
+      });
+      const parsed = bodySchema.parse(req.body);
+
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "Payment service not configured" });
+
+      let orderId: string;
+      let priceEur: number;
+      let label: string;
+      let discountCode: string | undefined;
+      let discountPct: number | undefined;
+      let referralCode: string | undefined;
+      let appliedDiscount: { id: number; code: string; percent: number } | null = null;
+
+      if (parsed.type === "subscription") {
+        if (!parsed.tier) return res.status(400).json({ message: "Tier requis" });
+        const planInfo = PLAN_LIMITS[parsed.tier as PlanTier];
+        if (!planInfo || parsed.tier === "free") return res.status(400).json({ message: "Plan invalide" });
+
+        const isLifetime = parsed.billing === "lifetime";
+        orderId = isLifetime
+          ? `order_${parsed.tier}_lifetime_${Date.now()}`
+          : `order_${parsed.tier}_${Date.now()}`;
+        priceEur = isLifetime ? planInfo.lifetimePrice : planInfo.price;
+        label = isLifetime ? `Abonnement ${planInfo.label} Lifetime` : `Abonnement ${planInfo.label}`;
+
+        if (parsed.discountCode) {
+          const dc = await storage.getDiscountCodeByCode(parsed.discountCode.trim());
+          if (dc && dc.active && !(dc.expiresAt && new Date(dc.expiresAt) < new Date()) && (dc.maxUses === null || dc.usedCount < dc.maxUses)) {
+            priceEur = Math.round(priceEur * (1 - dc.discountPercent / 100) * 100) / 100;
+            appliedDiscount = { id: dc.id, code: dc.code, percent: dc.discountPercent };
+            await storage.storeDiscountForOrder(orderId, dc.id, dc.discountPercent);
+            await storage.incrementDiscountCodeUsage(dc.id);
+            discountCode = dc.code;
+            discountPct = dc.discountPercent;
+          }
+        }
+
+        if (parsed.referralCode) {
+          const refCode = await storage.getReferralCodeByCode(parsed.referralCode.trim());
+          if (refCode && refCode.userId !== userId) {
+            await storage.storeReferralForOrder(orderId, refCode.userId, userId);
+            referralCode = parsed.referralCode.trim();
+          }
+        }
+
+        const user = (req as any).user;
+        const userPseudo = user?.user_metadata?.username || user?.email || "Inconnu";
+        const userEmail = user?.email || "Inconnu";
+        const userDiscord = user?.user_metadata?.discord_id || null;
+        webhookInvoiceCreated(parsed.tier, orderId, priceEur, {
+          pseudo: userPseudo, email: userEmail, userId,
+          discordId: userDiscord,
+          discountCode: appliedDiscount?.code ?? null,
+          discountPercent: appliedDiscount?.percent ?? null,
+        });
+
+      } else {
+        // service
+        if (!parsed.serviceType || !parsed.formData) return res.status(400).json({ message: "serviceType et formData requis" });
+        priceEur = parsed.serviceType === "blacklist" ? 30 : 25;
+        orderId = `service_${parsed.serviceType}_${Date.now()}`;
+        label = parsed.serviceType === "blacklist" ? "Demande de Blacklist" : "Demande d'Information";
+        await storage.createPendingServiceRequest(orderId, parsed.serviceType, userId, JSON.stringify(parsed.formData));
+      }
+
+      await storage.createCryptoPayment({
+        orderId,
+        userId,
+        orderType: parsed.type,
+        tier: parsed.type === "subscription" ? parsed.tier : undefined,
+        serviceType: parsed.type === "service" ? parsed.serviceType : undefined,
+        billing: parsed.billing,
+        priceEur,
+        label,
+        discountCode,
+        discountPercent: discountPct,
+        referralCode,
+      });
+
+      const sessionToken = signOrderId(orderId);
+      res.json({ orderId, sessionToken, priceEur, label, discountApplied: appliedDiscount ? { code: appliedDiscount.code, percent: appliedDiscount.percent } : null });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Données invalides", errors: err.errors });
+      console.error("POST /api/payment/init error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/payment/choose-currency - create NOWPayments payment for chosen crypto
+  app.post("/api/payment/choose-currency", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+      const bodySchema = z.object({
+        orderId: z.string(),
+        sessionToken: z.string(),
+        currency: z.string().min(2).max(20),
+      });
+      const { orderId, sessionToken, currency } = bodySchema.parse(req.body);
+
+      if (!verifyOrderToken(orderId, sessionToken)) {
+        return res.status(403).json({ message: "Token invalide" });
+      }
+
+      const session = await storage.getCryptoPaymentByOrderId(orderId);
+      if (!session) return res.status(404).json({ message: "Session introuvable" });
+      if (session.userId !== userId) return res.status(403).json({ message: "Accès refusé" });
+      if (session.nowpaymentsPaymentId && session.status !== "pending") {
+        return res.json({
+          paymentId: session.nowpaymentsPaymentId,
+          payAddress: session.payAddress,
+          payAmount: session.payAmount,
+          payCurrency: session.payCurrency,
+          expiresAt: session.expiresAt,
+          status: session.status,
+        });
+      }
+
+      const apiKey = process.env.NOWPAYMENTS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "Payment service not configured" });
+
+      const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
+      const ipnUrl = `${baseUrl}/api/nowpayments-ipn`;
+
+      const npRes = await fetch("https://api.nowpayments.io/v1/payment", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          price_amount: session.priceEur,
+          price_currency: "eur",
+          pay_currency: currency.toLowerCase(),
+          order_id: orderId,
+          order_description: session.label ?? orderId,
+          ipn_callback_url: ipnUrl,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      const npData = await npRes.json();
+      if (!npData.payment_id || !npData.pay_address) {
+        console.error("NOWPayments payment error:", npData);
+        return res.status(502).json({ message: npData.message || "Impossible de créer le paiement" });
+      }
+
+      const expiresAt = npData.expiration_estimate_date ? new Date(npData.expiration_estimate_date) : null;
+      await storage.updateCryptoPayment(orderId, {
+        nowpaymentsPaymentId: String(npData.payment_id),
+        payCurrency: npData.pay_currency,
+        payAmount: npData.pay_amount,
+        payAddress: npData.pay_address,
+        status: "waiting",
+        ...(expiresAt ? { expiresAt } : {}),
+      });
+
+      res.json({
+        paymentId: String(npData.payment_id),
+        payAddress: npData.pay_address,
+        payAmount: npData.pay_amount,
+        payCurrency: npData.pay_currency,
+        expiresAt: expiresAt?.toISOString() ?? null,
+        status: "waiting",
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Données invalides", errors: err.errors });
+      console.error("POST /api/payment/choose-currency error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // GET /api/payment/:orderId - get crypto payment session status
+  app.get("/api/payment/:orderId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user.id;
+      const { orderId } = req.params;
+      const token = req.query.token as string | undefined;
+
+      const session = await storage.getCryptoPaymentByOrderId(orderId);
+      if (!session) return res.status(404).json({ message: "Session introuvable" });
+
+      // Allow owner OR valid signed token
+      const ownerOrToken = session.userId === userId || (token && verifyOrderToken(orderId, token));
+      if (!ownerOrToken) return res.status(403).json({ message: "Accès refusé" });
+
+      let liveStatus = session.status;
+      // Poll NOWPayments for live status if we have a payment_id
+      if (session.nowpaymentsPaymentId && !["finished", "confirmed", "failed", "expired"].includes(session.status)) {
+        try {
+          const apiKey = process.env.NOWPAYMENTS_API_KEY;
+          if (apiKey) {
+            const npRes = await fetch(`https://api.nowpayments.io/v1/payment/${session.nowpaymentsPaymentId}`, {
+              headers: { "x-api-key": apiKey },
+              signal: AbortSignal.timeout(8000),
+            });
+            if (npRes.ok) {
+              const npData = await npRes.json();
+              liveStatus = npData.payment_status || session.status;
+              if (liveStatus !== session.status) {
+                await storage.updateCryptoPayment(orderId, { status: liveStatus });
+              }
+            }
+          }
+        } catch { /* ignore polling errors */ }
+      }
+
+      res.json({
+        orderId: session.orderId,
+        orderType: session.orderType,
+        tier: session.tier,
+        serviceType: session.serviceType,
+        billing: session.billing,
+        label: session.label,
+        priceEur: session.priceEur,
+        paymentId: session.nowpaymentsPaymentId,
+        payAddress: session.payAddress,
+        payAmount: session.payAmount,
+        payCurrency: session.payCurrency,
+        status: liveStatus,
+        expiresAt: session.expiresAt,
+        createdAt: session.createdAt,
+        discountCode: session.discountCode,
+        discountPercent: session.discountPercent,
+      });
+    } catch (err) {
+      console.error("GET /api/payment/:orderId error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // GET /api/admin/crypto-payments - admin payment history
+  app.get("/api/admin/crypto-payments", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
+      const data = await storage.getCryptoPayments(page, limit);
+      res.json(data);
+    } catch (err) {
+      console.error("GET /api/admin/crypto-payments error:", err);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
