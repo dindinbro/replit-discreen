@@ -160,7 +160,7 @@ const STEPS = [
     num: "02",
     icon: CreditCard,
     title: "Choisir un abonnement",
-    desc: "Sélectionnez le forfait adapté à vos besoins : Free, VIP ou PRO. Chaque plan débloque des modules de recherche supplémentaires et augmente votre quota quotidien.",
+    desc: "Sélectionnez le forfait adapté à vos besoins : Free ou PRO. Chaque plan débloque des modules de recherche supplémentaires et augmente votre quota quotidien.",
     img: "/tuto/step2-pricing.jpg",
   },
   {

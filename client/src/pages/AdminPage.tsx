@@ -1046,7 +1046,6 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="free">Free</SelectItem>
-                        <SelectItem value="vip">VIP</SelectItem>
                         <SelectItem value="pro">PRO</SelectItem>
                         <SelectItem value="business">Business</SelectItem>
                         <SelectItem value="api">API</SelectItem>
@@ -1894,7 +1893,7 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [generateTier, setGenerateTier] = useState("vip");
+  const [generateTier, setGenerateTier] = useState("pro");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
@@ -2196,7 +2195,6 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="vip">VIP</SelectItem>
                 <SelectItem value="pro">PRO</SelectItem>
                 <SelectItem value="business">Business</SelectItem>
                 <SelectItem value="api">API</SelectItem>

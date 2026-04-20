@@ -397,10 +397,10 @@ export default function GamePage() {
     enabled: !!user,
   });
 
-  const [redeemPending, setRedeemPending] = useState<"vip" | "pro" | null>(null);
+  const [redeemPending, setRedeemPending] = useState<"pro" | null>(null);
 
   const redeemMut = useMutation({
-    mutationFn: async (plan: "vip" | "pro") => {
+    mutationFn: async (plan: "pro") => {
       setRedeemPending(plan);
       const res = await apiRequest("POST", "/api/game/redeem", { plan });
       return res.json();
@@ -876,13 +876,12 @@ export default function GamePage() {
                 <div className="text-xs text-muted-foreground/50 uppercase tracking-widest font-mono mb-2">Dépenser ses crédits</div>
                 <div className="flex flex-col gap-2">
                   {[
-                    { plan: "vip",  label: "VIP",  cost: 10000, color: "text-yellow-400", border: "border-yellow-400/20", bg: "bg-yellow-400/5" },
                     { plan: "pro",  label: "PRO",  cost: 30000, color: "text-primary",    border: "border-primary/20",    bg: "bg-primary/5"    },
                   ].map(({ plan, label, cost, color, border, bg }) => {
                     const credits    = gameCredits?.total ?? 0;
                     const pct        = Math.min(100, Math.round((credits / cost) * 100));
                     const hasEnough  = credits >= cost;
-                    const alreadyHas = role === plan || role === "pro" && plan === "vip" || role === "admin";
+                    const alreadyHas = role === plan || role === "admin";
                     return (
                       <div key={plan} className={`rounded-lg border ${border} ${bg} p-3`}>
                         <div className="flex items-center justify-between mb-2">
@@ -896,7 +895,7 @@ export default function GamePage() {
                             <button
                               data-testid={`btn-redeem-${plan}`}
                               disabled={!hasEnough || redeemPending === plan}
-                              onClick={() => redeemMut.mutate(plan as "vip" | "pro")}
+                              onClick={() => redeemMut.mutate(plan as "pro")}
                               className={`text-[11px] font-bold px-2.5 py-1 rounded transition-all ${
                                 hasEnough
                                   ? `${color} border ${border} hover:bg-white/5 cursor-pointer`
@@ -909,7 +908,7 @@ export default function GamePage() {
                         </div>
                         <div className="w-full h-1.5 rounded-full bg-border/20 overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all duration-500 ${hasEnough ? (plan === "vip" ? "bg-yellow-400" : "bg-primary") : "bg-muted-foreground/30"}`}
+                            className={`h-full rounded-full transition-all duration-500 ${hasEnough ? "bg-primary" : "bg-muted-foreground/30"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>

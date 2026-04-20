@@ -1504,7 +1504,7 @@ export async function registerRoutes(
 
       const schema = z.object({
         userId: z.string().uuid(),
-        role: z.enum(["free", "vip", "pro", "business", "api", "admin"]),
+        role: z.enum(["free", "pro", "business", "api", "admin"]),
       });
 
       const parsed = schema.parse(req.body);
@@ -5304,10 +5304,10 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
   app.post("/api/game/redeem", requireAuth, async (req: any, res) => {
     try {
       const { plan } = req.body;
-      if (plan !== "vip" && plan !== "pro") {
+      if (plan !== "pro") {
         return res.status(400).json({ message: "Plan invalide" });
       }
-      const COSTS: Record<string, number> = { vip: 10000, pro: 30000 };
+      const COSTS: Record<string, number> = { pro: 30000 };
       const required = COSTS[plan];
       const userId = req.user.id;
 

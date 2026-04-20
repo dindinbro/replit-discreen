@@ -38,7 +38,7 @@ interface CategoryTab {
   id: SearchMode;
   label: string;
   icon: React.ElementType;
-  tier: "FREE" | "VIP" | "PRO";
+  tier: "FREE" | "PRO";
   placeholder: string;
   color: string;
   fakeResults: Array<{ label: string; value: string; icon: React.ElementType }>;
@@ -109,7 +109,7 @@ const CATEGORIES: CategoryTab[] = [
     id: "sherlock",
     label: "Username OSINT",
     icon: UserSearch,
-    tier: "VIP",
+    tier: "PRO",
     placeholder: "dark_rider42",
     color: "from-purple-500 to-violet-400",
     fakeResults: [
@@ -124,7 +124,7 @@ const CATEGORIES: CategoryTab[] = [
     id: "fivem",
     label: "Gaming",
     icon: Gamepad2,
-    tier: "VIP",
+    tier: "PRO",
     placeholder: "Steam / FiveM / Discord ID…",
     color: "from-orange-500 to-amber-400",
     fakeResults: [
@@ -165,7 +165,6 @@ const CATEGORIES: CategoryTab[] = [
 
 const TIER_BADGE: Record<string, { label: string; variant: "secondary" | "outline" | "destructive" }> = {
   FREE: { label: "FREE", variant: "secondary" },
-  VIP: { label: "VIP", variant: "outline" },
   PRO: { label: "PRO", variant: "destructive" },
 };
 
@@ -186,23 +185,6 @@ const PLANS = [
       { text: "OSINT avancé", ok: false },
       { text: "Wanted", ok: false },
       { text: "API", ok: false },
-    ],
-  },
-  {
-    id: "vip",
-    name: "VIP",
-    subtitle: "Pour les réguliers",
-    icon: Crown,
-    price: 6.99,
-    lifetimePrice: 69.99,
-    popular: false,
-    features: [
-      { text: "50 recherches / jour", ok: true },
-      { text: "Gaming, Email / IP", ok: true },
-      { text: "Recherches Discord / Externes", ok: true },
-      { text: "Toutes les bases", ok: true },
-      { text: "Google OSINT", ok: false },
-      { text: "Wanted", ok: false },
     ],
   },
   {
