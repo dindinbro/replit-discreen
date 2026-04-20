@@ -7,6 +7,15 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: "5000",
+        // Explicitly clear proxy vars so undici's EnvHttpProxyAgent
+        // does not route outbound API calls (NOWPayments, etc.) through
+        // any system-level proxy that may be configured on the VPS.
+        HTTP_PROXY: "",
+        HTTPS_PROXY: "",
+        http_proxy: "",
+        https_proxy: "",
+        NO_PROXY: "*",
+        no_proxy: "*",
       },
       max_memory_restart: "500M",
       restart_delay: 3000,

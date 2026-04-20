@@ -15,6 +15,14 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 import { exiftool } from "exiftool-vendored";
+import { Agent as UndiciAgent, fetch as undiciFetch } from "undici";
+
+// Direct agent that bypasses any system-level HTTP proxy (HTTPS_PROXY / HTTP_PROXY env vars)
+// configured on the VPS, which would otherwise intercept outbound NOWPayments API calls.
+const _directAgent = new UndiciAgent({ connect: { rejectUnauthorized: true } });
+function directFetch(url: string, init?: RequestInit & { dispatcher?: unknown }): Promise<Response> {
+  return undiciFetch(url, { ...init, dispatcher: _directAgent } as Parameters<typeof undiciFetch>[1]) as unknown as Promise<Response>;
+}
 import {
   webhookSearch, webhookBreachSearch, webhookExternalProxySearch, webhookLeakosintSearch, webhookDaltonSearch, webhookApiSearch,
   webhookRoleChange, webhookFreeze, webhookInvoiceCreated, webhookPaymentCompleted,
@@ -1659,7 +1667,7 @@ export async function registerRoutes(
       const label = parsed.type === "blacklist" ? "Demande de Blacklist" : "Demande d'Information";
       const priceAmount = parsed.type === "blacklist" ? 30 : 25;
 
-      const response = await fetch("https://api.nowpayments.io/v1/invoice", {
+      const response = await directFetch("https://api.nowpayments.io/v1/invoice", {
         method: "POST",
         headers: {
           "x-api-key": apiKey,
@@ -2581,7 +2589,7 @@ export async function registerRoutes(
       const cancelUrl = `${baseUrl}/pricing`;
       const ipnUrl = `${baseUrl}/api/nowpayments-ipn`;
 
-      const response = await fetch("https://api.nowpayments.io/v1/invoice", {
+      const response = await directFetch("https://api.nowpayments.io/v1/invoice", {
         method: "POST",
         headers: {
           "x-api-key": apiKey,
@@ -2749,9 +2757,9 @@ export async function registerRoutes(
     try {
       const apiKey = process.env.NOWPAYMENTS_API_KEY;
       if (!apiKey) return res.status(500).json({ message: "Payment not configured" });
-      const r = await fetch("https://api.nowpayments.io/v1/currencies?isFiat=false", {
+      const r = await directFetch("https://api.nowpayments.io/v1/currencies?isFiat=false", {
         headers: { "x-api-key": apiKey },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(30000),
       });
       const data = await r.json();
       // Return a curated popular list + full list
@@ -2903,7 +2911,7 @@ export async function registerRoutes(
       const baseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get("host")}`;
       const ipnUrl = `${baseUrl}/api/nowpayments-ipn`;
 
-      const npRes = await fetch("https://api.nowpayments.io/v1/payment", {
+      const npRes = await directFetch("https://api.nowpayments.io/v1/payment", {
         method: "POST",
         headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2914,7 +2922,7 @@ export async function registerRoutes(
           order_description: session.label ?? orderId,
           ipn_callback_url: ipnUrl,
         }),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(30000),
       });
 
       const npData = await npRes.json();
@@ -2968,9 +2976,9 @@ export async function registerRoutes(
         try {
           const apiKey = process.env.NOWPAYMENTS_API_KEY;
           if (apiKey) {
-            const npRes = await fetch(`https://api.nowpayments.io/v1/payment/${session.nowpaymentsPaymentId}`, {
+            const npRes = await directFetch(`https://api.nowpayments.io/v1/payment/${session.nowpaymentsPaymentId}`, {
               headers: { "x-api-key": apiKey },
-              signal: AbortSignal.timeout(8000),
+              signal: AbortSignal.timeout(30000),
             });
             if (npRes.ok) {
               const npData = await npRes.json();
