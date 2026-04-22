@@ -30,6 +30,7 @@ import StatusPage from "@/pages/StatusPage";
 import TicketsPage from "@/pages/TicketsPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
+import PromoBanner from "@/components/PromoBanner";
 import Layout from "@/components/Layout";
 import { Loader2, UserCircle2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -326,6 +327,7 @@ function App() {
             <Toaster />
             <SubscriptionToastProvider />
             <UsernameSetupModal />
+            <PromoBanner />
             <MaintenanceGate>
               <Router />
             </MaintenanceGate>

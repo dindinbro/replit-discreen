@@ -355,6 +355,18 @@ export async function registerRoutes(
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Seed permanent STARTER promo code (-27%)
+    try {
+      await db.execute(sql`
+        INSERT INTO discount_codes (code, discount_percent, max_uses, created_by, active)
+        VALUES ('STARTER', 27, NULL, 'system', TRUE)
+        ON CONFLICT (code) DO UPDATE SET
+          discount_percent = 27,
+          active = TRUE
+      `);
+    } catch (e) {
+      console.error("[seed] Failed to seed STARTER discount code:", e);
+    }
     // Ensure game_boosts table exists
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS game_boosts (
