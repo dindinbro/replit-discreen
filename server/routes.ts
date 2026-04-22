@@ -2400,7 +2400,58 @@ export async function registerRoutes(
 
       results = sortByRelevance(results, request.criteria);
 
-      console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}`);
+      // Free-tier preview mode: heavily mask values + cap to 3 results
+      // to give a tease of what's available while pushing toward PRO.
+      const isPreview = !isUnlimited && tier === "free";
+      if (isPreview) {
+        const maskValue = (val: unknown): string => {
+          if (val === null || val === undefined) return "";
+          const s = String(val);
+          if (!s.trim()) return "";
+          // Email: keep 2 chars on each side of @ and TLD
+          const emailMatch = s.match(/^([^@\s]+)@([^@\s]+)$/);
+          if (emailMatch) {
+            const [, local, domain] = emailMatch;
+            const dot = domain.lastIndexOf(".");
+            const dom = dot > 0 ? domain.slice(0, dot) : domain;
+            const tld = dot > 0 ? domain.slice(dot) : "";
+            return `${local.slice(0, 2)}••••@${dom.slice(0, 1)}••••${tld}`;
+          }
+          // Phone-like (digits and separators)
+          if (/^[\d\s+().-]{6,}$/.test(s)) {
+            const digits = s.replace(/\D/g, "");
+            if (digits.length >= 6) {
+              return `${digits.slice(0, 2)}••••••${digits.slice(-2)}`;
+            }
+          }
+          // URL: keep scheme + first chars of host
+          if (/^https?:\/\//i.test(s)) {
+            try {
+              const u = new URL(s);
+              return `${u.protocol}//${u.hostname.slice(0, 2)}••••`;
+            } catch { /* ignore */ }
+          }
+          // Generic: keep 2 chars then bullets (capped)
+          if (s.length <= 2) return s;
+          const bulletCount = Math.min(8, Math.max(4, s.length - 2));
+          return `${s.slice(0, 2)}${"•".repeat(bulletCount)}`;
+        };
+        const maskRecord = (rec: Record<string, unknown>): Record<string, unknown> => {
+          const out: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(rec)) {
+            if (k.startsWith("_") || k === "source" || k === "rownum") {
+              out[k] = v;
+              continue;
+            }
+            out[k] = maskValue(v);
+          }
+          out._masked = true;
+          return out;
+        };
+        results = results.slice(0, 3).map(maskRecord);
+      }
+
+      console.log(`[search] Done in ${Date.now() - searchStart}ms — results: ${results.length}, total: ${total}${isPreview ? " (preview)" : ""}`);
 
       const wUser = await buildUserInfo(req);
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
@@ -2435,6 +2486,7 @@ export async function registerRoutes(
       res.json({
         results,
         total,
+        previewMode: isPreview,
         cooldownSeconds: COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier) ? 0 : USER_SEARCH_COOLDOWN_MS / 1000,
         quota: {
           used: newCount,

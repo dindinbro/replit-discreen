@@ -48,6 +48,7 @@ import {
   Eye,
   ExternalLink,
   Upload,
+  Crown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -3013,6 +3014,7 @@ export default function SearchPage() {
             const activeError = searchMode === "external"
               ? leakosintMutation.error
               : searchMutation.error;
+            const isPreview = searchMode !== "external" && searchMutation.data?.previewMode === true;
 
             return (
               <>
@@ -3058,6 +3060,41 @@ export default function SearchPage() {
                       </p>
                     </div>
                   </Card>
+                )}
+
+                {isPreview && activeResults && activeResults.length > 0 && !isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="relative overflow-hidden rounded-xl border border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5"
+                    data-testid="banner-preview-mode"
+                  >
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="w-10 h-10 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+                          <Lock className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="space-y-1 min-w-0">
+                          <h4 className="text-base font-bold text-foreground">
+                            🔒 Résultats partiellement masqués
+                          </h4>
+                          <p className="text-sm text-muted-foreground">
+                            Débloquez l'accès complet instantanément avec un abonnement <span className="font-semibold text-primary">Pro</span>.
+                          </p>
+                        </div>
+                      </div>
+                      <Link href="/pricing">
+                        <Button
+                          size="sm"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1.5 shrink-0"
+                          data-testid="button-upgrade-from-preview"
+                        >
+                          <Crown className="w-4 h-4" />
+                          Passer à Pro
+                        </Button>
+                      </Link>
+                    </div>
+                  </motion.div>
                 )}
 
                 {isLoading ? (
