@@ -1,4 +1,4 @@
-CREATE TABLE "active_sessions" (
+CREATE TABLE IF NOT EXISTS "active_sessions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"session_token" text NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE "active_sessions" (
 	CONSTRAINT "active_sessions_session_token_unique" UNIQUE("session_token")
 );
 --> statement-breakpoint
-CREATE TABLE "api_keys" (
+CREATE TABLE IF NOT EXISTS "api_keys" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"key_hash" text NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE "api_keys" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "blacklist_entries" (
+CREATE TABLE IF NOT EXISTS "blacklist_entries" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"civilite" text,
 	"first_name" text,
@@ -48,7 +48,7 @@ CREATE TABLE "blacklist_entries" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "blacklist_requests" (
+CREATE TABLE IF NOT EXISTS "blacklist_requests" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text,
 	"first_name" text,
@@ -63,7 +63,7 @@ CREATE TABLE "blacklist_requests" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "blocked_ips_v2" (
+CREATE TABLE IF NOT EXISTS "blocked_ips_v2" (
 	"id" text PRIMARY KEY NOT NULL,
 	"ip_address" text NOT NULL,
 	"reason" text DEFAULT '' NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE "blocked_ips_v2" (
 	CONSTRAINT "blocked_ips_v2_ip_address_unique" UNIQUE("ip_address")
 );
 --> statement-breakpoint
-CREATE TABLE "categories" (
+CREATE TABLE IF NOT EXISTS "categories" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"description" text,
@@ -81,7 +81,7 @@ CREATE TABLE "categories" (
 	"sort_order" integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "chat_messages" (
+CREATE TABLE IF NOT EXISTS "chat_messages" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"username" text NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE "chat_messages" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "chat_mutes" (
+CREATE TABLE IF NOT EXISTS "chat_mutes" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"reason" text,
@@ -99,7 +99,7 @@ CREATE TABLE "chat_mutes" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "crypto_payments" (
+CREATE TABLE IF NOT EXISTS "crypto_payments" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"order_id" text NOT NULL,
 	"nowpayments_payment_id" text,
@@ -122,7 +122,7 @@ CREATE TABLE "crypto_payments" (
 	CONSTRAINT "crypto_payments_order_id_unique" UNIQUE("order_id")
 );
 --> statement-breakpoint
-CREATE TABLE "daily_usage" (
+CREATE TABLE IF NOT EXISTS "daily_usage" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"usage_date" date NOT NULL,
@@ -130,7 +130,7 @@ CREATE TABLE "daily_usage" (
 	"leakosint_count" integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "discord_link_codes" (
+CREATE TABLE IF NOT EXISTS "discord_link_codes" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"code" text NOT NULL,
@@ -140,7 +140,7 @@ CREATE TABLE "discord_link_codes" (
 	CONSTRAINT "discord_link_codes_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
-CREATE TABLE "discord_oauth_tokens" (
+CREATE TABLE IF NOT EXISTS "discord_oauth_tokens" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"discord_id" text NOT NULL,
 	"access_token" text NOT NULL,
@@ -152,7 +152,7 @@ CREATE TABLE "discord_oauth_tokens" (
 	CONSTRAINT "discord_oauth_tokens_discord_id_unique" UNIQUE("discord_id")
 );
 --> statement-breakpoint
-CREATE TABLE "discount_codes" (
+CREATE TABLE IF NOT EXISTS "discount_codes" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"code" text NOT NULL,
 	"discount_percent" integer NOT NULL,
@@ -165,7 +165,7 @@ CREATE TABLE "discount_codes" (
 	CONSTRAINT "discount_codes_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
-CREATE TABLE "dof_profiles" (
+CREATE TABLE IF NOT EXISTS "dof_profiles" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"pseudo" text NOT NULL,
 	"description" text DEFAULT '' NOT NULL,
@@ -175,7 +175,7 @@ CREATE TABLE "dof_profiles" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "game_boosts" (
+CREATE TABLE IF NOT EXISTS "game_boosts" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"code" text NOT NULL,
@@ -189,7 +189,7 @@ CREATE TABLE "game_boosts" (
 	CONSTRAINT "game_boosts_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
-CREATE TABLE "game_logs" (
+CREATE TABLE IF NOT EXISTS "game_logs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"email" text,
@@ -205,7 +205,7 @@ CREATE TABLE "game_logs" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "game_scores" (
+CREATE TABLE IF NOT EXISTS "game_scores" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"username" text DEFAULT 'Agent' NOT NULL,
@@ -213,7 +213,7 @@ CREATE TABLE "game_scores" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "info_requests" (
+CREATE TABLE IF NOT EXISTS "info_requests" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text,
 	"discord_id" text,
@@ -228,7 +228,7 @@ CREATE TABLE "info_requests" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "license_keys" (
+CREATE TABLE IF NOT EXISTS "license_keys" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"key" text NOT NULL,
 	"tier" text NOT NULL,
@@ -241,7 +241,7 @@ CREATE TABLE "license_keys" (
 	CONSTRAINT "license_keys_order_id_unique" UNIQUE("order_id")
 );
 --> statement-breakpoint
-CREATE TABLE "login_logs" (
+CREATE TABLE IF NOT EXISTS "login_logs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"email" text,
@@ -254,7 +254,7 @@ CREATE TABLE "login_logs" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "pending_service_requests" (
+CREATE TABLE IF NOT EXISTS "pending_service_requests" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"order_id" text NOT NULL,
 	"type" text NOT NULL,
@@ -265,7 +265,7 @@ CREATE TABLE "pending_service_requests" (
 	CONSTRAINT "pending_service_requests_order_id_unique" UNIQUE("order_id")
 );
 --> statement-breakpoint
-CREATE TABLE "referral_codes" (
+CREATE TABLE IF NOT EXISTS "referral_codes" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"code" text NOT NULL,
@@ -275,7 +275,7 @@ CREATE TABLE "referral_codes" (
 	CONSTRAINT "referral_codes_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
-CREATE TABLE "referral_events" (
+CREATE TABLE IF NOT EXISTS "referral_events" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"referrer_id" text NOT NULL,
 	"referee_id" text NOT NULL,
@@ -285,7 +285,7 @@ CREATE TABLE "referral_events" (
 	CONSTRAINT "referral_events_order_id_unique" UNIQUE("order_id")
 );
 --> statement-breakpoint
-CREATE TABLE "reviews" (
+CREATE TABLE IF NOT EXISTS "reviews" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"username" text,
@@ -300,7 +300,7 @@ CREATE TABLE "reviews" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "search_logs" (
+CREATE TABLE IF NOT EXISTS "search_logs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"email" text,
@@ -315,7 +315,7 @@ CREATE TABLE "search_logs" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "service_status" (
+CREATE TABLE IF NOT EXISTS "service_status" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"description" text DEFAULT '' NOT NULL,
@@ -326,12 +326,12 @@ CREATE TABLE "service_status" (
 	"updated_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "site_settings" (
+CREATE TABLE IF NOT EXISTS "site_settings" (
 	"key" text PRIMARY KEY NOT NULL,
 	"value" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "subscriptions" (
+CREATE TABLE IF NOT EXISTS "subscriptions" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"tier" text DEFAULT 'free' NOT NULL,
@@ -343,7 +343,7 @@ CREATE TABLE "subscriptions" (
 	CONSTRAINT "subscriptions_user_id_unique" UNIQUE("user_id")
 );
 --> statement-breakpoint
-CREATE TABLE "support_tickets" (
+CREATE TABLE IF NOT EXISTS "support_tickets" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"username" text,
@@ -356,7 +356,7 @@ CREATE TABLE "support_tickets" (
 	"updated_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "ticket_replies" (
+CREATE TABLE IF NOT EXISTS "ticket_replies" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"ticket_id" integer NOT NULL,
 	"user_id" text NOT NULL,
@@ -366,7 +366,7 @@ CREATE TABLE "ticket_replies" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"username" text NOT NULL,
 	"password_hash" text,
@@ -376,7 +376,7 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_username_unique" UNIQUE("username")
 );
 --> statement-breakpoint
-CREATE TABLE "vouches" (
+CREATE TABLE IF NOT EXISTS "vouches" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"discord_user_id" text NOT NULL,
 	"discord_username" text NOT NULL,
@@ -386,7 +386,7 @@ CREATE TABLE "vouches" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "wanted_profiles" (
+CREATE TABLE IF NOT EXISTS "wanted_profiles" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"nom" text,
 	"prenom" text,
@@ -416,13 +416,13 @@ CREATE TABLE "wanted_profiles" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "conversations" (
+CREATE TABLE IF NOT EXISTS "conversations" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"title" text NOT NULL,
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "messages" (
+CREATE TABLE IF NOT EXISTS "messages" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"conversation_id" integer NOT NULL,
 	"role" text NOT NULL,
@@ -430,5 +430,9 @@ CREATE TABLE "messages" (
 	"created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "messages" ADD CONSTRAINT "messages_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "daily_usage_user_date_idx" ON "daily_usage" USING btree ("user_id","usage_date");
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'messages_conversation_id_conversations_id_fk') THEN
+    ALTER TABLE "messages" ADD CONSTRAINT "messages_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "daily_usage_user_date_idx" ON "daily_usage" USING btree ("user_id","usage_date");

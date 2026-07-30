@@ -161,7 +161,9 @@ export function log(message: string, source = "express") {
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+    const path = await import("path");
+
+    const { fileURLToPath } = await import("url");
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -174,22 +176,8 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
 
-      log(logLine);
-    }
-  });
-
-  next();
-});
-
-(async () => {
-  // ── Auto-fix DB sequence permissions at startup ──────────────────────────
-  // New tables created by db:push may lack sequence grants for the app user.
-  // This runs at every startup and fixes it silently if possible.
-  try {
+    const { db } = await import("./db");
     const { pool } = await import("./db");
     const urlMatch = (process.env.DATABASE_URL ?? "").match(/postgresql?:\/\/([^:@]+)/);
     const dbUser = urlMatch ? urlMatch[1] : null;
@@ -296,3 +284,7 @@ app.use((req, res, next) => {
     },
   );
 })();
+
+    const { migrate } = await import("drizzle-orm/node-postgres/migrator");
+
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
