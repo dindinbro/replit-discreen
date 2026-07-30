@@ -1,19 +1,21 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { type Session, type User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
-function getOrCreateSessionToken(): string {
-  let token = sessionStorage.getItem("discreen_session_token");
-  if (!token) {
-    token = crypto.randomUUID() + "-" + Date.now().toString(36);
-    sessionStorage.setItem("discreen_session_token", token);
-  }
-  return token;
+export interface LocalUser {
+  id: string;
+  username: string;
+  email: string | null;
+  role: string;
+  /** Compat shim — parts of the UI read user_metadata.display_name */
+  user_metadata: { display_name: string; username: string; avatar_url?: string };
+  app_metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
+  /** Null until loaded */
+  user: LocalUser | null;
+  /** Compat alias – same as user */
+  session: { user: LocalUser } | null;
   role: string | null;
   frozen: boolean;
   loading: boolean;
@@ -21,19 +23,24 @@ interface AuthContextType {
   avatarUrl: string | null;
   expiresAt: string | null;
   uniqueId: number | null;
-  signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
-  signInWithDiscord: () => Promise<void>;
+
+  /** V2 methods */
+  signIn: (username: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (username: string, password: string, email?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  getAccessToken: () => string | null;
   refreshRole: () => Promise<void>;
+
+  /** Legacy compat shims so existing pages don't break */
+  signInWithEmail: (username: string, password: string) => Promise<{ error: string | null }>;
+  signUpWithEmail: (username: string, password: string) => Promise<{ error: string | null }>;
+  signInWithDiscord: () => Promise<void>;
+  getAccessToken: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [frozen, setFrozen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,230 +49,107 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [uniqueId, setUniqueId] = useState<number | null>(null);
 
-  const sessionRegisteredRef = useRef(false);
-
-  const registerSession = useCallback(async (accessToken: string): Promise<boolean> => {
-    try {
-      const sessionToken = getOrCreateSessionToken();
-      const res = await fetch("/api/session/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ sessionToken }),
-      });
-      if (!res.ok) {
-        console.error("Session register failed:", res.status);
-        return false;
-      }
-      return true;
-    } catch (err) {
-      console.error("Session register error:", err);
-      return false;
-    }
-  }, []);
-
-  const fetchRole = useCallback(async (accessToken: string) => {
-    try {
-      const res = await fetch("/api/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setRole(data.role || "user");
-        setFrozen(!!data.frozen);
-        setDisplayName(data.display_name || null);
-        setAvatarUrl(data.avatar_url || null);
-        setExpiresAt(data.expires_at || null);
-        setUniqueId(data.unique_id ?? null);
-
-        // Refresh the raw Supabase user object so user_metadata stays in sync
-        // (needed for checks like user.user_metadata?.display_name after username setup)
-        if (supabase) {
-          const { data: userData } = await supabase.auth.getUser(accessToken);
-          if (userData?.user) setUser(userData.user);
-        }
-
-        // Session registration is handled directly in onAuthStateChange
-      } else {
-        setRole("user");
-        setFrozen(false);
-        setDisplayName(null);
-        setAvatarUrl(null);
-        setExpiresAt(null);
-        setUniqueId(null);
-      }
-    } catch {
-      setRole("user");
-      setFrozen(false);
-      setDisplayName(null);
-      setAvatarUrl(null);
-      setExpiresAt(null);
-      setUniqueId(null);
-    }
-  }, [registerSession]);
-
-  useEffect(() => {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
-    let loadingResolved = false;
-    const resolveLoading = () => {
-      if (!loadingResolved) {
-        loadingResolved = true;
-        setLoading(false);
-      }
-    };
-
-    // ① Register listener FIRST — it is the single source of truth for resolving loading
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      if (newSession?.access_token) {
-        // Register session here, independently of /api/me — ensures logs fire
-        // even if /api/me fails (e.g. brand new account, race condition)
-        if (!sessionRegisteredRef.current) {
-          registerSession(newSession.access_token).then(ok => {
-            if (ok) sessionRegisteredRef.current = true;
-          });
-        }
-        fetchRole(newSession.access_token).then(resolveLoading);
-      } else {
-        setRole(null);
-        resolveLoading();
-      }
-    });
-
-    // ② Then initialise the session — handles all OAuth redirect cases
-    const initSession = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get("code");
-
-      if (code) {
-        // PKCE flow: explicit code exchange fires onAuthStateChange → SIGNED_IN
-        try {
-          await supabase.auth.exchangeCodeForSession(code);
-          // Remove code from URL so a page refresh doesn't fail the exchange
-          const clean = window.location.pathname + window.location.hash;
-          window.history.replaceState({}, "", clean);
-        } catch {
-          // Code already consumed by detectSessionInUrl — check for existing session
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) resolveLoading();
-        }
-        return;
-      }
-
-      // Implicit flow / existing session: getSession() triggers detectSessionInUrl
-      // which fires onAuthStateChange automatically via the Supabase SDK
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session && !window.location.hash.includes("access_token")) {
-        // Truly not logged in — safe to unblock
-        resolveLoading();
-      }
-      // Otherwise wait for onAuthStateChange (hash or refreshed session)
-    };
-
-    initSession();
-
-    // Safety valve — never block more than 10 s
-    const safetyTimer = setTimeout(resolveLoading, 10_000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(safetyTimer);
-    };
-  }, [fetchRole]);
-
-  useEffect(() => {
-    if (!session?.access_token) return;
-    const interval = setInterval(() => {
-      fetchRole(session.access_token);
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [session?.access_token, fetchRole]);
-
-  const signInWithEmail = useCallback(async (email: string, password: string) => {
-    if (!supabase) return { error: "Auth not configured" };
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
-  }, []);
-
-  const signUpWithEmail = useCallback(async (email: string, password: string) => {
-    if (!supabase) return { error: "Auth not configured" };
-
-    try {
-      const checkRes = await fetch("/api/check-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const checkData = await checkRes.json();
-      if (checkData.blocked) {
-        return { error: "Les adresses email temporaires ne sont pas autorisees. Veuillez utiliser une adresse email valide." };
-      }
-    } catch {
-    }
-
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error: error.message };
-    if (data.user && !data.session && data.user.identities?.length === 0) {
-      return { error: "Un compte existe deja avec cette adresse email. Essayez de vous connecter." };
-    }
-    return { error: null };
-  }, []);
-
-  const signInWithDiscord = useCallback(async () => {
-    if (!supabase) return;
-    await supabase.auth.signInWithOAuth({
-      provider: "discord",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+  const applyMeData = useCallback((data: any) => {
+    const u: LocalUser = {
+      id: String(data.id),
+      username: data.username || data.display_name || "",
+      email: data.email || null,
+      role: data.role || "free",
+      user_metadata: {
+        display_name: data.display_name || data.username || "",
+        username: data.username || "",
+        avatar_url: data.avatar_url || undefined,
       },
-    });
+      app_metadata: {},
+      created_at: data.created_at || new Date().toISOString(),
+    };
+    setUser(u);
+    setRole(data.role || "free");
+    setFrozen(!!data.frozen);
+    setDisplayName(data.display_name || data.username || null);
+    setAvatarUrl(data.avatar_url || null);
+    setExpiresAt(data.expires_at || null);
+    setUniqueId(data.unique_id ?? null);
   }, []);
 
-  const signOut = useCallback(async () => {
-    if (!supabase) return;
-    const token = session?.access_token;
-    const sessionToken = sessionStorage.getItem("discreen_session_token");
-    if (token && sessionToken) {
-      try {
-        await fetch("/api/session", {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ sessionToken }),
-        });
-      } catch {}
-    }
-    sessionStorage.removeItem("discreen_session_token");
-    sessionRegisteredRef.current = false;
-    await supabase.auth.signOut();
+  const clearAuth = useCallback(() => {
+    setUser(null);
     setRole(null);
     setFrozen(false);
-  }, [session]);
+    setDisplayName(null);
+    setAvatarUrl(null);
+    setExpiresAt(null);
+    setUniqueId(null);
+  }, []);
 
-  const getAccessToken = useCallback(() => {
-    return session?.access_token ?? null;
-  }, [session]);
+  // Check session on mount
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include" })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          applyMeData(data);
+        } else {
+          clearAuth();
+        }
+      })
+      .catch(() => clearAuth())
+      .finally(() => setLoading(false));
+  }, [applyMeData, clearAuth]);
+
+  const signIn = useCallback(async (username: string, password: string) => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.message || "Erreur de connexion." };
+
+      // Fetch full profile
+      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      if (meRes.ok) applyMeData(await meRes.json());
+      return { error: null };
+    } catch {
+      return { error: "Erreur réseau." };
+    }
+  }, [applyMeData]);
+
+  const signUp = useCallback(async (username: string, password: string, email?: string) => {
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password, email }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.message || "Erreur d'inscription." };
+
+      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      if (meRes.ok) applyMeData(await meRes.json());
+      return { error: null };
+    } catch {
+      return { error: "Erreur réseau." };
+    }
+  }, [applyMeData]);
+
+  const signOut = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    clearAuth();
+  }, [clearAuth]);
 
   const refreshRole = useCallback(async () => {
-    const token = session?.access_token;
-    if (token) {
-      await fetchRole(token);
-    }
-  }, [session, fetchRole]);
+    const res = await fetch("/api/auth/me", { credentials: "include" });
+    if (res.ok) applyMeData(await res.json());
+  }, [applyMeData]);
 
   return (
     <AuthContext.Provider value={{
-      session,
       user,
+      session: user ? { user } : null,
       role,
       frozen,
       loading,
@@ -273,12 +157,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       avatarUrl,
       expiresAt,
       uniqueId,
-      signInWithEmail,
-      signUpWithEmail,
-      signInWithDiscord,
+      signIn,
+      signUp,
       signOut,
-      getAccessToken,
       refreshRole,
+      // Legacy compat shims
+      signInWithEmail: signIn,
+      signUpWithEmail: (u, p) => signUp(u, p),
+      signInWithDiscord: async () => {},
+      getAccessToken: () => null,
     }}>
       {children}
     </AuthContext.Provider>

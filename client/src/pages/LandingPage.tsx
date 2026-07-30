@@ -2,278 +2,226 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
-import { Search, CreditCard, Database, Shield, Zap, Lock, Mail, User, Phone, Globe, Hash, ArrowRight } from "lucide-react";
-import { SiDiscord } from "react-icons/si";
+import { Search, Database, Shield, Zap, ArrowRight, Lock, Code2, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
-import { useTranslation } from "react-i18next";
 
-const QUICK_FILTER_KEYS = [
-  { key: "email", labelKey: "landing.filters.email", icon: Mail },
-  { key: "username", labelKey: "landing.filters.username", icon: User },
-  { key: "phone", labelKey: "landing.filters.phone", icon: Phone },
-  { key: "ipAddress", labelKey: "landing.filters.ip", icon: Globe },
-  { key: "discordId", labelKey: "landing.filters.discord", icon: Hash },
-] as const;
-
-function AnimatedCounter({ target, duration = 2000, suffix = "" }: { target: number; duration?: number; suffix?: string }) {
+function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
   const startedRef = useRef(false);
   const frameRef = useRef<number>(0);
-
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     const startTime = performance.now();
+    const duration = 2000;
     const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
+      const progress = Math.min((now - startTime) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
       setCount(Math.floor(eased * target));
-      if (progress < 1) {
-        frameRef.current = requestAnimationFrame(animate);
-      } else {
-        setCount(target);
-      }
+      if (progress < 1) frameRef.current = requestAnimationFrame(animate);
+      else setCount(target);
     };
     frameRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameRef.current);
-  }, [target, duration]);
-
+  }, [target]);
   return <>{count.toLocaleString("fr-FR")}{suffix}</>;
 }
 
+const FEATURES = [
+  {
+    icon: Search,
+    title: "Recherche instantanée",
+    desc: "Un moteur d'indexation pensé pour renvoyer des résultats pertinents en quelques millisecondes.",
+  },
+  {
+    icon: Database,
+    title: "Sources vérifiées",
+    desc: "Chaque source est croisée et validée avant d'être indexée, pour limiter le bruit et les faux positifs.",
+  },
+  {
+    icon: Shield,
+    title: "Confidentialité par conception",
+    desc: "Accès cloisonnés, chiffrement des données sensibles et journalisation de chaque consultation.",
+  },
+  {
+    icon: Code2,
+    title: "API sécurisée",
+    desc: "Intégrez Discreen à vos propres outils via une API REST authentifiée et limitée en débit.",
+  },
+];
+
 export default function LandingPage() {
-  const { t } = useTranslation();
-  const [activeFilter, setActiveFilter] = useState("email");
   const [searchValue, setSearchValue] = useState("");
-  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [showAuthHint, setShowAuthHint] = useState(false);
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const isLoggedIn = !!user;
 
-  const FILTER_PLACEHOLDERS: Record<string, string> = {
-    email: t("landing.placeholders.email"),
-    username: t("landing.placeholders.username"),
-    phone: t("landing.placeholders.phone"),
-    ipAddress: t("landing.placeholders.ip"),
-    discordId: t("landing.placeholders.discord"),
-  };
-
-  const handleSearch = () => setAuthDialogOpen(true);
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && searchValue.trim()) handleSearch();
+  const handleSearch = () => {
+    if (!user) { setShowAuthHint(true); return; }
+    navigate("/search");
   };
 
   return (
-    <main className="relative">
-
+    <main className="relative min-h-screen">
       {/* ── Hero ── */}
-      <section className="relative flex flex-col items-center h-[calc(100svh-56px)] lg:h-screen px-4 pt-8 pb-6">
-        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl mx-auto space-y-6 text-center">
+      <section className="relative flex flex-col items-center justify-center min-h-[calc(100svh-56px)] px-4 py-16 text-center">
+        {/* Subtle radial glow */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full bg-primary/8 blur-[120px]" />
+        </div>
 
-          {/* Signature phrase */}
+        <div className="relative z-10 max-w-3xl mx-auto space-y-6">
+          {/* Eyebrow */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
-            className="signature-phrase text-[10px] md:text-xs tracking-[0.28em] select-none"
+            transition={{ duration: 0.5 }}
+            className="signature-phrase text-[10px] md:text-xs tracking-[0.28em]"
           >
-            Power. Precision. Intelligence.
+            Recherche de données nouvelle génération
           </motion.p>
 
-          {/* Title */}
+          {/* Headline */}
           <motion.h1
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.08 }}
-            className="text-5xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[1.05]"
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[1.08] text-foreground"
           >
-            {t("landing.title1")}{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#b8902e] via-[#f0c060] to-[#d4a843]">
-              {t("landing.title2")}
+            La recherche de données,{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-400 to-primary/80">
+              sans compromis.
             </span>
           </motion.h1>
 
-          {/* Subtitle — one concise line */}
+          {/* Subtitle */}
           <motion.p
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.18 }}
-            className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto"
+            className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed"
           >
-            {t("landing.subtitle")}
+            Discreen centralise, vérifie et sécurise l'accès à des sources de données
+            pour vous donner des réponses fiables, en toute discrétion.
           </motion.p>
 
-          {/* CTA area */}
-          {isLoggedIn ? (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.28 }}
-              className="flex items-center justify-center gap-3 flex-wrap"
-            >
-              <Link href="/search">
-                <Button size="lg" className="gap-2 px-8 shadow-lg shadow-primary/20" data-testid="button-start-searching">
-                  <Search className="w-4 h-4" />
-                  {t("landing.startSearch")}
-                </Button>
-              </Link>
-              <Link href="/pricing">
-                <Button size="lg" variant="outline" className="gap-2 px-8" data-testid="button-view-pricing">
-                  <CreditCard className="w-4 h-4" />
-                  {t("landing.viewPricing")}
-                </Button>
-              </Link>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.28 }}
-              className="space-y-4 max-w-lg mx-auto w-full"
-            >
-              {/* Search bar */}
-              <div className="relative flex items-center">
-                <Search className="absolute left-4 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
-                <Input
-                  placeholder={FILTER_PLACEHOLDERS[activeFilter] || t("landing.searchPlaceholder")}
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-13 pl-11 pr-14 text-base rounded-2xl border-border/40 dark:border-white/8 bg-card/60 dark:bg-white/4 backdrop-blur-sm focus-visible:border-primary/50"
-                  data-testid="input-landing-search"
-                />
-                <button
-                  onClick={handleSearch}
-                  className="absolute right-2 w-9 h-9 rounded-xl bg-primary hover:bg-primary/90 transition-colors flex items-center justify-center text-primary-foreground"
-                  data-testid="button-landing-search"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+          {/* Search bar / CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.28 }}
+            className="max-w-lg mx-auto w-full space-y-3"
+          >
+            {user ? (
+              <div className="flex items-center gap-3 justify-center flex-wrap">
+                <Link href="/search">
+                  <Button size="lg" className="gap-2 px-8 btn-indigo-glow shadow-lg shadow-primary/20">
+                    <Search className="w-4 h-4" />
+                    Commencer la recherche
+                  </Button>
+                </Link>
+                <Link href="/pricing">
+                  <Button size="lg" variant="outline" className="gap-2 px-8">
+                    Voir les offres
+                  </Button>
+                </Link>
               </div>
+            ) : (
+              <>
+                <div className="relative flex items-center">
+                  <Search className="absolute left-4 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    placeholder="Rechercher un email, un domaine, un identifiant…"
+                    value={searchValue}
+                    onChange={(e) => { setSearchValue(e.target.value); setShowAuthHint(false); }}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    className="h-12 pl-11 pr-14 text-base rounded-xl border-border/60 bg-card/60 dark:bg-secondary/30 backdrop-blur-sm focus-visible:border-primary/60"
+                  />
+                  <button
+                    onClick={handleSearch}
+                    className="absolute right-2 w-9 h-9 rounded-lg bg-primary hover:bg-primary/90 transition-all flex items-center justify-center text-white shadow-lg shadow-primary/30"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+                {showAuthHint ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-2 justify-center text-sm text-muted-foreground"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-primary" />
+                    <span>
+                      <button
+                        onClick={() => navigate("/login")}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Connectez-vous
+                      </button>
+                      {" "}pour accéder à la recherche.
+                    </span>
+                  </motion.div>
+                ) : (
+                  <p className="text-xs text-muted-foreground/60">
+                    Recherchez dès maintenant sur l'ensemble des sources connectées.
+                  </p>
+                )}
+              </>
+            )}
+          </motion.div>
 
-              {/* Filter tabs — minimal, no border, text only */}
-              <div className="flex items-center justify-center gap-1 flex-wrap">
-                {QUICK_FILTER_KEYS.map((filter) => {
-                  const isActive = activeFilter === filter.key;
-                  return (
-                    <button
-                      key={filter.key}
-                      onClick={() => setActiveFilter(filter.key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200 ${
-                        isActive
-                          ? "bg-primary/12 dark:bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      data-testid={`button-filter-${filter.key}`}
-                    >
-                      <filter.icon className="w-3 h-3" />
-                      {t(filter.labelKey)}
-                    </button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Stats — minimal pill */}
+          {/* Stats */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.42 }}
-            className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/70"
+            className="flex items-center justify-center gap-6 text-xs text-muted-foreground/60 flex-wrap"
           >
-            <span>{t("landing.joinPrefix")}</span>
-            <span className="text-primary font-semibold" data-testid="text-counter-users">
-              <AnimatedCounter target={1247} duration={2200} />
+            <span>
+              <span className="text-primary font-semibold text-sm">
+                <AnimatedCounter target={1247} />
+              </span>{" "}utilisateurs actifs
             </span>
-            <span>{t("landing.usersSuffix")}</span>
-            <span className="mx-0.5 opacity-30">·</span>
-            <span className="text-primary font-semibold" data-testid="text-counter-data">
-              <AnimatedCounter target={18} duration={1800} suffix=".7+ To" />
+            <span className="opacity-30">·</span>
+            <span>
+              <span className="text-primary font-semibold text-sm">
+                <AnimatedCounter target={18} suffix=".7+ To" />
+              </span>{" "}de données indexées
             </span>
-            <span>{t("landing.dataSuffix")}</span>
-          </motion.div>
-
-          {/* Discord help — minimal */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.52 }}
-            className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/60"
-          >
-            <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-pulse" />
-            <span>{t("landing.needHelp")}</span>
-            <a
-              href="https://discord.gg/discreen"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary/80 hover:text-primary transition-colors font-medium"
-              data-testid="link-discord-support"
-            >
-              {t("landing.joinDiscord")}
-              <SiDiscord className="w-3 h-3" />
-            </a>
+            <span className="opacity-30">·</span>
+            <span>
+              <span className="text-primary font-semibold text-sm">
+                <AnimatedCounter target={99} suffix="%" />
+              </span>{" "}disponibilité
+            </span>
           </motion.div>
         </div>
 
-        {/* ── Feature cards — inside hero, anchored to bottom ── */}
+        {/* ── Feature cards ── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.55 }}
-          className="w-full max-w-4xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-3"
+          transition={{ duration: 0.55, delay: 0.52 }}
+          className="relative z-10 w-full max-w-5xl mx-auto mt-16 grid grid-cols-2 lg:grid-cols-4 gap-4 px-2"
         >
-          {[
-            { icon: Database, titleKey: "landing.features.databases", descKey: "landing.features.databasesDesc" },
-            { icon: Search, titleKey: "landing.features.advancedSearch", descKey: "landing.features.advancedSearchDesc" },
-            { icon: Shield, titleKey: "landing.features.secure", descKey: "landing.features.secureDesc" },
-            { icon: Zap, titleKey: "landing.features.fast", descKey: "landing.features.fastDesc" },
-          ].map((item, i) => (
+          {FEATURES.map((f, i) => (
             <motion.div
               key={i}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 320, damping: 22 }}
-              className="group relative rounded-xl border border-border/40 bg-gray-100 dark:bg-card/50 dark:backdrop-blur-sm p-4 space-y-2 cursor-default overflow-hidden hover:border-primary/50 hover:shadow-[0_0_18px_rgba(212,175,55,0.14)] transition-colors duration-200"
-              data-testid={`feature-card-${i}`}
+              whileHover={{ y: -4 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="group relative rounded-xl border border-border/50 dark:border-border/40 bg-card/80 dark:bg-card/60 backdrop-blur-sm p-5 space-y-3 cursor-default overflow-hidden hover:border-primary/40 transition-colors duration-200"
             >
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none rounded-xl" />
-              <div className="w-7 h-7 rounded-lg bg-primary/15 dark:bg-primary/10 flex items-center justify-center group-hover:bg-primary/25 dark:group-hover:bg-primary/20 transition-colors duration-200">
-                <item.icon className="w-3.5 h-3.5 text-primary group-hover:text-primary transition-colors duration-200" />
+              <div className="w-8 h-8 rounded-lg bg-primary/10 dark:bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-200">
+                <f.icon className="w-4 h-4 text-primary" />
               </div>
-              <h3 className="font-semibold text-sm text-gray-800 dark:text-foreground">{t(item.titleKey)}</h3>
-              <p className="text-xs text-gray-500 dark:text-muted-foreground/70 leading-relaxed">{t(item.descKey)}</p>
+              <h3 className="font-semibold text-sm text-foreground leading-snug">{f.title}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
             </motion.div>
           ))}
         </motion.div>
       </section>
-
-      <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-        <DialogContent className="sm:max-w-sm text-center p-8">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Lock className="w-7 h-7 text-primary" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-display font-bold">{t("landing.authRequired")}</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">{t("landing.authDesc")}</p>
-            </div>
-            <Button
-              size="lg"
-              className="w-full gap-2 mt-2"
-              onClick={() => { setAuthDialogOpen(false); navigate("/login"); }}
-              data-testid="button-auth-redirect"
-            >
-              {t("landing.signUp")}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 }

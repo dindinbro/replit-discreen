@@ -186,37 +186,60 @@ const supabaseAdmin =
     : null;
 
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!supabaseAdmin) {
-    return res.status(500).json({ message: "Supabase not configured" });
+  // V2: session-based auth
+  const sessionUserId = (req.session as any)?.authUserId;
+  if (sessionUserId) {
+    try {
+      const userRow = await storage.getUser(sessionUserId);
+      if (userRow) {
+        (req as any).user = {
+          id: String(userRow.id),
+          email: userRow.email || `${userRow.username}@discreen.local`,
+          user_metadata: {
+            display_name: userRow.username,
+            username: userRow.username,
+          },
+          app_metadata: {},
+        };
+        return next();
+      }
+    } catch {}
   }
 
+  // Legacy: Bearer token via Supabase (VPS users migrated)
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Non authentifié" });
+  if (authHeader?.startsWith("Bearer ") && supabaseAdmin) {
+    const token = authHeader.split(" ")[1];
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (!error && data.user) {
+      (req as any).user = data.user;
+      return next();
+    }
   }
 
-  const token = authHeader.split(" ")[1];
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-
-  if (error || !data.user) {
-    return res.status(401).json({ message: "Token invalide ou expiré" });
-  }
-
-  (req as any).user = data.user;
-  next();
+  return res.status(401).json({ message: "Non authentifié" });
 }
 
 async function getEffectiveRole(userId: string): Promise<string> {
-  if (!supabaseAdmin) return "free";
+  // Check users table role column first (V2 local users)
+  try {
+    const numId = parseInt(userId);
+    if (!isNaN(numId)) {
+      const userRow = await storage.getUser(numId);
+      if (userRow?.role === "admin") return "admin";
+    }
+  } catch {}
 
-  const { data: profile, error } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single();
-
-  if (!error && profile?.role === "admin") {
-    return "admin";
+  // Fallback: Supabase profiles (legacy VPS users)
+  if (supabaseAdmin) {
+    try {
+      const { data: profile, error } = await supabaseAdmin
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+      if (!error && profile?.role === "admin") return "admin";
+    } catch {}
   }
 
   const sub = await storage.getOrCreateSubscription(userId);
@@ -508,45 +531,52 @@ export async function registerRoutes(
   const loginLogCache = new Map<string, number>();
   const LOGIN_LOG_COOLDOWN = 2 * 60 * 60 * 1000; // 2 hours
 
-  // GET /api/me — returns effective role combining profile + subscription
+  // GET /api/me — returns effective role combining local users table + subscription
   app.get("/api/me", requireAuth, async (req, res) => {
     try {
-      if (!supabaseAdmin) {
-        return res.status(500).json({ message: "Supabase not configured" });
+      const user = (req as any).user;
+      const userId: string = user.id;
+
+      // Determine role: check local users table first, then Supabase profiles (legacy)
+      let profileRole = "user";
+      let userRow: any = null;
+      try {
+        const numId = parseInt(userId);
+        if (!isNaN(numId)) {
+          userRow = await storage.getUser(numId);
+          if (userRow?.role === "admin") profileRole = "admin";
+        }
+      } catch {}
+
+      if (profileRole !== "admin" && supabaseAdmin) {
+        try {
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("role, created_at")
+            .eq("id", userId)
+            .single();
+          if (profile?.role === "admin") profileRole = "admin";
+        } catch {}
       }
 
-      const user = (req as any).user;
-      const { data: profile, error } = await supabaseAdmin
-        .from("profiles")
-        .select("role, created_at")
-        .eq("id", user.id)
-        .single();
+      const sub = await storage.getOrCreateSubscription(userId);
 
-      const profileRole = (!error && profile) ? profile.role : "user";
-
-      const sub = await storage.getOrCreateSubscription(user.id);
-
-      // Fallback login log: fires from /api/me if /api/session/register was never called
-      // (e.g., Supabase onAuthStateChange didn't trigger on client, or token was refreshed)
+      // Login log (best-effort)
       try {
         const now = Date.now();
-        const lastLogged = loginLogCache.get(user.id) ?? 0;
+        const lastLogged = loginLogCache.get(userId) ?? 0;
         if (now - lastLogged > LOGIN_LOG_COOLDOWN) {
-          loginLogCache.set(user.id, now);
+          loginLogCache.set(userId, now);
           const isBypassed = sub?.id ? await isUserBypassed(sub.id) : false;
           if (!isBypassed) {
-            const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
+            const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket?.remoteAddress || "unknown";
             const userAgent = req.headers["user-agent"] || "unknown";
             const meta = user.user_metadata || {};
-            const provider = (user.app_metadata as any)?.provider || "unknown";
-            let username = meta.display_name || meta.full_name || user.email?.split("@")[0];
-            try {
-              const dbUser = await storage.getUserByUserId(user.id);
-              if (dbUser?.username) username = dbUser.username;
-            } catch (_) {}
+            const provider = (user.app_metadata as any)?.provider || "local";
+            const username = userRow?.username || meta.display_name || meta.full_name || user.email?.split("@")[0];
             await storage.createLoginLog({
-              userId: user.id,
-              email: user.email || undefined,
+              userId,
+              email: userRow?.email || user.email || undefined,
               username,
               ip,
               userAgent,
@@ -554,37 +584,30 @@ export async function registerRoutes(
               tier: sub?.tier || "free",
               discordId: sub?.discordId || undefined,
             });
-            const sessionEmail = await getSessionEmail(user.id, provider);
-            webhookSessionLogin(
-              { id: user.id, email: user.email || "", sessionEmail, username, uniqueId: sub?.id },
-              ip,
-              userAgent,
-              sub?.discordId,
-            );
           }
         }
-      } catch (logErr) {
-        console.error("[/api/me] Login log fallback error:", logErr);
-      }
+      } catch {}
 
       const meta = user.user_metadata || {};
-      const displayName = meta.display_name || meta.full_name || null;
+      const displayName = userRow?.username || meta.display_name || meta.full_name || null;
       const avatarUrl = meta.avatar_url || null;
 
       let isSupporter = false;
       if (sub?.discordId) {
-        const discordStatus = await checkDiscordMemberStatus(sub.discordId);
-        isSupporter = discordStatus.inGuild && discordStatus.isSupporter;
+        try {
+          const discordStatus = await checkDiscordMemberStatus(sub.discordId);
+          isSupporter = discordStatus.inGuild && discordStatus.isSupporter;
+        } catch {}
       }
 
       if (profileRole === "admin") {
         return res.json({
-          id: user.id,
-          email: user.email,
+          id: userId,
+          email: userRow?.email || user.email || null,
           role: "admin",
           frozen: sub?.frozen ?? false,
-          created_at: profile?.created_at || user.created_at,
-          unique_id: sub.id,
+          created_at: userRow?.createdAt || user.created_at || null,
+          unique_id: sub?.id,
           display_name: displayName,
           avatar_url: avatarUrl,
           expires_at: sub?.expiresAt || null,
@@ -599,12 +622,12 @@ export async function registerRoutes(
       }
 
       res.json({
-        id: user.id,
-        email: user.email,
+        id: userId,
+        email: userRow?.email || user.email || null,
         role: effectiveRole,
         frozen: sub?.frozen ?? false,
-        created_at: profile?.created_at || user.created_at,
-        unique_id: sub.id,
+        created_at: userRow?.createdAt || user.created_at || null,
+        unique_id: sub?.id,
         display_name: displayName,
         avatar_url: avatarUrl,
         expires_at: sub?.expiresAt || null,

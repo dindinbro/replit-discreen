@@ -23,34 +23,16 @@ import { Link, useLocation } from "wouter";
 import ChatWidget from "@/components/ChatWidget";
 import InteractiveGrid from "@/components/InteractiveGrid";
 
-/* ── Scorpion logo ───────────────────────────────────────── */
+/* ── V2 Logo ─────────────────────────────────────────────── */
 function DiscreenLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className={className} aria-label="Discreen">
-      <g strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="50" cy="63" rx="13" ry="17" fill="#f5a623"/>
-        <ellipse cx="50" cy="41" rx="11" ry="10" fill="#f5a623"/>
-        <circle cx="46" cy="38" r="1.8" fill="#1a1208"/>
-        <circle cx="54" cy="38" r="1.8" fill="#1a1208"/>
-        <path d="M41 34 Q32 27 26 30" stroke="#f5a623" strokeWidth="3" fill="none"/>
-        <path d="M26 30 Q22 25 25 22" stroke="#f5a623" strokeWidth="2.5" fill="none"/>
-        <path d="M26 30 Q20 30 20 34" stroke="#f5a623" strokeWidth="2.5" fill="none"/>
-        <path d="M59 34 Q68 27 74 30" stroke="#f5a623" strokeWidth="3" fill="none"/>
-        <path d="M74 30 Q78 25 75 22" stroke="#f5a623" strokeWidth="2.5" fill="none"/>
-        <path d="M74 30 Q80 30 80 34" stroke="#f5a623" strokeWidth="2.5" fill="none"/>
-        <line x1="38" y1="54" x2="22" y2="47" stroke="#f5a623" strokeWidth="2.2"/>
-        <line x1="38" y1="61" x2="20" y2="58" stroke="#f5a623" strokeWidth="2.2"/>
-        <line x1="38" y1="68" x2="20" y2="68" stroke="#f5a623" strokeWidth="2.2"/>
-        <line x1="39" y1="74" x2="23" y2="78" stroke="#f5a623" strokeWidth="2.2"/>
-        <line x1="62" y1="54" x2="78" y2="47" stroke="#f5a623" strokeWidth="2.2"/>
-        <line x1="62" y1="61" x2="80" y2="58" stroke="#f5a623" strokeWidth="2.2"/>
-        <line x1="62" y1="68" x2="80" y2="68" stroke="#f5a623" strokeWidth="2.2"/>
-        <line x1="61" y1="74" x2="77" y2="78" stroke="#f5a623" strokeWidth="2.2"/>
-        <path d="M50 80 Q58 93 74 88 Q86 82 84 66 Q83 54 73 48" stroke="#f5a623" strokeWidth="4.5" fill="none"/>
-        <path d="M73 48 L80 38 L68 46 Z" fill="#f5a623"/>
-        <circle cx="80" cy="37" r="2" fill="#f5a623" opacity="0.7"/>
-      </g>
-    </svg>
+    <div className={`${className} rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center`}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round"
+        className="w-[55%] h-[55%] text-primary">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+    </div>
   );
 }
 

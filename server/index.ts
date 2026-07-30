@@ -3,9 +3,6 @@ import "dotenv/config";
 function checkRequiredEnv() {
   const required: { key: string; alt?: string }[] = [
     { key: "DATABASE_URL" },
-    { key: "VITE_SUPABASE_URL", alt: "SUPABASE_URL" },
-    { key: "VITE_SUPABASE_ANON_KEY" },
-    { key: "SUPABASE_SERVICE_ROLE_KEY" },
   ];
   const missing: string[] = [];
   for (const { key, alt } of required) {
@@ -15,8 +12,6 @@ function checkRequiredEnv() {
   }
   if (missing.length > 0) {
     console.error(`[env] Missing required environment variables: ${missing.join(", ")}`);
-    console.error(`[env] Copy .env.example to .env and fill in the values.`);
-    // On Replit (code editor mode), warn but don't exit — the production app runs on VPS.
     if (!process.env.REPL_ID && !process.env.REPLIT_DEPLOYMENT) {
       process.exit(1);
     }
@@ -28,7 +23,9 @@ checkRequiredEnv();
 import express, { type Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
+import session from "express-session";
 import { registerRoutes } from "./routes";
+import { registerAuthRoutes } from "./auth";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initChatServer } from "./chat";
@@ -42,6 +39,21 @@ import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 const httpServer = createServer(app);
+
+// ── Session middleware (V2 auth) ──────────────────────────
+const sessionSecret = process.env.SESSION_SECRET || "discreen-v2-dev-secret-change-in-prod";
+app.use(session({
+  name: "discreen.sid",
+  secret: sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  },
+}));
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -193,6 +205,7 @@ app.use((req, res, next) => {
   }
   // ─────────────────────────────────────────────────────────────────────────
 
+  registerAuthRoutes(app);
   await registerRoutes(httpServer, app);
   initChatServer(httpServer);
 

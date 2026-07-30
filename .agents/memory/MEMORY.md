@@ -1,0 +1,2 @@
+- [Discreen V2 auth](discreen-v2-auth.md) — auth remplacé par username+password+bcrypt+express-session ; Supabase désactivé côté client
+- [Discreen V2 schema](discreen-v2-schema.md) — users table enrichie, migration appliquée manuellement via node (drizzle-kit push interactif bloquant)
