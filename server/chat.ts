@@ -5,7 +5,9 @@ import { storage } from "./storage";
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = supabaseUrl
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 // Rate limiting: max 5 messages per 10s per user
 const rateLimitMap = new Map<string, number[]>();
@@ -38,6 +40,10 @@ export function initChatServer(httpServer: HttpServer) {
       if (!token) {
         console.warn("[chat] Auth rejected: no token");
         return next(new Error("Non authentifié"));
+      }
+      if (!supabase) {
+        console.warn("[chat] Auth rejected: Supabase not configured");
+        return next(new Error("Supabase non configuré"));
       }
       const { data, error } = await supabase.auth.getUser(token);
       if (error || !data?.user) {

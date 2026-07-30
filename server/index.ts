@@ -16,7 +16,11 @@ function checkRequiredEnv() {
   if (missing.length > 0) {
     console.error(`[env] Missing required environment variables: ${missing.join(", ")}`);
     console.error(`[env] Copy .env.example to .env and fill in the values.`);
-    process.exit(1);
+    // On Replit (code editor mode), warn but don't exit — the production app runs on VPS.
+    if (!process.env.REPL_ID && !process.env.REPLIT_DEPLOYMENT) {
+      process.exit(1);
+    }
+    console.warn("[env] Running on Replit without full env — some features will be unavailable.");
   }
 }
 checkRequiredEnv();
