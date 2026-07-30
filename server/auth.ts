@@ -95,6 +95,30 @@ export function registerAuthRoutes(app: Express) {
     });
   });
 
+  /* ── Bootstrap admin (first admin only, one-time) ────── */
+  app.post("/api/auth/bootstrap-admin", async (req: Request, res: Response) => {
+    const userId = (req.session as any).authUserId;
+    if (!userId) return res.status(401).json({ message: "Connectez-vous d'abord." });
+
+    try {
+      const { db } = await import("./db");
+      const { users } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      // Block if any admin already exists
+      const admins = await db.select().from(users).where(eq(users.role, "admin")).limit(1);
+      if (admins.length > 0) {
+        return res.status(403).json({ message: "Un administrateur existe déjà. Utilisez le script CLI pour les promotions suivantes." });
+      }
+
+      await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
+      return res.json({ ok: true, message: "Votre compte a été promu administrateur." });
+    } catch (err) {
+      console.error("[auth/bootstrap-admin] error:", err);
+      return res.status(500).json({ message: "Erreur serveur." });
+    }
+  });
+
   /* ── Me (session check) ───────────────────────────────── */
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     const userId = (req.session as any).authUserId;

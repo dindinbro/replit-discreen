@@ -1,8 +1,26 @@
-# Discreen - Search Engine for Data Dumps
+# Discreen V2 - Search Engine for Data Dumps
 
 ## Overview
 
-Discreen is a web application designed for searching through large data dumps, inspired by IntelX. It allows users to apply multiple search criteria (e.g., username, email, IP address) and aggregates results from multiple sources, grouping them by source file. The platform incorporates Supabase for authentication and role-based access control, alongside a modern UI with an emerald green branding theme. The project aims to provide a robust and efficient search solution for data analysis, with future ambitions to expand its integration capabilities and user base.
+Discreen V2 is a data-search / OSINT platform with a dark navy + indigo design. Authentication is fully local (username + bcrypt password + express-session) — Supabase is disabled. The frontend is React/Vite; the backend is Express/Node.js with PostgreSQL via Drizzle ORM.
+
+## Admin account management
+
+**First admin (one-time, via the app):**
+1. Create an account on `/login` (Inscription tab).
+2. While logged in, call `POST /api/auth/bootstrap-admin` — this only works when zero admins exist. It promotes your session account to admin instantly.
+
+**Promote any user via CLI (recommended for subsequent promotions):**
+```bash
+node scripts/make-admin.cjs <username>
+# Example:
+node scripts/make-admin.cjs jarvis
+```
+
+**Demote or change role via SQL:**
+```sql
+UPDATE users SET role = 'free' WHERE username = 'someuser';
+```
 
 ### Search Modes
 The search system supports three modes (checked in this order):

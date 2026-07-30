@@ -61,3 +61,7 @@ DISCORD_BOT_LOGS_WEBHOOK_URL = "https://discord.com/api/webhooks/147165659866871
 USE_R2_SEARCH = "true"
 VPS_SEARCH_URL = "http://81.17.101.243:5050"
 DISCORD_SESSION_WEBHOOK_URL = "https://discord.com/api/webhooks/1472488001870499937/dp5acjV6jWFRMru3wVsRf8UPDDNcXECv6FSq7CLWXFtGQCFgVFZj19XJ6AwAxkm9l2Cn"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
