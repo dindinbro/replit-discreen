@@ -6,6 +6,7 @@ import { Search, Database, Shield, Zap, ArrowRight, Lock, Code2, Globe } from "l
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import HudRings from "@/components/HudRings";
+import { DiscreenMark } from "@/components/Layout";
 
 function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -218,6 +219,24 @@ export default function LandingPage() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* ── Footer signature ── */}
+        <motion.footer
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.7 }}
+          className="relative z-10 w-full max-w-5xl mx-auto mt-20 pt-8 border-t border-border/40 flex flex-col items-center gap-3 text-center"
+        >
+          <div className="flex items-center gap-2 text-muted-foreground/70">
+            <DiscreenMark className="w-4 h-4" />
+            <span className="text-xs font-medium tracking-wide">
+              Di<span className="text-primary">screen</span>
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground/45 max-w-sm leading-relaxed">
+            Conçu pour ceux qui préfèrent poser la question une seule fois.
+          </p>
+        </motion.footer>
       </section>
     </main>
   );

@@ -23,15 +23,31 @@ import { Link, useLocation } from "wouter";
 import ChatWidget from "@/components/ChatWidget";
 import InteractiveGrid from "@/components/InteractiveGrid";
 
+/* ── Signature mark ──────────────────────────────────────────
+   A scope/radar reticle — one ring, one gap, one open tick — the
+   same visual language as the hero HUD rings and the search loader.
+   Reused everywhere (nav, 404, footer) so the brand reads as one
+   deliberate system instead of scattered flourishes. ── */
+export function DiscreenMark({ className = "w-[55%] h-[55%]", spin = false }: { className?: string; spin?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`text-primary ${className}`}>
+      <circle
+        cx="12" cy="12" r="8.25"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+        strokeDasharray="44 8"
+        className={spin ? "animate-[hud-spin_9s_linear_infinite]" : ""}
+      />
+      <circle cx="12" cy="12" r="1.75" fill="currentColor" />
+      <path d="M12 1.5v2.75M22.5 12h-2.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /* ── V2 Logo ─────────────────────────────────────────────── */
 function DiscreenLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <div className={`${className} rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center`}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round"
-        className="w-[55%] h-[55%] text-primary">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
+      <DiscreenMark />
     </div>
   );
 }
@@ -411,9 +427,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="h-16 flex items-center shrink-0 px-4">
         <Link href="/">
           <div className={`flex items-center gap-2.5 cursor-pointer group ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
-            <div className="relative shrink-0 w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <div className="relative shrink-0">
               <div className="absolute inset-0 rounded-lg bg-primary/25 blur-md scale-110 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <DiscreenLogo className="w-5 h-5 relative" />
+              <DiscreenLogo className="w-8 h-8 relative" />
             </div>
             <span
               className="font-bold text-[17px] tracking-tight whitespace-nowrap overflow-hidden text-foreground"

@@ -1,6 +1,25 @@
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const STATUS_MESSAGES = [
+  "Analyse des bases de données...",
+  "Croisement des sources...",
+  "Vérification de la fiabilité...",
+  "Élimination des faux positifs...",
+  "Assemblage des résultats...",
+];
+
+function useRotatingStatus(interval = 2600) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((v) => (v + 1) % STATUS_MESSAGES.length), interval);
+    return () => clearInterval(id);
+  }, [interval]);
+  return STATUS_MESSAGES[i];
+}
 
 export default function SearchLoader({ variant = "primary" }: { variant?: "primary" | "red" }) {
+  const status = useRotatingStatus();
   const color   = variant === "red" ? "#ef4444" : "hsl(var(--primary))";
   const dim     = variant === "red" ? "#ef444433" : "hsl(var(--primary) / 0.2)";
 
@@ -78,14 +97,19 @@ export default function SearchLoader({ variant = "primary" }: { variant?: "prima
       </svg>
 
       <div className="flex flex-col items-center space-y-2">
-        <motion.p
-          className="font-medium text-sm"
-          style={{ color }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          Analyse des bases de données...
-        </motion.p>
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={status}
+            className="font-medium text-sm"
+            style={{ color }}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.3 }}
+          >
+            {status}
+          </motion.p>
+        </AnimatePresence>
         <div className="flex items-center gap-1">
           {[0, 1, 2, 3, 4].map(i => (
             <motion.div
