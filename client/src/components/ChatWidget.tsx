@@ -47,9 +47,13 @@ export default function ChatWidget() {
   useEffect(() => {
     if (!user) return;
     const token = getAccessToken();
+    // V2 (username/password) users have no JWT — their session cookie is sent
+    // automatically by the browser, so we omit the auth token entirely.
+    // Supabase users still pass their JWT in auth.token.
     const socket = io(window.location.origin, {
       path: "/socket.io",
-      auth: { token },
+      ...(token ? { auth: { token } } : {}),
+      withCredentials: true,
       transports: ["websocket", "polling"],
     });
     socketRef.current = socket;

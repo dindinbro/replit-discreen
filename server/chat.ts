@@ -2,6 +2,7 @@ import { Server as HttpServer } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import { createClient } from "@supabase/supabase-js";
 import { storage } from "./storage";
+import type { RequestHandler } from "express";
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -27,18 +28,49 @@ function sanitize(msg: string): string {
   return msg.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").trim().slice(0, 500);
 }
 
-export function initChatServer(httpServer: HttpServer) {
+export function initChatServer(httpServer: HttpServer, sessionMiddleware?: RequestHandler) {
   const io = new SocketIOServer(httpServer, {
     path: "/socket.io",
     cors: { origin: "*", methods: ["GET", "POST"] },
     transports: ["websocket", "polling"],
   });
 
+  // Attach express-session to Socket.IO engine so WebSocket upgrade requests
+  // get their session parsed — required for V2 (username/password) users.
+  if (sessionMiddleware) {
+    io.engine.use(sessionMiddleware);
+  }
+
   io.use(async (socket: Socket, next) => {
     try {
       const token = socket.handshake.auth?.token as string | undefined;
+      const req = socket.request as any;
+
+      // ── Path 1: V2 session-based auth ────────────────────────────────────
+      const sessionUserId: number | undefined = req.session?.authUserId;
+      if (sessionUserId) {
+        const userRow = await storage.getUser(sessionUserId);
+        if (!userRow) {
+          console.warn("[chat] V2 auth rejected: user not found for session userId", sessionUserId);
+          return next(new Error("Utilisateur introuvable"));
+        }
+        const username = (req.session?.authUsername as string | undefined) || userRow.username || "Anonyme";
+        const avatarUrl: string | null = (userRow as any).avatar_url ?? null;
+        // Use String(userId) so the rest of the handler is uniform
+        const userIdStr = String(userRow.id);
+        const isAdmin = userRow.role === "admin";
+        (socket as any).userId = userIdStr;
+        (socket as any).username = username;
+        (socket as any).avatarUrl = avatarUrl;
+        (socket as any).tier = isAdmin ? "admin" : (userRow.role ?? "free");
+        (socket as any).isAdmin = isAdmin;
+        console.log(`[chat] V2 session auth OK: ${username} (${userIdStr}) tier=${(socket as any).tier}`);
+        return next();
+      }
+
+      // ── Path 2: Supabase JWT auth (legacy / Supabase users) ──────────────
       if (!token) {
-        console.warn("[chat] Auth rejected: no token");
+        console.warn("[chat] Auth rejected: no token and no session");
         return next(new Error("Non authentifié"));
       }
       if (!supabase) {
@@ -66,7 +98,7 @@ export function initChatServer(httpServer: HttpServer) {
       // Use "admin" as tier if user has admin role so the badge displays correctly
       (socket as any).tier = isAdmin ? "admin" : ((sub as any)?.tier ?? "free");
       (socket as any).isAdmin = isAdmin;
-      console.log(`[chat] Auth OK: ${username} (${user.id}) tier=${(socket as any).tier} isAdmin=${isAdmin}`);
+      console.log(`[chat] Supabase auth OK: ${username} (${user.id}) tier=${(socket as any).tier} isAdmin=${isAdmin}`);
       next();
     } catch (err) {
       console.error("[chat] Auth error:", err);

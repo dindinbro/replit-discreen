@@ -42,7 +42,7 @@ const httpServer = createServer(app);
 
 // ── Session middleware (V2 auth) ──────────────────────────
 const sessionSecret = process.env.SESSION_SECRET || "discreen-v2-dev-secret-change-in-prod";
-app.use(session({
+export const sessionMiddleware = session({
   name: "discreen.sid",
   secret: sessionSecret,
   resave: false,
@@ -53,7 +53,8 @@ app.use(session({
     sameSite: "lax",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   },
-}));
+});
+app.use(sessionMiddleware);
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -228,7 +229,7 @@ app.use((req, res, next) => {
 
   registerAuthRoutes(app);
   await registerRoutes(httpServer, app);
-  initChatServer(httpServer);
+  initChatServer(httpServer, sessionMiddleware);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
