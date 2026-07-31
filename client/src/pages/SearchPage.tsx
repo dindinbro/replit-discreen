@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
 import { usePerformSearch, useSearchQuota, SearchLimitError } from "@/hooks/use-search";
 import SearchLoader from "@/components/SearchLoader";
+import { DiscreenMark } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -470,19 +471,33 @@ function ResultCard({
         </div>
 
         {/* Champs */}
-        <div className="divide-y divide-border/40">
-          {previewFields.map(([col, val]) => (
-            <div key={col} className="flex gap-3 px-4 py-2.5" data-testid={`field-${col}-${globalIndex}`}>
-              <span className="text-sm text-muted-foreground whitespace-nowrap w-36 shrink-0">{getFieldLabel(col)} :</span>
-              <span className="text-sm font-medium text-foreground break-all">{cleanFieldValue(val)}</span>
-            </div>
-          ))}
-          {expanded && hiddenFields.map(([col, val]) => (
-            <div key={col} className="flex gap-3 px-4 py-2.5" data-testid={`field-${col}-${globalIndex}`}>
-              <span className="text-sm text-muted-foreground whitespace-nowrap w-36 shrink-0">{getFieldLabel(col)} :</span>
-              <span className="text-sm font-medium text-foreground break-all">{cleanFieldValue(val)}</span>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 p-2.5">
+          {[...previewFields, ...(expanded ? hiddenFields : [])].map(([col, val]) => {
+            const Icon = getFieldIcon(col);
+            const colorVar = getFieldColorVar(col);
+            return (
+              <div
+                key={col}
+                className="flex items-start gap-2.5 px-2 py-2 rounded-lg hover:bg-muted/40 transition-colors"
+                data-testid={`field-${col}-${globalIndex}`}
+              >
+                <div
+                  className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center mt-0.5"
+                  style={{ backgroundColor: `hsl(var(${colorVar}) / 0.12)` }}
+                >
+                  <Icon className="w-3.5 h-3.5" style={{ color: `hsl(var(${colorVar}))` }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 leading-tight mb-0.5">
+                    {getFieldLabel(col)}
+                  </p>
+                  <p className="text-sm font-medium text-foreground break-all leading-snug">
+                    {cleanFieldValue(val)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* En savoir plus */}
@@ -2638,7 +2653,7 @@ export default function SearchPage() {
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 space-y-4 border-2 border-dashed border-border rounded-2xl bg-muted/30">
                     <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center">
-                      <Search className="w-8 h-8 text-muted-foreground" />
+                      <DiscreenMark className="w-7 h-7 opacity-60" />
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-medium text-foreground">{t("search.noResults")}</p>
