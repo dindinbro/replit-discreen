@@ -1,1145 +1,315 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  ArrowLeft,
-  Loader2,
-  User,
-  Camera,
-  Pencil,
-  ShieldCheck,
-  Shield,
-  Lock,
-  Unlock,
-  Save,
-  Copy,
-  Check,
-  AlertTriangle,
-  Link,
-  Unlink,
-  Heart,
-  Monitor,
-  Smartphone,
-  Globe,
-  Trash2,
-  Gift,
-  Trophy,
-  Star,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Wallet,
-  Percent,
-  Users,
-  ExternalLink,
-} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useTranslation } from "react-i18next";
-import { REFERRAL_RANKS, getReferralRank } from "@shared/schema";
+import {
+  ArrowLeft, User, Mail, CreditCard, Lock, Eye, EyeOff,
+  Check, Loader2, ChevronRight, ShieldCheck,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const ROLE_CONFIG: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-  admin: { variant: "destructive", label: "Admin" },
-  free: { variant: "secondary", label: "Free" },
-  vip: { variant: "outline", label: "VIP" },
-  pro: { variant: "default", label: "PRO" },
-  business: { variant: "default", label: "Business" },
-  api: { variant: "outline", label: "API" },
+/* ── Role badge ─────────────────────────────────────────── */
+const ROLE_STYLE: Record<string, string> = {
+  admin:    "bg-red-500/15 text-red-400 border-red-500/30",
+  pro:      "bg-primary/15 text-primary border-primary/30",
+  business: "bg-primary/15 text-primary border-primary/30",
+  vip:      "bg-amber-400/15 text-amber-400 border-amber-400/30",
+  free:     "bg-muted/50 text-muted-foreground border-border/40",
+  api:      "bg-blue-500/15 text-blue-400 border-blue-500/30",
+};
+const ROLE_LABEL: Record<string, string> = {
+  admin: "Admin", pro: "PRO", business: "Business", vip: "VIP", free: "Gratuit", api: "API",
 };
 
-
-interface ProfileData {
-  id: string;
-  email: string;
-  role: string;
-  frozen: boolean;
-  created_at: string;
-  unique_id: number;
-  display_name: string | null;
-  avatar_url: string | null;
-  discord_id: string | null;
-  is_supporter: boolean;
+function RoleBadge({ role }: { role: string }) {
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${ROLE_STYLE[role] ?? ROLE_STYLE.free}`}>
+      {ROLE_LABEL[role] ?? role}
+    </span>
+  );
 }
 
+/* ── Section wrapper ────────────────────────────────────── */
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/70 px-1">{label}</p>
+      <div className="rounded-xl border border-border/60 bg-card/60 overflow-hidden divide-y divide-border/40">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ── Static row ─────────────────────────────────────────── */
+function InfoRow({ icon: Icon, label, value, sub, onClick, accent }: {
+  icon: React.ElementType; label: string; value: React.ReactNode; sub?: string;
+  onClick?: () => void; accent?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-4 px-4 py-3.5 ${onClick ? "cursor-pointer hover:bg-secondary/30 transition-colors" : ""}`}
+      onClick={onClick}
+    >
+      <Icon className={`w-4 h-4 shrink-0 ${accent ? "text-primary" : "text-muted-foreground"}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">{value}</span>
+        {onClick && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />}
+      </div>
+    </div>
+  );
+}
+
+/* ── Inline edit field ──────────────────────────────────── */
+function EditRow({
+  icon: Icon, label, sub, placeholder, type = "text",
+  onSave, validate, extraField,
+}: {
+  icon: React.ElementType; label: string; sub?: string; placeholder?: string; type?: string;
+  onSave: (value: string, extra?: string) => Promise<void>;
+  validate?: (value: string) => string | null;
+  extraField?: { placeholder: string; label: string; type?: string };
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [extra, setExtra] = useState("");
+  const [showVal, setShowVal] = useState(false);
+  const [showExtra, setShowExtra] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const inputType = type === "password" ? (showVal ? "text" : "password") : type;
+  const extraType = type === "password" ? (showExtra ? "text" : "password") : type;
+
+  const handleSave = async () => {
+    if (validate) { const e = validate(value); if (e) { setErr(e); return; } }
+    setSaving(true); setErr(null);
+    try {
+      await onSave(value, extra || undefined);
+      setDone(true); setValue(""); setExtra("");
+      setTimeout(() => { setDone(false); setOpen(false); }, 1200);
+    } catch (e: any) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div>
+      <div
+        className="flex items-center gap-4 px-4 py-3.5 cursor-pointer hover:bg-secondary/30 transition-colors"
+        onClick={() => { setOpen(v => !v); setErr(null); setValue(""); setExtra(""); setDone(false); }}
+      >
+        <Icon className="w-4 h-4 shrink-0 text-muted-foreground" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">{label}</p>
+          {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+        </div>
+        <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground/50 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+      </div>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden border-t border-border/40 bg-secondary/10"
+          >
+            <div className="px-4 py-4 space-y-3">
+              <div className="relative">
+                <Input
+                  type={inputType}
+                  placeholder={placeholder}
+                  value={value}
+                  onChange={e => { setValue(e.target.value); setErr(null); }}
+                  className="pr-10 bg-secondary/40 border-border/50 focus-visible:border-primary/60"
+                  onKeyDown={e => e.key === "Enter" && !extraField && handleSave()}
+                />
+                {type === "password" && (
+                  <button type="button" tabIndex={-1} onClick={() => setShowVal(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground">
+                    {showVal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
+              {extraField && (
+                <div className="relative">
+                  <Input
+                    type={extraType}
+                    placeholder={extraField.placeholder}
+                    value={extra}
+                    onChange={e => { setExtra(e.target.value); setErr(null); }}
+                    className="pr-10 bg-secondary/40 border-border/50 focus-visible:border-primary/60"
+                    onKeyDown={e => e.key === "Enter" && handleSave()}
+                  />
+                  {type === "password" && (
+                    <button type="button" tabIndex={-1} onClick={() => setShowExtra(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground">
+                      {showExtra ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  )}
+                </div>
+              )}
+              {err && <p className="text-xs text-destructive">{err}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !value.trim()}
+                  className="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium transition-all disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : done ? <Check className="w-3 h-3" /> : null}
+                  {done ? "Sauvegardé" : "Sauvegarder"}
+                </button>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ── Main ───────────────────────────────────────────────── */
 export default function ProfilePage() {
-  const { t } = useTranslation();
-  const { user, role, loading: authLoading, getAccessToken, refreshRole } = useAuth();
+  const { user, role, loading, refreshRole } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+    </div>
+  );
+  if (!user) { navigate("/login"); return null; }
 
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
-  const [savingAvatar, setSavingAvatar] = useState(false);
+  const apiCall = async (url: string, body: object) => {
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Erreur serveur");
+    return data;
+  };
 
-  const [displayName, setDisplayName] = useState("");
-  const [savingName, setSavingName] = useState(false);
+  const handleUsername = async (username: string) => {
+    await apiCall("/api/auth/profile/username", { username });
+    toast({ title: "Pseudo mis à jour !" });
+    await refreshRole();
+  };
 
-  const [twoFaEnabled, setTwoFaEnabled] = useState(false);
-  const [loadingTwoFa, setLoadingTwoFa] = useState(true);
-  const [enrolling, setEnrolling] = useState(false);
-  const [totpUri, setTotpUri] = useState<string | null>(null);
-  const [totpSecret, setTotpSecret] = useState<string | null>(null);
-  const [factorId, setFactorId] = useState<string | null>(null);
-  const [verifyCode, setVerifyCode] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [disabling, setDisabling] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const handleEmail = async (email: string) => {
+    await apiCall("/api/auth/profile/email", { email });
+    toast({ title: "Email mis à jour !" });
+    await refreshRole();
+  };
 
-  const [linkCode, setLinkCode] = useState<string | null>(null);
-  const [generatingCode, setGeneratingCode] = useState(false);
-  const [savingDiscord, setSavingDiscord] = useState(false);
+  const handlePassword = async (newPassword: string, currentPassword?: string) => {
+    await apiCall("/api/auth/profile/password", { currentPassword, newPassword });
+    toast({ title: "Mot de passe modifié !" });
+  };
 
-  const [activeTab, setActiveTab] = useState<"compte" | "securite" | "discord" | "parrainage" | "sessions">("compte");
-  const [referralStats, setReferralStats] = useState<{ code: string; totalCredits: number; referralCount: number } | null>(null);
-  const [loadingReferral, setLoadingReferral] = useState(true);
-  const [referralError, setReferralError] = useState<string | null>(null);
-  const [copiedReferral, setCopiedReferral] = useState(false);
-  const [emailVisible, setEmailVisible] = useState(false);
-
-  interface SessionInfo {
-    id: number;
-    userAgent: string;
-    lastActiveAt: string;
-    createdAt: string;
-  }
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(true);
-  const [removingSessionId, setRemovingSessionId] = useState<number | null>(null);
-
-  const canChangeName = role === "admin";
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      setLoadingProfile(false);
-      return;
-    }
-    fetchProfile();
-    fetchTwoFaStatus();
-    fetchSessions();
-    fetchReferralStats();
-  }, [authLoading, user]);
-
-  async function fetchProfile() {
-    try {
-      const token = getAccessToken();
-      if (!token) return;
-      const res = await fetch("/api/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setProfile(data);
-        setDisplayName(data.display_name || "");
-        setAvatarUrl(data.avatar_url || "");
-      }
-    } catch (err) {
-      console.error("fetchProfile error:", err);
-    } finally {
-      setLoadingProfile(false);
-    }
-  }
-
-  async function fetchTwoFaStatus() {
-    try {
-      const token = getAccessToken();
-      if (!token) return;
-      const res = await fetch("/api/profile/2fa/status", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTwoFaEnabled(data.enabled);
-      }
-    } catch (err) {
-      console.error("fetchTwoFaStatus error:", err);
-    } finally {
-      setLoadingTwoFa(false);
-    }
-  }
-
-  async function fetchSessions() {
-    try {
-      const token = getAccessToken();
-      if (!token) return;
-      const res = await fetch("/api/session/active", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data.sessions || []);
-      }
-    } catch (err) {
-      console.error("fetchSessions error:", err);
-    } finally {
-      setLoadingSessions(false);
-    }
-  }
-
-  async function fetchReferralStats() {
-    try {
-      const token = getAccessToken();
-      if (!token) return;
-      const res = await fetch("/api/referral/stats", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setReferralStats(data);
-        setReferralError(null);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        console.error("fetchReferralStats failed:", res.status, errData);
-        setReferralError(errData.detail || errData.message || `Erreur ${res.status}`);
-      }
-    } catch (err: any) {
-      console.error("fetchReferralStats error:", err);
-      setReferralError(err?.message || "Erreur réseau");
-    } finally {
-      setLoadingReferral(false);
-    }
-  }
-
-  function parseUserAgent(ua: string): { browser: string; os: string; isMobile: boolean } {
-    const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua);
-    let browser = "Navigateur inconnu";
-    let os = "OS inconnu";
-
-    if (/Edg\//i.test(ua)) browser = "Microsoft Edge";
-    else if (/OPR\//i.test(ua) || /Opera/i.test(ua)) browser = "Opera";
-    else if (/Chrome\//i.test(ua) && !/Edg/i.test(ua)) browser = "Google Chrome";
-    else if (/Firefox\//i.test(ua)) browser = "Firefox";
-    else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = "Safari";
-
-    if (/Windows/i.test(ua)) os = "Windows";
-    else if (/Mac OS/i.test(ua)) os = "macOS";
-    else if (/Linux/i.test(ua) && !isMobile) os = "Linux";
-    else if (/Android/i.test(ua)) os = "Android";
-    else if (/iPhone|iPad/i.test(ua)) os = "iOS";
-
-    return { browser, os, isMobile };
-  }
-
-  function timeAgo(dateStr: string): string {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "A l'instant";
-    if (mins < 60) return `Il y a ${mins}min`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `Il y a ${hours}h`;
-    const days = Math.floor(hours / 24);
-    return `Il y a ${days}j`;
-  }
-
-  async function removeSession(sessionId: number) {
-    setRemovingSessionId(sessionId);
-    try {
-      const token = getAccessToken();
-      const session = sessions.find(s => s.id === sessionId);
-      if (!session) return;
-      await fetch("/api/session", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({}),
-      });
-      await fetchSessions();
-      toast({ title: "Session deconnectee" });
-    } catch {
-      toast({ title: "Erreur", variant: "destructive" });
-    } finally {
-      setRemovingSessionId(null);
-    }
-  }
-
-  async function saveAvatar() {
-    setSavingAvatar(true);
-    try {
-      const token = getAccessToken();
-      if (!token) return;
-      const res = await fetch("/api/profile/avatar", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ avatar_url: avatarUrl.trim() }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast({ title: t("profile.avatarUpdated") });
-        setAvatarDialogOpen(false);
-        setProfile((p) => p ? { ...p, avatar_url: data.avatar_url } : p);
-        if (supabase) await supabase.auth.refreshSession();
-        await refreshRole();
-      } else {
-        toast({ title: t("common.error"), description: data.message, variant: "destructive" });
-      }
-    } catch {
-      toast({ title: t("common.error"), description: t("profile.avatarUpdateError"), variant: "destructive" });
-    } finally {
-      setSavingAvatar(false);
-    }
-  }
-
-  async function saveDisplayName() {
-    setSavingName(true);
-    try {
-      const token = getAccessToken();
-      if (!token) return;
-      const res = await fetch("/api/profile/display-name", {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ display_name: displayName.trim() }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast({ title: t("profile.usernameUpdated") });
-        setProfile((p) => p ? { ...p, display_name: data.display_name } : p);
-        await refreshRole();
-      } else {
-        toast({ title: t("common.error"), description: data.message, variant: "destructive" });
-      }
-    } catch {
-      toast({ title: t("common.error"), description: t("profile.usernameUpdateError"), variant: "destructive" });
-    } finally {
-      setSavingName(false);
-    }
-  }
-
-  async function startEnroll() {
-    if (!supabase) {
-      toast({ title: t("common.error"), description: t("profile.twoFaEnrollError"), variant: "destructive" });
-      return;
-    }
-    setEnrolling(true);
-    try {
-      const { data, error } = await supabase.auth.mfa.enroll({
-        factorType: "totp",
-        friendlyName: "Discreen A2F",
-      });
-      if (error) {
-        toast({ title: t("common.error"), description: error.message, variant: "destructive" });
-        return;
-      }
-      if (data) {
-        setTotpUri(data.totp.uri);
-        setTotpSecret(data.totp.secret);
-        setFactorId(data.id);
-      }
-    } catch (err) {
-      toast({ title: t("common.error"), description: t("profile.twoFaEnrollError"), variant: "destructive" });
-    } finally {
-      setEnrolling(false);
-    }
-  }
-
-  async function verifyEnroll() {
-    if (!factorId || verifyCode.length !== 6) return;
-    if (!supabase) return;
-    setVerifying(true);
-    try {
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
-      if (challengeError) {
-        toast({ title: t("common.error"), description: challengeError.message, variant: "destructive" });
-        return;
-      }
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: challengeData.id,
-        code: verifyCode,
-      });
-      if (verifyError) {
-        toast({ title: t("common.error"), description: t("profile.invalidCode"), variant: "destructive" });
-        return;
-      }
-      toast({ title: t("profile.twoFaActivatedSuccess") });
-      setTwoFaEnabled(true);
-      setTotpUri(null);
-      setTotpSecret(null);
-      setFactorId(null);
-      setVerifyCode("");
-    } catch {
-      toast({ title: t("common.error"), description: t("profile.verificationFailed"), variant: "destructive" });
-    } finally {
-      setVerifying(false);
-    }
-  }
-
-  async function disableTwoFa() {
-    setDisabling(true);
-    try {
-      const token = getAccessToken();
-      if (!token) return;
-      const res = await fetch("/api/profile/2fa", {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        toast({ title: t("profile.twoFaDeactivated") });
-        setTwoFaEnabled(false);
-      } else {
-        const data = await res.json();
-        toast({ title: t("common.error"), description: data.message, variant: "destructive" });
-      }
-    } catch {
-      toast({ title: t("common.error"), description: t("profile.twoFaDisableError"), variant: "destructive" });
-    } finally {
-      setDisabling(false);
-    }
-  }
-
-  function copySecret() {
-    if (totpSecret) {
-      navigator.clipboard.writeText(totpSecret);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
-  if (authLoading || loadingProfile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user || !profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="p-8 max-w-md text-center space-y-4">
-          <AlertTriangle className="w-12 h-12 text-destructive mx-auto" />
-          <h2 className="text-xl font-semibold">{t("profile.notLoggedIn")}</h2>
-          <p className="text-muted-foreground text-sm">{t("profile.notLoggedInDesc")}</p>
-          <Button onClick={() => navigate("/login")} data-testid="button-go-login">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            {t("profile.goLogin")}
-          </Button>
-        </Card>
-      </div>
-    );
-  }
-
-  const roleConfig = ROLE_CONFIG[profile.role] || ROLE_CONFIG.free;
+  const currentEmail = (user as any).email as string | null;
+  const currentUsername = (user as any).username ?? user.user_metadata?.display_name ?? "";
 
   return (
-    <div className="min-h-screen bg-background text-foreground bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-7xl mx-auto h-16 flex items-center justify-between gap-2 px-4">
-          <div className="flex items-center gap-2">
-            <img src="/favicon.png" alt="Discreen" className="w-8 h-8 rounded-lg object-contain shrink-0" />
-            <span className="font-display font-bold text-2xl tracking-tight">
-              Di<span className="text-primary">screen</span>
-            </span>
-            <Badge variant="outline" className="ml-2">{t("profile.title")}</Badge>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b border-border/40 bg-card/40 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+          <button
+            onClick={() => navigate("/")}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
+            <h1 className="text-sm font-semibold">Paramètres</h1>
           </div>
-          <Button variant="ghost" onClick={() => navigate("/")} data-testid="button-back-home">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            {t("profile.back")}
-          </Button>
         </div>
-      </header>
+      </div>
 
-      <main className="container max-w-3xl mx-auto px-4 py-8 space-y-6">
-        <Card className="p-6 space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="relative group">
-              <div
-                className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-border cursor-pointer"
-                onClick={() => setAvatarDialogOpen(true)}
-                data-testid="button-change-avatar"
-              >
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt="Avatar"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                ) : (
-                  <User className="w-8 h-8 text-muted-foreground" />
-                )}
-              </div>
-              <div
-                className="absolute inset-0 w-20 h-20 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                onClick={() => setAvatarDialogOpen(true)}
-              >
-                <Camera className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <div className="flex-1 min-w-0 space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg font-semibold truncate">{profile.display_name || profile.email?.split("@")[0]}</h2>
-                <Badge variant={roleConfig.variant} data-testid="badge-profile-role">{roleConfig.label}</Badge>
-                {profile.is_supporter && (
-                  <Badge variant="outline" className="border-pink-500/30 text-pink-500" data-testid="badge-supporter">
-                    <Heart className="w-3 h-3 mr-1" />
-                    {t("profile.supporter")}
-                  </Badge>
-                )}
-                {referralStats && (() => {
-                  const rank = getReferralRank(referralStats.totalCredits);
-                  return (
-                    <Badge variant="outline" data-testid="badge-referral-rank" style={{ borderColor: rank.current.color + "50", color: rank.current.color }}>
-                      <Trophy className="w-3 h-3 mr-1" />
-                      {rank.current.name}
-                    </Badge>
-                  );
-                })()}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <p className={`text-sm text-muted-foreground truncate transition-all ${emailVisible ? "" : "blur-sm select-none"}`}>{profile.email}</p>
-                <button
-                  data-testid="button-toggle-email"
-                  onClick={() => setEmailVisible(!emailVisible)}
-                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                >
-                  {emailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">ID: #{profile.unique_id}</p>
+      {/* Body */}
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Avatar + name hero */}
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center text-xl font-bold text-primary">
+            {currentUsername?.[0]?.toUpperCase() ?? "?"}
+          </div>
+          <div>
+            <p className="text-lg font-bold">{currentUsername}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <RoleBadge role={role ?? "free"} />
+              {role === "admin" && <ShieldCheck className="w-3.5 h-3.5 text-red-400" />}
             </div>
           </div>
-        </Card>
-
-        <div className="flex flex-wrap gap-2 p-1.5 rounded-xl bg-secondary/50 border border-border/50">
-          {([
-            { id: "compte" as const, label: "Compte", icon: User },
-            { id: "securite" as const, label: "Sécurité", icon: ShieldCheck },
-            { id: "discord" as const, label: "Discord", icon: Link },
-            { id: "parrainage" as const, label: "Parrainage", icon: Gift },
-            { id: "sessions" as const, label: "Sessions", icon: Monitor },
-          ]).map((tab) => (
-            <button
-              key={tab.id}
-              data-testid={`tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-muted-foreground bg-transparent hover:bg-muted/80 hover:text-foreground"
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
         </div>
 
-        {activeTab === "compte" && (
-          <section className="space-y-4">
-            <Card className="p-6 space-y-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Pencil className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-display font-bold">{t("profile.editUsername")}</h3>
-              </div>
-              {canChangeName ? (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="display-name">{t("profile.usernameLabel")}</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="display-name"
-                        data-testid="input-display-name"
-                        placeholder={t("profile.usernamePlaceholder")}
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        maxLength={30}
-                      />
-                      <Button
-                        data-testid="button-save-name"
-                        onClick={saveDisplayName}
-                        disabled={savingName || displayName.trim().length < 2}
-                      >
-                        {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{t("profile.usernameHint")}</p>
-                </>
-              ) : (
-                <div className="flex items-center gap-3 text-sm">
-                  <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">{t("profile.adminOnly")}</p>
-                    <p className="text-muted-foreground text-xs mt-0.5">{t("profile.adminOnlyDesc")}</p>
-                  </div>
-                </div>
-              )}
-            </Card>
+        {/* COMPTE */}
+        <Section label="Compte">
+          <EditRow
+            icon={User}
+            label="Pseudo"
+            sub={`Actuel\u00a0: ${currentUsername}`}
+            placeholder="nouveau_pseudo"
+            validate={v => /^[a-z0-9_]{3,20}$/.test(v.trim()) ? null : "3–20 car., minuscules, chiffres, _"}
+            onSave={handleUsername}
+          />
+          <EditRow
+            icon={Mail}
+            label="Email"
+            sub={currentEmail ? `Actuel\u00a0: ${currentEmail}` : "Aucun email — ajoutez-en un"}
+            placeholder="exemple@mail.com"
+            type="email"
+            validate={v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : "Email invalide"}
+            onSave={handleEmail}
+          />
+          <InfoRow
+            icon={CreditCard}
+            label="Abonnement"
+            value={<RoleBadge role={role ?? "free"} />}
+            onClick={() => navigate("/pricing")}
+          />
+        </Section>
 
-            <Card className="p-6 space-y-4">
-              <div className="grid gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">{t("profile.emailLabel")}</p>
-                  <div className="flex items-center gap-1.5">
-                    <p className={`text-sm transition-all ${emailVisible ? "" : "blur-sm select-none"}`}>{profile.email}</p>
-                    <button
-                      data-testid="button-toggle-email-tab"
-                      onClick={() => setEmailVisible(!emailVisible)}
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {emailVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">{t("profile.memberSince")}</p>
-                  <p className="text-sm">{new Date(profile.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>
-                </div>
-              </div>
-            </Card>
-          </section>
-        )}
+        {/* MOT DE PASSE */}
+        <Section label="Mot de passe">
+          <EditRow
+            icon={Lock}
+            label="Changer le mot de passe"
+            sub="Saisissez votre mot de passe actuel pour continuer"
+            placeholder="Mot de passe actuel"
+            type="password"
+            extraField={{ placeholder: "Nouveau mot de passe (8+ car.)", label: "Nouveau" }}
+            validate={v => v.length >= 1 ? null : "Requis"}
+            onSave={handlePassword}
+          />
+        </Section>
 
-        {activeTab === "securite" && (
-          <section className="space-y-4">
-            <Card className="p-6 space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <ShieldCheck className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-display font-bold">{t("profile.twoFa")}</h3>
-              </div>
-              {loadingTwoFa ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                </div>
-              ) : twoFaEnabled ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-emerald-500" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{t("profile.twoFaEnabled")}</p>
-                      <p className="text-xs text-muted-foreground">{t("profile.twoFaEnabledDesc")}</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={disableTwoFa}
-                    disabled={disabling}
-                    data-testid="button-disable-2fa"
-                  >
-                    {disabling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
-                    {t("profile.disableTwoFa")}
-                  </Button>
-                </div>
-              ) : totpUri ? (
-                <div className="space-y-4">
-                  <p className="text-sm">{t("profile.scanQrCode")}</p>
-                  <div className="flex justify-center p-4 bg-white rounded-lg">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`}
-                      alt="QR Code A2F"
-                      className="w-48 h-48"
-                      data-testid="img-totp-qr"
-                    />
-                  </div>
-                  {totpSecret && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">{t("profile.manualCode")}</p>
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono break-all select-all">{totpSecret}</code>
-                        <Button variant="ghost" size="icon" onClick={copySecret} data-testid="button-copy-secret">
-                          {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="verify-code">{t("profile.verifyCodeLabel")}</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="verify-code"
-                        data-testid="input-2fa-code"
-                        placeholder="000000"
-                        value={verifyCode}
-                        onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        maxLength={6}
-                        className="font-mono text-center tracking-widest"
-                      />
-                      <Button
-                        data-testid="button-verify-2fa"
-                        onClick={verifyEnroll}
-                        disabled={verifying || verifyCode.length !== 6}
-                      >
-                        {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : t("profile.verify")}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{t("profile.twoFaDisabled")}</p>
-                      <p className="text-xs text-muted-foreground">{t("profile.twoFaDisabledDesc")}</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={startEnroll}
-                    disabled={enrolling}
-                    data-testid="button-enable-2fa"
-                  >
-                    {enrolling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-                    {t("profile.enableTwoFa")}
-                  </Button>
-                </div>
-              )}
-            </Card>
-          </section>
-        )}
-
-        {activeTab === "discord" && (
-          <section className="space-y-4">
-            <Card className="p-6 space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Link className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-display font-bold">{t("profile.linkDiscord")}</h3>
-              </div>
-              {profile.discord_id ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
-                      <Check className="w-5 h-5 text-indigo-500" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{t("profile.discordLinked")}</p>
-                      <p className="text-xs text-muted-foreground">ID: {profile.discord_id}</p>
-                    </div>
-                    {profile.is_supporter && (
-                      <Badge variant="outline" className="border-pink-500/30 text-pink-500 ml-auto" data-testid="badge-supporter-discord">
-                        <Heart className="w-3 h-3 mr-1" />
-                        {t("profile.supporter")}
-                      </Badge>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="button-unlink-discord"
-                    onClick={async () => {
-                      try {
-                        const token = getAccessToken();
-                        const res = await fetch("/api/profile/discord", {
-                          method: "DELETE",
-                          headers: { Authorization: `Bearer ${token}` },
-                        });
-                        if (res.ok) {
-                          setProfile((p) => p ? { ...p, discord_id: null, is_supporter: false } : p);
-                          toast({ title: t("profile.discordUnlinkedSuccess") });
-                        }
-                      } catch {
-                        toast({ title: t("profile.discordUnlinkError"), variant: "destructive" });
-                      }
-                    }}
-                  >
-                    <Unlink className="w-4 h-4 mr-1" />
-                    {t("profile.unlinkDiscord")}
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {t("profile.discord.description")}
-                  </p>
-                  {linkCode ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-lg border border-border/50">
-                        <div className="flex-1">
-                          <p className="text-xs text-muted-foreground mb-1">{t("profile.discord.codeLabel")}</p>
-                          <p className="text-2xl font-mono font-bold tracking-widest text-primary" data-testid="text-link-code">{linkCode}</p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          data-testid="button-copy-code"
-                          onClick={() => {
-                            navigator.clipboard.writeText(linkCode);
-                            toast({ title: t("profile.discord.codeCopied") });
-                          }}
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        <p>{t("profile.discord.codeInstructions")}</p>
-                        <code className="text-xs bg-secondary/50 px-2 py-1 rounded">/link {linkCode}</code>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{t("profile.discord.codeExpiry")}</p>
-                    </div>
-                  ) : (
-                    <Button
-                      data-testid="button-generate-code"
-                      disabled={generatingCode}
-                      onClick={async () => {
-                        setGeneratingCode(true);
-                        try {
-                          const token = getAccessToken();
-                          const res = await fetch("/api/profile/discord/generate-code", {
-                            method: "POST",
-                            headers: { Authorization: `Bearer ${token}` },
-                          });
-                          const data = await res.json();
-                          if (res.ok) {
-                            setLinkCode(data.code);
-                            toast({ title: t("profile.discord.codeGenerated") });
-                          } else {
-                            toast({ title: data.message || t("common.error"), variant: "destructive" });
-                          }
-                        } catch {
-                          toast({ title: t("profile.discord.linkError"), variant: "destructive" });
-                        } finally {
-                          setGeneratingCode(false);
-                        }
-                      }}
-                      className="gap-2"
-                    >
-                      {generatingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link className="w-4 h-4" />}
-                      {t("profile.discord.generateCode")}
-                    </Button>
-                  )}
-                </div>
-              )}
-            </Card>
-          </section>
-        )}
-
-        {activeTab === "parrainage" && (
-          <section className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Card className="p-8 space-y-6 h-full">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                    <Star className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <h3 className="text-xl font-display font-bold">Éclats & Grades</h3>
-                </div>
-
-                {loadingReferral ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
-                  </div>
-                ) : !referralStats ? (
-                  <div className="text-center py-12">
-                    <Star className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">Impossible de charger les données.</p>
-                    {referralError && (
-                      <p className="text-xs text-destructive mt-2 font-mono bg-destructive/10 px-3 py-1 rounded inline-block">{referralError}</p>
-                    )}
-                    <div className="mt-3">
-                      <Button variant="outline" size="sm" onClick={() => { setLoadingReferral(true); setReferralError(null); fetchReferralStats(); }}>
-                        Réessayer
-                      </Button>
-                    </div>
-                  </div>
-                ) : (() => {
-                  const { current, nextRank } = getReferralRank(referralStats.totalCredits);
-                  const progress = nextRank
-                    ? ((referralStats.totalCredits - current.threshold) / (nextRank.threshold - current.threshold)) * 100
-                    : 100;
-                  return (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center">
-                          <p className="text-3xl font-bold text-amber-500">{referralStats.totalCredits}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Éclats</p>
-                        </div>
-                        <div className="p-5 rounded-xl bg-secondary/20 border border-border/50 text-center">
-                          <p className="text-3xl font-bold text-foreground">{referralStats.referralCount}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Parrainages</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="w-5 h-5" style={{ color: current.color }} />
-                            <span className="font-semibold" style={{ color: current.color }}>{current.name}</span>
-                          </div>
-                          {nextRank && (
-                            <span className="text-xs text-muted-foreground">
-                              {referralStats.totalCredits}/{nextRank.threshold} → {nextRank.name}
-                            </span>
-                          )}
-                        </div>
-                        <div className="w-full h-3 rounded-full bg-secondary/50 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: `${Math.min(progress, 100)}%`,
-                              background: `linear-gradient(90deg, ${current.color}, ${nextRank?.color || current.color})`,
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <p className="text-sm text-muted-foreground italic">
-                        Accumule des Éclats pour monter en grade et débloquer des titres exclusifs.
-                      </p>
-                    </>
-                  );
-                })()}
-              </Card>
-
-              <Card className="p-8 space-y-6 h-full">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Gift className="w-5 h-5 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-display font-bold">Commission</h3>
-                </div>
-
-                <div className="p-5 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
-                  <h4 className="font-semibold text-primary flex items-center gap-2">
-                    <Percent className="w-4 h-4" />
-                    Comment ça marche ?
-                  </h4>
-                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                    <li>Copie ton code de parrainage unique</li>
-                    <li>Partage-le avec tes amis</li>
-                    <li>Tu gagnes <span className="text-primary font-semibold">30%</span> de commission sur chaque vente</li>
-                  </ol>
-                </div>
-
-                {referralStats && (
-                  <div className="flex items-center gap-4 p-4 bg-secondary/30 rounded-xl border border-border/50">
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-1">Ton code de parrainage</p>
-                      <p className="text-2xl font-mono font-bold tracking-widest text-primary" data-testid="text-referral-code">
-                        {referralStats.code}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      data-testid="button-copy-referral"
-                      onClick={() => {
-                        navigator.clipboard.writeText(referralStats.code);
-                        setCopiedReferral(true);
-                        setTimeout(() => setCopiedReferral(false), 2000);
-                        toast({ title: "Code copié !" });
-                      }}
-                    >
-                      {copiedReferral ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-5 rounded-xl bg-gradient-to-br from-emerald-500/10 to-primary/5 border border-primary/30 text-center">
-                    <Percent className="w-5 h-5 text-primary mx-auto mb-2" />
-                    <p className="text-3xl font-bold text-primary">30%</p>
-                    <p className="text-sm text-muted-foreground mt-1">Par vente</p>
-                  </div>
-                  <div className="p-5 rounded-xl bg-secondary/20 border border-border/50 text-center">
-                    <Users className="w-5 h-5 text-primary mx-auto mb-2" />
-                    <p className="text-3xl font-bold text-foreground">{referralStats?.referralCount ?? 0}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Vente{(referralStats?.referralCount ?? 0) !== 1 ? "s" : ""}</p>
-                  </div>
-                </div>
-
-                <a href="https://discord.gg/discreen" target="_blank" rel="noopener noreferrer" className="block">
-                  <Button variant="outline" className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/10" data-testid="button-withdraw-commission-side">
-                    <Wallet className="w-4 h-4" />
-                    Retirer ma commission
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </Button>
-                </a>
-                <p className="text-xs text-muted-foreground text-center leading-tight">
-                  Ouvre un ticket Discord pour retirer ta commission
-                </p>
-              </Card>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Star className="w-5 h-5 text-amber-500" />
-                <h3 className="text-lg font-display font-bold">Échelle des Grades</h3>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {REFERRAL_RANKS.map((rank, idx) => {
-                  const isCurrentRank = referralStats && getReferralRank(referralStats.totalCredits).rankIndex === idx;
-                  const isAchieved = referralStats && referralStats.totalCredits >= rank.threshold;
-                  return (
-                    <Card
-                      key={rank.name}
-                      className={`relative p-4 text-center transition-all duration-200 ${
-                        isCurrentRank
-                          ? "shadow-md"
-                          : isAchieved
-                          ? ""
-                          : "opacity-40"
-                      }`}
-                      style={{
-                        borderColor: isCurrentRank ? rank.color + "60" : isAchieved ? rank.color + "30" : undefined,
-                      }}
-                      data-testid={`rank-item-${rank.name}`}
-                    >
-                      {isCurrentRank && (
-                        <div
-                          className="absolute top-0 left-0 right-0 h-1 rounded-t-lg"
-                          style={{ background: rank.color }}
-                        />
-                      )}
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mx-auto mb-2"
-                        style={{
-                          backgroundColor: isAchieved ? rank.color + "18" : "transparent",
-                          border: `2px solid ${isAchieved ? rank.color : "hsl(var(--border))"}`,
-                          color: isAchieved ? rank.color : "hsl(var(--muted-foreground))",
-                        }}
-                      >
-                        {isAchieved && !isCurrentRank ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          idx + 1
-                        )}
-                      </div>
-                      <p className="font-bold text-sm" style={{ color: isAchieved ? rank.color : undefined }}>
-                        {rank.name}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {rank.threshold === 0 ? "Début" : `${rank.threshold} Éclats`}
-                      </p>
-                      {isCurrentRank && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] mt-2 px-2 py-0"
-                          style={{ borderColor: rank.color + "50", color: rank.color }}
-                        >
-                          Actuel
-                        </Badge>
-                      )}
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {activeTab === "sessions" && (
-          <section className="space-y-4">
-            <Card className="p-6 space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Monitor className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-display font-bold">Sessions Actives</h3>
-              </div>
-              {loadingSessions ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                </div>
-              ) : sessions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune session active.</p>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {sessions.length} session{sessions.length > 1 ? "s" : ""} active{sessions.length > 1 ? "s" : ""} (max 2)
-                  </p>
-                  {sessions.map((session) => {
-                    const ua = parseUserAgent(session.userAgent || "");
-                    const DeviceIcon = ua.isMobile ? Smartphone : Monitor;
-                    return (
-                      <div
-                        key={session.id}
-                        className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-secondary/10"
-                        data-testid={`session-item-${session.id}`}
-                      >
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <DeviceIcon className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-sm">{ua.browser}</p>
-                            <Badge variant="secondary" className="text-xs">{ua.os}</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Derniere activite : {timeAgo(session.lastActiveAt)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
-          </section>
-        )}
-      </main>
-
-      <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("profile.editAvatar")}</DialogTitle>
-            <DialogDescription>
-              {t("profile.editAvatarDesc")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {avatarUrl && (
-              <div className="flex justify-center">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-border">
-                  <img
-                    src={avatarUrl}
-                    alt="Apercu"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "";
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="avatar-url">{t("profile.imageUrl")}</Label>
-              <Input
-                id="avatar-url"
-                data-testid="input-avatar-url"
-                placeholder="https://exemple.com/photo.jpg"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setAvatarDialogOpen(false)} data-testid="button-cancel-avatar">
-                {t("common.cancel")}
-              </Button>
-              <Button onClick={saveAvatar} disabled={savingAvatar} data-testid="button-save-avatar">
-                {savingAvatar ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                {t("common.save")}
-              </Button>
-            </div>
+        {/* Danger zone — placeholder for future */}
+        <div className="pt-2">
+          <p className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/40 px-1 mb-2">Zone</p>
+          <div className="rounded-xl border border-border/40 bg-card/30 px-4 py-3.5 flex items-center gap-4">
+            <Lock className="w-4 h-4 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground/60">Suppression de compte — contacter le support</p>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
     </div>
   );
 }

@@ -144,6 +144,55 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  /* ── Profile update routes ───────────────────────────── */
+
+  app.patch("/api/auth/profile/username", async (req: Request, res: Response) => {
+    const userId = (req.session as any).authUserId;
+    if (!userId) return res.status(401).json({ message: "Non authentifié" });
+    const clean = (req.body.username ?? "").trim();
+    if (!/^[a-z0-9_]{3,20}$/.test(clean))
+      return res.status(400).json({ message: "3–20 caractères, minuscules, chiffres et _ uniquement." });
+    try {
+      const existing = await storage.getUserByUsername(clean);
+      if (existing && existing.id !== userId)
+        return res.status(409).json({ message: "Ce nom d'utilisateur est déjà pris." });
+      await storage.updateUser(userId, { username: clean });
+      (req.session as any).authUsername = clean;
+      return res.json({ ok: true, username: clean });
+    } catch { return res.status(500).json({ message: "Erreur serveur." }); }
+  });
+
+  app.patch("/api/auth/profile/password", async (req: Request, res: Response) => {
+    const userId = (req.session as any).authUserId;
+    if (!userId) return res.status(401).json({ message: "Non authentifié" });
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ message: "Tous les champs sont requis." });
+    if (newPassword.length < 8)
+      return res.status(400).json({ message: "Le nouveau mot de passe doit contenir au moins 8 caractères." });
+    try {
+      const user = await storage.getUser(userId);
+      if (!user?.passwordHash) return res.status(400).json({ message: "Impossible de modifier le mot de passe." });
+      const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!valid) return res.status(401).json({ message: "Mot de passe actuel incorrect." });
+      await storage.updateUser(userId, { passwordHash: await bcrypt.hash(newPassword, 12) });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ message: "Erreur serveur." }); }
+  });
+
+  app.patch("/api/auth/profile/email", async (req: Request, res: Response) => {
+    const userId = (req.session as any).authUserId;
+    if (!userId) return res.status(401).json({ message: "Non authentifié" });
+    const clean = (req.body.email ?? "").trim() || null;
+    if (clean && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean))
+      return res.status(400).json({ message: "Adresse email invalide." });
+    try {
+      await storage.updateUser(userId, { email: clean });
+      (req.session as any).authEmail = clean;
+      return res.json({ ok: true, email: clean });
+    } catch { return res.status(500).json({ message: "Erreur serveur." }); }
+  });
+
   /* ── Me (session check) ───────────────────────────────── */
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     const userId = (req.session as any).authUserId;
