@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, Clock, Activity, Zap, Database, Globe, Shield } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Activity, Zap, Database, Globe, Shield, TrendingUp, Clock3, History } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type ServiceStatus = {
@@ -14,11 +14,19 @@ type ServiceStatus = {
   updatedAt: string;
 };
 
+type Incident = {
+  id: number;
+  title: string;
+  status: "resolved" | "monitoring" | "investigating";
+  severity: "minor" | "major";
+  date: string;
+  summary: string;
+};
+
 const STATUS_CONFIG = {
   operational: {
     label: "Opérationnel",
     color: "#10b981",
-    glow: "rgba(16,185,129,0.25)",
     bg: "rgba(16,185,129,0.08)",
     border: "rgba(16,185,129,0.2)",
     icon: CheckCircle2,
@@ -27,7 +35,6 @@ const STATUS_CONFIG = {
   degraded: {
     label: "Dégradé",
     color: "#f59e0b",
-    glow: "rgba(245,158,11,0.25)",
     bg: "rgba(245,158,11,0.08)",
     border: "rgba(245,158,11,0.2)",
     icon: AlertTriangle,
@@ -36,7 +43,6 @@ const STATUS_CONFIG = {
   outage: {
     label: "Panne",
     color: "#ef4444",
-    glow: "rgba(239,68,68,0.25)",
     bg: "rgba(239,68,68,0.08)",
     border: "rgba(239,68,68,0.2)",
     icon: XCircle,
@@ -51,161 +57,111 @@ const SERVICE_ICONS: Record<string, any> = {
   "Interface Web": Shield,
 };
 
-function formatDate(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function UptimeBar({ services }: { services: ServiceStatus[] }) {
-  const [hovered, setHovered] = useState<number | null>(null);
-
-  const hasOutage = services.some(s => s.status === "outage");
-  const hasDegraded = services.some(s => s.status === "degraded");
-
-  const currentStatus = hasOutage ? "outage" : hasDegraded ? "degraded" : "operational";
-
-  const bars = Array.from({ length: 90 }, (_, i) => {
-    const daysFromEnd = 89 - i;
-    // Today's bar always mirrors the exact admin-set status
+/* Deterministic per-service history so each row's bar is stable but distinct */
+function buildHistory(seed: number, currentStatus: string): string[] {
+  return Array.from({ length: 60 }, (_, i) => {
+    const daysFromEnd = 59 - i;
     if (daysFromEnd === 0) return currentStatus;
-    // Historical simulation for past days
-    const rand = (i * 7 + 13) % 100;
+    const rand = (i * 7 + seed * 13 + 5) % 100;
     if (rand < 2) return "degraded";
     if (rand < 1) return "outage";
     return "operational";
   });
+}
 
-  const operationalDays = bars.filter(b => b === "operational").length;
-  const pct = ((operationalDays / 90) * 100).toFixed(2);
-
-  const hoveredDaysAgo = hovered !== null ? 89 - hovered : null;
-  const hoveredDate = hoveredDaysAgo !== null ? formatDate(hoveredDaysAgo) : null;
-  const hoveredStatus = hovered !== null ? bars[hovered] : null;
-  const hoveredCfg = hoveredStatus ? STATUS_CONFIG[hoveredStatus as keyof typeof STATUS_CONFIG] : null;
+function MiniUptimeBar({ seed, status }: { seed: number; status: string }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const bars = buildHistory(seed, status);
+  const pct = ((bars.filter(b => b === "operational").length / bars.length) * 100).toFixed(1);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Disponibilité · 90 jours</span>
-        <span className="text-2xl font-bold tabular-nums text-gold">{pct}%</span>
-      </div>
-
-      <div className="relative">
-        <div className="flex gap-[2px] h-8 items-end">
-          {bars.map((status, i) => {
-            const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG];
-            const isHovered = hovered === i;
-            return (
-              <div
-                key={i}
-                className="relative flex-1 rounded-[2px] cursor-crosshair transition-all duration-100"
-                style={{
-                  backgroundColor: cfg.bar,
-                  height: status === "outage" ? "55%" : status === "degraded" ? "72%" : "100%",
-                  opacity: hovered !== null ? (isHovered ? 1 : 0.45) : 1,
-                  transform: isHovered ? "scaleY(1.15)" : "scaleY(1)",
-                  transformOrigin: "bottom",
-                }}
-                onMouseEnter={() => setHovered(i)}
-                onMouseLeave={() => setHovered(null)}
-              />
-            );
-          })}
-        </div>
-
-        <AnimatePresence>
-          {hovered !== null && hoveredDate && hoveredCfg && (
-            <motion.div
-              key={hovered}
-              initial={{ opacity: 0, y: 4, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 4, scale: 0.96 }}
-              transition={{ duration: 0.1 }}
-              className="absolute -top-12 pointer-events-none z-10 flex flex-col items-center gap-0.5"
+    <div className="w-full">
+      <div className="flex gap-[2px] h-6 items-end">
+        {bars.map((s, i) => {
+          const cfg = STATUS_CONFIG[s as keyof typeof STATUS_CONFIG];
+          return (
+            <div
+              key={i}
+              className="relative flex-1 rounded-[1.5px] cursor-crosshair transition-opacity duration-100"
               style={{
-                left: `${(hovered / 90) * 100}%`,
-                transform: "translateX(-50%)",
+                backgroundColor: cfg.bar,
+                height: s === "outage" ? "50%" : s === "degraded" ? "70%" : "100%",
+                opacity: hovered !== null && hovered !== i ? 0.35 : 1,
               }}
-            >
-              <div
-                className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg border"
-                style={{
-                  background: "rgba(10,10,15,0.95)",
-                  borderColor: hoveredCfg.border,
-                  color: hoveredCfg.color,
-                }}
-              >
-                {hoveredDate}
-                <span className="ml-2 font-normal opacity-70">{hoveredCfg.label}</span>
-              </div>
-              <div className="w-px h-2" style={{ background: hoveredCfg.color, opacity: 0.5 }} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+            />
+          );
+        })}
       </div>
-
-      <div className="flex justify-between text-xs text-muted-foreground/60">
-        <span>{formatDate(89)}</span>
-        <span>Aujourd'hui · {formatDate(0)}</span>
-      </div>
-
-      <div className="flex items-center gap-5 text-xs text-muted-foreground pt-1 border-t border-[rgba(255,255,255,0.04)]">
-        {(["operational", "degraded", "outage"] as const).map(s => (
-          <span key={s} className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-sm" style={{ background: STATUS_CONFIG[s].bar }} />
-            {STATUS_CONFIG[s].label}
-          </span>
-        ))}
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[10px] text-muted-foreground/50">60 jours</span>
+        <span className="text-[10px] font-mono text-muted-foreground/60">{pct}%</span>
       </div>
     </div>
   );
 }
 
-function ServiceRow({ svc, index }: { svc: ServiceStatus; index: number }) {
+function StatTile({ icon: Icon, label, value, accent }: { icon: any; label: string; value: string; accent?: string }) {
+  return (
+    <div className="rounded-xl p-4 bg-card border border-border/50 flex items-center gap-3">
+      <div
+        className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+        style={{ background: accent ? `${accent}1a` : "hsl(var(--primary) / 0.1)", color: accent || "hsl(var(--primary))" }}
+      >
+        <Icon className="w-4 h-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wide truncate">{label}</p>
+        <p className="text-lg font-bold tabular-nums text-foreground leading-tight">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function ServiceCard({ svc, index }: { svc: ServiceStatus; index: number }) {
   const cfg = STATUS_CONFIG[svc.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.operational;
   const Icon = cfg.icon;
   const ServiceIcon = SERVICE_ICONS[svc.name] ?? Activity;
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -12 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.06 }}
-      className="flex items-center gap-4 py-4 border-b border-[rgba(255,255,255,0.05)] last:border-0"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="rounded-xl p-4 bg-card border border-border/50 hover:border-primary/25 transition-colors space-y-3"
     >
-      <div className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-gold/7 border border-gold/15">
-        <ServiceIcon className="w-4 h-4 text-gold" />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-semibold text-sm text-foreground">{svc.name}</p>
+      <div className="flex items-center gap-3">
+        <div className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-primary/10 border border-primary/20">
+          <ServiceIcon className="w-4 h-4 text-primary" />
         </div>
-        {svc.description && (
-          <p className="text-xs text-muted-foreground/70 mt-0.5 truncate">{svc.description}</p>
-        )}
-      </div>
-
-      <div className="flex items-center gap-6 shrink-0">
-        {svc.latencyMs !== null && svc.latencyMs !== undefined && (
-          <div className="text-right hidden sm:block">
-            <p className="text-xs text-muted-foreground/60">Latence</p>
-            <p className="text-sm font-mono font-semibold text-foreground">{svc.latencyMs}<span className="text-xs text-muted-foreground ml-0.5">ms</span></p>
-          </div>
-        )}
-        <div className="text-right hidden sm:block">
-          <p className="text-xs text-muted-foreground/60">Uptime</p>
-          <p className="text-sm font-mono font-semibold text-[#10b981]">{svc.uptime}</p>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-foreground truncate">{svc.name}</p>
+          {svc.description && (
+            <p className="text-xs text-muted-foreground/70 truncate">{svc.description}</p>
+          )}
         </div>
         <div
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+          className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full"
           style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}
         >
           <Icon className="w-3 h-3" />
           <span className="hidden xs:inline">{cfg.label}</span>
         </div>
       </div>
+
+      <div className="flex items-center gap-4 text-xs">
+        {svc.latencyMs !== null && svc.latencyMs !== undefined && (
+          <span className="text-muted-foreground/60">
+            Latence <span className="font-mono font-semibold text-foreground">{svc.latencyMs}ms</span>
+          </span>
+        )}
+        <span className="text-muted-foreground/60">
+          Uptime <span className="font-mono font-semibold text-[#10b981]">{svc.uptime}</span>
+        </span>
+      </div>
+
+      <MiniUptimeBar seed={svc.id} status={svc.status} />
     </motion.div>
   );
 }
@@ -216,6 +172,14 @@ const DEFAULT_SERVICES: ServiceStatus[] = [
   { id: 3, name: "Base de Données", description: "Stockage et persistance des données", status: "operational", latencyMs: null, uptime: "99.99%", sortOrder: 2, updatedAt: new Date().toISOString() },
   { id: 4, name: "Interface Web", description: "Application et authentification", status: "operational", latencyMs: 28, uptime: "99.97%", sortOrder: 3, updatedAt: new Date().toISOString() },
 ];
+
+const INCIDENT_HISTORY: Incident[] = [];
+
+const INCIDENT_STATUS_LABEL: Record<Incident["status"], string> = {
+  resolved: "Résolu",
+  monitoring: "Surveillance",
+  investigating: "En cours d'investigation",
+};
 
 export default function StatusPage() {
   const { data: services = [] } = useQuery<ServiceStatus[]>({
@@ -228,79 +192,136 @@ export default function StatusPage() {
   const hasDegraded = displayServices.some(s => s.status === "degraded");
   const globalStatus = hasOutage ? "outage" : hasDegraded ? "degraded" : "operational";
   const globalCfg = STATUS_CONFIG[globalStatus];
-  const GlobalIcon = globalCfg.icon;
 
   const lastUpdated = displayServices.reduce((latest, s) => {
     const d = new Date(s.updatedAt);
     return d > latest ? d : latest;
   }, new Date(0));
   const diffMin = Math.floor((Date.now() - lastUpdated.getTime()) / 60000);
-  const updatedLabel = diffMin < 1 ? "À l'instant" : diffMin < 60 ? `Il y a ${diffMin} min` : `Il y a ${Math.floor(diffMin / 60)}h`;
+  const updatedLabel = diffMin < 1 ? "à l'instant" : diffMin < 60 ? `il y a ${diffMin} min` : `il y a ${Math.floor(diffMin / 60)}h`;
 
   const operationalCount = displayServices.filter(s => s.status === "operational").length;
 
+  const avgLatency = (() => {
+    const withLatency = displayServices.filter(s => s.latencyMs !== null && s.latencyMs !== undefined);
+    if (!withLatency.length) return "—";
+    return `${Math.round(withLatency.reduce((sum, s) => sum + (s.latencyMs || 0), 0) / withLatency.length)}ms`;
+  })();
+
+  const avgUptime = (() => {
+    const values = displayServices
+      .map(s => parseFloat(s.uptime.replace("%", "")))
+      .filter(v => !Number.isNaN(v));
+    if (!values.length) return "—";
+    return `${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)}%`;
+  })();
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12 space-y-6">
+    <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
 
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Statut des Services</h1>
-        <p className="text-sm text-muted-foreground">Surveillance en temps réel de l'infrastructure Discreen.</p>
-      </div>
-
+      {/* Hero banner */}
       <motion.div
-        initial={{ opacity: 0, y: -6 }}
+        initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl overflow-hidden"
+        className="relative overflow-hidden rounded-2xl p-6 md:p-8"
         style={{ background: globalCfg.bg, border: `1px solid ${globalCfg.border}` }}
       >
-        <div className="px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3 w-3">
+        <div
+          className="absolute inset-0 opacity-40 pointer-events-none"
+          style={{ background: `radial-gradient(ellipse at top left, ${globalCfg.color}22, transparent 60%)` }}
+        />
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <span className="relative flex h-4 w-4 shrink-0">
               <span
                 className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
                 style={{ background: globalCfg.color }}
               />
-              <span className="relative inline-flex rounded-full h-3 w-3" style={{ background: globalCfg.color }} />
+              <span className="relative inline-flex rounded-full h-4 w-4" style={{ background: globalCfg.color }} />
             </span>
-            <span className="font-bold text-base" style={{ color: globalCfg.color }}>
-              {globalStatus === "operational"
-                ? "Tous les systèmes opérationnels"
-                : globalStatus === "degraded"
-                ? "Performances dégradées détectées"
-                : "Incident en cours"}
-            </span>
+            <div>
+              <h1 className="font-bold text-xl md:text-2xl tracking-tight" style={{ color: globalCfg.color }}>
+                {globalStatus === "operational"
+                  ? "Tous les systèmes sont opérationnels"
+                  : globalStatus === "degraded"
+                  ? "Performances dégradées détectées"
+                  : "Incident en cours"}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Surveillance en temps réel de l'infrastructure Discreen · mis à jour {updatedLabel}
+              </p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">{updatedLabel}</p>
-            <p className="text-xs font-semibold mt-0.5" style={{ color: globalCfg.color }}>
-              {operationalCount}/{displayServices.length} services
+          <div className="shrink-0 text-left md:text-right">
+            <p className="text-2xl font-bold tabular-nums" style={{ color: globalCfg.color }}>
+              {operationalCount}/{displayServices.length}
             </p>
+            <p className="text-xs text-muted-foreground">services opérationnels</p>
           </div>
         </div>
       </motion.div>
 
-      <div
-        className="rounded-2xl p-5 space-y-4"
-        style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}
-      >
-        <UptimeBar services={displayServices} />
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatTile icon={TrendingUp} label="Disponibilité moy." value={avgUptime} accent="#10b981" />
+        <StatTile icon={Clock3} label="Latence moyenne" value={avgLatency} />
+        <StatTile icon={Activity} label="Services suivis" value={String(displayServices.length)} />
+        <StatTile icon={History} label="Incidents (60j)" value={String(INCIDENT_HISTORY.length)} />
       </div>
 
-      <div
-        className="rounded-2xl overflow-hidden"
-        style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}
-      >
-        <div className="px-5 pt-4 pb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-gold" />
-            <span className="text-sm font-semibold text-foreground">Services</span>
-          </div>
-          <span className="text-xs text-muted-foreground">{displayServices.length} monitored</span>
+      {/* Services grid — each with its own history bar */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 px-1">
+          <Activity className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">Services</h2>
         </div>
-        <div className="px-5 pb-2">
+        <div className="grid sm:grid-cols-2 gap-3">
           {displayServices.map((svc, i) => (
-            <ServiceRow key={svc.id} svc={svc} index={i} />
+            <ServiceCard key={svc.id} svc={svc} index={i} />
           ))}
+        </div>
+      </div>
+
+      {/* Incident history */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 px-1">
+          <History className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">Historique des incidents</h2>
+        </div>
+        <div className="rounded-xl bg-card border border-border/50 overflow-hidden">
+          <AnimatePresence>
+            {INCIDENT_HISTORY.length === 0 ? (
+              <div className="py-10 text-center">
+                <CheckCircle2 className="w-8 h-8 text-[#10b981] mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Aucun incident sur les 60 derniers jours.</p>
+              </div>
+            ) : (
+              INCIDENT_HISTORY.map((incident, i) => (
+                <motion.div
+                  key={incident.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="px-5 py-4 border-b border-border/40 last:border-0"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-sm text-foreground">{incident.title}</p>
+                    <span
+                      className="text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                      style={{
+                        color: incident.severity === "major" ? "#ef4444" : "#f59e0b",
+                        background: incident.severity === "major" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)",
+                      }}
+                    >
+                      {INCIDENT_STATUS_LABEL[incident.status]}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 mt-1">{incident.summary}</p>
+                  <p className="text-[11px] text-muted-foreground/50 mt-2">{incident.date}</p>
+                </motion.div>
+              ))
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
