@@ -49,7 +49,10 @@ export function registerAuthRoutes(app: Express) {
       (req.session as any).authEmail = user.email || null;
 
       return res.json({ id: user.id, username: user.username, role: user.role });
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        return res.status(409).json({ message: "Ce nom d'utilisateur est déjà pris." });
+      }
       console.error("[auth/register] error:", err);
       return res.status(500).json({ message: "Erreur serveur." });
     }
@@ -159,7 +162,12 @@ export function registerAuthRoutes(app: Express) {
       await storage.updateUser(userId, { username: clean });
       (req.session as any).authUsername = clean;
       return res.json({ ok: true, username: clean });
-    } catch { return res.status(500).json({ message: "Erreur serveur." }); }
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        return res.status(409).json({ message: "Ce nom d'utilisateur est déjà pris." });
+      }
+      return res.status(500).json({ message: "Erreur serveur." });
+    }
   });
 
   app.patch("/api/auth/profile/password", async (req: Request, res: Response) => {

@@ -11,7 +11,11 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("free"),
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  // Case-insensitive uniqueness: the plain .unique() above only blocks
+  // exact-case duplicates ("Jean" vs "jean" would otherwise both pass).
+  usernameLowerUnique: uniqueIndex("users_username_lower_idx").on(sql`lower(${table.username})`),
+}));
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
