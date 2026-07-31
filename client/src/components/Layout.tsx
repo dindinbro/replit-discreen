@@ -316,7 +316,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     // Disabled/coming-soon logic: blocked unless admin (or not adminOnly)
     const isBlocked = item.disabled && !(item.adminOnly && role === "admin");
 
-    const itemClass = `flex items-center rounded-md transition-colors duration-100 select-none
+    const itemClass = `relative flex items-center rounded-md transition-colors duration-100 select-none
       ${collapsed ? "justify-center w-9 h-9 p-0 mx-auto" : indent ? "gap-2 px-2.5 py-[5px] ml-1" : "gap-2.5 px-2.5 py-[7px]"}
       ${isBlocked
         ? "cursor-not-allowed opacity-35 text-muted-foreground/50"
@@ -327,6 +327,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     const innerContent = (
       <>
+        {active && !isBlocked && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary shadow-[0_0_6px_rgba(99,102,241,0.6)]" />
+        )}
         <Icon className={`shrink-0 ${collapsed ? "w-[18px] h-[18px]" : indent ? "w-3.5 h-3.5" : "w-[15px] h-[15px]"} ${active && !isBlocked ? "text-primary" : ""}`} />
         <span
           className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12px]" : "text-[13px]"}`}
@@ -402,13 +405,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   /* ── Sidebar content ── */
   const sidebarContent = (
     <div className="flex flex-col h-full w-full overflow-hidden"
-      style={{ background: "hsl(var(--sidebar-bg, 240 10% 5%))", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
+      style={{
+        background: "linear-gradient(180deg, hsl(var(--sidebar-bg, 240 10% 5%)) 0%, hsl(230 14% 6%) 100%)",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
+      }}>
 
       {/* Logo */}
       <div className="h-14 flex items-center shrink-0 px-4">
         <Link href="/">
-          <div className={`flex items-center gap-2.5 cursor-pointer ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
-            <DiscreenLogo className="w-7 h-7 shrink-0" />
+          <div className={`flex items-center gap-2.5 cursor-pointer group ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-full bg-primary/25 blur-md scale-110 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <DiscreenLogo className="w-7 h-7 relative" />
+            </div>
             <span
               className="font-semibold text-[15px] tracking-tight whitespace-nowrap overflow-hidden text-foreground"
               style={{ opacity: collapsed ? 0 : 1, maxWidth: collapsed ? 0 : 130, transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
@@ -435,14 +444,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className={`w-full flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-white/[0.05] transition-colors focus:outline-none
+                  className={`w-full flex items-center gap-2.5 rounded-lg px-2 py-2 border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-primary/20 transition-colors focus:outline-none
                     ${collapsed ? "justify-center" : ""}`}
                   data-testid="button-user-menu"
                   title={collapsed ? userName : undefined}
                 >
                   <label
                     htmlFor="avatar-file-upload"
-                    className="relative w-7 h-7 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center overflow-hidden group cursor-pointer shrink-0"
+                    className="relative w-7 h-7 rounded-full bg-primary/15 border border-primary/25 shadow-[0_0_0_1px_rgba(99,102,241,0.08)] flex items-center justify-center overflow-hidden group cursor-pointer shrink-0"
                     onClick={(e) => e.stopPropagation()}
                     title="Changer la photo de profil"
                     data-testid="button-avatar-change"
@@ -462,8 +471,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           {uniqueId && <span className="text-[10px] font-mono text-foreground/30 shrink-0">#{uniqueId}</span>}
                         </div>
                         {role && (
-                          <span className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 inline-block ${ROLE_COLOR[role] ? "" : "text-muted-foreground/40"}`}
-                            style={{ color: role === "admin" ? "#f87171" : role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : undefined }}>
+                          <span
+                            className="text-[9px] font-bold uppercase tracking-wider mt-0.5 inline-block px-1.5 py-[1px] rounded"
+                            style={{
+                              color: role === "admin" ? "#f87171" : role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : undefined,
+                              background: role === "admin" ? "rgba(248,113,113,0.1)" : role === "pro" || role === "business" ? "hsl(var(--primary) / 0.1)" : role === "vip" ? "rgba(251,191,36,0.1)" : "transparent",
+                            }}
+                          >
                             {ROLE_DISPLAY[role] || "Free"}
                           </span>
                         )}
