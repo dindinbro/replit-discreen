@@ -51,34 +51,34 @@
 }
 
 .dark {
-  --background: 222 47% 5%;        /* #080c17 — deep navy */
-  --foreground: 213 31% 91%;       /* #dce6f1 */
+  --background: 230 14% 6%;        /* #0c0d11 — near-black, subtle cool */
+  --foreground: 216 20% 91%;       /* #e1e5ee */
 
   --primary: 239 84% 67%;          /* indigo #6366f1 */
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 217 33% 10%;        /* #111827 */
-  --secondary-foreground: 213 31% 82%;
+  --secondary: 225 12% 10%;        /* #151619 */
+  --secondary-foreground: 216 20% 82%;
 
-  --muted: 217 33% 10%;
-  --muted-foreground: 215 20% 48%;
+  --muted: 225 12% 10%;
+  --muted-foreground: 218 10% 52%; /* #788090 — warmer, more readable */
 
-  --accent: 239 40% 14%;
-  --accent-foreground: 239 84% 75%;
+  --accent: 239 38% 14%;
+  --accent-foreground: 239 84% 78%;
 
-  --destructive: 0 63% 35%;
+  --destructive: 0 65% 40%;
   --destructive-foreground: 210 40% 98%;
 
-  --card: 222 47% 8%;              /* #0d1223 */
-  --card-foreground: 213 31% 91%;
-  --card-border: 217 33% 16%;
+  --card: 228 12% 9%;              /* #111318 — clear separation from bg */
+  --card-foreground: 216 20% 91%;
+  --card-border: 225 10% 15%;      /* #1f2130 */
 
-  --popover: 222 47% 7%;
-  --popover-foreground: 213 31% 91%;
-  --popover-border: 217 33% 16%;
+  --popover: 228 12% 8%;
+  --popover-foreground: 216 20% 91%;
+  --popover-border: 225 10% 15%;
 
-  --border: 217 33% 16%;           /* #1e293b */
-  --input: 217 33% 13%;
+  --border: 225 10% 15%;           /* #1f2130 */
+  --input: 225 10% 12%;            /* #181a24 */
   --ring: 239 84% 67%;
 
   --field-person: 239 84% 70%;
