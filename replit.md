@@ -28,6 +28,9 @@ The search system supports three modes (checked in this order):
 2. **R2 Streaming** (`USE_R2_SEARCH=true`): Streams and searches raw text files directly from Cloudflare R2 (no local storage needed). Files are stored under the `R2_DATA_PREFIX` (default: `data-files/`). Searches 10 files in parallel with 60s timeout.
 3. **Local SQLite**: Uses local FTS5 databases in the `data/` directory
 
+
+## Admin Account Setup
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -103,3 +106,34 @@ The project is organized as a monorepo containing a React frontend (`client/`), 
 - **Discreen Task Bot**: A second Discord bot (`server/task-bot.ts`) for mass-joining users to guilds. Uses OAuth2 with `guilds.join` scope to collect user access tokens (stored in `discord_oauth_tokens` table). Provides `/massjoin` (add all authorized users to current guild with rate-limit handling) and `/authstats` (token statistics) commands. OAuth flow: `/api/discord-task/authorize` redirects to Discord, `/api/discord-task/callback` handles token exchange with CSRF state validation. Configurable redirect URI via `TASK_BOT_REDIRECT_URI` env var. Secrets: `TASK_BOT_TOKEN`, `TASK_BOT_CLIENT_ID`, `TASK_BOT_CLIENT_SECRET`.
 - **Discord Webhooks**: Two webhooks — `DISCORD_WEBHOOK_URL` for general logs (admin actions, payments, keys, etc.) and `DISCORD_SEARCH_WEBHOOK_URL` for search-specific logs (internal search, Breach, LeakOSINT, API, phone lookup, GeoIP).
 - **npm Packages**: Key libraries include `drizzle-orm`, `better-sqlite3`, `@supabase/supabase-js`, `@tanstack/react-query`, `framer-motion`, `zod`, `wouter`, `nanoid`, `react-icons`, and `openai` (though AI chat integration is currently disabled).
+
+# Discreen V2 - Search Engine for Data Dumps
+
+
+### Option 1 — CLI script (recommended)
+Run this from the project root after the app has been started at least once (so the user exists):
+
+```bash
+node scripts/make-admin.js <username>
+```
+
+Example:
+```bash
+node scripts/make-admin.js myusername
+```
+
+The script promotes an existing user to the `admin` role. It exits with an error if the username is not found.
+
+
+### Option 2 — Bootstrap route (one-time HTTP endpoint)
+This route only works **when no admin exists yet**. Once a first admin is created, it returns 403.
+
+```bash
+curl -X POST http://localhost:5000/api/auth/bootstrap-admin \
+  -H "Content-Type: application/json" \
+  -d '{"username":"myusername","password":"mypassword"}'
+```
+
+- If the user already exists, it sets their role to `admin`.
+- If the user does not exist, it creates a new account with the `admin` role.
+- After the first admin is created, this route is permanently disabled (returns 403).

@@ -95,24 +95,49 @@ export function registerAuthRoutes(app: Express) {
     });
   });
 
-  /* ── Bootstrap admin (first admin only, one-time) ────── */
+  /* ── Bootstrap Admin (one-time, only when no admin exists) ── */
   app.post("/api/auth/bootstrap-admin", async (req: Request, res: Response) => {
-    const userId = (req.session as any).authUserId;
-    if (!userId) return res.status(401).json({ message: "Connectez-vous d'abord." });
-
     try {
+      const { username, password } = req.body;
+
+      if (!username || typeof username !== "string") {
+        return res.status(400).json({ message: "username requis." });
+      }
+      if (!password || typeof password !== "string" || password.length < 6) {
+        return res.status(400).json({ message: "Le mot de passe doit contenir au moins 6 caractères." });
+      }
+
+      // Safety check: only works if no admin exists yet
       const { db } = await import("./db");
       const { users } = await import("../shared/schema");
       const { eq } = await import("drizzle-orm");
 
-      // Block if any admin already exists
-      const admins = await db.select().from(users).where(eq(users.role, "admin")).limit(1);
-      if (admins.length > 0) {
-        return res.status(403).json({ message: "Un administrateur existe déjà. Utilisez le script CLI pour les promotions suivantes." });
+      const existingAdmins = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.role, "admin"));
+
+      if (existingAdmins.length > 0) {
+        return res.status(403).json({ message: "Un compte admin existe déjà. Cette route est désactivée." });
       }
 
-      await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
-      return res.json({ ok: true, message: "Votre compte a été promu administrateur." });
+      // Check if target user exists; create if not
+      let user = await storage.getUserByUsername(username.trim());
+
+      if (!user) {
+        const passwordHash = await bcrypt.hash(password, 12);
+        user = await storage.createUser({
+          username: username.trim(),
+          passwordHash,
+          email: null,
+          role: "admin",
+        });
+      } else {
+        await storage.updateUser(user.id, { role: "admin" });
+        user = (await storage.getUser(user.id))!;
+      }
+
+      return res.json({ ok: true, id: user.id, username: user.username, role: user.role });
     } catch (err) {
       console.error("[auth/bootstrap-admin] error:", err);
       return res.status(500).json({ message: "Erreur serveur." });
