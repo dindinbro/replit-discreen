@@ -2399,20 +2399,26 @@ export async function registerRoutes(
         console.error("[external-search] Failed (non-blocking):", err);
         return [] as Record<string, unknown>[];
       });
+      const brixhubPromise = brixhubParametricSearch(request.criteria).catch((err) => {
+        console.error("[brixhub] Failed (non-blocking):", err);
+        return { results: [] as Record<string, unknown>[], meta: null };
+      });
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("SEARCH_TIMEOUT")), 35000)
       );
       let results: Record<string, unknown>[];
       let total: number | null;
       let externalResults: Record<string, unknown>[] = [];
+      let brixhubResults: Record<string, unknown>[] = [];
       try {
-        const [searchResult, extResults] = await Promise.race([
-          Promise.all([searchPromise, externalPromise]),
+        const [searchResult, extResults, brixResult] = await Promise.race([
+          Promise.all([searchPromise, externalPromise, brixhubPromise]),
           timeoutPromise,
-        ]) as [{ results: Record<string, unknown>[]; total: number | null }, Record<string, unknown>[]];
+        ]) as [{ results: Record<string, unknown>[]; total: number | null }, Record<string, unknown>[], { results: Record<string, unknown>[] }];
         results = searchResult.results;
         total = searchResult.total;
         externalResults = extResults;
+        brixhubResults = brixResult.results;
       } catch (timeoutErr: any) {
         if (timeoutErr.message === "SEARCH_TIMEOUT") {
           console.warn(`[search] Timeout after ${Date.now() - searchStart}ms`);
@@ -2429,6 +2435,17 @@ export async function registerRoutes(
         total = (total ?? 0) + filteredExternal.length;
         if (filteredExternal.length !== externalResults.length) {
           console.log(`[search] External filtered: ${externalResults.length} -> ${filteredExternal.length}`);
+        }
+      }
+
+      if (brixhubResults.length > 0) {
+        const filteredBrixhub = request.criteria.length > 1
+          ? filterResultsByCriteria(brixhubResults, request.criteria)
+          : brixhubResults;
+        results = [...results, ...filteredBrixhub];
+        total = (total ?? 0) + filteredBrixhub.length;
+        if (filteredBrixhub.length !== brixhubResults.length) {
+          console.log(`[search] BrixHub filtered: ${brixhubResults.length} -> ${filteredBrixhub.length}`);
         }
       }
 
@@ -3868,59 +3885,6 @@ export async function registerRoutes(
       } else {
         res.status(400).json({ error: error.message || "Search error" });
       }
-    }
-  });
-
-  // POST /api/brixhub-search - proxy to BrixHub external API
-  app.post("/api/brixhub-search", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-      const sub = await storage.getSubscription(userId);
-      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
-
-      if (!userBypassed && await storage.isFrozen(userId)) {
-        return res.status(403).json({ message: "Votre compte est gelé. Contactez un administrateur." });
-      }
-
-      const today = new Date().toISOString().split("T")[0];
-      const effectiveRole = await getEffectiveRole(userId);
-      const isAdmin = effectiveRole === "admin";
-      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
-      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
-
-      const newCount = await storage.incrementDailyUsage(userId, today);
-      if (!isUnlimited && newCount > planInfo.dailySearches) {
-        return res.status(429).json({ message: "Nombre de recherches limite atteint.", used: newCount, limit: planInfo.dailySearches, tier });
-      }
-
-      if (!isBrixhubConfigured()) {
-        return res.status(503).json({ message: "Service BrixHub non configuré sur ce serveur." });
-      }
-
-      const criteria = z.array(z.object({ type: z.string(), value: z.string().min(1) })).min(1).max(20)
-        .safeParse(req.body?.criteria);
-      if (!criteria.success) {
-        return res.status(400).json({ message: "Au moins un critère est requis." });
-      }
-
-      const { results, meta, error } = await brixhubParametricSearch(criteria.data as SearchCriterion[]);
-      if (error) {
-        return res.status(502).json({ message: "Erreur du service BrixHub." });
-      }
-
-      const wUser = await buildUserInfo(req);
-      const criteriaStr = criteria.data.map((c) => `${c.type}:${c.value}`).join(", ");
-      if (!wUser.bypassed) logSearchToDb(req, wUser, "brixhub", criteriaStr, results.length);
-
-      res.json({
-        results,
-        total: meta?.total ?? results.length,
-        quota: { used: newCount, limit: planInfo.dailySearches, tier },
-      });
-    } catch (err) {
-      console.error("POST /api/brixhub-search error:", err);
-      res.status(500).json({ message: "Erreur interne." });
     }
   });
 

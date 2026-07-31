@@ -44,34 +44,6 @@ export function useSearchFilters() {
   });
 }
 
-export interface BrixhubSearchResponse {
-  results: Record<string, unknown>[];
-  total?: number;
-}
-
-export function useBrixhubSearch(getAccessToken: () => string | null) {
-  return useMutation({
-    mutationFn: async (criteria: { type: string; value: string }[]): Promise<BrixhubSearchResponse> => {
-      const token = getAccessToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch("/api/brixhub-search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ criteria }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Erreur inconnue" }));
-        if (res.status === 429) {
-          throw new SearchLimitError(err.message || "Limite atteinte", err.used || 0, err.limit || 0, err.tier || "free");
-        }
-        throw new Error(err.message || "Erreur BrixHub");
-      }
-      return (await res.json()) as BrixhubSearchResponse;
-    },
-  });
-}
-
 export function useSearchQuota(getAccessToken: () => string | null) {
   return useQuery({
     queryKey: ["/api/search-quota"],

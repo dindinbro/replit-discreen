@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
-import { usePerformSearch, useSearchQuota, useBrixhubSearch, SearchLimitError } from "@/hooks/use-search";
+import { usePerformSearch, useSearchQuota, SearchLimitError } from "@/hooks/use-search";
 import SearchLoader from "@/components/SearchLoader";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -775,9 +774,6 @@ interface FormSearchPanelProps {
   isLoading: boolean;
   searchCooldown: number;
   atLimit: boolean;
-  advancedSearch: boolean;
-  setAdvancedSearch: (v: boolean) => void;
-  advancedLoading: boolean;
   isUnlimited: boolean;
   displayTier: string;
 }
@@ -791,9 +787,6 @@ function FormSearchPanel({
   isLoading,
   searchCooldown,
   atLimit,
-  advancedSearch,
-  setAdvancedSearch,
-  advancedLoading,
 }: FormSearchPanelProps) {
   const [open, setOpen] = useState<Set<string>>(() =>
     new Set(searchMode === 'fivem' ? ['fivem'] : ['identite', 'contact'])
@@ -952,14 +945,12 @@ function FormSearchPanel({
           <Button
             data-testid="button-search"
             onClick={() => handleSearch(0)}
-            disabled={(isLoading || advancedLoading) || filledCount === 0 || searchCooldown > 0 || atLimit}
+            disabled={isLoading || filledCount === 0 || searchCooldown > 0 || atLimit}
             className={(atLimit || searchCooldown > 0)
               ? 'h-10 px-6 font-semibold gap-2 bg-muted text-muted-foreground cursor-not-allowed'
-              : advancedSearch
-              ? 'h-10 px-6 font-semibold gap-2 bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground'
               : 'h-10 px-6 font-semibold gap-2 bg-primary text-primary-foreground hover:bg-primary/90'}
           >
-            {(isLoading || advancedLoading)
+            {isLoading
               ? <Loader2 className="w-4 h-4 animate-spin" />
               : <Search className="w-4 h-4" />}
             {atLimit
@@ -972,7 +963,7 @@ function FormSearchPanel({
             data-testid="button-reset-internal"
             variant="outline"
             onClick={handleReset}
-            disabled={isLoading || advancedLoading}
+            disabled={isLoading}
             className="h-10 gap-2"
           >
             <RotateCcw className="w-4 h-4" />
@@ -984,20 +975,6 @@ function FormSearchPanel({
             </span>
           )}
         </div>
-
-        <label className="flex items-center gap-2.5 cursor-pointer select-none" data-testid="toggle-advanced-search">
-          <span className="text-xs text-muted-foreground">
-            {'Recherche avancée '}
-            {advancedSearch
-              ? <span className="text-primary font-medium">ON</span>
-              : <span className="opacity-50">OFF</span>}
-          </span>
-          <Switch
-            checked={advancedSearch}
-            onCheckedChange={setAdvancedSearch}
-            data-testid="switch-advanced-search"
-          />
-        </label>
       </div>
     </motion.div>
   );
@@ -1011,7 +988,6 @@ export default function SearchPage() {
   const { getAccessToken, role } = useAuth();
   const [wouterLocation] = useLocation();
   const searchMutation = usePerformSearch(getAccessToken);
-  const brixhubMutation = useBrixhubSearch(getAccessToken);
   const quotaQuery = useSearchQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -1067,11 +1043,6 @@ export default function SearchPage() {
   const [wantedResults, setWantedResults] = useState<any[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
-  const [advancedSearch, setAdvancedSearch] = useState(false);
-  const [advancedResults, setAdvancedResults] = useState<Record<string, unknown>[]>([]);
-  const [advancedLoading, setAdvancedLoading] = useState(false);
-  const [advancedError, setAdvancedError] = useState<string | null>(null);
-  const [advancedSearched, setAdvancedSearched] = useState(false);
   const [searchCooldown, setSearchCooldown] = useState(0);
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [submittedTerms, setSubmittedTerms] = useState<string[]>([]);
@@ -1453,46 +1424,6 @@ export default function SearchPage() {
       }
     );
 
-    if (advancedSearch) {
-      setAdvancedLoading(true);
-      setAdvancedResults([]);
-      setAdvancedError(null);
-      setAdvancedSearched(true);
-      const token = getAccessToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      fetch("/api/brixhub-search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ criteria: filledCriteria.map((c) => ({ type: c.type, value: c.value.trim() })) }),
-      })
-        .then(async (r) => {
-          if (!r.ok) {
-            const d = await r.json().catch(() => ({}));
-            throw new Error(d.message || "Recherche avancée (BrixHub) temporairement indisponible.");
-          }
-          const d = await r.json().catch(() => ({}));
-          return (d.results || []).map((result: Record<string, unknown>) => ({ ...result, _advancedSource: "BrixHub" }));
-        })
-        .then((results) => {
-          setAdvancedResults(results);
-          setAdvancedError(null);
-        })
-        .catch((err: Error) => {
-          setAdvancedResults([]);
-          setAdvancedError(err.message);
-        })
-        .finally(() => {
-          setAdvancedLoading(false);
-          queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
-        });
-    } else {
-      setAdvancedResults([]);
-      setAdvancedError(null);
-      setAdvancedSearched(false);
-    }
-
   };
 
   const handleReset = () => {
@@ -1507,12 +1438,7 @@ export default function SearchPage() {
     setGeoipTerm("");
     setGeoipResult(null);
     setWantedResults([]);
-    setAdvancedResults([]);
-    setAdvancedLoading(false);
-    setAdvancedError(null);
-    setAdvancedSearched(false);
     searchMutation.reset();
-    brixhubMutation.reset();
   };
 
   const isWantedMode = searchMode === "wanted";
@@ -1743,9 +1669,6 @@ export default function SearchPage() {
               isLoading={searchMutation.isPending}
               searchCooldown={searchCooldown}
               atLimit={atLimit}
-              advancedSearch={advancedSearch}
-              setAdvancedSearch={setAdvancedSearch}
-              advancedLoading={advancedLoading}
               isUnlimited={isUnlimited}
               displayTier={displayTier}
             />
@@ -2548,15 +2471,9 @@ export default function SearchPage() {
         {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
-            const baseResults = searchMutation.data?.results;
-            const activeResults = (advancedSearch && advancedResults.length > 0)
-              ? [...(baseResults || []), ...advancedResults]
-              : baseResults;
-            const baseTotal = searchMutation.data?.total;
-            const activeTotal = (advancedSearch && advancedResults.length > 0)
-              ? (baseTotal ?? 0) + advancedResults.length
-              : baseTotal;
-            const isLoading = searchMutation.isPending || advancedLoading;
+            const activeResults = searchMutation.data?.results;
+            const activeTotal = searchMutation.data?.total;
+            const isLoading = searchMutation.isPending;
             const activeError = searchMutation.error;
 
             return (
@@ -2571,13 +2488,6 @@ export default function SearchPage() {
                     <span className="text-xs text-muted-foreground font-mono">⚡ {searchTime.toFixed(2)}s</span>
                   )}
                 </div>
-
-                {advancedError && !advancedLoading && (
-                  <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-amber-500/25 bg-amber-500/5 text-sm text-amber-400/90" data-testid="brixhub-error-display">
-                    <ShieldAlert className="w-4 h-4 shrink-0" />
-                    <span>{advancedError}</span>
-                  </div>
-                )}
 
                 {activeError && !isLoading && (
                   <Card className="p-8 text-center space-y-4 border-destructive/30 bg-destructive/5" data-testid="search-error-display">
