@@ -27,7 +27,7 @@ services:
       PORT: 5000
       # Kill switch for data-dump search, sensitive external sources,
       # payments and person-lookup features. See server/sensitive-guard.ts.
-      ENABLE_SENSITIVE_FEATURES: "false"
+      ENABLE_SENSITIVE_FEATURES: "true"
     depends_on:
       postgres:
         condition: service_healthy

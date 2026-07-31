@@ -3920,7 +3920,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/wanted/search", requireAuth, requireRole("pro", "business", "api"), async (req, res) => {
+  app.get("/api/wanted/search", requireAuth, requireAdmin, async (req, res) => {
     try {
       const criteria = req.query as Record<string, string>;
       const results = await storage.searchWantedProfiles(criteria);
@@ -4109,14 +4109,6 @@ export async function registerRoutes(
   app.post("/api/xeuledoc", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).user.id;
-      const sub = await storage.getSubscription(userId);
-      const tier = (sub?.tier as string) || "free";
-      const TIER_ORDER_X: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
-      const tierLevel = TIER_ORDER_X[tier] ?? 0;
-      const isAdmin = (req as any).user?.role === "admin";
-      if (!isAdmin && tierLevel < 1) {
-        return res.status(403).json({ message: "Google OSINT necessite un abonnement VIP minimum." });
-      }
 
       const { url: docUrl } = req.body;
       if (!docUrl || typeof docUrl !== "string") {
@@ -4283,16 +4275,6 @@ export async function registerRoutes(
       const userId = (req as any).user.id;
       const userEmail = (req as any).user?.email || "inconnu";
 
-      const sub = await storage.getSubscription(userId);
-      const tier = (sub?.tier as string) || "free";
-      const TIER_ORDER_S: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
-      const tierLevel = TIER_ORDER_S[tier] ?? 0;
-      const isAdmin = (req as any).user?.role === "admin";
-
-      if (!isAdmin && tierLevel < 1) {
-        return res.status(403).json({ message: "Sherlock necessite un abonnement VIP minimum." });
-      }
-
       const blEntries = await storage.getBlacklistEntries();
       const isBlacklisted = blEntries.some((entry) => {
         const blPseudo = (entry.pseudo || "").trim().toLowerCase();
@@ -4389,16 +4371,6 @@ export async function registerRoutes(
 
       const userId = (req as any).user.id;
       const userEmail = (req as any).user?.email || "inconnu";
-
-      const sub = await storage.getSubscription(userId);
-      const tier = (sub?.tier as string) || "free";
-      const TIER_ORDER_W: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
-      const tierLevel = TIER_ORDER_W[tier] ?? 0;
-      const isAdmin = (req as any).user?.role === "admin";
-
-      if (!isAdmin && tierLevel < 1) {
-        return res.status(403).json({ message: "Username OSINT necessite un abonnement VIP minimum." });
-      }
 
       const blEntries = await storage.getBlacklistEntries();
       const isBlacklisted = blEntries.some((entry) => {
@@ -4516,16 +4488,6 @@ export async function registerRoutes(
 
       const userId = (req as any).user.id;
       const userEmail = (req as any).user?.email || "inconnu";
-
-      const sub = await storage.getSubscription(userId);
-      const tier = (sub?.tier as string) || "free";
-      const TIER_ORDER_H: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
-      const tierLevel = TIER_ORDER_H[tier] ?? 0;
-      const isAdmin = (req as any).user?.role === "admin";
-
-      if (!isAdmin && tierLevel < 1) {
-        return res.status(403).json({ message: "Holehe necessite un abonnement VIP minimum." });
-      }
 
       console.log(`[holehe] User ${userEmail} (${userId}) checking email: ${cleaned}`);
 

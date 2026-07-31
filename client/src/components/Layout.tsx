@@ -9,7 +9,7 @@ import {
   Home, Search, MessageSquare,
   Key, FileText, Menu, X, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
-  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, Sword,
+  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, ShieldAlert, Sword,
   Camera, Activity,
 } from "lucide-react";
 import {
@@ -114,9 +114,8 @@ interface NavSection {
 const SEARCH_MODULES: NavItem[] = [
   { label: "Paramétrique",   href: "/search?mode=internal",  icon: Sparkles },
   { label: "Username OSINT", href: "/search?mode=sherlock",  icon: Eye },
-  { label: "Gaming",         href: "/search?mode=fivem",     icon: Gamepad2 },
   { label: "Google OSINT",   href: "/search?mode=xeuledoc",  icon: FileSearch },
-  { label: "Wanted",         href: "/search?mode=wanted",    icon: ShieldAlert },
+  { label: "Wanted",         href: "/search?mode=wanted",    icon: ShieldAlert, adminOnly: true },
   { label: "Lookup",          href: "/search?mode=phone",     icon: Phone },
 ];
 
@@ -313,8 +312,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const label = itemLabel(item);
     const isQueryNav = item.href.includes("?");
 
-    // Disabled/coming-soon logic: blocked unless admin (or not adminOnly)
-    const isBlocked = item.disabled && !(item.adminOnly && role === "admin");
+    // Coming-soon items are shown but not clickable. adminOnly items are
+    // filtered out of the list entirely for non-admins before this runs.
+    const isBlocked = !!item.disabled;
 
     const itemClass = `relative flex items-center rounded-lg transition-all duration-150 select-none
       ${collapsed ? "justify-center w-10 h-10 p-0 mx-auto" : indent ? "gap-2.5 px-3 py-[7px] ml-1" : "gap-3 px-3 py-2.5"}
@@ -550,7 +550,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {/* Items */}
               {(isOpen || collapsed) && (
                 <div className="flex flex-col gap-px">
-                  {section.items.map(item => renderNavItem(item, section.key === "recherche" || section.key === "lookup"))}
+                  {section.items
+                    .filter(item => !item.adminOnly || role === "admin")
+                    .map(item => renderNavItem(item, section.key === "recherche" || section.key === "lookup"))}
                 </div>
               )}
             </div>
@@ -669,11 +671,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {mobileOpen && (
               <div className="border-t border-border/30 bg-background/95 backdrop-blur max-h-[80vh] overflow-y-auto">
                 <nav className="px-4 py-3 flex flex-col gap-1" data-testid="nav-mobile">
-                  {ALL_FLAT_ITEMS.map((item) => {
+                  {ALL_FLAT_ITEMS.filter(item => !item.adminOnly || role === "admin").map((item) => {
                     const active = isActive(item.href);
                     const Icon = item.icon;
                     const label = itemLabel(item);
-                    const mobileBlocked = item.disabled && !(item.adminOnly && role === "admin");
+                    const mobileBlocked = item.disabled;
                     const btn = (
                       <Button
                         key={item.href}

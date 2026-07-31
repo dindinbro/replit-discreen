@@ -1008,7 +1008,7 @@ let nextCriterionId = 1;
 export default function SearchPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { getAccessToken } = useAuth();
+  const { getAccessToken, role } = useAuth();
   const [wouterLocation] = useLocation();
   const searchMutation = usePerformSearch(getAccessToken);
   const brixhubMutation = useBrixhubSearch(getAccessToken);
@@ -2341,7 +2341,7 @@ export default function SearchPage() {
           )}
 
           {searchMode === "wanted" && (() => {
-            const canAccessWanted = true; // [FREE MODE]
+            const canAccessWanted = role === "admin";
             return (
             <motion.div
               key="wanted"
@@ -2466,7 +2466,19 @@ export default function SearchPage() {
                   </Button>
                 </div>
               </div>
-
+              {!canAccessWanted && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl bg-background/30" data-testid="wanted-admin-overlay">
+                  <div className="text-center space-y-3 p-6">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                      <Lock className="w-6 h-6 text-red-500" />
+                    </div>
+                    <h3 className="text-lg font-bold">Accès réservé aux administrateurs</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                      Le moteur de recherche Wanted n'est accessible qu'aux administrateurs.
+                    </p>
+                  </div>
+                </div>
+              )}
             </motion.div>
             );
           })()}
