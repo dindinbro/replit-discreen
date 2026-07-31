@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Database, Shield, Zap, ArrowRight, Lock, Code2, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
+import HudRings from "@/components/HudRings";
 
 function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -69,6 +70,7 @@ export default function LandingPage() {
         {/* Subtle radial glow */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full bg-primary/8 blur-[120px]" />
+          <HudRings />
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto space-y-6">

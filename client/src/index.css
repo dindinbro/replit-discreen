@@ -196,6 +196,35 @@
 .interactive-grid-lines { display: none; }
 .interactive-grid-glow  { display: none; }
 
+/* ─── Hero HUD rings (J.A.R.V.I.S.-style) ─────────────────── */
+.hud-rings {
+  -webkit-mask-image: radial-gradient(circle, black 55%, transparent 78%);
+  mask-image: radial-gradient(circle, black 55%, transparent 78%);
+  will-change: transform;
+}
+.hud-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hud-spin linear infinite;
+}
+.hud-ring--rev { animation-direction: reverse; }
+@keyframes hud-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.hud-core {
+  animation: hud-pulse 4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes hud-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%      { opacity: 0.75; transform: scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-ring, .hud-core { animation: none; }
+}
+
 /* ─── Mouse-follow line ───────────────────────────────────── */
 .mouse-line {
   position: fixed; pointer-events: none; z-index: 1;
