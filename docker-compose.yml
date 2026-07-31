@@ -33,6 +33,12 @@ services:
         condition: service_healthy
     ports:
       - "5000:5000"
+    networks:
+      - default
+      # Prod nginx (separate ~/discreen compose stack) proxies to this
+      # container by name over this network. Without it, redeploying here
+      # detaches the app from nginx's network and prod 502s.
+      - discreen_default
 
   nginx:
     image: nginx:alpine
@@ -46,3 +52,7 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  discreen_default:
+    external: true

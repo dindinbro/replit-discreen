@@ -51,14 +51,14 @@ export interface BrixhubSearchResponse {
 
 export function useBrixhubSearch(getAccessToken: () => string | null) {
   return useMutation({
-    mutationFn: async (query: string): Promise<BrixhubSearchResponse> => {
+    mutationFn: async (criteria: { type: string; value: string }[]): Promise<BrixhubSearchResponse> => {
       const token = getAccessToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch("/api/brixhub-search", {
         method: "POST",
         headers,
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ criteria }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Erreur inconnue" }));

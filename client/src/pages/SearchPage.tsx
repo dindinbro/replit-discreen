@@ -1458,7 +1458,6 @@ export default function SearchPage() {
       setAdvancedResults([]);
       setAdvancedError(null);
       setAdvancedSearched(true);
-      const searchTerm = filledCriteria.map((c) => c.value.trim()).join(" ");
       const token = getAccessToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -1466,7 +1465,7 @@ export default function SearchPage() {
       fetch("/api/brixhub-search", {
         method: "POST",
         headers,
-        body: JSON.stringify({ query: searchTerm }),
+        body: JSON.stringify({ criteria: filledCriteria.map((c) => ({ type: c.type, value: c.value.trim() })) }),
       })
         .then(async (r) => {
           if (!r.ok) return []; // fail silently

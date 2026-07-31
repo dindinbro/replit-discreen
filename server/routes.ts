@@ -5,7 +5,8 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { api } from "@shared/routes";
-import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes } from "@shared/schema";
+import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes, type SearchCriterion } from "@shared/schema";
+import { brixhubParametricSearch, brixhubRawSearch, BRIXHUB_SEARCH_FIELDS, isBrixhubConfigured, type BrixhubField } from "./brixhub";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria, sortByRelevance } from "./searchSqlite";
@@ -3714,26 +3715,9 @@ export async function registerRoutes(
 
 
   // Public API v1 - search via API key (for API tier users)
-  async function callBrixhubInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
-    const apiKey = process.env.BRIXHUB_API_KEY;
-    if (!apiKey) return [];
-    try {
-      const response = await fetch("https://brixhub.cc/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        body: JSON.stringify({ query: searchTerm }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!response.ok) return [];
-      const ct = (response.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) return [];
-      const data = await response.json();
-      if (!data.results || !Array.isArray(data.results)) return [];
-      return data.results.map((r: Record<string, unknown>) => ({ _source: "brixhub", ...r }));
-    } catch (err) {
-      console.error("[api/v1] BrixHub error:", err);
-      return [];
-    }
+  async function callBrixhubInternal(criteria: SearchCriterion[]): Promise<Record<string, unknown>[]> {
+    const { results } = await brixhubParametricSearch(criteria);
+    return results;
   }
 
 
@@ -3761,8 +3745,6 @@ export async function registerRoutes(
 
       const request = api.search.perform.input.parse(req.body);
 
-      const searchTerm = request.criteria.map((c: any) => c.value).join(" ");
-
       const searchStart = Date.now();
 
       const [internalResult, externalResults, brixhubResults] = await Promise.all([
@@ -3771,7 +3753,7 @@ export async function registerRoutes(
           return { results: [] as Record<string, unknown>[], total: 0 as number | null };
         }),
         callExternalSearchApi(request.criteria).catch(() => [] as Record<string, unknown>[]),
-        callBrixhubInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
+        callBrixhubInternal(request.criteria).catch(() => [] as Record<string, unknown>[]),
       ]);
 
       let allResults = [
@@ -3817,6 +3799,78 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/v1/parametric-search - dedicated parametric (multi-criteria)
+  // search API, backed directly by BrixHub. Unlike /api/v1/search (which
+  // funnels everything through Discreen's smaller internal SearchFilterType
+  // enum), this exposes BrixHub's full field set — nom_famille, prenom,
+  // email, iban, siret, discord_id, etc. — for callers who need precise
+  // parametric filtering.
+  app.post("/api/v1/parametric-search", async (req: Request, res: Response) => {
+    try {
+      if (!isBrixhubConfigured()) {
+        return res.status(503).json({ error: "Parametric search is not configured on this server." });
+      }
+
+      const authHeader = req.headers["x-api-key"] || req.headers.authorization?.replace("Bearer ", "");
+      if (!authHeader || typeof authHeader !== "string") {
+        return res.status(401).json({ error: "Missing API key. Use X-Api-Key header." });
+      }
+
+      const validation = await storage.validateApiKeyWithAdmin(authHeader, async (userId) => {
+        const role = await getEffectiveRole(userId);
+        return role === "admin";
+      });
+      if (!validation.valid || !validation.userId) {
+        return res.status(401).json({ error: "Invalid or revoked API key. API tier subscription required." });
+      }
+
+      const sub = await storage.getSubscription(validation.userId);
+      const bypassed = sub ? await isUserBypassed(sub.id) : false;
+
+      if (!bypassed && await storage.isFrozen(validation.userId)) {
+        return res.status(403).json({ error: "Account frozen. Contact an administrator." });
+      }
+
+      const bodySchema = z.object({
+        ...Object.fromEntries(BRIXHUB_SEARCH_FIELDS.map((f) => [f, z.string().min(1).optional()])),
+        page: z.number().int().min(1).optional(),
+        per_page: z.number().int().min(1).max(100).optional(),
+        flexible: z.boolean().optional(),
+      });
+      const body = bodySchema.parse(req.body);
+
+      const { page, per_page, flexible, ...rawFields } = body;
+      const fields = rawFields as Partial<Record<BrixhubField, string>>;
+      if (Object.keys(fields).length === 0) {
+        return res.status(400).json({ error: "At least one search parameter is required." });
+      }
+
+      const searchStart = Date.now();
+      const { results, meta, error } = await brixhubRawSearch(fields, { page, perPage: per_page, flexible });
+
+      if (error) {
+        return res.status(502).json({ error: `Parametric search upstream error: ${error}` });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      await storage.incrementDailyUsage(validation.userId, today);
+
+      const criteriaStr = Object.entries(fields).map(([k, v]) => `${k}:${v}`).join(", ");
+      webhookApiSearch(validation.userId, criteriaStr, meta?.total ?? results.length);
+
+      console.log(`[api/v1/parametric-search] done in ${Date.now() - searchStart}ms — results: ${results.length}`);
+
+      res.json({ results, meta });
+    } catch (error: any) {
+      console.error("API v1 parametric-search error:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Validation error", details: error.errors });
+      } else {
+        res.status(400).json({ error: error.message || "Search error" });
+      }
+    }
+  });
+
   // POST /api/brixhub-search - proxy to BrixHub external API
   app.post("/api/brixhub-search", requireAuth, async (req, res) => {
     try {
@@ -3840,48 +3894,28 @@ export async function registerRoutes(
         return res.status(429).json({ message: "Nombre de recherches limite atteint.", used: newCount, limit: planInfo.dailySearches, tier });
       }
 
-      const { query } = req.body;
-      if (!query || typeof query !== "string" || query.trim().length < 1 || query.length > 200) {
-        return res.status(400).json({ message: "Terme de recherche requis (1-200 caractères)." });
-      }
-
-      const apiKey = process.env.BRIXHUB_API_KEY;
-      if (!apiKey) {
+      if (!isBrixhubConfigured()) {
         return res.status(503).json({ message: "Service BrixHub non configuré sur ce serveur." });
       }
 
-      let response: globalThis.Response;
-      try {
-        response = await fetch("https://brixhub.cc/api/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-          body: JSON.stringify({ query: query.trim() }),
-          signal: AbortSignal.timeout(15000),
-        });
-      } catch (fetchErr) {
-        console.error("BrixHub fetch error:", fetchErr);
-        return res.status(502).json({ message: "Impossible de joindre BrixHub." });
+      const criteria = z.array(z.object({ type: z.string(), value: z.string().min(1) })).min(1).max(20)
+        .safeParse(req.body?.criteria);
+      if (!criteria.success) {
+        return res.status(400).json({ message: "Au moins un critère est requis." });
       }
 
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        console.error("BrixHub error:", response.status, errText.slice(0, 200));
-        if (response.status === 429) return res.status(429).json({ message: "Limite BrixHub atteinte. Réessayez plus tard.", used: newCount, limit: planInfo.dailySearches, tier });
+      const { results, meta, error } = await brixhubParametricSearch(criteria.data as SearchCriterion[]);
+      if (error) {
         return res.status(502).json({ message: "Erreur du service BrixHub." });
       }
 
-      const ct = (response.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) {
-        return res.status(503).json({ message: "BrixHub temporairement inaccessible." });
-      }
-
-      const data = await response.json();
       const wUser = await buildUserInfo(req);
-      if (!wUser.bypassed) logSearchToDb(req, wUser, "brixhub", query.trim(), Array.isArray(data.results) ? data.results.length : 0);
+      const criteriaStr = criteria.data.map((c) => `${c.type}:${c.value}`).join(", ");
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "brixhub", criteriaStr, results.length);
 
       res.json({
-        results: data.results || [],
-        total: data.total ?? (Array.isArray(data.results) ? data.results.length : 0),
+        results,
+        total: meta?.total ?? results.length,
         quota: { used: newCount, limit: planInfo.dailySearches, tier },
       });
     } catch (err) {
