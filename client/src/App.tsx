@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 import NotFound from "@/pages/not-found";
+import FeatureDisabledPage from "@/pages/FeatureDisabledPage";
 import LandingPage from "@/pages/LandingPage";
 import SearchPage from "@/pages/SearchPage";
 import PricingPage from "@/pages/PricingPage";
@@ -227,35 +228,41 @@ function Router() {
       <Route path="/admin">
         <ProtectedRoute component={AdminPage} withLayout={false} />
       </Route>
+      {/* Data-dump / person search — disabled on this environment, see FeatureDisabledPage */}
       <Route path="/search">
-        <ProtectedRoute component={SearchPage} />
+        <ProtectedRoute component={FeatureDisabledPage} />
       </Route>
+      {/* Search API key management — disabled (tied to the disabled search/payments stack) */}
       <Route path="/api-keys">
-        <ProtectedRoute component={ApiKeysPage} />
+        <ProtectedRoute component={FeatureDisabledPage} />
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={ProfilePage} withLayout={false} />
       </Route>
+      {/* Blacklist/info requests operate on the disabled search index — disabled */}
       <Route path="/blacklist-request">
-        <ProtectedRoute component={BlacklistRequestPage} />
+        <ProtectedRoute component={FeatureDisabledPage} />
       </Route>
       <Route path="/info-request">
-        <ProtectedRoute component={InfoRequestPage} />
+        <ProtectedRoute component={FeatureDisabledPage} />
       </Route>
+      {/* "DOF" profile directory — person-profile search, disabled */}
       <Route path="/users">
-        <PublicRoute component={UsersPage} />
+        <PublicRoute component={FeatureDisabledPage} />
       </Route>
       <Route path="/documentation">
         <PublicRoute component={DocumentationPage} />
       </Route>
+      {/* Payments — disabled on this environment */}
       <Route path="/pricing">
-        <PublicRoute component={PricingPage} />
+        <PublicRoute component={FeatureDisabledPage} />
       </Route>
       <Route path="/tuto">
         <PublicRoute component={TutorialPage} />
       </Route>
+      {/* AI assistant that extracts OSINT search criteria — disabled */}
       <Route path="/disx">
-        <ProtectedRoute component={DisXPage} />
+        <ProtectedRoute component={FeatureDisabledPage} />
       </Route>
       <Route path="/contact">
         <PublicRoute component={ContactPage} />
@@ -272,11 +279,12 @@ function Router() {
       <Route path="/status">
         <PublicRoute component={StatusPage} />
       </Route>
+      {/* Payments — disabled on this environment */}
       <Route path="/checkout">
-        <ProtectedRoute component={CheckoutPage} withLayout={false} />
+        <ProtectedRoute component={FeatureDisabledPage} />
       </Route>
       <Route path="/payment-success">
-        <PublicRoute component={PaymentSuccessPage} />
+        <PublicRoute component={FeatureDisabledPage} />
       </Route>
       <Route path="/">
         <PublicRoute component={LandingPage} />

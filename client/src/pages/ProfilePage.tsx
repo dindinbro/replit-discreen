@@ -328,6 +328,10 @@ export default function ProfilePage() {
   }
 
   async function startEnroll() {
+    if (!supabase) {
+      toast({ title: t("common.error"), description: t("profile.twoFaEnrollError"), variant: "destructive" });
+      return;
+    }
     setEnrolling(true);
     try {
       const { data, error } = await supabase.auth.mfa.enroll({
@@ -352,6 +356,7 @@ export default function ProfilePage() {
 
   async function verifyEnroll() {
     if (!factorId || verifyCode.length !== 6) return;
+    if (!supabase) return;
     setVerifying(true);
     try {
       const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });

@@ -8,6 +8,7 @@ import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFi
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { searchAllIndexes, initSearchDatabases, filterResultsByCriteria, sortByRelevance } from "./searchSqlite";
+import { SENSITIVE_FEATURES_ENABLED } from "./sensitive-guard";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import OpenAI from "openai";
 import crypto from "crypto";
@@ -333,7 +334,11 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  await initSearchDatabases();
+  if (SENSITIVE_FEATURES_ENABLED) {
+    await initSearchDatabases();
+  } else {
+    console.log("[searchSqlite] Sensitive features disabled — skipping local/remote search DB init");
+  }
 
   try {
     await db.execute(sql`
@@ -697,7 +702,7 @@ export async function registerRoutes(
         // Fetch stored username from users table for accurate display name
         let storedUsername = username;
         try {
-          const dbUser = await storage.getUserByUserId(user.id);
+          const dbUser = await storage.getUser(Number(user.id));
           if (dbUser?.username) storedUsername = dbUser.username;
         } catch (_) {}
 
@@ -1293,7 +1298,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/game-boosts/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
       const { active, maxUses, expiresAt, multiplier, name } = req.body;
       const updates: any = {};
@@ -1310,7 +1315,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/game-boosts/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
       const ok = await storage.deleteGameBoost(id);
       if (!ok) return res.status(404).json({ message: "Boost introuvable" });
@@ -1380,7 +1385,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/service-status/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const row = await storage.updateServiceStatus(id, req.body);
       if (!row) return res.status(404).json({ message: "Service introuvable" });
       res.json(row);
@@ -1389,7 +1394,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/service-status/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const ok = await storage.deleteServiceStatus(id);
       res.json({ ok });
     } catch (err) { res.status(500).json({ message: "Erreur serveur" }); }
@@ -5337,6 +5342,7 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
 
       // Game log webhook (skip for bypassed/admin users)
       try {
+        if (!supabaseAdmin) throw new Error("Supabase admin non configuré");
         const { data: profile } = await supabaseAdmin.from("profiles").select("unique_id, discord_id").eq("id", userId).single();
         const sub = await storage.getOrCreateSubscription(userId);
         const isBypassed = sub.id ? await isUserBypassed(sub.id) : false;
@@ -5401,6 +5407,10 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
       const { total } = await storage.getUserGameCredits(userId);
       if (total < required) {
         return res.status(400).json({ message: `Crédits insuffisants (${total} / ${required})` });
+      }
+
+      if (!supabaseAdmin) {
+        return res.status(503).json({ message: "Fonctionnalité indisponible sur cet environnement." });
       }
 
       // Check current role — don't downgrade
@@ -5757,7 +5767,7 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
 
   app.delete("/api/admin/chat/mute/:userId", requireAuth, requireAdmin, async (req, res) => {
     try {
-      await storage.removeMute(req.params.userId);
+      await storage.removeMute(req.params.userId as string);
       res.json({ ok: true });
     } catch (err: any) { res.status(500).json({ message: err?.message ?? "Erreur interne" }); }
   });

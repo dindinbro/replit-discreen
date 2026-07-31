@@ -14,6 +14,7 @@ export default function AuthCallbackPage() {
       setErrorMsg("Auth non configuré.");
       return;
     }
+    const sb = supabase;
 
     // Check for error in URL first
     const searchParams = new URLSearchParams(window.location.search);
@@ -41,7 +42,7 @@ export default function AuthCallbackPage() {
     };
 
     // Listen for auth state changes — covers both implicit (hash token) and PKCE (code exchange)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
       if (session) {
         subscription.unsubscribe();
         finish(true);
@@ -49,7 +50,7 @@ export default function AuthCallbackPage() {
     });
 
     // Also try to get an existing session immediately (in case detectSessionInUrl already ran)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    sb.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         subscription.unsubscribe();
         finish(true);
@@ -59,10 +60,10 @@ export default function AuthCallbackPage() {
     // If there's a code in the URL (PKCE fallback), try to exchange it
     const code = searchParams.get("code");
     if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      sb.auth.exchangeCodeForSession(code).then(({ error }) => {
         if (error) {
           // Code might already be consumed by detectSessionInUrl — check session
-          supabase.auth.getSession().then(({ data: { session } }) => {
+          sb.auth.getSession().then(({ data: { session } }) => {
             if (!session && !done) {
               finish(false, error.message);
             }
@@ -73,7 +74,7 @@ export default function AuthCallbackPage() {
 
     // Timeout fallback — give 10 seconds for the session to be established
     const timeout = setTimeout(() => {
-      supabase.auth.getSession().then(({ data: { session } }) => {
+      sb.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           finish(true);
         } else {

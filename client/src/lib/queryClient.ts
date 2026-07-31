@@ -2,6 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (!supabase) return {};
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) {

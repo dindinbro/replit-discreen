@@ -227,7 +227,7 @@ export default function VouchesPage() {
     enabled: !!user,
     queryFn: async () => {
       const res = await fetch("/api/reviews/me", {
-        headers: { Authorization: `Bearer ${await (getAccessToken as () => Promise<string | null>)()}` },
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
       });
       if (res.status === 404) return null;
       return res.json();
@@ -236,7 +236,7 @@ export default function VouchesPage() {
 
   const deleteVouchMutation = useMutation({
     mutationFn: async (id: number) => {
-      const token = await (getAccessToken as () => Promise<string | null>)();
+      const token = getAccessToken();
       const res = await fetch(`/api/vouches/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Erreur lors de la suppression");
     },
@@ -248,7 +248,7 @@ export default function VouchesPage() {
 
   const deleteReviewMutation = useMutation({
     mutationFn: async (id: number) => {
-      const token = await (getAccessToken as () => Promise<string | null>)();
+      const token = getAccessToken();
       const res = await fetch(`/api/admin/reviews/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Erreur lors de la suppression");
     },

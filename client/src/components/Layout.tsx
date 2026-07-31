@@ -129,6 +129,10 @@ const LOOKUP_MODULES: NavItem[] = [
   { label: "NIR",       href: "/search?mode=nir",   icon: Hash },
 ];
 
+// Data-dump search, person-lookup and payment sections are disabled on this
+// environment (not deleted — see server/sensitive-guard.ts and
+// client/src/App.tsx DISABLED_ROUTES). Their nav entries are simply not
+// mounted below.
 const NAV_SECTIONS: NavSection[] = [
   {
     key: "home",
@@ -137,33 +141,17 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    key: "recherche",
-    labelKey: "nav.section.recherche",
-    collapsible: true,
-    defaultOpen: true,
-    items: SEARCH_MODULES,
-  },
-  {
-    key: "lookup",
-    label: "Données & Lookup",
-    collapsible: true,
-    defaultOpen: true,
-    items: LOOKUP_MODULES,
-  },
-  {
     key: "community",
     labelKey: "nav.section.community",
     items: [
       { label: "STING.EXE",   href: "/game",  icon: Sword, badge: "JEU", badgeColor: "gold" },
       { label: "nav.reviews", labelKey: "nav.reviews", href: "/avis",  icon: Star },
-      { label: "nav.dof",     labelKey: "nav.dof",     href: "/users", icon: Users },
     ],
   },
   {
     key: "info",
     labelKey: "nav.section.info",
     items: [
-      { label: "nav.pricing",  labelKey: "nav.pricing",  href: "/pricing",  icon: CreditCard },
       { label: "nav.tutorial", labelKey: "nav.tutorial", href: "/tuto",    icon: BookOpen },
       { label: "nav.contact",  labelKey: "nav.contact",  href: "/contact",  icon: MessageSquare },
       { label: "Statut", href: "/status", icon: Activity },
@@ -520,9 +508,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <DropdownMenuContent side="right" align="start" className="w-48">
             <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
               <User className="w-4 h-4 mr-2" />{t("header.myAccount")}
-            </DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-item-api-keys" onClick={() => navigate("/api-keys")}>
-              <Key className="w-4 h-4 mr-2" />{t("header.apiKeys")}
             </DropdownMenuItem>
             <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
               <FileText className="w-4 h-4 mr-2" />{t("header.documentation")}

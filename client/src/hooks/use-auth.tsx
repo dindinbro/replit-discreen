@@ -6,7 +6,7 @@ export interface LocalUser {
   email: string | null;
   role: string;
   /** Compat shim — parts of the UI read user_metadata.display_name */
-  user_metadata: { display_name: string; username: string; avatar_url?: string };
+  user_metadata: { display_name: string; username: string; avatar_url?: string; full_name?: string };
   app_metadata: Record<string, unknown>;
   created_at: string;
 }

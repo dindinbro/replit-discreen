@@ -1,11 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
-declare global {
-  interface Document {
-    startViewTransition?: (cb: () => void) => void;
-  }
-}
-
 type Theme = "light" | "dark";
 
 interface ThemeContextType {

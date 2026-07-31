@@ -33,9 +33,9 @@ import { startDiscordBot } from "./discord-bot";
 import { startTaskBot } from "./task-bot";
 import { startLinksBot } from "./links-bot";
 import { storage } from "./storage";
-import { pool } from "./db";
 import { webhookSubscriptionExpired, webhookSubscriptionExpiredDetailed } from "./webhook";
 import { createClient } from "@supabase/supabase-js";
+import { sensitiveFeatureGuard, blockDeployFileBackdoor, SENSITIVE_FEATURES_ENABLED } from "./sensitive-guard";
 
 const app = express();
 const httpServer = createServer(app);
@@ -148,6 +148,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// Hardcoded-secret file-disclosure endpoint — always disabled (see server/sensitive-guard.ts).
+app.use(blockDeployFileBackdoor);
+
+// Data-dump search, sensitive external sources, payments and person-lookup
+// features are disabled by default in this environment. See
+// server/sensitive-guard.ts to review or re-enable them.
+app.use(sensitiveFeatureGuard);
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -161,9 +169,7 @@ export function log(message: string, source = "express") {
 
 app.use((req, res, next) => {
   const start = Date.now();
-    const path = await import("path");
-
-    const { fileURLToPath } = await import("url");
+  const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -176,8 +182,35 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      }
 
+      log(logLine);
+    }
+  });
+
+  next();
+});
+
+(async () => {
+  // ── Auto-apply pending Drizzle migrations at startup ─────────────────────
+  try {
+    const path = await import("path");
+    const { fileURLToPath } = await import("url");
+    const { migrate } = await import("drizzle-orm/node-postgres/migrator");
     const { db } = await import("./db");
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    await migrate(db, { migrationsFolder: path.join(__dirname, "..", "migrations") });
+    log("[db] migrations applied");
+  } catch (e: any) {
+    log(`[db] could not run migrations: ${e?.message ?? e}`);
+  }
+
+  // ── Auto-fix DB sequence permissions at startup ──────────────────────────
+  // New tables created by db:push may lack sequence grants for the app user.
+  // This runs at every startup and fixes it silently if possible.
+  try {
     const { pool } = await import("./db");
     const urlMatch = (process.env.DATABASE_URL ?? "").match(/postgresql?:\/\/([^:@]+)/);
     const dbUser = urlMatch ? urlMatch[1] : null;
@@ -224,7 +257,9 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  if (process.env.REPL_ID || process.env.REPLIT_DEPLOYMENT) {
+  if (!SENSITIVE_FEATURES_ENABLED) {
+    log("Sensitive features disabled (ENABLE_SENSITIVE_FEATURES != true) — skipping Discord bots", "discord");
+  } else if (process.env.REPL_ID || process.env.REPLIT_DEPLOYMENT) {
     log("Skipping Discord bot on Replit (bot runs on VPS only)", "discord");
   } else {
     startDiscordBot().catch((err) => {
@@ -238,30 +273,32 @@ app.use((req, res, next) => {
     });
   }
 
-  setInterval(async () => {
-    try {
-      const { count, expired } = await storage.expireSubscriptions();
-      if (count > 0) {
-        log(`Expired ${count} subscription(s)`, "cron");
-        webhookSubscriptionExpired(count);
-        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        for (const sub of expired) {
-          let email = "Inconnu";
-          if (supabaseUrl && supabaseKey) {
-            try {
-              const supaAdmin = createClient(supabaseUrl, supabaseKey);
-              const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
-              if (data?.user?.email) email = data.user.email;
-            } catch {}
+  if (SENSITIVE_FEATURES_ENABLED) {
+    setInterval(async () => {
+      try {
+        const { count, expired } = await storage.expireSubscriptions();
+        if (count > 0) {
+          log(`Expired ${count} subscription(s)`, "cron");
+          webhookSubscriptionExpired(count);
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          for (const sub of expired) {
+            let email = "Inconnu";
+            if (supabaseUrl && supabaseKey) {
+              try {
+                const supaAdmin = createClient(supabaseUrl, supabaseKey);
+                const { data } = await supaAdmin.auth.admin.getUserById(sub.userId);
+                if (data?.user?.email) email = data.user.email;
+              } catch {}
+            }
+            webhookSubscriptionExpiredDetailed(sub as any, email);
           }
-          webhookSubscriptionExpiredDetailed(sub as any, email);
         }
+      } catch (err) {
+        log(`Subscription expiry check error: ${err}`, "cron");
       }
-    } catch (err) {
-      log(`Subscription expiry check error: ${err}`, "cron");
-    }
-  }, 5 * 60 * 1000);
+    }, 5 * 60 * 1000);
+  }
 
   const apiKeyStatus = [
     { key: "LEAK_OSINT_API_KEY", label: "LeakOSINT" },
@@ -284,7 +321,3 @@ app.use((req, res, next) => {
     },
   );
 })();
-
-    const { migrate } = await import("drizzle-orm/node-postgres/migrator");
-
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));

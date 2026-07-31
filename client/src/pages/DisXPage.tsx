@@ -129,8 +129,7 @@ export default function DisXPage() {
     setEntries(prev => [...prev, newEntry]);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
 
       const res = await fetch("/api/disx/chat", {
         method: "POST",

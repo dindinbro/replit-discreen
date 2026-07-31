@@ -2705,7 +2705,7 @@ function MaintenanceToggle({ getAccessToken }: { getAccessToken: () => string | 
 }
 
 interface BlockedIpEntry {
-  id: string;
+  id: number;
   ipAddress: string;
   reason: string;
   blockedBy: string;
@@ -3804,7 +3804,7 @@ const TIER_COLORS: Record<string, string> = {
   api: "bg-green-500/20 text-green-400",
 };
 
-function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => Promise<string | null>; isSuperAdmin?: boolean }) {
+function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin?: boolean }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
   const [applied, setApplied] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
@@ -3994,7 +3994,7 @@ function StarsRating({ rating, onChange }: { rating: number; onChange?: (r: numb
   );
 }
 
-function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => Promise<string | null> }) {
+function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("all");
@@ -4144,7 +4144,7 @@ function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => Promise
   );
 }
 
-function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => Promise<string | null>; isSuperAdmin?: boolean }) {
+function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin?: boolean }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ userId: "", dateFrom: "", dateTo: "" });
   const [applied, setApplied] = useState({ userId: "", dateFrom: "", dateTo: "" });
@@ -4284,7 +4284,7 @@ function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () 
         <Card className="p-8 text-center text-muted-foreground text-sm">Aucun log de jeu pour ces filtres.</Card>
       ) : (
         <div className="space-y-1.5">
-          {data.rows.map(log => (
+          {rows.map(log => (
             <Card key={log.id} className="px-4 py-2.5 hover:bg-muted/30 transition-colors" data-testid={`row-gamelog-${log.id}`}>
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="flex items-center gap-2 shrink-0">
