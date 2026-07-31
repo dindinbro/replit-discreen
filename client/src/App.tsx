@@ -12,13 +12,10 @@ import LandingPage from "@/pages/LandingPage";
 import SearchPage from "@/pages/SearchPage";
 import PricingPage from "@/pages/PricingPage";
 import ContactPage from "@/pages/ContactPage";
-import TutorialPage from "@/pages/TutorialPage";
-import DisXPage from "@/pages/DisXPage";
 import AuthPage from "@/pages/AuthPage";
 import AdminPage from "@/pages/AdminPage";
 import ApiKeysPage from "@/pages/ApiKeysPage";
 import DocumentationPage from "@/pages/DocumentationPage";
-import VouchesPage from "@/pages/VouchesPage";
 import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
 import ProfilePage from "@/pages/ProfilePage";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
@@ -31,7 +28,6 @@ import StatusPage from "@/pages/StatusPage";
 import TicketsPage from "@/pages/TicketsPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
-import PromoBanner from "@/components/PromoBanner";
 import Layout from "@/components/Layout";
 import { Loader2, UserCircle2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -252,20 +248,11 @@ function Router() {
       <Route path="/pricing">
         <PublicRoute component={PricingPage} />
       </Route>
-      <Route path="/tuto">
-        <PublicRoute component={TutorialPage} />
-      </Route>
-      <Route path="/disx">
-        <ProtectedRoute component={DisXPage} />
-      </Route>
       <Route path="/contact">
         <PublicRoute component={ContactPage} />
       </Route>
       <Route path="/tickets">
         <ProtectedRoute component={TicketsPage} />
-      </Route>
-      <Route path="/avis">
-        <PublicRoute component={VouchesPage} />
       </Route>
       <Route path="/game">
         <PublicRoute component={GamePage} />
@@ -328,7 +315,6 @@ function App() {
             <Toaster />
             <SubscriptionToastProvider />
             <UsernameSetupModal />
-            <PromoBanner />
             <MaintenanceGate>
               <Router />
             </MaintenanceGate>

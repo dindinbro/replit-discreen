@@ -1979,27 +1979,6 @@ export async function registerRoutes(
     }
   });
 
-  // GET /api/leakosint-quota - get current LeakOSINT usage/limits
-  app.get("/api/leakosint-quota", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-      const effectiveRole = await getEffectiveRole(userId);
-      const isAdmin = effectiveRole === "admin";
-      const sub = await storage.getSubscription(userId);
-      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
-      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const today = new Date().toISOString().split("T")[0];
-      const used = await storage.getLeakosintDailyUsage(userId, today);
-      res.json({
-        used,
-        limit: isAdmin ? -1 : planInfo.dailyLeakosintSearches,
-        tier,
-      });
-    } catch (err) {
-      console.error("GET /api/leakosint-quota error:", err);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
 
   const CRITERIA_TO_EXTERNAL_FIELD: Record<string, string> = {
     email: "email",
@@ -2334,13 +2313,7 @@ export async function registerRoutes(
       const TIER_ORDER: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4 };
       const tierLevel = TIER_ORDER[tier] ?? 0;
 
-      if (hasFivemFilter && tierLevel < TIER_ORDER.vip) {
-        return res.status(403).json({
-          message: "La recherche Gaming nécessite un abonnement VIP minimum.",
-          requiredTier: "vip",
-          tier,
-        });
-      }
+      // [FREE MODE] Gaming search available to all tiers
 
       if (!isUnlimited && tier === "free") {
         const clientIp = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket.remoteAddress || "unknown";
@@ -3313,110 +3286,6 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/breach-search - proxy to breach.vip external API
-  app.post("/api/breach-search", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-
-      const sub = await storage.getSubscription(userId);
-      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
-
-      if (!userBypassed && await storage.isFrozen(userId)) {
-        return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
-      }
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const effectiveRole = await getEffectiveRole(userId);
-      const isAdmin = effectiveRole === "admin";
-
-      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
-      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
-
-      const newCount = await storage.incrementDailyUsage(userId, today);
-
-      if (!isUnlimited && newCount > planInfo.dailySearches) {
-        return res.status(429).json({
-          message: "Nombre de recherches limite atteint.",
-          used: newCount,
-          limit: planInfo.dailySearches,
-          tier,
-        });
-      }
-
-      const { term, fields } = req.body;
-      if (!term || typeof term !== "string" || term.length < 1 || term.length > 100) {
-        return res.status(400).json({ message: "Le terme de recherche est requis (1-100 caracteres)." });
-      }
-      if (!fields || !Array.isArray(fields) || fields.length === 0 || fields.length > 10) {
-        return res.status(400).json({ message: "Au moins un champ est requis (max 10)." });
-      }
-
-      const breachApiKey = process.env.BREACH_API_KEY;
-      if (!breachApiKey) {
-        return res.status(503).json({ message: "Cle API Breach non configuree." });
-      }
-
-      let response: globalThis.Response;
-      try {
-        response = await fetch("https://breach.vip/api/search", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Api-Key": breachApiKey,
-          },
-          body: JSON.stringify({
-            term,
-            fields,
-            wildcard: true,
-            case_sensitive: false,
-            categories: null,
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
-      } catch (fetchErr) {
-        console.error("Breach.vip API fetch error:", fetchErr);
-        return res.status(502).json({ message: "Impossible de joindre le service de recherche externe." });
-      }
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        console.error("Breach.vip API error:", response.status, errText.slice(0, 300));
-        if (response.status === 429) {
-          return res.status(429).json({ message: "Limite de requetes de l'API externe atteinte. Reessayez dans une minute." });
-        }
-        return res.status(502).json({ message: "Erreur du service de recherche externe." });
-      }
-
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("application/json")) {
-        console.error("Breach.vip API non-JSON response");
-        return res.status(503).json({ message: "Le service externe est temporairement inaccessible. Reessayez plus tard." });
-      }
-
-      const data = await response.json();
-
-      const wUser = await buildUserInfo(req);
-      const resultCount = Array.isArray(data.results) ? data.results.length : 0;
-      if (!wUser.bypassed) {
-        webhookBreachSearch(wUser, term, fields, resultCount);
-      }
-      if (!wUser.bypassed) logSearchToDb(req, wUser, "breach", term, resultCount);
-
-      res.json({
-        results: data.results || [],
-        quota: {
-          used: newCount,
-          limit: planInfo.dailySearches,
-          tier,
-        },
-      });
-    } catch (err) {
-      console.error("POST /api/breach-search error:", err);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
 
   function getOperatorByPrefix(nationalNumber: string, type: string): string {
     if (type !== "mobile") {
@@ -3801,469 +3670,32 @@ export async function registerRoutes(
     return entry.count;
   }
 
-  const API_TOKEN_COOLDOWN_MS = 30_000;
 
-  const apiSlots: Record<string, { lastUsed: number; queue: Array<() => void> }> = {
-    leakosint: { lastUsed: 0, queue: [] },
-    dalton: { lastUsed: 0, queue: [] },
-  };
 
-  function waitForApiSlot(apiName: "leakosint" | "dalton"): Promise<void> {
-    const slot = apiSlots[apiName];
-    return new Promise((resolve) => {
-      const tryExecute = () => {
-        const now = Date.now();
-        const elapsed = now - slot.lastUsed;
-        if (elapsed >= API_TOKEN_COOLDOWN_MS) {
-          slot.lastUsed = now;
-          resolve();
-        } else {
-          const waitTime = API_TOKEN_COOLDOWN_MS - elapsed;
-          setTimeout(() => {
-            slot.lastUsed = Date.now();
-            resolve();
-          }, waitTime);
-        }
-      };
-
-      if (slot.queue.length === 0) {
-        slot.queue.push(tryExecute);
-        tryExecute();
-      } else {
-        slot.queue.push(tryExecute);
-      }
-    });
-  }
-
-  function releaseApiSlot(apiName: "leakosint" | "dalton") {
-    const slot = apiSlots[apiName];
-    slot.queue.shift();
-    if (slot.queue.length > 0) {
-      slot.queue[0]();
-    }
-  }
-
-  // POST /api/leakosint-search - proxy to LeakOSINT API
-  app.post("/api/leakosint-search", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-
-      const sub = await storage.getSubscription(userId);
-      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
-
-      if (!userBypassed && await storage.isFrozen(userId)) {
-        return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
-      }
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const effectiveRole = await getEffectiveRole(userId);
-      const isAdmin = effectiveRole === "admin";
-
-      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
-      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const leakosintLimit = planInfo.dailyLeakosintSearches;
-
-      if (!userBypassed && !isAdmin && leakosintLimit === 0) {
-        return res.status(403).json({
-          message: "Votre abonnement ne permet pas d'utiliser cette source. Passez a un plan superieur.",
-          used: 0,
-          limit: 0,
-          tier,
-        });
-      }
-
-      const newCount = await storage.incrementLeakosintDailyUsage(userId, today);
-
-      if (!userBypassed && !isAdmin && newCount > leakosintLimit) {
-        return res.status(429).json({
-          message: "Limite de recherches Autre Source atteinte pour aujourd'hui.",
-          used: newCount,
-          limit: leakosintLimit,
-          tier,
-        });
-      }
-
-      const { request: searchRequest, limit: searchLimit, lang } = req.body;
-      if (!searchRequest || (typeof searchRequest !== "string" && !Array.isArray(searchRequest))) {
-        return res.status(400).json({ message: "Le terme de recherche est requis." });
-      }
-      if (typeof searchRequest === "string" && (searchRequest.length < 1 || searchRequest.length > 500)) {
-        return res.status(400).json({ message: "Le terme doit faire entre 1 et 500 caracteres." });
-      }
-      if (searchLimit !== undefined && (typeof searchLimit !== "number" || searchLimit < 100 || searchLimit > 10000)) {
-        return res.status(400).json({ message: "La limite doit etre entre 100 et 10000." });
-      }
-      if (lang !== undefined && (typeof lang !== "string" || lang.length > 5)) {
-        return res.status(400).json({ message: "Code langue invalide." });
-      }
-
-      const leakosintToken = process.env.LEAK_OSINT_API_KEY || process.env.LEAKOSINT_API_KEY;
-      if (!leakosintToken) {
-        console.error("LEAKOSINT_API_KEY not configured");
-        return res.status(500).json({ message: "Service LeakOSINT non configure." });
-      }
-
-      await waitForApiSlot("leakosint");
-
-      let response: globalThis.Response;
-      try {
-        response = await fetch("https://leakosintapi.com/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            token: leakosintToken,
-            request: searchRequest,
-            limit: searchLimit || 100,
-            lang: lang || "en",
-            type: "json",
-          }),
-          signal: AbortSignal.timeout(45000),
-        });
-      } catch (fetchErr) {
-        releaseApiSlot("leakosint");
-        console.error("LeakOSINT API fetch error:", fetchErr);
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
-        return res.status(502).json({ message: "Impossible de joindre le service LeakOSINT." });
-      }
-
-      if (!response.ok) {
-        releaseApiSlot("leakosint");
-        const errText = await response.text().catch(() => "");
-        console.error("LeakOSINT API error:", response.status, errText.slice(0, 300));
-        const wUser = await buildUserInfo(req);
-        if (response.status === 429) {
-          if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
-          return res.status(429).json({ message: "Limite de requetes LeakOSINT atteinte. Reessayez plus tard." });
-        }
-        let errMsg = "Erreur du service LeakOSINT.";
-        let errReason = "Erreur API";
-        try {
-          const errData = JSON.parse(errText);
-          if (errData.error) { errMsg = `LeakOSINT: ${errData.error}`; errReason = errData.error; }
-        } catch {}
-        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", errReason);
-        return res.status(502).json({ message: errMsg });
-      }
-
-      const data = await response.json() as Record<string, unknown>;
-      console.log("[leakosint] Response keys:", Object.keys(data), "Status field:", data["Status"]);
-
-      if (data["Error code"]) {
-        releaseApiSlot("leakosint");
-        console.error("LeakOSINT API error code:", data["Error code"]);
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
-        return res.status(502).json({ message: `Erreur LeakOSINT: ${data["Error code"]}` });
-      }
-
-      if (data["error"]) {
-        releaseApiSlot("leakosint");
-        console.error("LeakOSINT API error:", data["error"]);
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
-        return res.status(502).json({ message: `Erreur LeakOSINT: ${data["error"]}` });
-      }
-
-      const listData = data["List"] as Record<string, { InfoLeak?: string; Data?: Record<string, unknown>[] }> | undefined;
-      const results: Record<string, unknown>[] = [];
-
-      if (!listData && !data["Found"]) {
-        releaseApiSlot("leakosint");
-        console.warn("[leakosint] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
-        return res.status(502).json({ message: "Reponse inattendue du service LeakOSINT. Contactez un administrateur." });
-      } else if (listData) {
-        for (const [dbName, dbInfo] of Object.entries(listData)) {
-          if (dbName === "No results found") continue;
-          if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
-            for (const row of dbInfo.Data) {
-              results.push({ _source: dbName, ...row });
-            }
-          }
-        }
-        console.log(`[leakosint] Parsed ${results.length} results from ${Object.keys(listData).length} sources`);
-      }
-
-      const wUser = await buildUserInfo(req);
-      if (!wUser.bypassed) webhookLeakosintSearch(wUser, String(searchRequest), results.length, "ok");
-      if (!wUser.bypassed) logSearchToDb(req, wUser, "leakosint", String(searchRequest), results.length);
-
-      releaseApiSlot("leakosint");
-
-      res.json({
-        results,
-        raw: data,
-        source: "leakosint",
-        quota: {
-          used: newCount,
-          limit: leakosintLimit,
-          tier,
-        },
-      });
-    } catch (err) {
-      releaseApiSlot("leakosint");
-      console.error("POST /api/leakosint-search error:", err);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // POST /api/dalton-search - proxy to DaltonAPI (same format as LeakOSINT)
-  // Shares the same daily quota as LeakOSINT but does NOT increment it (LeakOSINT already counts for the advanced search)
-  // No separate cooldown check here - LeakOSINT route handles cooldown for both (called in parallel from frontend)
-  app.post("/api/dalton-search", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).user.id;
-
-      const sub = await storage.getSubscription(userId);
-      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
-
-      if (!userBypassed && await storage.isFrozen(userId)) {
-        return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
-      }
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const effectiveRole = await getEffectiveRole(userId);
-      const isAdmin = effectiveRole === "admin";
-
-      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
-      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
-      const leakosintLimit = planInfo.dailyLeakosintSearches;
-
-      if (!userBypassed && !isAdmin && leakosintLimit === 0) {
-        return res.status(403).json({
-          message: "Votre abonnement ne permet pas d'utiliser cette source. Passez a un plan superieur.",
-          used: 0,
-          limit: 0,
-          tier,
-        });
-      }
-
-      const currentUsage = await storage.getLeakosintDailyUsage(userId, today);
-      if (!userBypassed && !isAdmin && currentUsage >= leakosintLimit) {
-        return res.status(429).json({
-          message: "Limite de recherches Autre Source atteinte pour aujourd'hui.",
-          used: currentUsage,
-          limit: leakosintLimit,
-          tier,
-        });
-      }
-
-      const { request: searchRequest, limit: searchLimit, lang } = req.body;
-      if (!searchRequest || (typeof searchRequest !== "string" && !Array.isArray(searchRequest))) {
-        return res.status(400).json({ message: "Le terme de recherche est requis." });
-      }
-      if (typeof searchRequest === "string" && (searchRequest.length < 1 || searchRequest.length > 500)) {
-        return res.status(400).json({ message: "Le terme doit faire entre 1 et 500 caracteres." });
-      }
-
-      const daltonToken = process.env.DALTON_API_KEY;
-      if (!daltonToken) {
-        console.error("DALTON_API_KEY not configured");
-        return res.status(500).json({ message: "Service DaltonAPI non configure." });
-      }
-
-      await waitForApiSlot("dalton");
-
-      let response: globalThis.Response;
-      try {
-        response = await fetch("https://leakosintapi.com/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            token: daltonToken,
-            request: searchRequest,
-            limit: searchLimit || 100,
-            lang: lang || "en",
-            type: "json",
-          }),
-          signal: AbortSignal.timeout(45000),
-        });
-      } catch (fetchErr) {
-        releaseApiSlot("dalton");
-        console.error("DaltonAPI fetch error:", fetchErr);
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Service injoignable");
-        return res.status(502).json({ message: "Impossible de joindre le service DaltonAPI." });
-      }
-
-      if (!response.ok) {
-        releaseApiSlot("dalton");
-        const errText = await response.text().catch(() => "");
-        console.error("DaltonAPI error:", response.status, errText.slice(0, 300));
-        const wUser = await buildUserInfo(req);
-        if (response.status === 429) {
-          if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Rate limit");
-          return res.status(429).json({ message: "Limite de requetes DaltonAPI atteinte. Reessayez plus tard." });
-        }
-        let errMsg = "Erreur du service DaltonAPI.";
-        let errReason = "Erreur API";
-        try {
-          const errData = JSON.parse(errText);
-          if (errData.error) { errMsg = `DaltonAPI: ${errData.error}`; errReason = errData.error; }
-        } catch {}
-        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", errReason);
-        return res.status(502).json({ message: errMsg });
-      }
-
-      const data = await response.json() as Record<string, unknown>;
-      console.log("[dalton] Response keys:", Object.keys(data), "Status field:", data["Status"]);
-
-      if (data["Error code"]) {
-        releaseApiSlot("dalton");
-        console.error("DaltonAPI error code:", data["Error code"]);
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["Error code"]));
-        return res.status(502).json({ message: `Erreur DaltonAPI: ${data["Error code"]}` });
-      }
-
-      if (data["error"]) {
-        releaseApiSlot("dalton");
-        console.error("DaltonAPI error:", data["error"]);
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", String(data["error"]));
-        return res.status(502).json({ message: `Erreur DaltonAPI: ${data["error"]}` });
-      }
-
-      const listData = data["List"] as Record<string, { InfoLeak?: string; Data?: Record<string, unknown>[] }> | undefined;
-      const results: Record<string, unknown>[] = [];
-
-      if (!listData && !data["Found"]) {
-        releaseApiSlot("dalton");
-        console.warn("[dalton] No 'List' field in response. Full keys:", Object.keys(data), "Body:", JSON.stringify(data).slice(0, 500));
-        const wUser = await buildUserInfo(req);
-        if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), 0, "error", "Reponse inattendue");
-        return res.status(502).json({ message: "Reponse inattendue du service DaltonAPI. Contactez un administrateur." });
-      } else if (listData) {
-        for (const [dbName, dbInfo] of Object.entries(listData)) {
-          if (dbName === "No results found") continue;
-          if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
-            for (const row of dbInfo.Data) {
-              results.push({ _source: dbName, ...row });
-            }
-          }
-        }
-        console.log(`[dalton] Parsed ${results.length} results from ${Object.keys(listData).length} sources`);
-      }
-
-      releaseApiSlot("dalton");
-
-      const wUser = await buildUserInfo(req);
-      if (!wUser.bypassed) webhookDaltonSearch(wUser, String(searchRequest), results.length, "ok");
-      if (!wUser.bypassed) logSearchToDb(req, wUser, "dalton", String(searchRequest), results.length);
-
-      res.json({
-        results,
-        raw: data,
-        source: "dalton",
-        quota: {
-          used: currentUsage,
-          limit: leakosintLimit,
-          tier,
-        },
-      });
-    } catch (err) {
-      releaseApiSlot("dalton");
-      console.error("POST /api/dalton-search error:", err);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
 
   // Public API v1 - search via API key (for API tier users)
-  async function callLeakosintInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
-    const leakosintToken = process.env.LEAK_OSINT_API_KEY || process.env.LEAKOSINT_API_KEY;
-    if (!leakosintToken) return [];
+  async function callBrixhubInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
+    const apiKey = process.env.BRIXHUB_API_KEY;
+    if (!apiKey) return [];
     try {
-      await waitForApiSlot("leakosint");
-      const response = await fetch("https://leakosintapi.com/", {
+      const response = await fetch("https://brixhub.cc/api/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: leakosintToken, request: searchTerm, limit: 100, lang: "en", type: "json" }),
-        signal: AbortSignal.timeout(45000),
-      });
-      if (!response.ok) { releaseApiSlot("leakosint"); return []; }
-      const data = await response.json() as Record<string, unknown>;
-      releaseApiSlot("leakosint");
-      if (data["Error code"] || data["error"]) return [];
-      const listData = data["List"] as Record<string, { Data?: Record<string, unknown>[] }> | undefined;
-      const results: Record<string, unknown>[] = [];
-      if (listData) {
-        for (const [dbName, dbInfo] of Object.entries(listData)) {
-          if (dbName === "No results found") continue;
-          if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
-            for (const row of dbInfo.Data) results.push({ _source: `leakosint:${dbName}`, ...row });
-          }
-        }
-      }
-      return results;
-    } catch (err) {
-      releaseApiSlot("leakosint");
-      console.error("[api/v1] LeakOSINT error:", err);
-      return [];
-    }
-  }
-
-  async function callDaltonInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
-    const daltonToken = process.env.DALTON_API_KEY;
-    if (!daltonToken) return [];
-    try {
-      await waitForApiSlot("dalton");
-      const response = await fetch("https://leakosintapi.com/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: daltonToken, request: searchTerm, limit: 100, lang: "en", type: "json" }),
-        signal: AbortSignal.timeout(45000),
-      });
-      if (!response.ok) { releaseApiSlot("dalton"); return []; }
-      const data = await response.json() as Record<string, unknown>;
-      releaseApiSlot("dalton");
-      if (data["Error code"] || data["error"]) return [];
-      const listData = data["List"] as Record<string, { Data?: Record<string, unknown>[] }> | undefined;
-      const results: Record<string, unknown>[] = [];
-      if (listData) {
-        for (const [dbName, dbInfo] of Object.entries(listData)) {
-          if (dbName === "No results found") continue;
-          if (dbInfo.Data && Array.isArray(dbInfo.Data)) {
-            for (const row of dbInfo.Data) results.push({ _source: `dalton:${dbName}`, ...row });
-          }
-        }
-      }
-      return results;
-    } catch (err) {
-      releaseApiSlot("dalton");
-      console.error("[api/v1] DaltonAPI error:", err);
-      return [];
-    }
-  }
-
-  async function callBreachInternal(searchTerm: string): Promise<Record<string, unknown>[]> {
-    const breachApiKey = process.env.BREACH_API_KEY;
-    if (!breachApiKey) return [];
-    try {
-      const response = await fetch("https://breach.vip/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Api-Key": breachApiKey },
-        body: JSON.stringify({ term: searchTerm, fields: ["email", "username", "password", "hash", "name", "phone", "ip"], wildcard: true, case_sensitive: false, categories: null }),
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ query: searchTerm }),
         signal: AbortSignal.timeout(15000),
       });
       if (!response.ok) return [];
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("application/json")) return [];
+      const ct = (response.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json")) return [];
       const data = await response.json();
       if (!data.results || !Array.isArray(data.results)) return [];
-      return data.results.map((r: Record<string, unknown>) => ({ _source: "breach.vip", ...r }));
+      return data.results.map((r: Record<string, unknown>) => ({ _source: "brixhub", ...r }));
     } catch (err) {
-      console.error("[api/v1] Breach.vip error:", err);
+      console.error("[api/v1] BrixHub error:", err);
       return [];
     }
   }
+
 
   app.post("/api/v1/search", async (req: Request, res: Response) => {
     try {
@@ -4293,23 +3725,19 @@ export async function registerRoutes(
 
       const searchStart = Date.now();
 
-      const [internalResult, externalResults, leakosintResults, daltonResults, breachResults] = await Promise.all([
+      const [internalResult, externalResults, brixhubResults] = await Promise.all([
         searchAllIndexes(request.criteria, request.limit, request.offset).catch(err => {
           console.error("[api/v1] Internal search error:", err);
           return { results: [] as Record<string, unknown>[], total: 0 as number | null };
         }),
         callExternalSearchApi(request.criteria).catch(() => [] as Record<string, unknown>[]),
-        callLeakosintInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
-        callDaltonInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
-        callBreachInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
+        callBrixhubInternal(searchTerm).catch(() => [] as Record<string, unknown>[]),
       ]);
 
       let allResults = [
         ...internalResult.results,
         ...externalResults,
-        ...leakosintResults,
-        ...daltonResults,
-        ...breachResults,
+        ...brixhubResults,
       ];
 
       if (request.criteria.length > 1) {
@@ -4328,7 +3756,7 @@ export async function registerRoutes(
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
       webhookApiSearch(validation.userId, criteriaStr, total);
 
-      console.log(`[api/v1] Search done in ${Date.now() - searchStart}ms — internal: ${internalResult.results.length}, external: ${externalResults.length}, leakosint: ${leakosintResults.length}, dalton: ${daltonResults.length}, breach: ${breachResults.length}, total: ${total}`);
+      console.log(`[api/v1] Search done in ${Date.now() - searchStart}ms — internal: ${internalResult.results.length}, external: ${externalResults.length}, brixhub: ${brixhubResults.length}, total: ${total}`);
 
       res.json({
         results: allResults,
@@ -4336,9 +3764,7 @@ export async function registerRoutes(
         sources: {
           internal: internalResult.results.length,
           external_proxy: externalResults.length,
-          leakosint: leakosintResults.length,
-          dalton: daltonResults.length,
-          breach: breachResults.length,
+          brixhub: brixhubResults.length,
         },
       });
     } catch (error: any) {
@@ -4348,6 +3774,79 @@ export async function registerRoutes(
       } else {
         res.status(400).json({ error: error.message || "Search error" });
       }
+    }
+  });
+
+  // POST /api/brixhub-search - proxy to BrixHub external API
+  app.post("/api/brixhub-search", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const sub = await storage.getSubscription(userId);
+      const userBypassed = sub ? await isUserBypassed(sub.id) : false;
+
+      if (!userBypassed && await storage.isFrozen(userId)) {
+        return res.status(403).json({ message: "Votre compte est gelé. Contactez un administrateur." });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      const effectiveRole = await getEffectiveRole(userId);
+      const isAdmin = effectiveRole === "admin";
+      const tier: PlanTier = isAdmin ? "api" : ((sub?.tier as PlanTier) || "free");
+      const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
+      const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
+
+      const newCount = await storage.incrementDailyUsage(userId, today);
+      if (!isUnlimited && newCount > planInfo.dailySearches) {
+        return res.status(429).json({ message: "Nombre de recherches limite atteint.", used: newCount, limit: planInfo.dailySearches, tier });
+      }
+
+      const { query } = req.body;
+      if (!query || typeof query !== "string" || query.trim().length < 1 || query.length > 200) {
+        return res.status(400).json({ message: "Terme de recherche requis (1-200 caractères)." });
+      }
+
+      const apiKey = process.env.BRIXHUB_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ message: "Service BrixHub non configuré sur ce serveur." });
+      }
+
+      let response: globalThis.Response;
+      try {
+        response = await fetch("https://brixhub.cc/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({ query: query.trim() }),
+          signal: AbortSignal.timeout(15000),
+        });
+      } catch (fetchErr) {
+        console.error("BrixHub fetch error:", fetchErr);
+        return res.status(502).json({ message: "Impossible de joindre BrixHub." });
+      }
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error("BrixHub error:", response.status, errText.slice(0, 200));
+        if (response.status === 429) return res.status(429).json({ message: "Limite BrixHub atteinte. Réessayez plus tard.", used: newCount, limit: planInfo.dailySearches, tier });
+        return res.status(502).json({ message: "Erreur du service BrixHub." });
+      }
+
+      const ct = (response.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json")) {
+        return res.status(503).json({ message: "BrixHub temporairement inaccessible." });
+      }
+
+      const data = await response.json();
+      const wUser = await buildUserInfo(req);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "brixhub", query.trim(), Array.isArray(data.results) ? data.results.length : 0);
+
+      res.json({
+        results: data.results || [],
+        total: data.total ?? (Array.isArray(data.results) ? data.results.length : 0),
+        quota: { used: newCount, limit: planInfo.dailySearches, tier },
+      });
+    } catch (err) {
+      console.error("POST /api/brixhub-search error:", err);
+      res.status(500).json({ message: "Erreur interne." });
     }
   });
 

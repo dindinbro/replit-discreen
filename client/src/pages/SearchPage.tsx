@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
-import { usePerformSearch, useSearchQuota, useLeakosintQuota, useBreachSearch, useLeakosintSearch, SearchLimitError } from "@/hooks/use-search";
+import { usePerformSearch, useSearchQuota, useBrixhubSearch, SearchLimitError } from "@/hooks/use-search";
 import SearchLoader from "@/components/SearchLoader";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
@@ -24,6 +24,7 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Copy,
   Braces,
   User,
@@ -262,18 +263,6 @@ function getFieldLabel(fieldName: string): string {
   return labels[key] || fieldName.replace(/_/g, " ");
 }
 
-const BREACH_FIELDS = [
-  { value: "email", label: "Email" },
-  { value: "username", label: "Nom d'utilisateur" },
-  { value: "name", label: "Nom" },
-  { value: "phone", label: "Telephone" },
-  { value: "ip", label: "Adresse IP" },
-  { value: "password", label: "Password" },
-  { value: "domain", label: "Domaine" },
-  { value: "discordid", label: "Discord ID" },
-  { value: "steamid", label: "Steam ID" },
-  { value: "uuid", label: "UUID" },
-];
 
 interface CriterionRow {
   id: string;
@@ -406,6 +395,7 @@ function ResultCard({
 }) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const entries = Object.entries(row);
   const rawLine = row["_raw"] as string | undefined;
@@ -418,119 +408,92 @@ function ResultCard({
       return pa - pb;
     });
 
-  const sourceText = "Discreen";
-  const score = computeRelevanceScore(row, globalIndex, searchTerms);
-  const scoreColor = score === 100 ? "#d4a843" : score >= 80 ? "#d4a843" : score >= 60 ? "#f59e0b" : "#6b7280";
-
-  const handleCopy = () => {
-    const lines = visibleFields
-      .filter(([k]) => k.toLowerCase() !== "source")
-      .map(([k, v]) => `${cleanFieldName(k)}: ${cleanFieldValue(v)}`);
-    lines.push("Source: Discreen");
-    navigator.clipboard.writeText(lines.join("\n"));
-    setCopied(true);
-    toast({ title: "Copie !" });
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyJSON = () => {
-    const clean = Object.fromEntries(
-      visibleFields
-        .filter(([k]) => k.toLowerCase() !== "source")
-        .map(([k, v]) => [cleanFieldName(k), cleanFieldValue(v)])
-    );
-    clean["source"] = "Discreen";
-    navigator.clipboard.writeText(JSON.stringify(clean, null, 2));
-    toast({ title: "JSON copie !" });
-  };
-
   let dataFields = visibleFields.filter(([k]) => k.toLowerCase() !== "source");
   if (dataFields.length === 0 && rawLine) {
     dataFields = [["donnee", rawLine]];
   }
 
-  const titleField = visibleFields.find(([k]) => {
+  const PREVIEW_COUNT = 6;
+  const previewFields = dataFields.slice(0, PREVIEW_COUNT);
+  const hiddenFields = dataFields.slice(PREVIEW_COUNT);
+
+  const titleField = dataFields.find(([k]) => {
     const key = k.toLowerCase();
-    return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname"].includes(key);
+    return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname", "prenom"].includes(key);
   });
+
+  const handleCopy = () => {
+    const lines = dataFields.map(([k, v]) => `${getFieldLabel(k)} : ${cleanFieldValue(v)}`);
+    lines.push("Source : Discreen");
+    navigator.clipboard.writeText(lines.join("\n"));
+    setCopied(true);
+    toast({ title: "Copié !" });
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04, duration: 0.2 }}
+      transition={{ delay: index * 0.03, duration: 0.18 }}
     >
       <div
-        className="card-premium rounded-xl overflow-hidden"
+        className="rounded-xl overflow-hidden border border-border/60 bg-card"
         data-testid={`card-result-${globalIndex}`}
       >
-        <div className="flex items-center justify-between gap-4 p-4 pb-3 border-b border-[rgba(212,168,67,0.15)]">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="shrink-0 flex items-center justify-center w-8 h-8 rounded-md bg-[rgba(212,168,67,0.08)] text-sm font-bold text-[#d4a843] border border-[rgba(212,168,67,0.2)]">
-              {globalIndex + 1}
-            </span>
-            <div className="min-w-0">
-              <p className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
-                {titleField ? cleanFieldValue(titleField[1]) : `Resultat ${globalIndex + 1}`}
-              </p>
-              {sourceText && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{sourceText}</p>
-              )}
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/50">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <User className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
+                {titleField ? cleanFieldValue(titleField[1]) : `Résultat ${globalIndex + 1}`}
+              </span>
+              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span
-              className="score-badge hidden sm:inline-flex items-center gap-1"
-              style={{ color: scoreColor, borderColor: `${scoreColor}60`, background: `${scoreColor}12` }}
-              title="Score de pertinence IA"
-            >
-              {score}% match
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="flex items-center gap-1 shrink-0">
+            <button
               onClick={handleCopy}
-              className="btn-gold-glow border-[rgba(212,168,67,0.25)] hover:border-[rgba(212,168,67,0.6)] hover:text-[#d4a843]"
+              className="p-1.5 rounded-md hover:bg-muted transition-colors"
               data-testid={`button-copy-${globalIndex}`}
+              title="Copier"
             >
-              {copied ? <Check className="w-3.5 h-3.5 mr-1" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
-              Copier
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyJSON}
-              className="btn-gold-glow border-[rgba(212,168,67,0.25)] hover:border-[rgba(212,168,67,0.6)] hover:text-[#d4a843]"
-              data-testid={`button-json-${globalIndex}`}
-            >
-              <Braces className="w-3.5 h-3.5 mr-1" />
-              JSON
-            </Button>
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </div>
         </div>
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
-          {dataFields.map(([col, val]) => {
-            const Icon = getFieldIcon(col);
-            const cssVar = getFieldColorVar(col);
-            return (
-              <div key={col} className="flex items-start gap-3" data-testid={`field-${col}-${globalIndex}`}>
-                <div
-                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{
-                    color: `hsl(var(${cssVar}))`,
-                    backgroundColor: `hsl(var(${cssVar}) / 0.12)`,
-                  }}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider" style={{ fontSize: "0.6rem" }}>{getFieldLabel(col)}</p>
-                  <p className="text-sm font-medium text-foreground break-all leading-tight">{cleanFieldValue(val)}</p>
-                </div>
-              </div>
-            );
-          })}
+
+        {/* Champs */}
+        <div className="divide-y divide-border/40">
+          {previewFields.map(([col, val]) => (
+            <div key={col} className="flex gap-3 px-4 py-2.5" data-testid={`field-${col}-${globalIndex}`}>
+              <span className="text-sm text-muted-foreground whitespace-nowrap w-36 shrink-0">{getFieldLabel(col)} :</span>
+              <span className="text-sm font-medium text-foreground break-all">{cleanFieldValue(val)}</span>
+            </div>
+          ))}
+          {expanded && hiddenFields.map(([col, val]) => (
+            <div key={col} className="flex gap-3 px-4 py-2.5" data-testid={`field-${col}-${globalIndex}`}>
+              <span className="text-sm text-muted-foreground whitespace-nowrap w-36 shrink-0">{getFieldLabel(col)} :</span>
+              <span className="text-sm font-medium text-foreground break-all">{cleanFieldValue(val)}</span>
+            </div>
+          ))}
         </div>
+
+        {/* En savoir plus */}
+        {hiddenFields.length > 0 && (
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="w-full flex items-center gap-1 px-4 py-2.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors border-t border-border/40"
+            data-testid={`button-expand-${globalIndex}`}
+          >
+            {expanded ? "Voir moins" : "En savoir plus"}
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+          </button>
+        )}
       </div>
     </motion.div>
   );
@@ -803,6 +766,244 @@ function TelegramLookupPanel() {
   );
 }
 
+
+interface FormSearchPanelProps {
+  searchMode: string;
+  criteria: CriterionRow[];
+  setCriteria: React.Dispatch<React.SetStateAction<CriterionRow[]>>;
+  handleSearch: (page?: number) => void;
+  handleReset: () => void;
+  isLoading: boolean;
+  searchCooldown: number;
+  atLimit: boolean;
+  advancedSearch: boolean;
+  setAdvancedSearch: (v: boolean) => void;
+  advancedLoading: boolean;
+  isUnlimited: boolean;
+  displayTier: string;
+}
+
+function FormSearchPanel({
+  searchMode,
+  criteria,
+  setCriteria,
+  handleSearch,
+  handleReset,
+  isLoading,
+  searchCooldown,
+  atLimit,
+  advancedSearch,
+  setAdvancedSearch,
+  advancedLoading,
+}: FormSearchPanelProps) {
+  const [open, setOpen] = useState<Set<string>>(() =>
+    new Set(searchMode === 'fivem' ? ['fivem'] : ['identite', 'contact'])
+  );
+
+  const toggle = (key: string) =>
+    setOpen(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const getVal = (type: string) => criteria.find(c => c.type === type)?.value ?? '';
+
+  const setVal = (type: string, value: string) => {
+    if (value.trim() === '') {
+      setCriteria(prev => prev.filter(c => c.type !== type));
+    } else {
+      setCriteria(prev => {
+        const ex = prev.find(c => c.type === type);
+        if (ex) return prev.map(c => c.type === type ? { ...c, value } : c);
+        return [...prev, { id: String(nextCriterionId++), type, value }];
+      });
+    }
+  };
+
+  type SectionField = { type: string; label: string; placeholder: string };
+
+  const renderField = (type: string, label: string, placeholder: string) => (
+    <div key={type}>
+      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1.5">{label}</p>
+      <Input
+        value={getVal(type)}
+        onChange={e => setVal(type, e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleSearch(0); }}
+        placeholder={placeholder}
+        className="h-9 text-sm"
+        data-testid={"form-field-" + type}
+      />
+    </div>
+  );
+
+  const renderSection = (id: string, Icon: React.ElementType, label: string, fields: SectionField[]) => {
+    const isOpen = open.has(id);
+    const filled = fields.some(f => getVal(f.type) !== '');
+    return (
+      <div key={id} className="last:border-0">
+        <button
+          type="button"
+          onClick={() => toggle(id)}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/20 transition-colors text-left"
+        >
+          <div className="flex items-center gap-3">
+            <Icon className={filled ? 'w-4 h-4 text-primary' : 'w-4 h-4 text-muted-foreground/60'} />
+            <span className={filled ? 'text-sm font-medium text-foreground' : 'text-sm font-medium text-muted-foreground'}>{label}</span>
+            {filled && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+          </div>
+          <ChevronDown className={isOpen ? 'w-4 h-4 text-muted-foreground/60 transition-transform duration-200 shrink-0 rotate-180' : 'w-4 h-4 text-muted-foreground/60 transition-transform duration-200 shrink-0'} />
+        </button>
+        {isOpen && (
+          <div className="px-6 pb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {fields.map(f => renderField(f.type, f.label, f.placeholder))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const ALL_SECTIONS: Array<{ id: string; icon: React.ElementType; label: string; fields: SectionField[] }> = [
+    {
+      id: 'identite', icon: User, label: 'Identité',
+      fields: [
+        { type: 'lastName',    label: 'Nom',             placeholder: 'Ex: Martin'       },
+        { type: 'firstName',   label: 'Prénom',          placeholder: 'Ex: Jean'         },
+        { type: 'username',    label: 'Pseudo',          placeholder: 'Ex: shadow_42'    },
+        { type: 'displayName', label: "Nom d'affichage", placeholder: 'Ex: Jean Martin'  },
+        { type: 'gender',      label: 'Genre',           placeholder: 'M / F'            },
+      ],
+    },
+    {
+      id: 'naissance', icon: Calendar, label: 'Naissance',
+      fields: [
+        { type: 'dob', label: 'Date de naissance',  placeholder: 'Ex: 1990-01-01' },
+        { type: 'yob', label: 'Année de naissance', placeholder: 'Ex: 1990'       },
+      ],
+    },
+    {
+      id: 'contact', icon: Mail, label: 'Contact',
+      fields: [
+        { type: 'email', label: 'Email',     placeholder: 'Ex: jean@gmail.com'      },
+        { type: 'phone', label: 'Téléphone', placeholder: 'Ex: 0612345678 / +33...' },
+      ],
+    },
+    {
+      id: 'localisation', icon: MapPin, label: 'Localisation',
+      fields: [
+        { type: 'address', label: 'Adresse',    placeholder: 'Ex: 12 rue des Lilas' },
+        { type: 'city',    label: 'Ville',       placeholder: 'Ex: Paris'            },
+        { type: 'zipCode', label: 'Code postal', placeholder: 'Ex: 75001'            },
+      ],
+    },
+    {
+      id: 'fivem', icon: Gamepad2, label: 'FiveM / GTA RP',
+      fields: [
+        { type: 'fivemId',       label: 'ID FiveM',       placeholder: 'Ex: 12345'         },
+        { type: 'fivemLicense',  label: 'License FiveM',  placeholder: 'license:xxxx'      },
+        { type: 'steamId',       label: 'Steam ID',       placeholder: 'Ex: 76561197...'   },
+        { type: 'discordId',     label: 'Discord ID',     placeholder: 'Ex: 123456789012'  },
+        { type: 'xbox',          label: 'Xbox',           placeholder: 'xbl:xxxx'          },
+        { type: 'live',          label: 'Live',           placeholder: 'live:xxxx'         },
+        { type: 'minecraftUuid', label: 'Minecraft UUID', placeholder: 'Ex: 069a79f4...'   },
+      ],
+    },
+    {
+      id: 'numerique', icon: Globe, label: 'Numérique',
+      fields: [
+        { type: 'ipAddress',  label: 'Adresse IP',  placeholder: 'Ex: 192.168.1.1'       },
+        { type: 'macAddress', label: 'Adresse MAC', placeholder: 'Ex: AA:BB:CC:DD:EE:FF' },
+      ],
+    },
+    {
+      id: 'documents', icon: FileText, label: 'Documents & Finance',
+      fields: [
+        { type: 'ssn',  label: 'N° Sécu',     placeholder: 'Ex: 1 82 01 75 056 047'     },
+        { type: 'iban', label: 'IBAN',         placeholder: 'Ex: FR76 3000 6000 0112...' },
+        { type: 'bic',  label: 'BIC',          placeholder: 'Ex: BNPAFRPP'              },
+        { type: 'vin',  label: 'VIN / Plaque', placeholder: 'Ex: AA-123-BB'             },
+      ],
+    },
+    {
+      id: 'password', icon: Lock, label: 'Mot de passe',
+      fields: [
+        { type: 'password',       label: 'Mot de passe', placeholder: 'Ex: monpassword123'     },
+        { type: 'hashedPassword', label: 'Hash',         placeholder: 'Ex: 5f4dcc3b5aa765d...' },
+      ],
+    },
+  ];
+
+  const filledCount = criteria.filter(c => c.value.trim()).length;
+
+  return (
+    <motion.div
+      key="form-search"
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className="rounded-2xl border border-border/50 bg-card overflow-hidden"
+    >
+      <div className="divide-y divide-border/30">
+        {ALL_SECTIONS.map(s => renderSection(s.id, s.icon, s.label, s.fields))}
+      </div>
+
+      <div className="px-6 py-4 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <Button
+            data-testid="button-search"
+            onClick={() => handleSearch(0)}
+            disabled={(isLoading || advancedLoading) || filledCount === 0 || searchCooldown > 0 || atLimit}
+            className={(atLimit || searchCooldown > 0)
+              ? 'h-10 px-6 font-semibold gap-2 bg-muted text-muted-foreground cursor-not-allowed'
+              : advancedSearch
+              ? 'h-10 px-6 font-semibold gap-2 bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground'
+              : 'h-10 px-6 font-semibold gap-2 bg-primary text-primary-foreground hover:bg-primary/90'}
+          >
+            {(isLoading || advancedLoading)
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Search className="w-4 h-4" />}
+            {atLimit
+              ? 'Limite atteinte'
+              : searchCooldown > 0
+              ? ('Patientez ' + searchCooldown + 's')
+              : 'Rechercher'}
+          </Button>
+          <Button
+            data-testid="button-reset-internal"
+            variant="outline"
+            onClick={handleReset}
+            disabled={isLoading || advancedLoading}
+            className="h-10 gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Effacer
+          </Button>
+          {filledCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {filledCount} champ{filledCount > 1 ? 's' : ''} rempli{filledCount > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        <label className="flex items-center gap-2.5 cursor-pointer select-none" data-testid="toggle-advanced-search">
+          <span className="text-xs text-muted-foreground">
+            {'Recherche avancée '}
+            {advancedSearch
+              ? <span className="text-primary font-medium">ON</span>
+              : <span className="opacity-50">OFF</span>}
+          </span>
+          <Switch
+            checked={advancedSearch}
+            onCheckedChange={setAdvancedSearch}
+            data-testid="switch-advanced-search"
+          />
+        </label>
+      </div>
+    </motion.div>
+  );
+}
+
 let nextCriterionId = 1;
 
 export default function SearchPage() {
@@ -811,10 +1012,8 @@ export default function SearchPage() {
   const { getAccessToken } = useAuth();
   const [wouterLocation] = useLocation();
   const searchMutation = usePerformSearch(getAccessToken);
-  const breachMutation = useBreachSearch(getAccessToken);
-  const leakosintMutation = useLeakosintSearch(getAccessToken);
+  const brixhubMutation = useBrixhubSearch(getAccessToken);
   const quotaQuery = useSearchQuota(getAccessToken);
-  const leakosintQuotaQuery = useLeakosintQuota(getAccessToken);
   const [limitReached, setLimitReached] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [searchTime, setSearchTime] = useState<number | null>(null);
@@ -880,11 +1079,6 @@ export default function SearchPage() {
   const [page, setPage] = useState(0);
   const pageSize = 20;
   const [selectedResult, setSelectedResult] = useState<{ row: Record<string, unknown>; globalIndex: number } | null>(null);
-
-  const [breachTerm, setBreachTerm] = useState("");
-  const [breachSelectedFields, setBreachSelectedFields] = useState<string[]>(["email"]);
-
-  const [leakosintTerm, setLeakosintTerm] = useState("");
 
   const [phoneLookupTerm, setPhoneLookupTerm] = useState("");
   const [phoneLookupLoading, setPhoneLookupLoading] = useState(false);
@@ -1153,14 +1347,6 @@ export default function SearchPage() {
   const internalUnlimited = internalLimit === -1;
   const internalAtLimit = !internalUnlimited && internalUsed >= internalLimit;
 
-  const leakosintQuota = leakosintQuotaQuery.data;
-  const leakosintQuotaFromResponse = leakosintMutation.data?.quota;
-  const leakosintUsed = leakosintQuotaFromResponse?.used ?? leakosintQuota?.used ?? 0;
-  const leakosintLimit = leakosintQuotaFromResponse?.limit ?? leakosintQuota?.limit ?? 0;
-  const leakosintTier = leakosintQuotaFromResponse?.tier ?? leakosintQuota?.tier ?? "free";
-  const leakosintUnlimited = leakosintLimit === -1;
-  const leakosintAtLimit = !leakosintUnlimited && leakosintUsed >= leakosintLimit;
-
   const TIER_ORDER: Record<string, number> = { free: 0, vip: 1, pro: 2, business: 3, api: 4, admin: 5 };
   const tierLevel = TIER_ORDER[internalTier] ?? 0;
 
@@ -1192,113 +1378,6 @@ export default function SearchPage() {
   const updateCriterion = (id: string, field: "type" | "value", val: string) => {
     setCriteria((prev) =>
       prev.map((c) => (c.id === id ? { ...c, [field]: val } : c))
-    );
-  };
-
-  const toggleBreachField = (field: string) => {
-    setBreachSelectedFields((prev) =>
-      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]
-    );
-  };
-
-  const handleBreachSearch = () => {
-    if (!breachTerm.trim()) {
-      toast({
-        title: "Terme manquant",
-        description: "Veuillez entrer un terme de recherche pour la recherche externe.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (breachSelectedFields.length === 0) {
-      toast({
-        title: "Champs manquants",
-        description: "Veuillez selectionner au moins un champ de recherche.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLimitReached(false);
-    setBlacklistMatch(null);
-
-    const token = getAccessToken();
-    if (token && breachTerm.trim().length >= 3) {
-      fetch("/api/blacklist/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ values: [breachTerm.trim()] }),
-      })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => { if (data) setBlacklistMatch(data); })
-        .catch(() => {});
-    }
-
-    breachMutation.mutate(
-      {
-        term: breachTerm.trim(),
-        fields: breachSelectedFields,
-      },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
-        },
-        onError: (err) => {
-          if (err instanceof SearchLimitError) {
-            setLimitReached(true);
-          }
-        },
-      }
-    );
-  };
-
-  const handleLeakosintSearch = () => {
-    if (!leakosintTerm.trim()) {
-      toast({
-        title: "Terme manquant",
-        description: "Veuillez entrer un terme de recherche.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLimitReached(false);
-    setBlacklistMatch(null);
-
-    const token = getAccessToken();
-    if (token && leakosintTerm.trim().length >= 3) {
-      fetch("/api/blacklist/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ values: [leakosintTerm.trim()] }),
-      })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => { if (data) setBlacklistMatch(data); })
-        .catch(() => {});
-    }
-
-    leakosintMutation.mutate(
-      {
-        request: leakosintTerm.trim(),
-        limit: 100,
-        lang: "en",
-      },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["/api/leakosint-quota"] });
-        },
-        onError: (err) => {
-          if (err instanceof SearchLimitError) {
-            setLimitReached(true);
-          } else {
-            toast({
-              title: "Erreur de recherche",
-              description: err.message || "Le service est temporairement indisponible. Reessayez plus tard.",
-              variant: "destructive",
-            });
-          }
-        },
-      }
     );
   };
 
@@ -1385,59 +1464,22 @@ export default function SearchPage() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const errors: string[] = [];
-
-      const daltonPromise = fetch("/api/dalton-search", {
+      fetch("/api/brixhub-search", {
         method: "POST",
         headers,
-        body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
+        body: JSON.stringify({ query: searchTerm }),
       })
         .then(async (r) => {
-          if (!r.ok) {
-            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
-            if (r.status === 429 && err.cooldown) {
-              return [];
-            } else if (r.status === 429) {
-              errors.push(`Source 2: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
-            } else if (r.status === 403) {
-              errors.push("Source 2: acces non autorise pour votre abonnement");
-            }
-            return [];
-          }
-          const d = await r.json();
-          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "DaltonAPI" }));
+          if (!r.ok) return []; // fail silently
+          const d = await r.json().catch(() => ({}));
+          return (d.results || []).map((result: Record<string, unknown>) => ({ ...result, _advancedSource: "BrixHub" }));
         })
-        .catch(() => []);
-
-      const leakosintPromise = fetch("/api/leakosint-search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ request: searchTerm, limit: 100, lang: "en" }),
-      })
-        .then(async (r) => {
-          if (!r.ok) {
-            const err = await r.json().catch(() => ({ message: "Erreur inconnue" }));
-            if (r.status === 429) {
-              errors.push(`Source 1: limite atteinte (${err.used || "?"}/${err.limit || "?"})`);
-            } else if (r.status === 403) {
-              errors.push("Source 1: acces non autorise pour votre abonnement");
-            }
-            return [];
-          }
-          const d = await r.json();
-          return (d.results || []).map((r: Record<string, unknown>) => ({ ...r, _advancedSource: "LeakOSINT" }));
-        })
-        .catch(() => []);
-
-      Promise.all([daltonPromise, leakosintPromise]).then(([daltonRes, leakRes]) => {
-        setAdvancedResults([...daltonRes, ...leakRes]);
-        setAdvancedLoading(false);
-        if (errors.length > 0) {
-          setAdvancedError(errors.join(" | "));
-        }
-        queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/leakosint-quota"] });
-      });
+        .catch(() => [])
+        .then((results) => {
+          setAdvancedResults(results);
+          setAdvancedLoading(false);
+          queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
+        });
     } else {
       setAdvancedResults([]);
       setAdvancedError(null);
@@ -1451,9 +1493,6 @@ export default function SearchPage() {
     setPage(0);
     setLimitReached(false);
     setBlacklistMatch(null);
-    setBreachTerm("");
-    setBreachSelectedFields(["email"]);
-    setLeakosintTerm("");
     setPhoneLookupTerm("");
     setPhoneLookupResult(null);
     setNirTerm("");
@@ -1466,8 +1505,7 @@ export default function SearchPage() {
     setAdvancedError(null);
     setAdvancedSearched(false);
     searchMutation.reset();
-    breachMutation.reset();
-    leakosintMutation.reset();
+    brixhubMutation.reset();
   };
 
   const isWantedMode = searchMode === "wanted";
@@ -1688,537 +1726,175 @@ export default function SearchPage() {
         </section>
 
         <AnimatePresence mode="wait">
-          {searchMode === "internal" && (
+          {(searchMode === "internal" || searchMode === "fivem") && (
+            <FormSearchPanel
+              searchMode={searchMode}
+              criteria={criteria}
+              setCriteria={setCriteria}
+              handleSearch={handleSearch}
+              handleReset={handleReset}
+              isLoading={searchMutation.isPending}
+              searchCooldown={searchCooldown}
+              atLimit={atLimit}
+              advancedSearch={advancedSearch}
+              setAdvancedSearch={setAdvancedSearch}
+              advancedLoading={advancedLoading}
+              isUnlimited={isUnlimited}
+              displayTier={displayTier}
+            />
+          )}
+
+                    {(searchMode === "phone" || searchMode === "geoip" || searchMode === "nir") && (
             <motion.div
-              key="internal"
+              key="lookup"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
             >
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  <h2 className="text-xl font-bold tracking-tight">Recherche par Critères</h2>
-                </div>
-                {getAvailableFilters().length > 0 && (
-                  <Select
-                    value=""
-                    onValueChange={(val) => addCriterionWithType(val)}
-                  >
-                    <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-criterion">
-                      <Plus className="w-4 h-4" />
-                      <SelectValue placeholder={t("search.addFilter")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableFilters().map((ft) => {
-                        const Icon = FILTER_ICONS[ft] || FileText;
-                        return (
-                          <SelectItem key={ft} value={ft}>
-                            <span className="flex items-center gap-2">
-                              <Icon className="w-4 h-4" />
-                              {FilterLabels[ft as SearchFilterType]}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                )}
+              {/* Tab bar */}
+              <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-1 w-fit">
+                {([{ mode: "phone", label: "Téléphone", Icon: Phone }, { mode: "geoip", label: "GeoIP", Icon: MapPin }, { mode: "nir", label: "NIR", Icon: Hash }] as const).map(({ mode, label, Icon }) => (
+                  <button key={mode} onClick={() => setSearchMode(mode as any)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${searchMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    <Icon className="w-3.5 h-3.5" /> {label}
+                  </button>
+                ))}
               </div>
 
+              {/* Téléphone */}
+              {searchMode === "phone" && (
               <div className="space-y-4">
-                <AnimatePresence mode="popLayout">
-                  {criteria.map((criterion, idx) => {
-                    const IconComp = FILTER_ICONS[criterion.type] || FileText;
-                    return (
-                      <motion.div
-                        key={criterion.id}
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="group relative"
-                      >
-                        <Card className="p-3 bg-secondary/30 border-border/50">
-                          <div className="flex flex-col sm:flex-row items-center gap-3">
-                            <div
-                              className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-primary"
-                            >
-                              <IconComp className="w-4 h-4" />
-                            </div>
-                            
-                            <div className="w-full sm:w-[220px]">
-                              <span className="text-sm font-medium text-foreground">
-                                {FilterLabels[criterion.type as SearchFilterType]}
-                              </span>
-                            </div>
-
-                            <div className="flex-1 w-full relative">
-                              <Input
-                                data-testid={`input-criterion-value-${criterion.id}`}
-                                placeholder={FILTER_PLACEHOLDERS[criterion.type] || "Entrez une valeur..."}
-                                value={criterion.value}
-                                onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSearch(0);
-                                }}
-                                className="bg-background pr-10"
-                              />
-                              {criterion.type === "phone" && (
-                                <p className="text-xs text-muted-foreground mt-1">Pensez à tester les formats : 06..., +33... et sans le 0 (612345678)</p>
-                              )}
-                            </div>
-
-                            <Button
-                              data-testid={`button-remove-criterion-${criterion.id}`}
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0"
-                              onClick={() => removeCriterion(criterion.id)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-
-              {criteria.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Ajoutez un filtre pour lancer une recherche</p>
-                </div>
-              )}
-
-              {(() => {
-                const advancedTiers = ["pro", "business", "api"];
-                const canUseAdvanced = advancedTiers.includes(internalTier);
-                return (
-                  <label
-                    data-testid="toggle-advanced-search"
-                    className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-all duration-300 select-none ${
-                      !canUseAdvanced
-                        ? "border-border/30 bg-secondary/10 opacity-60 cursor-not-allowed"
-                        : advancedSearch
-                          ? "border-primary/40 bg-primary/5 shadow-md shadow-primary/10 cursor-pointer"
-                          : "border-border/50 bg-secondary/20 hover:border-primary/20 hover:bg-secondary/30 cursor-pointer"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                        !canUseAdvanced
-                          ? "bg-secondary text-muted-foreground"
-                          : advancedSearch ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
-                      }`}>
-                        {canUseAdvanced ? <Zap className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Recherche Discreen Avancee</p>
-                        <p className="text-xs text-muted-foreground">
-                          {!canUseAdvanced
-                            ? "Disponible a partir de l'abonnement PRO"
-                            : advancedSearch
-                              ? "Active — interroge toutes les sources en parallele"
-                              : "Desactivee — recherche dans les bases internes uniquement"}
-                        </p>
-                      </div>
-                    </div>
-                    {canUseAdvanced ? (
-                      <Switch
-                        checked={advancedSearch}
-                        onCheckedChange={setAdvancedSearch}
-                        data-testid="switch-advanced-search"
-                      />
-                    ) : (
-                      <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-600 dark:text-amber-400">
-                        PRO+
-                      </Badge>
-                    )}
-                  </label>
-                );
-              })()}
-
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="h-7 bg-primary/5 text-primary border-primary/20 gap-1.5 font-medium">
-                    <Search className="w-3.5 h-3.5" />
-                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${Math.max(0, displayLimit - displayUsed)} recherches restantes`}
-                  </Badge>
-                  {advancedSearch && (
-                    <Badge variant="outline" className="h-7 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 gap-1.5 font-medium">
-                      <Zap className="w-3.5 h-3.5" />
-                      Mode Avance
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="flex gap-2 w-full">
-                  <Button
-                    data-testid="button-search"
-                    onClick={() => handleSearch(0)}
-                    disabled={(searchMutation.isPending || advancedLoading) || !criteria.some((c) => c.value.trim()) || searchCooldown > 0 || atLimit}
-                    className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${
-                      searchCooldown > 0 || atLimit
-                        ? "bg-muted text-muted-foreground cursor-not-allowed"
-                        : advancedSearch
-                        ? "bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground hover:from-primary/90 hover:to-emerald-500/90 shadow-primary/25"
-                        : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/25"
-                    }`}
-                  >
-                    {(searchMutation.isPending || advancedLoading) ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : searchCooldown > 0 ? (
-                      <Loader2 className="w-4 h-4" />
-                    ) : advancedSearch ? (
-                      <Zap className="w-4 h-4" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    {atLimit ? "Limite atteinte" : searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : advancedSearch ? t("search.advancedSearch") : t("search.searchButton")}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Input data-testid="input-phone-lookup" placeholder="06 12 34 56 78" value={phoneLookupTerm} onChange={(e) => setPhoneLookupTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePhoneLookup()} className="max-w-xs" />
+                  <Button data-testid="button-phone-lookup" onClick={handlePhoneLookup} disabled={phoneLookupLoading || !phoneLookupTerm.trim()}>
+                    {phoneLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span className="ml-1.5">Lookup</span>
                   </Button>
-                  <Button
-                    data-testid="button-reset-internal"
-                    variant="outline"
-                    onClick={handleReset}
-                    disabled={searchMutation.isPending || advancedLoading}
-                    className="h-11 gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reinitialiser
+                  <Button data-testid="button-reset-phone" variant="outline" onClick={handleReset} disabled={phoneLookupLoading} className="gap-2">
+                    <RotateCcw className="w-4 h-4" /> Reinitialiser
                   </Button>
                 </div>
-              </div>
-            </motion.div>
-          )}
-
-          {searchMode === "fivem" && (
-            <motion.div
-              key="fivem"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="glass-panel-fivem rounded-2xl p-6 md:p-8 space-y-6"
-            >
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Gamepad2 className="w-5 h-5 text-orange-500" />
-                  <h2 className="text-xl font-bold tracking-tight">Recherche Gaming</h2>
-                </div>
-                {getAvailableFilters().length > 0 && (
-                  <Select
-                    value=""
-                    onValueChange={(val) => addCriterionWithType(val)}
-                  >
-                    <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-fivem-criterion">
-                      <Plus className="w-4 h-4" />
-                      <SelectValue placeholder={t("search.addFilter")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableFilters().map((ft) => {
-                        const Icon = FILTER_ICONS[ft] || FileText;
-                        return (
-                          <SelectItem key={ft} value={ft}>
-                            <span className="flex items-center gap-2">
-                              <Icon className="w-4 h-4" />
-                              {FivemFilterLabels[ft as keyof typeof FivemFilterLabels]}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <AnimatePresence mode="popLayout">
-                  {criteria.map((criterion, idx) => {
-                    const IconComp = FILTER_ICONS[criterion.type] || FileText;
-                    return (
-                      <motion.div
-                        key={criterion.id}
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="group relative"
-                      >
-                        <Card className="p-3 bg-orange-500/5 dark:bg-orange-950/20 border-orange-500/10">
-                          <div className="flex flex-col sm:flex-row items-center gap-3">
-                            <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-orange-500/10 text-orange-500">
-                              <IconComp className="w-4 h-4" />
-                            </div>
-                            <div className="w-full sm:w-[220px]">
-                              <span className="text-sm font-medium text-foreground">
-                                {FivemFilterLabels[criterion.type as keyof typeof FivemFilterLabels] || FilterLabels[criterion.type as SearchFilterType]}
-                              </span>
-                            </div>
-                            <div className="flex-1 w-full relative">
-                              <Input
-                                data-testid={`input-fivem-criterion-value-${criterion.id}`}
-                                placeholder={FILTER_PLACEHOLDERS[criterion.type] || "Entrez une valeur..."}
-                                value={criterion.value}
-                                onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSearch(0);
-                                }}
-                                className="bg-background pr-10"
-                              />
-                            </div>
-                            <Button
-                              data-testid={`button-remove-fivem-criterion-${criterion.id}`}
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0"
-                              onClick={() => removeCriterion(criterion.id)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-
-              {criteria.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Gamepad2 className="w-10 h-10 mx-auto mb-3 opacity-40 text-orange-500" />
-                  <p className="text-sm">Ajoutez un filtre pour lancer une recherche Gaming</p>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="h-7 bg-orange-500/5 text-orange-500 border-orange-500/20 gap-1.5 font-medium">
-                    <Search className="w-3.5 h-3.5" />
-                    {isUnlimited ? `Illimite (${displayTier.toUpperCase()})` : `${Math.max(0, displayLimit - displayUsed)} recherches restantes`}
-                  </Badge>
-                </div>
-
-                <div className="flex gap-2 w-full">
-                  <Button
-                    data-testid="button-fivem-search"
-                    onClick={() => handleSearch(0)}
-                    disabled={searchMutation.isPending || !criteria.some((c) => c.value.trim()) || searchCooldown > 0 || atLimit}
-                    className={`flex-1 h-11 font-semibold gap-2 shadow-lg ${searchCooldown > 0 || atLimit ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-orange-600 text-white shadow-orange-500/25 border-orange-600"}`}
-                  >
-                    {searchMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : searchCooldown > 0 ? (
-                      <Loader2 className="w-4 h-4" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    {atLimit ? "Limite atteinte" : searchCooldown > 0 ? `${t("search.wait")} ${searchCooldown}s` : t("search.searchButton")}
-                  </Button>
-                  <Button
-                    data-testid="button-reset-fivem"
-                    variant="outline"
-                    onClick={handleReset}
-                    disabled={searchMutation.isPending}
-                    className="h-11 gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reinitialiser
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {searchMode === "phone" && (
-            <motion.div
-              key="phone"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
-            >
-              <div className="flex items-center gap-2">
-                <Phone className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold">Lookup Operateur</h2>
-              </div>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                <Input
-                  data-testid="input-phone-lookup"
-                  placeholder="06 12 34 56 78"
-                  value={phoneLookupTerm}
-                  onChange={(e) => setPhoneLookupTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handlePhoneLookup()}
-                  className="max-w-xs"
-                />
-                <Button
-                  data-testid="button-phone-lookup"
-                  onClick={handlePhoneLookup}
-                  disabled={phoneLookupLoading || !phoneLookupTerm.trim()}
-                >
-                  {phoneLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  <span className="ml-1.5">Lookup</span>
-                </Button>
-                <Button
-                  data-testid="button-reset-phone"
-                  variant="outline"
-                  onClick={handleReset}
-                  disabled={phoneLookupLoading}
-                  className="gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Reinitialiser
-                </Button>
-              </div>
-
-              {phoneLookupResult && (
-                <div className="mt-2">
-                  {phoneLookupResult.ok ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Type</p>
-                        <Badge variant="outline" data-testid="text-phone-type">
-                          {phoneLookupResult.type === "mobile" ? "Mobile" : phoneLookupResult.type === "voip" ? "VoIP" : phoneLookupResult.type === "special" ? "Special" : "Fixe"}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Pays</p>
-                        <p className="text-sm font-medium" data-testid="text-phone-country">{phoneLookupResult.country}</p>
-                      </div>
-                      {phoneLookupResult.region && (
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Region</p>
-                          <p className="text-sm font-medium" data-testid="text-phone-region">{phoneLookupResult.region}</p>
+                {phoneLookupResult && (
+                  <div>
+                    {phoneLookupResult.ok ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Type</p>
+                          <Badge variant="outline" data-testid="text-phone-type">{phoneLookupResult.type === "mobile" ? "Mobile" : phoneLookupResult.type === "voip" ? "VoIP" : phoneLookupResult.type === "special" ? "Special" : "Fixe"}</Badge>
                         </div>
-                      )}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Numero (E.164)</p>
-                        <p className="text-sm font-mono font-medium" data-testid="text-phone-e164">{phoneLookupResult.e164}</p>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Pays</p>
+                          <p className="text-sm font-medium" data-testid="text-phone-country">{phoneLookupResult.country}</p>
+                        </div>
+                        {phoneLookupResult.region && (<div className="space-y-1"><p className="text-xs text-muted-foreground">Region</p>
+                          <p className="text-sm font-medium" data-testid="text-phone-region">{phoneLookupResult.region}</p></div>)}
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Numero (E.164)</p>
+                          <p className="text-sm font-mono font-medium" data-testid="text-phone-e164">{phoneLookupResult.e164}</p>
+                        </div>
+                        <div className="sm:col-span-2 md:col-span-4 space-y-1">
+                          <p className="text-xs text-muted-foreground">Opérateur d'attribution</p>
+                          <p className="text-sm font-medium" data-testid="text-phone-operator">{phoneLookupResult.operator}</p>
+                          <p className="text-xs text-muted-foreground/70 mt-1">Basé sur les préfixes ARCEP — peut différer si le numéro a été porté</p>
+                        </div>
                       </div>
-                      <div className="sm:col-span-2 md:col-span-4 space-y-1">
-                        <p className="text-xs text-muted-foreground">Opérateur d'attribution</p>
-                        <p className="text-sm font-medium" data-testid="text-phone-operator">{phoneLookupResult.operator}</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Basé sur les préfixes ARCEP — peut différer si le numéro a été porté</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-destructive" data-testid="text-phone-error">{phoneLookupResult.message}</p>
-                  )}
-                </div>
+                    ) : (<p className="text-sm text-destructive" data-testid="text-phone-error">{phoneLookupResult.message}</p>)}
+                  </div>
+                )}
+              </div>
               )}
-            </motion.div>
-          )}
 
-          {searchMode === "geoip" && (
-            <motion.div
-              key="geoip"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
-            >
-              <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-semibold">GeoIP Lookup</h2>
-              </div>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                <Input
-                  data-testid="input-geoip"
-                  placeholder="8.8.8.8"
-                  value={geoipTerm}
-                  onChange={(e) => setGeoipTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleGeoip()}
-                  className="max-w-xs"
-                />
-                <Button
-                  data-testid="button-geoip-lookup"
-                  onClick={handleGeoip}
-                  disabled={geoipLoading || !geoipTerm.trim()}
-                >
-                  {geoipLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  <span className="ml-1.5">Lookup</span>
-                </Button>
-                <Button
-                  data-testid="button-reset-geoip"
-                  variant="outline"
-                  onClick={handleReset}
-                  disabled={geoipLoading}
-                  className="gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Reinitialiser
-                </Button>
-              </div>
-
-              {geoipResult && (
-                <div className="mt-2">
-                  {geoipResult.ok ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">IP</p>
-                        <p className="text-sm font-mono font-medium" data-testid="text-geoip-ip">{geoipResult.ip}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Pays</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-country">{geoipResult.country} ({geoipResult.countryCode})</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Region</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-region">{geoipResult.region}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Ville</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-city">{geoipResult.city}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Code Postal</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-zip">{geoipResult.zip || "N/A"}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Coordonnees</p>
-                        <p className="text-sm font-mono font-medium" data-testid="text-geoip-coords">{geoipResult.lat}, {geoipResult.lon}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Fuseau horaire</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-tz">{geoipResult.timezone}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">FAI</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-isp">{geoipResult.isp}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Organisation</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-org">{geoipResult.org}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">AS</p>
-                        <p className="text-sm font-medium" data-testid="text-geoip-as">{geoipResult.as}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Proxy / VPN</p>
-                        <Badge variant={geoipResult.proxy ? "destructive" : "outline"} data-testid="text-geoip-proxy">
-                          {geoipResult.proxy ? "Oui" : "Non"}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Hebergement</p>
-                        <Badge variant={geoipResult.hosting ? "secondary" : "outline"} data-testid="text-geoip-hosting">
-                          {geoipResult.hosting ? "Oui" : "Non"}
-                        </Badge>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-destructive" data-testid="text-geoip-error">{geoipResult.message}</p>
-                  )}
+              {/* GeoIP */}
+              {searchMode === "geoip" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Input data-testid="input-geoip" placeholder="8.8.8.8" value={geoipTerm} onChange={(e) => setGeoipTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleGeoip()} className="max-w-xs" />
+                  <Button data-testid="button-geoip-lookup" onClick={handleGeoip} disabled={geoipLoading || !geoipTerm.trim()}>
+                    {geoipLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span className="ml-1.5">Lookup</span>
+                  </Button>
+                  <Button data-testid="button-reset-geoip" variant="outline" onClick={handleReset} disabled={geoipLoading} className="gap-2">
+                    <RotateCcw className="w-4 h-4" /> Reinitialiser
+                  </Button>
                 </div>
+                {geoipResult && (
+                  <div>
+                    {geoipResult.ok ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">IP</p><p className="text-sm font-mono font-medium" data-testid="text-geoip-ip">{geoipResult.ip}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Pays</p><p className="text-sm font-medium" data-testid="text-geoip-country">{geoipResult.country} ({geoipResult.countryCode})</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Region</p><p className="text-sm font-medium" data-testid="text-geoip-region">{geoipResult.region}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Ville</p><p className="text-sm font-medium" data-testid="text-geoip-city">{geoipResult.city}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Code Postal</p><p className="text-sm font-medium" data-testid="text-geoip-zip">{geoipResult.zip || "N/A"}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Coordonnees</p><p className="text-sm font-mono font-medium" data-testid="text-geoip-coords">{geoipResult.lat}, {geoipResult.lon}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Fuseau horaire</p><p className="text-sm font-medium" data-testid="text-geoip-tz">{geoipResult.timezone}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">FAI</p><p className="text-sm font-medium" data-testid="text-geoip-isp">{geoipResult.isp}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Organisation</p><p className="text-sm font-medium" data-testid="text-geoip-org">{geoipResult.org}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">AS</p><p className="text-sm font-medium" data-testid="text-geoip-as">{geoipResult.as}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Proxy / VPN</p>
+                          <Badge variant={geoipResult.proxy ? "destructive" : "outline"} data-testid="text-geoip-proxy">{geoipResult.proxy ? "Oui" : "Non"}</Badge>
+                        </div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Hebergement</p>
+                          <Badge variant={geoipResult.hosting ? "secondary" : "outline"} data-testid="text-geoip-hosting">{geoipResult.hosting ? "Oui" : "Non"}</Badge>
+                        </div>
+                      </div>
+                    ) : (<p className="text-sm text-destructive" data-testid="text-geoip-error">{geoipResult.message}</p>)}
+                  </div>
+                )}
+              </div>
+              )}
+
+              {/* NIR */}
+              {searchMode === "nir" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Hash className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold">Numero NIR</p>
+                    <p className="text-xs text-muted-foreground">Entrez un numero de securite sociale a 13 ou 15 chiffres</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Input data-testid="input-nir" placeholder="1 85 01 25 123 456 78" value={nirTerm} onChange={(e) => setNirTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleNirDecode()} className="max-w-sm font-mono" />
+                  <Button data-testid="button-nir-decode" onClick={handleNirDecode} disabled={nirLoading || !nirTerm.trim()}>
+                    {nirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                    <span className="ml-1.5">Decoder le NIR</span>
+                  </Button>
+                  <Button data-testid="button-reset-nir" variant="outline" onClick={handleReset} disabled={nirLoading} className="gap-2">
+                    <RotateCcw className="w-4 h-4" /> Reinitialiser
+                  </Button>
+                </div>
+                {nirResult && (
+                  <div>
+                    {nirResult.ok ? (
+                      <div className="space-y-4">
+                        {nirResult.formatted && (
+                          <div className="text-center">
+                            <p className="font-mono text-lg font-semibold tracking-wider" data-testid="text-nir-formatted">{nirResult.formatted}</p>
+                            {nirResult.keyValid !== null && (
+                              <Badge variant={nirResult.keyValid ? "default" : "destructive"} className="mt-1" data-testid="badge-nir-key">
+                                {nirResult.keyValid ? "Cle de controle valide" : "Cle de controle invalide"}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Sexe</p><p className="text-sm font-medium" data-testid="text-nir-sex">{nirResult.sex}</p></div>
+                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Annee de naissance</p><p className="text-sm font-medium" data-testid="text-nir-year">{nirResult.birthYear}</p></div>
+                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Mois de naissance</p><p className="text-sm font-medium" data-testid="text-nir-month">{nirResult.birthMonth}</p></div>
+                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Departement</p><p className="text-sm font-medium" data-testid="text-nir-dept">{nirResult.department} - {nirResult.departmentLabel}</p></div>
+                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Code commune</p><p className="text-sm font-mono font-medium" data-testid="text-nir-commune">{nirResult.commune}</p></div>
+                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Numero d'ordre</p><p className="text-sm font-mono font-medium" data-testid="text-nir-order">{nirResult.order}</p></div>
+                        </div>
+                      </div>
+                    ) : (<p className="text-sm text-destructive" data-testid="text-nir-error">{nirResult.message}</p>)}
+                  </div>
+                )}
+              </div>
               )}
             </motion.div>
           )}
 
           {searchMode === "xeuledoc" && (() => {
-            const canAccessXeuledoc = ["pro", "business", "api", "admin"].includes(internalTier);
+            const canAccessXeuledoc = true; // [FREE MODE]
             return (
             <motion.div
               key="xeuledoc"
@@ -2684,7 +2360,7 @@ export default function SearchPage() {
           )}
 
           {searchMode === "wanted" && (() => {
-            const canAccessWanted = ["pro", "business", "api", "admin"].includes(internalTier);
+            const canAccessWanted = true; // [FREE MODE]
             return (
             <motion.div
               key="wanted"
@@ -2832,113 +2508,6 @@ export default function SearchPage() {
             );
           })()}
 
-          {searchMode === "nir" && (
-            <motion.div
-              key="nir"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
-            >
-              <div className="text-center space-y-2">
-                <Badge variant="outline" className="gap-1.5 px-3 py-1">
-                  <Hash className="w-3.5 h-3.5" />
-                  Decodeur NIR
-                </Badge>
-                <h2 className="text-2xl font-bold">Decodeur de Numero de Securite Sociale</h2>
-                <p className="text-sm text-muted-foreground">
-                  Analysez un numero NIR pour extraire les informations qu'il contient : sexe, date et lieu de naissance
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Hash className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold">Numero NIR</p>
-                    <p className="text-xs text-muted-foreground">Entrez un numero de securite sociale a 13 ou 15 chiffres</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Input
-                    data-testid="input-nir"
-                    placeholder="1 85 01 25 123 456 78"
-                    value={nirTerm}
-                    onChange={(e) => setNirTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleNirDecode()}
-                    className="max-w-sm font-mono"
-                  />
-                  <Button
-                    data-testid="button-nir-decode"
-                    onClick={handleNirDecode}
-                    disabled={nirLoading || !nirTerm.trim()}
-                  >
-                    {nirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                    <span className="ml-1.5">Decoder le NIR</span>
-                  </Button>
-                  <Button
-                    data-testid="button-reset-nir"
-                    variant="outline"
-                    onClick={handleReset}
-                    disabled={nirLoading}
-                    className="gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reinitialiser
-                  </Button>
-                </div>
-              </div>
-
-              {nirResult && (
-                <div className="mt-2">
-                  {nirResult.ok ? (
-                    <div className="space-y-4">
-                      {nirResult.formatted && (
-                        <div className="text-center">
-                          <p className="font-mono text-lg font-semibold tracking-wider" data-testid="text-nir-formatted">{nirResult.formatted}</p>
-                          {nirResult.keyValid !== null && (
-                            <Badge variant={nirResult.keyValid ? "default" : "destructive"} className="mt-1" data-testid="badge-nir-key">
-                              {nirResult.keyValid ? "Cle de controle valide" : "Cle de controle invalide"}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Sexe</p>
-                          <p className="text-sm font-medium" data-testid="text-nir-sex">{nirResult.sex}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Annee de naissance</p>
-                          <p className="text-sm font-medium" data-testid="text-nir-year">{nirResult.birthYear}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Mois de naissance</p>
-                          <p className="text-sm font-medium" data-testid="text-nir-month">{nirResult.birthMonth}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Departement</p>
-                          <p className="text-sm font-medium" data-testid="text-nir-dept">{nirResult.department} - {nirResult.departmentLabel}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Code commune</p>
-                          <p className="text-sm font-mono font-medium" data-testid="text-nir-commune">{nirResult.commune}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Numero d'ordre</p>
-                          <p className="text-sm font-mono font-medium" data-testid="text-nir-order">{nirResult.order}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-destructive" data-testid="text-nir-error">{nirResult.message}</p>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-
           {searchMode === "telegram" && (
             <TelegramLookupPanel />
           )}
@@ -2996,55 +2565,32 @@ export default function SearchPage() {
         {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
-            const baseResults = searchMode === "external"
-              ? leakosintMutation.data?.results
-              : searchMutation.data?.results;
-            const activeResults = (searchMode === "internal" && advancedSearch && advancedResults.length > 0)
+            const baseResults = searchMutation.data?.results;
+            const activeResults = (advancedSearch && advancedResults.length > 0)
               ? [...(baseResults || []), ...advancedResults]
               : baseResults;
-            const baseTotal = searchMode === "external"
-              ? leakosintMutation.data?.results?.length
-              : searchMutation.data?.total;
-            const activeTotal = (searchMode === "internal" && advancedSearch && advancedResults.length > 0)
+            const baseTotal = searchMutation.data?.total;
+            const activeTotal = (advancedSearch && advancedResults.length > 0)
               ? (baseTotal ?? 0) + advancedResults.length
               : baseTotal;
-            const isLoading = searchMode === "external"
-              ? leakosintMutation.isPending
-              : (searchMutation.isPending || advancedLoading);
-            const activeError = searchMode === "external"
-              ? leakosintMutation.error
-              : searchMutation.error;
-            const isPreview = searchMode !== "external" && searchMutation.data?.previewMode === true;
+            const isLoading = searchMutation.isPending || advancedLoading;
+            const activeError = searchMutation.error;
+            const isPreview = searchMutation.data?.previewMode === true;
 
             return (
               <>
                 <div id="results-section" className="flex items-center justify-between flex-wrap gap-2">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Database className="w-5 h-5 text-primary" />
-                    Resultats de recherche
-                    {activeTotal != null && activeTotal > 0 && (
-                      <Badge variant="secondary" className="ml-2">
-                        {activeTotal}
-                      </Badge>
-                    )}
-                  </h3>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {activeTotal != null && activeTotal > 0 ? (
+                      <><span className="text-foreground font-semibold">{activeTotal}</span> résultat{activeTotal > 1 ? "s" : ""}</>
+                    ) : (isLoading ? null : "Résultats")}
+                  </p>
                   {searchTime != null && !isLoading && (
-                    <motion.span
-                      initial={{ opacity: 0, x: 8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="text-xs font-mono px-3 py-1 rounded-full border border-[rgba(212,168,67,0.3)] bg-[rgba(212,168,67,0.06)] text-[#d4a843]"
-                    >
-                      ⚡ Search completed in {searchTime.toFixed(2)}s
-                    </motion.span>
+                    <span className="text-xs text-muted-foreground font-mono">⚡ {searchTime.toFixed(2)}s</span>
                   )}
                 </div>
 
-                {advancedSearched && advancedError && !advancedLoading && (
-                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center gap-2 text-sm" data-testid="advanced-search-error">
-                    <Zap className="w-4 h-4 shrink-0" />
-                    <span>Sources avancees : {advancedError}</span>
-                  </div>
-                )}
+                {/* BrixHub errors are suppressed — fail silently */}
 
                 {activeError && !isLoading && (
                   <Card className="p-8 text-center space-y-4 border-destructive/30 bg-destructive/5" data-testid="search-error-display">
@@ -3180,16 +2726,16 @@ export default function SearchPage() {
                         </Button>
                       </div>
                     )}
-                    <div className={`grid grid-cols-1 xl:grid-cols-2 gap-2.5 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
+                    <div className={`grid grid-cols-1 gap-3 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
                     {activeResults.map((row, idx) => {
-                      const gi = ((searchMode === "internal" || searchMode === "fivem") ? page * pageSize : 0) + idx;
+                      const gi = (searchMode === "internal" || searchMode === "fivem" ? page * pageSize : 0) + idx;
                       return (
-                        <MiniResultCard
+                        <ResultCard
                           key={idx}
                           row={row}
+                          index={idx}
                           globalIndex={gi}
                           searchTerms={submittedTerms}
-                          onClick={() => setSelectedResult({ row, globalIndex: gi })}
                         />
                       );
                     })}
@@ -3241,27 +2787,6 @@ export default function SearchPage() {
         )}
       </div>
 
-      {/* Result Detail Dialog */}
-      <Dialog open={!!selectedResult} onOpenChange={(open) => { if (!open) setSelectedResult(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-          <DialogHeader className="px-5 pt-5 pb-2">
-            <DialogTitle className="text-base font-display font-bold flex items-center gap-2">
-              <Database className="w-4 h-4 text-primary" />
-              Résultat #{selectedResult ? selectedResult.globalIndex + 1 : ""}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedResult && (
-            <div className="px-3 pb-4">
-              <ResultCard
-                row={selectedResult.row}
-                index={0}
-                globalIndex={selectedResult.globalIndex}
-                searchTerms={submittedTerms}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </main>
   );
 }

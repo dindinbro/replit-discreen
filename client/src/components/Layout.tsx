@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import {
   ShieldCheck, LogOut, Settings, Moon, Sun,
   Home, Search, CreditCard, MessageSquare,
-  Key, FileText, Menu, X, Star, Users, User,
+  Key, FileText, Menu, X, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
-  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, BookOpen, BotMessageSquare, Sword,
+  Sparkles, Phone, MapPin, Hash, FileSearch, Eye, Gamepad2, ShieldAlert, Sword,
   Camera, Activity,
 } from "lucide-react";
 import {
@@ -119,10 +119,7 @@ const SEARCH_MODULES: NavItem[] = [
   { label: "Gaming",         href: "/search?mode=fivem",     icon: Gamepad2,       badge: "VIP", badgeColor: "blue" },
   { label: "Google OSINT",   href: "/search?mode=xeuledoc",  icon: FileSearch,     badge: "PRO", badgeColor: "red" },
   { label: "Wanted",         href: "/search?mode=wanted",    icon: ShieldAlert,    badge: "PRO", badgeColor: "red" },
-  { label: "DisX IA",        href: "/disx",                  icon: BotMessageSquare, badge: "PRO", badgeColor: "red" },
-  { label: "Téléphone",      href: "/search?mode=phone",     icon: Phone },
-  { label: "GeoIP",          href: "/search?mode=geoip",     icon: MapPin },
-  { label: "NIR",            href: "/search?mode=nir",       icon: Hash },
+  { label: "Lookup",          href: "/search?mode=phone",     icon: Phone },
 ];
 
 const NAV_SECTIONS: NavSection[] = [
@@ -144,7 +141,6 @@ const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.section.community",
     items: [
       { label: "STING.EXE",   href: "/game",  icon: Sword, badge: "JEU", badgeColor: "gold" },
-      { label: "nav.reviews", labelKey: "nav.reviews", href: "/avis",  icon: Star },
       { label: "nav.dof",     labelKey: "nav.dof",     href: "/users", icon: Users },
     ],
   },
@@ -153,7 +149,6 @@ const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.section.info",
     items: [
       { label: "nav.pricing",  labelKey: "nav.pricing",  href: "/pricing",  icon: CreditCard },
-      { label: "nav.tutorial", labelKey: "nav.tutorial", href: "/tuto",    icon: BookOpen },
       { label: "nav.contact",  labelKey: "nav.contact",  href: "/contact",  icon: MessageSquare },
       { label: "Statut", href: "/status", icon: Activity },
     ],
@@ -334,20 +329,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     // Disabled/coming-soon logic: blocked unless admin (or not adminOnly)
     const isBlocked = item.disabled && !(item.adminOnly && role === "admin");
 
-    const itemClass = `flex items-center rounded-lg transition-all duration-150 select-none
-      ${collapsed ? "justify-center px-0 py-2.5 mx-1 gap-0" : indent ? "gap-2.5 px-3 py-2 ml-2" : "gap-3 px-3 py-2.5"}
+    const itemClass = `flex items-center rounded-md transition-colors duration-100 select-none
+      ${collapsed ? "justify-center w-9 h-9 p-0 mx-auto" : indent ? "gap-2 px-2.5 py-[5px] ml-1" : "gap-2.5 px-2.5 py-[7px]"}
       ${isBlocked
-        ? "cursor-not-allowed opacity-40 border-l-2 border-transparent text-muted-foreground"
+        ? "cursor-not-allowed opacity-35 text-muted-foreground/50"
         : active
-        ? "cursor-pointer bg-primary/10 text-primary border-l-2 border-primary"
-        : "cursor-pointer text-muted-foreground hover:text-foreground hover:bg-accent/50 border-l-2 border-transparent"
+        ? "cursor-pointer bg-white/[0.08] text-foreground"
+        : "cursor-pointer text-muted-foreground/60 hover:text-foreground/90 hover:bg-white/[0.04]"
       }`;
 
     const innerContent = (
       <>
-        <Icon className={`shrink-0 ${collapsed ? "w-5 h-5" : indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active && !isBlocked ? "text-primary" : ""}`} />
+        <Icon className={`shrink-0 ${collapsed ? "w-[18px] h-[18px]" : indent ? "w-3.5 h-3.5" : "w-[15px] h-[15px]"} ${active && !isBlocked ? "text-primary" : ""}`} />
         <span
-          className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12.5px]" : "text-sm"}`}
+          className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12px]" : "text-[13px]"}`}
           style={{
             opacity: collapsed ? 0 : 1,
             maxWidth: collapsed ? 0 : 160,
@@ -357,11 +352,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {label}
         </span>
         {!collapsed && (item.comingSoon ? (
-          <span className="ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 bg-muted/60 text-muted-foreground border border-border/40">
+          <span className="ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 bg-white/[0.05] text-muted-foreground/50 border border-white/[0.06]">
             SOON
           </span>
         ) : item.badge ? (
-          <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${badgeClass(item.badgeColor)}`}>
+          <span className={`ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${badgeClass(item.badgeColor)}`}>
             {item.badge}
           </span>
         ) : null)}
@@ -423,16 +418,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   /* ── Sidebar content ── */
   const sidebarContent = (
-    <div className="flex flex-col h-full w-full border-r border-border/30 bg-background/[0.93] backdrop-blur-sm overflow-hidden">
+    <div className="flex flex-col h-full w-full overflow-hidden"
+      style={{ background: "hsl(var(--sidebar-bg, 240 10% 5%))", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
 
       {/* Logo */}
-      <div className="h-14 flex items-center shrink-0 px-3 border-b border-border/20">
+      <div className="h-14 flex items-center shrink-0 px-4">
         <Link href="/">
-          <div className={`flex items-center gap-2 cursor-pointer ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
-            <DiscreenLogo className="w-8 h-8 shrink-0" />
+          <div className={`flex items-center gap-2.5 cursor-pointer ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
+            <DiscreenLogo className="w-7 h-7 shrink-0" />
             <span
-              className="font-display font-bold text-lg tracking-tight whitespace-nowrap overflow-hidden"
-              style={{ opacity: collapsed ? 0 : 1, maxWidth: collapsed ? 0 : 140, transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
+              className="font-semibold text-[15px] tracking-tight whitespace-nowrap overflow-hidden text-foreground"
+              style={{ opacity: collapsed ? 0 : 1, maxWidth: collapsed ? 0 : 130, transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
             >
               Di<span className="text-primary">screen</span>
             </span>
@@ -440,7 +436,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </Link>
       </div>
 
-      {/* Profile card */}
+      {/* Profile row */}
       {user ? (
         <>
           <input
@@ -452,123 +448,114 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onChange={handleAvatarFileChange}
             data-testid="input-avatar-file"
           />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className={`shrink-0 border-b border-border/20 hover:bg-accent/30 transition-colors focus:outline-none
-                ${collapsed ? "py-3 flex justify-center items-center" : "py-5 px-4 flex flex-col items-center gap-1.5"}`}
-              data-testid="button-user-menu"
-              title={collapsed ? userName : undefined}
-            >
-              {!collapsed ? (
-                <>
+          <div className="px-2 pb-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`w-full flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-white/[0.05] transition-colors focus:outline-none
+                    ${collapsed ? "justify-center" : ""}`}
+                  data-testid="button-user-menu"
+                  title={collapsed ? userName : undefined}
+                >
                   <label
                     htmlFor="avatar-file-upload"
-                    className="relative w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center overflow-hidden group cursor-pointer"
+                    className="relative w-7 h-7 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center overflow-hidden group cursor-pointer shrink-0"
                     onClick={(e) => e.stopPropagation()}
                     title="Changer la photo de profil"
                     data-testid="button-avatar-change"
                   >
-                    {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-6 h-6 text-primary" />}
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                      {avatarUploading ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Camera className="w-5 h-5 text-white" />
-                      )}
+                    {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-3.5 h-3.5 text-primary" />}
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                      {avatarUploading
+                        ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                        : <Camera className="w-3 h-3 text-white" />}
                     </div>
                   </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold tracking-tight mt-0.5">{userName}</span>
-                    {uniqueId && (
-                      <span className="text-[10px] font-mono text-foreground/50 font-semibold mt-0.5">#{uniqueId}</span>
-                    )}
-                  </div>
-                  {role && (
-                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${ROLE_COLOR[role] || ROLE_COLOR.free}`}>
-                      {ROLE_DISPLAY[role] || ROLE_DISPLAY.free}
-                    </span>
+                  {!collapsed && (
+                    <>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[13px] font-medium text-foreground/90 truncate leading-none">{userName}</span>
+                          {uniqueId && <span className="text-[10px] font-mono text-foreground/30 shrink-0">#{uniqueId}</span>}
+                        </div>
+                        {role && (
+                          <span className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 inline-block ${ROLE_COLOR[role] ? "" : "text-muted-foreground/40"}`}
+                            style={{ color: role === "admin" ? "#f87171" : role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : undefined }}>
+                            {ROLE_DISPLAY[role] || "Free"}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
+                    </>
                   )}
-                  {userHandle && <span className="text-[11px] text-muted-foreground/60">@{userHandle}</span>}
-                </>
-              ) : (
-                <label
-                  htmlFor="avatar-file-upload"
-                  className="relative w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center overflow-hidden group cursor-pointer"
-                  onClick={(e) => e.stopPropagation()}
-                  title="Changer la photo de profil"
-                >
-                  {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-primary" />}
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                    <Camera className="w-3 h-3 text-white" />
-                  </div>
-                </label>
-              )}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="w-48">
-            <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
-              <User className="w-4 h-4 mr-2" />{t("header.myAccount")}
-            </DropdownMenuItem>
-            <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
-              <FileText className="w-4 h-4 mr-2" />{t("header.documentation")}
-            </DropdownMenuItem>
-            {role === "admin" && (
-              <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
-                <Settings className="w-4 h-4 mr-2" />{t("header.admin")}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="menu-item-sign-out" onClick={() => signOut()} className="text-destructive focus:text-destructive">
-              <LogOut className="w-4 h-4 mr-2" />{t("header.signOut")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-48">
+                <DropdownMenuItem data-testid="menu-item-profile" onClick={() => navigate("/profile")}>
+                  <User className="w-4 h-4 mr-2" />{t("header.myAccount")}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="menu-item-documentation" onClick={() => navigate("/documentation")}>
+                  <FileText className="w-4 h-4 mr-2" />{t("header.documentation")}
+                </DropdownMenuItem>
+                {role === "admin" && (
+                  <DropdownMenuItem data-testid="menu-item-admin" onClick={() => navigate("/admin")}>
+                    <Settings className="w-4 h-4 mr-2" />{t("header.admin")}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem data-testid="menu-item-sign-out" onClick={() => signOut()} className="text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" />{t("header.signOut")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </>
       ) : (
-        <div className={`shrink-0 border-b border-border/20 ${collapsed ? "py-3 flex justify-center" : "py-4 px-4"}`}>
+        <div className={`px-2 pb-2 ${collapsed ? "flex justify-center" : ""}`}>
           <Link href="/login">
             <Button
-              variant="default"
-              className={`overflow-hidden ${collapsed ? "w-9 h-9 p-0 justify-center" : "w-full gap-2 justify-center"}`}
+              size="sm"
+              variant="ghost"
+              className={`h-8 overflow-hidden bg-white/[0.04] hover:bg-white/[0.07] text-muted-foreground/60 hover:text-foreground/90 border border-white/[0.06] ${collapsed ? "w-9 p-0 justify-center" : "w-full gap-2 text-[13px]"}`}
               data-testid="button-login"
               title={collapsed ? t("header.signIn") : undefined}
             >
-              <LogIn className="w-4 h-4 shrink-0" />
+              <LogIn className="w-3.5 h-3.5 shrink-0" />
               {!collapsed && <span>{t("header.signIn")}</span>}
             </Button>
           </Link>
         </div>
       )}
 
+      {/* Divider */}
+      <div className="mx-3 mb-1" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
+
       {/* Nav sections */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 scrollbar-none" data-testid="nav-main">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-1 scrollbar-none px-2" data-testid="nav-main">
         {NAV_SECTIONS.map((section, si) => {
           const isOpen = section.collapsible ? (openSections[section.key] ?? true) : true;
 
           return (
-            <div key={section.key} className={si > 0 ? "mt-1" : ""}>
-              {/* Section header */}
+            <div key={section.key} className={si > 0 ? "mt-3" : ""}>
+              {/* Section label */}
               {(section.labelKey || section.label) && !collapsed && (
                 <div
-                  className={`flex items-center justify-between px-4 py-1.5 mt-1 ${section.collapsible ? "cursor-pointer hover:text-foreground" : ""}`}
+                  className={`flex items-center justify-between px-2 mb-1 ${section.collapsible ? "cursor-pointer" : ""}`}
                   onClick={section.collapsible ? () => toggleSection(section.key) : undefined}
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 select-none">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/30 select-none">
                     {section.label ?? (section.labelKey ? t(section.labelKey, { defaultValue: section.key.toUpperCase() }) : section.key.toUpperCase())}
                   </span>
                   {section.collapsible && (
-                    <ChevronDown
-                      className={`w-3 h-3 text-muted-foreground/40 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
-                    />
+                    <ChevronDown className={`w-3 h-3 text-muted-foreground/25 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
                   )}
                 </div>
               )}
-              {(section.labelKey || section.label) && collapsed && <div className="my-1 mx-3 border-t border-border/20" />}
+              {(section.labelKey || section.label) && collapsed && <div className="my-2 mx-1" style={{ height: 1, background: "rgba(255,255,255,0.04)" }} />}
 
               {/* Items */}
               {(isOpen || collapsed) && (
-                <div className="px-2 flex flex-col gap-0.5">
+                <div className="flex flex-col gap-px">
                   {section.items.map(item => renderNavItem(item, section.key === "recherche" || section.key === "lookup"))}
                 </div>
               )}
@@ -578,55 +565,47 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Bottom bar */}
-      <div className="shrink-0 border-t border-border/20 flex items-center justify-around h-12 px-1">
-        {onlineCount !== null && (
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        className="shrink-0 flex items-center h-11 px-2 gap-0.5">
+        {onlineCount !== null && !collapsed && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5 cursor-default px-1" data-testid="status-online-count">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                {!collapsed && <span className="text-[11px] text-muted-foreground font-medium tabular-nums">{onlineCount}</span>}
+              <div className="flex items-center gap-1.5 cursor-default px-2 flex-1" data-testid="status-online-count">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse shrink-0" />
+                <span className="text-[11px] text-muted-foreground/40 font-medium tabular-nums">{onlineCount}</span>
               </div>
             </TooltipTrigger>
             <TooltipContent side="top">{t("header.onlineUsers", { count: onlineCount })}</TooltipContent>
           </Tooltip>
         )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleLanguage} data-testid="button-lang-toggle">
-              <span className="text-[10px] font-bold">{i18n.language === "fr" ? "FR" : "EN"}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{i18n.language === "fr" ? "Switch to English" : "Passer en Français"}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={toggleTheme} data-testid="button-theme-toggle">
-              {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}</TooltipContent>
-        </Tooltip>
-        {user ? (
+        <div className={`flex items-center gap-0.5 ${collapsed ? "w-full justify-center" : "ml-auto"}`}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => signOut()} data-testid="button-sign-out-bar">
-                <LogOut className="w-4 h-4" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-foreground/80 hover:bg-white/[0.04]" onClick={toggleLanguage} data-testid="button-lang-toggle">
+                <span className="text-[10px] font-semibold">{i18n.language === "fr" ? "FR" : "EN"}</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">{t("header.signOut")}</TooltipContent>
+            <TooltipContent side="top">{i18n.language === "fr" ? "Switch to English" : "Passer en Français"}</TooltipContent>
           </Tooltip>
-        ) : (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/login">
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" data-testid="button-login-bar">
-                  <LogIn className="w-4 h-4" />
-                </Button>
-              </Link>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-foreground/80 hover:bg-white/[0.04]" onClick={toggleTheme} data-testid="button-theme-toggle">
+                {theme === "light" ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+              </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">{t("header.signIn")}</TooltipContent>
+            <TooltipContent side="top">{theme === "light" ? t("nav.darkMode") : t("nav.lightMode")}</TooltipContent>
           </Tooltip>
-        )}
+          {user && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/40 hover:text-destructive/80 hover:bg-white/[0.04]" onClick={() => signOut()} data-testid="button-sign-out-bar">
+                  <LogOut className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{t("header.signOut")}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -749,7 +728,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <ChatWidget />
         </div>
 
-        {theme === "dark" && <InteractiveGrid />}
+        {/* grid removed */}
       </div>
     </TooltipProvider>
   );

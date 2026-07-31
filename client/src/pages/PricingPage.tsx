@@ -75,7 +75,7 @@ const PLANS = [
       "Username OSINT illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
-      { text: "Agent DisX IA", available: true, isNew: true },
+
     ],
   },
   {
@@ -96,7 +96,7 @@ const PLANS = [
       "Username OSINT illimite",
       "Moteur de recherche Wanted",
       "Parrainage",
-      { text: "Agent DisX IA", available: true, isNew: true },
+
     ],
   },
   {
@@ -118,7 +118,7 @@ const PLANS = [
       "Possibilite de revente",
       "Endpoint API /api/v1/search",
       "Support premium 24/7",
-      { text: "Agent DisX IA", available: true, isNew: true },
+
     ],
   },
 ];

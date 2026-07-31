@@ -189,24 +189,9 @@
   animation: shimmer-indigo 4s linear infinite;
 }
 
-/* ─── Interactive grid ────────────────────────────────────── */
-.interactive-grid-lines {
-  position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background-image:
-    linear-gradient(rgba(99,102,241,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99,102,241,0.025) 1px, transparent 1px);
-  background-size: 70px 70px;
-}
-.interactive-grid-glow {
-  position: fixed; inset: 0; pointer-events: none; z-index: 1;
-  transition: opacity 0.45s ease;
-  background-image:
-    linear-gradient(rgba(99,102,241,0.10) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99,102,241,0.10) 1px, transparent 1px);
-  background-size: 70px 70px;
-  -webkit-mask-image: radial-gradient(280px circle at var(--mx) var(--my), rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, transparent 75%);
-  mask-image: radial-gradient(280px circle at var(--mx) var(--my), rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, transparent 75%);
-}
+/* ─── Interactive grid — disabled ────────────────────────── */
+.interactive-grid-lines { display: none; }
+.interactive-grid-glow  { display: none; }
 
 /* ─── Mouse-follow line ───────────────────────────────────── */
 .mouse-line {

@@ -3930,11 +3930,11 @@ function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
-      ) : data?.rows.length === 0 ? (
+      ) : (data?.rows?.length ?? 0) === 0 ? (
         <Card className="p-8 text-center text-muted-foreground text-sm">Aucun log pour ces filtres.</Card>
       ) : (
         <div className="space-y-1.5">
-          {data?.rows.map(log => (
+          {(data?.rows ?? []).map(log => (
             <Card key={log.id} className="px-4 py-2.5 hover:bg-muted/30 transition-colors" data-testid={`row-log-${log.id}`}>
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="flex items-center gap-2 shrink-0">

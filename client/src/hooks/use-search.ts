@@ -44,94 +44,30 @@ export function useSearchFilters() {
   });
 }
 
-export interface BreachSearchRequest {
-  term: string;
-  fields: string[];
-}
-
-export interface BreachSearchResponse {
+export interface BrixhubSearchResponse {
   results: Record<string, unknown>[];
-  quota?: SearchQuota;
+  total?: number;
 }
 
-export function useBreachSearch(getAccessToken: () => string | null) {
+export function useBrixhubSearch(getAccessToken: () => string | null) {
   return useMutation({
-    mutationFn: async (request: BreachSearchRequest): Promise<BreachSearchResponse> => {
+    mutationFn: async (query: string): Promise<BrixhubSearchResponse> => {
       const token = getAccessToken();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const res = await fetch("/api/breach-search", {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch("/api/brixhub-search", {
         method: "POST",
         headers,
-        body: JSON.stringify(request),
+        body: JSON.stringify({ query }),
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Erreur inconnue" }));
         if (res.status === 429) {
-          throw new SearchLimitError(
-            err.message || "Limite atteinte",
-            err.used || 0,
-            err.limit || 0,
-            err.tier || "free"
-          );
+          throw new SearchLimitError(err.message || "Limite atteinte", err.used || 0, err.limit || 0, err.tier || "free");
         }
-        throw new Error(err.message || "Erreur de recherche externe");
+        throw new Error(err.message || "Erreur BrixHub");
       }
-
-      return (await res.json()) as BreachSearchResponse;
-    },
-  });
-}
-
-export interface LeakosintSearchRequest {
-  request: string;
-  limit?: number;
-  lang?: string;
-}
-
-export interface LeakosintSearchResponse {
-  results: Record<string, unknown>[];
-  raw?: Record<string, unknown>;
-  quota?: SearchQuota;
-}
-
-export function useLeakosintSearch(getAccessToken: () => string | null) {
-  return useMutation({
-    mutationFn: async (request: LeakosintSearchRequest): Promise<LeakosintSearchResponse> => {
-      const token = getAccessToken();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const res = await fetch("/api/leakosint-search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(request),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Erreur inconnue" }));
-        if (res.status === 429) {
-          throw new SearchLimitError(
-            err.message || "Limite atteinte",
-            err.used || 0,
-            err.limit || 0,
-            err.tier || "free"
-          );
-        }
-        throw new Error(err.message || "Erreur de recherche LeakOSINT");
-      }
-
-      return (await res.json()) as LeakosintSearchResponse;
+      return (await res.json()) as BrixhubSearchResponse;
     },
   });
 }
@@ -152,21 +88,6 @@ export function useSearchQuota(getAccessToken: () => string | null) {
   });
 }
 
-export function useLeakosintQuota(getAccessToken: () => string | null) {
-  return useQuery({
-    queryKey: ["/api/leakosint-quota"],
-    queryFn: async () => {
-      const token = getAccessToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch("/api/leakosint-quota", { headers });
-      if (!res.ok) return null;
-      return (await res.json()) as SearchQuota;
-    },
-    refetchInterval: 30000,
-  });
-}
 
 export function usePerformSearch(getAccessToken: () => string | null) {
   return useMutation({
