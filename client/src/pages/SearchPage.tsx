@@ -1468,13 +1468,22 @@ export default function SearchPage() {
         body: JSON.stringify({ criteria: filledCriteria.map((c) => ({ type: c.type, value: c.value.trim() })) }),
       })
         .then(async (r) => {
-          if (!r.ok) return []; // fail silently
+          if (!r.ok) {
+            const d = await r.json().catch(() => ({}));
+            throw new Error(d.message || "Recherche avancée (BrixHub) temporairement indisponible.");
+          }
           const d = await r.json().catch(() => ({}));
           return (d.results || []).map((result: Record<string, unknown>) => ({ ...result, _advancedSource: "BrixHub" }));
         })
-        .catch(() => [])
         .then((results) => {
           setAdvancedResults(results);
+          setAdvancedError(null);
+        })
+        .catch((err: Error) => {
+          setAdvancedResults([]);
+          setAdvancedError(err.message);
+        })
+        .finally(() => {
           setAdvancedLoading(false);
           queryClient.invalidateQueries({ queryKey: ["/api/search-quota"] });
         });
@@ -2563,7 +2572,12 @@ export default function SearchPage() {
                   )}
                 </div>
 
-                {/* BrixHub errors are suppressed — fail silently */}
+                {advancedError && !advancedLoading && (
+                  <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-amber-500/25 bg-amber-500/5 text-sm text-amber-400/90" data-testid="brixhub-error-display">
+                    <ShieldAlert className="w-4 h-4 shrink-0" />
+                    <span>{advancedError}</span>
+                  </div>
+                )}
 
                 {activeError && !isLoading && (
                   <Card className="p-8 text-center space-y-4 border-destructive/30 bg-destructive/5" data-testid="search-error-display">

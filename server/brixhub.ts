@@ -78,6 +78,46 @@ export function mapCriteriaToBrixhubParams(criteria: SearchCriterion[]): Partial
   return params;
 }
 
+// BrixHub occasionally returns a transient 503 ("Search temporarily
+// unavailable, please retry") for an otherwise valid query, sometimes for
+// tens of seconds at a stretch — a few short retries clear it in practice.
+const TRANSIENT_STATUS = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [800, 1600];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function brixhubSearchAttempt(
+  apiKey: string,
+  params: Record<string, unknown>,
+): Promise<{ ok: true; results: BrixhubProfile[]; meta: BrixhubSearchMeta | null } | { ok: false; status: number; message: string }> {
+  const response = await fetch(`${BRIXHUB_BASE_URL}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
+    body: JSON.stringify(params),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    return { ok: false, status: response.status, message: body?.message || `HTTP ${response.status}` };
+  }
+
+  const ct = (response.headers.get("content-type") || "").toLowerCase();
+  if (!ct.includes("application/json")) {
+    return { ok: false, status: response.status, message: "non_json_response" };
+  }
+
+  const body = await response.json();
+  const results = body?.data?.results;
+  return {
+    ok: true,
+    results: Array.isArray(results) ? results.map((r: Record<string, unknown>) => ({ _source: "brixhub", ...r })) : [],
+    meta: body?.meta ?? null,
+  };
+}
+
 async function brixhubSearchRequest(
   params: Record<string, unknown>,
 ): Promise<BrixhubSearchResult> {
@@ -86,34 +126,21 @@ async function brixhubSearchRequest(
   if (!apiKey) return empty;
 
   try {
-    const response = await fetch(`${BRIXHUB_BASE_URL}/search`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-API-Key": apiKey },
-      body: JSON.stringify(params),
-      signal: AbortSignal.timeout(15000),
-    });
+    let attempt = await brixhubSearchAttempt(apiKey, params);
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => null);
-      const message = body?.message || `HTTP ${response.status}`;
-      console.error(`[brixhub] search failed: ${message}`);
-      return { ...empty, error: message };
+    for (const delay of RETRY_DELAYS_MS) {
+      if (attempt.ok || !TRANSIENT_STATUS.has(attempt.status)) break;
+      console.warn(`[brixhub] transient error (${attempt.message}), retrying in ${delay}ms`);
+      await sleep(delay);
+      attempt = await brixhubSearchAttempt(apiKey, params);
     }
 
-    const ct = (response.headers.get("content-type") || "").toLowerCase();
-    if (!ct.includes("application/json")) {
-      console.error("[brixhub] search returned non-JSON response");
-      return { ...empty, error: "non_json_response" };
+    if (!attempt.ok) {
+      console.error(`[brixhub] search failed: ${attempt.message}`);
+      return { ...empty, error: attempt.message };
     }
 
-    const body = await response.json();
-    const results = body?.data?.results;
-    if (!Array.isArray(results)) return empty;
-
-    return {
-      results: results.map((r: Record<string, unknown>) => ({ _source: "brixhub", ...r })),
-      meta: body?.meta ?? null,
-    };
+    return { results: attempt.results, meta: attempt.meta };
   } catch (err) {
     console.error("[brixhub] search error:", err);
     return { ...empty, error: err instanceof Error ? err.message : "unknown_error" };
@@ -133,7 +160,10 @@ export async function brixhubParametricSearch(
     ...params,
     page: opts.page ?? 1,
     per_page: opts.perPage ?? 10,
-    flexible: opts.flexible ?? true,
+    // BrixHub's own default is exact match. flexible:true reliably 503s on
+    // at least the "email" field (their index maps it as keyword-only), so
+    // don't force it on unless the caller explicitly asks for it.
+    flexible: opts.flexible ?? false,
   });
 }
 
