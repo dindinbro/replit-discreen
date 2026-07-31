@@ -129,10 +129,6 @@ const LOOKUP_MODULES: NavItem[] = [
   { label: "NIR",       href: "/search?mode=nir",   icon: Hash },
 ];
 
-// Data-dump search, person-lookup and payment sections are disabled on this
-// environment (not deleted — see server/sensitive-guard.ts and
-// client/src/App.tsx DISABLED_ROUTES). Their nav entries are simply not
-// mounted below.
 const NAV_SECTIONS: NavSection[] = [
   {
     key: "home",
@@ -141,17 +137,33 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    key: "recherche",
+    labelKey: "nav.section.recherche",
+    collapsible: true,
+    defaultOpen: true,
+    items: SEARCH_MODULES,
+  },
+  {
+    key: "lookup",
+    label: "Données & Lookup",
+    collapsible: true,
+    defaultOpen: true,
+    items: LOOKUP_MODULES,
+  },
+  {
     key: "community",
     labelKey: "nav.section.community",
     items: [
       { label: "STING.EXE",   href: "/game",  icon: Sword, badge: "JEU", badgeColor: "gold" },
       { label: "nav.reviews", labelKey: "nav.reviews", href: "/avis",  icon: Star },
+      { label: "nav.dof",     labelKey: "nav.dof",     href: "/users", icon: Users },
     ],
   },
   {
     key: "info",
     labelKey: "nav.section.info",
     items: [
+      { label: "nav.pricing",  labelKey: "nav.pricing",  href: "/pricing",  icon: CreditCard },
       { label: "nav.tutorial", labelKey: "nav.tutorial", href: "/tuto",    icon: BookOpen },
       { label: "nav.contact",  labelKey: "nav.contact",  href: "/contact",  icon: MessageSquare },
       { label: "Statut", href: "/status", icon: Activity },

@@ -228,41 +228,35 @@ function Router() {
       <Route path="/admin">
         <ProtectedRoute component={AdminPage} withLayout={false} />
       </Route>
-      {/* Data-dump / person search — disabled on this environment, see FeatureDisabledPage */}
       <Route path="/search">
-        <ProtectedRoute component={FeatureDisabledPage} />
+        <ProtectedRoute component={SearchPage} />
       </Route>
-      {/* Search API key management — disabled (tied to the disabled search/payments stack) */}
       <Route path="/api-keys">
-        <ProtectedRoute component={FeatureDisabledPage} />
+        <ProtectedRoute component={ApiKeysPage} />
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={ProfilePage} withLayout={false} />
       </Route>
-      {/* Blacklist/info requests operate on the disabled search index — disabled */}
       <Route path="/blacklist-request">
-        <ProtectedRoute component={FeatureDisabledPage} />
+        <ProtectedRoute component={BlacklistRequestPage} />
       </Route>
       <Route path="/info-request">
-        <ProtectedRoute component={FeatureDisabledPage} />
+        <ProtectedRoute component={InfoRequestPage} />
       </Route>
-      {/* "DOF" profile directory — person-profile search, disabled */}
       <Route path="/users">
-        <PublicRoute component={FeatureDisabledPage} />
+        <PublicRoute component={UsersPage} />
       </Route>
       <Route path="/documentation">
         <PublicRoute component={DocumentationPage} />
       </Route>
-      {/* Payments — disabled on this environment */}
       <Route path="/pricing">
-        <PublicRoute component={FeatureDisabledPage} />
+        <PublicRoute component={PricingPage} />
       </Route>
       <Route path="/tuto">
         <PublicRoute component={TutorialPage} />
       </Route>
-      {/* AI assistant that extracts OSINT search criteria — disabled */}
       <Route path="/disx">
-        <ProtectedRoute component={FeatureDisabledPage} />
+        <ProtectedRoute component={DisXPage} />
       </Route>
       <Route path="/contact">
         <PublicRoute component={ContactPage} />
@@ -279,12 +273,11 @@ function Router() {
       <Route path="/status">
         <PublicRoute component={StatusPage} />
       </Route>
-      {/* Payments — disabled on this environment */}
       <Route path="/checkout">
-        <ProtectedRoute component={FeatureDisabledPage} />
+        <ProtectedRoute component={CheckoutPage} />
       </Route>
       <Route path="/payment-success">
-        <PublicRoute component={FeatureDisabledPage} />
+        <PublicRoute component={PaymentSuccessPage} />
       </Route>
       <Route path="/">
         <PublicRoute component={LandingPage} />
