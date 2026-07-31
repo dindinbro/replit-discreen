@@ -30,7 +30,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string }>): Promise<User | undefined>;
+  updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string; avatarUrl: string | null }>): Promise<User | undefined>;
   getCategories(): Promise<Category[]>;
   getCategoryById(id: number): Promise<Category | undefined>;
   createCategory(category: InsertCategory): Promise<Category>;
@@ -220,7 +220,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string }>): Promise<User | undefined> {
+  async updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string; avatarUrl: string | null }>): Promise<User | undefined> {
     const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return user;
   }

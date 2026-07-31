@@ -1,4 +1,5 @@
 - [Discreen V2 auth](discreen-v2-auth.md) — auth remplacé par username+password+bcrypt+express-session ; Supabase désactivé côté client
-- [Discreen V2 schema](discreen-v2-schema.md) — users table enrichie, migration appliquée manuellement via node (drizzle-kit push interactif bloquant)
-- [Discreen V2 profile routes](discreen-v2-profile-routes.md) — PATCH /api/auth/profile/username|password|email dans server/auth.ts ; session mise à jour en place
+- [Discreen V2 schema](discreen-v2-schema.md) — users table enrichie (avatar_url ajouté), migration appliquée via ALTER TABLE IF NOT EXISTS dans routes.ts au démarrage
+- [Discreen V2 profile routes](discreen-v2-profile-routes.md) — PATCH /api/profile/username|password|avatar dans server/routes.ts ; V2 détecté via /^\d+$/ ; session mise à jour en place
 - [Discreen V2 nav](discreen-v2-nav.md) — nav consolidée : Telegram Lookup supprimé, Téléphone/GeoIP/NIR fusionnés dans SEARCH_MODULES, section DONNÉES & LOOKUP supprimée
+- [V2 profile API](v2-profile-api.md) — routes profil fonctionnelles pour V2 : /api/profile/avatar, /api/profile/username, /api/profile/password

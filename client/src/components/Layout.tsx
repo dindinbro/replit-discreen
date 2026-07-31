@@ -231,18 +231,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       });
       URL.revokeObjectURL(objectUrl);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-      const token = getAccessToken();
-      if (!token) return;
       const res = await fetch("/api/profile/avatar", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ avatar_url: dataUrl }),
       });
       if (res.ok) {
-        // Refresh the Supabase session so the JWT picks up new user_metadata (avatar_url)
-        if (supabase) {
-          await supabase.auth.refreshSession();
-        }
         await refreshRole();
       }
     } catch {

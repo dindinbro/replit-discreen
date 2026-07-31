@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { api } from "@shared/routes";
 import { FilterLabels, insertCategorySchema, PLAN_LIMITS, type PlanTier, FivemFilterTypes } from "@shared/schema";
 import { z } from "zod";
@@ -199,6 +200,7 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
           user_metadata: {
             display_name: userRow.username,
             username: userRow.username,
+            avatar_url: userRow.avatarUrl || undefined,
           },
           app_metadata: {},
         };
@@ -423,6 +425,10 @@ export async function registerRoutes(
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    // Ensure avatar_url column exists on users table (V2 profile support)
+    try {
+      await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
+    } catch (_) {}
     console.log("[referral] Tables ensured OK");
   } catch (err) {
     console.error("[referral] Failed to ensure referral tables:", err);
@@ -897,19 +903,39 @@ export async function registerRoutes(
 
   app.patch("/api/profile/display-name", requireAuth, async (req, res) => {
     try {
-      if (!supabaseAdmin) {
-        return res.status(500).json({ message: "Supabase not configured" });
-      }
       const user = (req as any).user;
+      const { display_name } = req.body;
+      if (!display_name || typeof display_name !== "string" || display_name.trim().length < 2 || display_name.trim().length > 30) {
+        return res.status(400).json({ message: "Le pseudo doit contenir entre 2 et 30 caractères." });
+      }
+      const trimmedName = display_name.trim();
+
+      // V2 local user — proxy to username update (admin only for legacy parity)
+      const isV2User = /^\d+$/.test(user.id);
+      if (isV2User) {
+        const numId = parseInt(user.id, 10);
+        const role = await getEffectiveRole(user.id);
+        if (role !== "admin") {
+          return res.status(403).json({ message: "Seuls les administrateurs peuvent modifier le pseudo via cette route." });
+        }
+        const existing = await storage.getUserByUsername(trimmedName);
+        if (existing && existing.id !== numId) {
+          return res.status(409).json({ message: "Ce pseudo est déjà utilisé par un autre utilisateur." });
+        }
+        const updated = await storage.updateUser(numId, { username: trimmedName });
+        if (!updated) return res.status(404).json({ message: "Utilisateur introuvable." });
+        (req.session as any).authUsername = trimmedName;
+        return res.json({ success: true, display_name: updated.username });
+      }
+
+      // Legacy Supabase user
+      if (!supabaseAdmin) {
+        return res.status(500).json({ message: "Non supporté." });
+      }
       const role = await getEffectiveRole(user.id);
       if (role !== "admin") {
         return res.status(403).json({ message: "Seuls les administrateurs peuvent modifier le pseudo." });
       }
-      const { display_name } = req.body;
-      if (!display_name || typeof display_name !== "string" || display_name.trim().length < 2 || display_name.trim().length > 30) {
-        return res.status(400).json({ message: "Le pseudo doit contenir entre 2 et 30 caracteres." });
-      }
-      const trimmedName = display_name.trim();
       let page = 1;
       let taken = false;
       while (!taken) {
@@ -922,7 +948,7 @@ export async function registerRoutes(
         page++;
       }
       if (taken) {
-        return res.status(409).json({ message: "Ce pseudo est deja utilise par un autre utilisateur." });
+        return res.status(409).json({ message: "Ce pseudo est déjà utilisé par un autre utilisateur." });
       }
       const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
         user_metadata: { ...user.user_metadata, display_name: trimmedName },
@@ -937,26 +963,108 @@ export async function registerRoutes(
     }
   });
 
-  // PATCH /api/profile/avatar — update avatar URL
+  // PATCH /api/profile/avatar — update avatar URL (base64 or URL)
   app.patch("/api/profile/avatar", requireAuth, async (req, res) => {
     try {
-      if (!supabaseAdmin) {
-        return res.status(500).json({ message: "Supabase not configured" });
-      }
       const user = (req as any).user;
       const { avatar_url } = req.body;
       if (avatar_url && typeof avatar_url === "string" && avatar_url.length > 5_000_000) {
         return res.status(400).json({ message: "Fichier trop volumineux." });
       }
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-        user_metadata: { ...user.user_metadata, avatar_url: avatar_url || null },
-      });
-      if (error) {
-        return res.status(500).json({ message: error.message });
+      const finalUrl: string | null = avatar_url || null;
+
+      // V2 local user — store in users table
+      const isV2User = /^\d+$/.test(user.id);
+      if (isV2User) {
+        const numId = parseInt(user.id, 10);
+        const updated = await storage.updateUser(numId, { avatarUrl: finalUrl });
+        if (!updated) return res.status(404).json({ message: "Utilisateur introuvable." });
+        return res.json({ success: true, avatar_url: updated.avatarUrl || null });
       }
-      res.json({ success: true, avatar_url: avatar_url || null });
+
+      // Legacy Supabase user
+      if (supabaseAdmin) {
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+          user_metadata: { ...user.user_metadata, avatar_url: finalUrl },
+        });
+        if (error) return res.status(500).json({ message: error.message });
+        return res.json({ success: true, avatar_url: finalUrl });
+      }
+
+      return res.status(500).json({ message: "Non supporté." });
     } catch (err) {
       console.error("PATCH /api/profile/avatar error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // PATCH /api/profile/username — update username (all V2 users)
+  app.patch("/api/profile/username", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { username } = req.body;
+      if (!username || typeof username !== "string" || username.trim().length < 2 || username.trim().length > 30) {
+        return res.status(400).json({ message: "Le pseudo doit contenir entre 2 et 30 caractères." });
+      }
+      if (!/^[a-zA-Z0-9_\-]+$/.test(username.trim())) {
+        return res.status(400).json({ message: "Le pseudo ne peut contenir que des lettres, chiffres, _ et -." });
+      }
+      const trimmed = username.trim();
+
+      const isV2User = /^\d+$/.test(user.id);
+      if (!isV2User) {
+        return res.status(400).json({ message: "Non supporté pour les comptes legacy." });
+      }
+      const numId = parseInt(user.id, 10);
+      // Check uniqueness
+      const existing = await storage.getUserByUsername(trimmed);
+      if (existing && existing.id !== numId) {
+        return res.status(409).json({ message: "Ce pseudo est déjà utilisé." });
+      }
+      const updated = await storage.updateUser(numId, { username: trimmed });
+      if (!updated) return res.status(404).json({ message: "Utilisateur introuvable." });
+      // Update session username
+      (req.session as any).authUsername = trimmed;
+      return res.json({ success: true, display_name: updated.username });
+    } catch (err) {
+      console.error("PATCH /api/profile/username error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // PATCH /api/profile/password — change password (V2 users, requires current password)
+  app.patch("/api/profile/password", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!/^\d+$/.test(user.id)) {
+        return res.status(400).json({ message: "Non supporté pour les comptes legacy." });
+      }
+      const numId = parseInt(user.id, 10);
+
+      const { current_password, new_password } = req.body;
+      if (!current_password || typeof current_password !== "string") {
+        return res.status(400).json({ message: "Mot de passe actuel requis." });
+      }
+      if (!new_password || typeof new_password !== "string" || new_password.length < 6) {
+        return res.status(400).json({ message: "Le nouveau mot de passe doit contenir au moins 6 caractères." });
+      }
+
+      const userRow = await storage.getUser(numId);
+      if (!userRow || !userRow.passwordHash) {
+        return res.status(400).json({ message: "Compte non compatible avec le changement de mot de passe." });
+      }
+
+      const valid = await bcrypt.compare(current_password, userRow.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ message: "Mot de passe actuel incorrect." });
+      }
+
+      const passwordHash = await bcrypt.hash(new_password, 12);
+      await storage.updateUser(numId, { passwordHash });
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("PATCH /api/profile/password error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });

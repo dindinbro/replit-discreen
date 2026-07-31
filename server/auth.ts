@@ -222,7 +222,7 @@ export function registerAuthRoutes(app: Express) {
         frozen: sub?.frozen ?? false,
         unique_id: sub?.id ?? null,
         display_name: user.username,
-        avatar_url: null,
+        avatar_url: user.avatarUrl || null,
         expires_at: sub?.expiresAt || null,
         discord_id: sub?.discordId || null,
         created_at: user.createdAt || null,
