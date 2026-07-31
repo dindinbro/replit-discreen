@@ -197,7 +197,7 @@ export default function TutorialPage() {
         <p className="text-xs tracking-[0.22em] uppercase text-primary/70 font-semibold">Guide de démarrage</p>
         <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight">
           Commencer avec{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#b8902e] via-[#f0c060] to-[#d4a843]">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold-dark via-gold-light to-gold">
             Discreen
           </span>
         </h1>

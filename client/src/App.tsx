@@ -10,7 +10,6 @@ import NotFound from "@/pages/not-found";
 import FeatureDisabledPage from "@/pages/FeatureDisabledPage";
 import LandingPage from "@/pages/LandingPage";
 import SearchPage from "@/pages/SearchPage";
-import PricingPage from "@/pages/PricingPage";
 import ContactPage from "@/pages/ContactPage";
 import AuthPage from "@/pages/AuthPage";
 import AdminPage from "@/pages/AdminPage";
@@ -244,9 +243,6 @@ function Router() {
       </Route>
       <Route path="/documentation">
         <PublicRoute component={DocumentationPage} />
-      </Route>
-      <Route path="/pricing">
-        <PublicRoute component={PricingPage} />
       </Route>
       <Route path="/contact">
         <PublicRoute component={ContactPage} />

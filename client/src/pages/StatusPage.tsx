@@ -88,7 +88,7 @@ function UptimeBar({ services }: { services: ServiceStatus[] }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Disponibilité · 90 jours</span>
-        <span className="text-2xl font-bold tabular-nums" style={{ color: "#d4a843" }}>{pct}%</span>
+        <span className="text-2xl font-bold tabular-nums text-gold">{pct}%</span>
       </div>
 
       <div className="relative">
@@ -174,8 +174,8 @@ function ServiceRow({ svc, index }: { svc: ServiceStatus; index: number }) {
       transition={{ delay: index * 0.06 }}
       className="flex items-center gap-4 py-4 border-b border-[rgba(255,255,255,0.05)] last:border-0"
     >
-      <div className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.15)" }}>
-        <ServiceIcon className="w-4 h-4 text-[#d4a843]" />
+      <div className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-gold/7 border border-gold/15">
+        <ServiceIcon className="w-4 h-4 text-gold" />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -292,7 +292,7 @@ export default function StatusPage() {
       >
         <div className="px-5 pt-4 pb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-[#d4a843]" />
+            <Activity className="w-4 h-4 text-gold" />
             <span className="text-sm font-semibold text-foreground">Services</span>
           </div>
           <span className="text-xs text-muted-foreground">{displayServices.length} monitored</span>

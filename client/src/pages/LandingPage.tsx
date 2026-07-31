@@ -121,11 +121,6 @@ export default function LandingPage() {
                     Commencer la recherche
                   </Button>
                 </Link>
-                <Link href="/pricing">
-                  <Button size="lg" variant="outline" className="gap-2 px-8">
-                    Voir les offres
-                  </Button>
-                </Link>
               </div>
             ) : (
               <>

@@ -40,6 +40,11 @@ import { sensitiveFeatureGuard, blockDeployFileBackdoor, SENSITIVE_FEATURES_ENAB
 const app = express();
 const httpServer = createServer(app);
 
+// Behind nginx (TLS-terminating reverse proxy): trust X-Forwarded-Proto so
+// express-session can tell the request is secure and actually set the
+// session cookie (cookie.secure otherwise silently drops it).
+app.set("trust proxy", 1);
+
 // ── Session middleware (V2 auth) ──────────────────────────
 const sessionSecret = process.env.SESSION_SECRET || "discreen-v2-dev-secret-change-in-prod";
 export const sessionMiddleware = session({

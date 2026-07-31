@@ -245,7 +245,7 @@ export default function CheckoutPage() {
         <XCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
         <h2 className="text-xl font-bold mb-2">Session introuvable</h2>
         <p className="text-muted-foreground mb-4">{sessionError}</p>
-        <Link href="/pricing"><Button>Retour aux offres</Button></Link>
+        <Link href="/"><Button>Retour à l'accueil</Button></Link>
       </Card>
     </div>
   );
@@ -257,9 +257,9 @@ export default function CheckoutPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <button onClick={() => navigate("/pricing")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5">
+          <button onClick={() => navigate("/")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5">
             <ArrowLeft className="w-4 h-4" />
-            Retour aux offres
+            Retour à l'accueil
           </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center">
@@ -475,8 +475,8 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                <Link href="/pricing">
-                  <Button variant="ghost" size="sm">Retour aux offres</Button>
+                <Link href="/">
+                  <Button variant="ghost" size="sm">Retour à l'accueil</Button>
                 </Link>
               </Card>
             </motion.div>
@@ -494,7 +494,7 @@ export default function CheckoutPage() {
                   <p className="text-muted-foreground text-sm">Le paiement n'a pas abouti. Vous pouvez réessayer avec un nouveau paiement.</p>
                 </div>
                 <div className="flex gap-3 justify-center flex-wrap">
-                  <Link href="/pricing"><Button>Réessayer</Button></Link>
+                  <Link href="/"><Button>Retour à l'accueil</Button></Link>
                   <Link href="/tickets"><Button variant="outline">Contacter le support</Button></Link>
                 </div>
               </Card>

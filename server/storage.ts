@@ -29,8 +29,10 @@ import crypto from "crypto";
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string; avatarUrl: string | null }>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
   getCategories(): Promise<Category[]>;
   getCategoryById(id: number): Promise<Category | undefined>;
   createCategory(category: InsertCategory): Promise<Category>;
@@ -215,6 +217,10 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
@@ -223,6 +229,11 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string; avatarUrl: string | null }>): Promise<User | undefined> {
     const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return user;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id)).returning({ id: users.id });
+    return result.length > 0;
   }
 
   async getCategories(): Promise<Category[]> {

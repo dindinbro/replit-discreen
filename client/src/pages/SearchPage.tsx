@@ -348,14 +348,13 @@ function BlurredResultCards({ tier }: { tier: string }) {
           <div className="space-y-2">
             <h3 className="text-xl font-bold text-foreground" data-testid="text-quota-exceeded-title">Contenu verrouille</h3>
             <p className="text-sm text-muted-foreground" data-testid="text-quota-exceeded-description">
-              Vous avez utilise toutes vos recherches quotidiennes sur le plan <span className="font-semibold text-foreground">{tier.toUpperCase()}</span>.
-              Passez a l'abonnement superieur pour profiter de recherches supplementaires et acceder a plus de resultats.
+              Vous avez utilise toutes vos recherches quotidiennes disponibles pour aujourd'hui. Reessayez demain.
             </p>
           </div>
-          <Link href="/pricing">
+          <Link href="/contact">
             <Button className="gap-2 mt-2" data-testid="button-upgrade-plan">
               <Zap className="w-4 h-4" />
-              Passer au plan superieur
+              Nous contacter
             </Button>
           </Link>
         </Card>
@@ -543,15 +542,15 @@ function MiniResultCard({
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: (globalIndex % 20) * 0.03, duration: 0.22, ease: [0.22,1,0.36,1] }}
       onClick={onClick}
-      className="group relative flex items-stretch rounded-xl border border-[rgba(255,255,255,0.06)] bg-[rgba(8,8,10,0.6)] hover:border-[rgba(212,168,67,0.3)] hover:bg-[rgba(212,168,67,0.025)] transition-all duration-200 cursor-pointer overflow-hidden select-none"
+      className="group relative flex items-stretch rounded-xl border border-[rgba(255,255,255,0.06)] bg-[rgba(8,8,10,0.6)] hover:border-gold/30 hover:bg-gold/[0.025] transition-all duration-200 cursor-pointer overflow-hidden select-none"
       data-testid={`mini-card-result-${globalIndex}`}
     >
       {/* Left accent bar */}
-      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-[rgba(212,168,67,0)] via-[rgba(212,168,67,0)] to-[rgba(212,168,67,0)] group-hover:from-[rgba(212,168,67,0.7)] group-hover:via-[rgba(212,168,67,0.35)] group-hover:to-[rgba(212,168,67,0)] transition-all duration-300" />
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-gold/0 via-gold/0 to-gold/0 group-hover:from-gold/70 group-hover:via-gold/35 group-hover:to-gold/0 transition-all duration-300" />
 
       <div className="flex items-center gap-4 px-5 py-4 w-full pl-6">
         {/* Index badge */}
-        <span className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-[#d4a843] bg-[rgba(212,168,67,0.07)] border border-[rgba(212,168,67,0.18)]">
+        <span className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-gold bg-gold/7 border border-gold/18">
           {globalIndex + 1}
         </span>
 
@@ -587,7 +586,7 @@ function MiniResultCard({
           >
             {score}%
           </span>
-          <span className="flex items-center gap-1 text-[11px] text-muted-foreground/35 group-hover:text-[#d4a843] transition-colors duration-200 whitespace-nowrap">
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground/35 group-hover:text-gold transition-colors duration-200 whitespace-nowrap">
             <Eye className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Voir</span>
           </span>
@@ -2048,24 +2047,6 @@ export default function SearchPage() {
                 </motion.div>
               )}
               </div>
-              {!canAccessXeuledoc && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl bg-background/30" data-testid="xeuledoc-upgrade-overlay">
-                  <div className="text-center space-y-3 p-6">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                      <Lock className="w-6 h-6 text-red-500" />
-                    </div>
-                    <h3 className="text-lg font-bold">Abonnement PRO requis</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm">
-                      Google Docs OSINT est disponible a partir de l'abonnement PRO ou superieur.
-                    </p>
-                    <Link href="/pricing">
-                      <Button className="mt-2 gap-2" data-testid="button-upgrade-xeuledoc">
-                        Voir les abonnements
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              )}
             </motion.div>
             );
           })()}
@@ -2486,24 +2467,6 @@ export default function SearchPage() {
                 </div>
               </div>
 
-              {!canAccessWanted && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl bg-background/30" data-testid="wanted-upgrade-overlay">
-                  <div className="text-center space-y-3 p-6">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                      <Lock className="w-6 h-6 text-red-500" />
-                    </div>
-                    <h3 className="text-lg font-bold">Abonnement PRO requis</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm">
-                      Le moteur de recherche Wanted est disponible a partir de l'abonnement PRO ou superieur.
-                    </p>
-                    <Link href="/pricing">
-                      <Button className="mt-2 gap-2" data-testid="button-upgrade-wanted">
-                        Voir les abonnements
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              )}
             </motion.div>
             );
           })()}
@@ -2575,7 +2538,6 @@ export default function SearchPage() {
               : baseTotal;
             const isLoading = searchMutation.isPending || advancedLoading;
             const activeError = searchMutation.error;
-            const isPreview = searchMutation.data?.previewMode === true;
 
             return (
               <>
@@ -2606,41 +2568,6 @@ export default function SearchPage() {
                       </p>
                     </div>
                   </Card>
-                )}
-
-                {isPreview && activeResults && activeResults.length > 0 && !isLoading && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="relative overflow-hidden rounded-xl border border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-5"
-                    data-testid="banner-preview-mode"
-                  >
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="w-10 h-10 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
-                          <Lock className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="space-y-1 min-w-0">
-                          <h4 className="text-base font-bold text-foreground">
-                            🔒 Résultats partiellement masqués
-                          </h4>
-                          <p className="text-sm text-muted-foreground">
-                            Débloquez l'accès complet instantanément avec un abonnement <span className="font-semibold text-primary">Pro</span>.
-                          </p>
-                        </div>
-                      </div>
-                      <Link href="/pricing">
-                        <Button
-                          size="sm"
-                          className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1.5 shrink-0"
-                          data-testid="button-upgrade-from-preview"
-                        >
-                          <Crown className="w-4 h-4" />
-                          Passer à Pro
-                        </Button>
-                      </Link>
-                    </div>
-                  </motion.div>
                 )}
 
                 {isLoading ? (

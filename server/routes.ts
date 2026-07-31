@@ -1577,61 +1577,22 @@ export async function registerRoutes(
     }
   });
 
-  // GET /api/admin/users — returns all users with effective role (paginated Supabase fetch)
+  // GET /api/admin/users — returns all local (V2) users with effective role
   app.get("/api/admin/users", requireAuth, requireAdmin, async (_req, res) => {
     try {
-      if (!supabaseAdmin) {
-        return res.status(500).json({ message: "Supabase not configured" });
-      }
-
-      // Paginate through all Supabase auth users (default limit is 50)
-      const allUsers: any[] = [];
-      let page = 1;
-      while (true) {
-        const { data: pageData, error: pageError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
-        if (pageError) {
-          console.error("listUsers error:", pageError);
-          return res.status(500).json({ message: "Erreur lors de la récupération des utilisateurs" });
-        }
-        if (!pageData?.users?.length) break;
-        allUsers.push(...pageData.users);
-        if (pageData.users.length < 1000) break;
-        page++;
-      }
-
-      const { data: profiles, error: profilesError } = await supabaseAdmin
-        .from("profiles")
-        .select("id, role, created_at");
-
-      if (profilesError) {
-        console.error("profiles error:", profilesError);
-        return res.status(500).json({ message: "Erreur lors de la récupération des profils" });
-      }
-
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const allUsers = await storage.getAllUsers();
 
       const result = await Promise.all(allUsers.map(async (u) => {
-        const profile = profileMap.get(u.id);
-        const profileRole = profile?.role || "user";
-
-        let effectiveRole: string;
-        const sub = await storage.getOrCreateSubscription(u.id);
-        if (profileRole === "admin") {
-          effectiveRole = "admin";
-        } else {
-          effectiveRole = (sub?.tier as string) || "free";
-        }
-
-        const meta = u.user_metadata || {};
-        const username: string | null = meta.display_name || meta.username || meta.full_name || null;
+        const sub = await storage.getOrCreateSubscription(String(u.id));
+        const effectiveRole = u.role === "admin" ? "admin" : ((sub?.tier as string) || "free");
 
         return {
-          id: u.id,
+          id: String(u.id),
           email: u.email || "",
-          username,
+          username: u.username,
           role: effectiveRole,
           frozen: sub?.frozen ?? false,
-          created_at: profile?.created_at || u.created_at,
+          created_at: u.createdAt,
           unique_id: sub.id,
         };
       }));
@@ -1646,67 +1607,41 @@ export async function registerRoutes(
   // POST /api/admin/set-role — handles all roles: free/vip/pro/business/api/admin
   app.post("/api/admin/set-role", requireAuth, requireAdmin, async (req, res) => {
     try {
-      if (!supabaseAdmin) {
-        return res.status(500).json({ message: "Supabase not configured" });
-      }
-
       const schema = z.object({
-        userId: z.string().uuid(),
+        userId: z.string().regex(/^\d+$/, "ID utilisateur invalide"),
         role: z.enum(["free", "pro", "business", "api", "admin"]),
       });
 
       const parsed = schema.parse(req.body);
+      const targetId = parseInt(parsed.userId, 10);
+
+      const targetUser = await storage.getUser(targetId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "Utilisateur introuvable" });
+      }
 
       if (parsed.role === "admin") {
-        const { error } = await supabaseAdmin
-          .from("profiles")
-          .update({ role: "admin" })
-          .eq("id", parsed.userId);
-
-        if (error) {
-          console.error("set-role error:", error);
-          return res.status(500).json({ message: "Erreur lors de la mise à jour du rôle" });
-        }
+        await storage.updateUser(targetId, { role: "admin" });
       } else {
-        const { error: profileError } = await supabaseAdmin
-          .from("profiles")
-          .update({ role: "user" })
-          .eq("id", parsed.userId);
-
-        if (profileError) {
-          console.error("set-role profile error:", profileError);
-          return res.status(500).json({ message: "Erreur lors de la mise à jour du profil" });
+        if (targetUser.role === "admin") {
+          await storage.updateUser(targetId, { role: "free" });
         }
-
         await storage.upsertSubscription(parsed.userId, parsed.role as PlanTier);
       }
 
       const adminEmail = (req as any).user?.email || "admin";
 
-      let targetEmail = parsed.userId;
-      let targetUsername = "N/A";
       let targetUniqueId: number | null = null;
       try {
-        if (supabaseAdmin) {
-          const { data: profile } = await supabaseAdmin
-            .from("profiles")
-            .select("email, username")
-            .eq("id", parsed.userId)
-            .single();
-          if (profile) {
-            targetEmail = profile.email || parsed.userId;
-            targetUsername = profile.username || "N/A";
-          }
-        }
         const sub = await storage.getSubscription(parsed.userId);
         if (sub) {
-          targetUniqueId = (sub as any).uniqueId ?? null;
+          targetUniqueId = sub.id;
         }
       } catch (e) {
         console.error("webhookRoleChange: failed to fetch target info", e);
       }
 
-      webhookRoleChange(adminEmail, { email: targetEmail, username: targetUsername, uniqueId: targetUniqueId, userId: parsed.userId }, parsed.role);
+      webhookRoleChange(adminEmail, { email: targetUser.email || "", username: targetUser.username, uniqueId: targetUniqueId, userId: parsed.userId }, parsed.role);
 
       res.json({ success: true, userId: parsed.userId, role: parsed.role });
     } catch (err) {
@@ -1722,7 +1657,7 @@ export async function registerRoutes(
   app.post("/api/admin/freeze", requireAuth, requireAdmin, async (req, res) => {
     try {
       const schema = z.object({
-        userId: z.string().uuid(),
+        userId: z.string().regex(/^\d+$/, "ID utilisateur invalide"),
         frozen: z.boolean(),
       });
       const parsed = schema.parse(req.body);
@@ -1730,14 +1665,12 @@ export async function registerRoutes(
       const adminEmail = (req as any).user?.email || "admin";
 
       let targetEmail = parsed.userId;
-      let targetUsername = parsed.userId.slice(0, 8);
+      let targetUsername = parsed.userId;
       let targetUniqueId: number | null = null;
-      if (supabaseAdmin) {
-        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(parsed.userId);
-        if (authUser?.user) {
-          targetEmail = authUser.user.email || parsed.userId;
-          targetUsername = authUser.user.user_metadata?.username || targetEmail.split("@")[0];
-        }
+      const targetUser = await storage.getUser(parseInt(parsed.userId, 10));
+      if (targetUser) {
+        targetEmail = targetUser.email || parsed.userId;
+        targetUsername = targetUser.username;
       }
       const targetSub = await storage.getSubscription(parsed.userId);
       if (targetSub) {
@@ -1766,14 +1699,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Vous ne pouvez pas supprimer votre propre compte" });
       }
 
-      if (!supabaseAdmin) {
-        return res.status(500).json({ message: "Supabase admin non configure" });
+      if (!/^\d+$/.test(targetUserId)) {
+        return res.status(400).json({ message: "ID utilisateur invalide" });
       }
 
-      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
-      if (authError) {
-        console.error("Supabase deleteUser error:", authError);
-        return res.status(500).json({ message: "Erreur lors de la suppression du compte Supabase" });
+      const deleted = await storage.deleteUser(parseInt(targetUserId, 10));
+      if (!deleted) {
+        return res.status(404).json({ message: "Utilisateur introuvable" });
       }
 
       try {
@@ -2523,7 +2455,7 @@ export async function registerRoutes(
 
       // Free-tier preview mode: heavily mask values + cap to 3 results
       // to give a tease of what's available while pushing toward PRO.
-      const isPreview = !isUnlimited && tier === "free";
+      const isPreview = false; // [FREE MODE] site is free — no more masking
       if (isPreview) {
         const maskValue = (val: unknown): string => {
           if (val === null || val === undefined) return "";

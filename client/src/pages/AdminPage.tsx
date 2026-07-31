@@ -55,7 +55,6 @@ import {
   Monitor,
   Globe,
   ScanLine,
-  Tag,
   ToggleLeft,
   ToggleRight,
   RefreshCw,
@@ -65,7 +64,6 @@ import {
   Sparkles,
   Timer,
   EyeOff,
-  Star,
   MessageSquare,
   DatabaseZap,
   Filter,
@@ -116,7 +114,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "discounts" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "reviews" | "tickets" | "chat" | "bypass" | "crypto-payments";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "tickets" | "chat" | "bypass" | "crypto-payments";
 
 interface AdminTabDef {
   key: AdminTab;
@@ -155,13 +153,11 @@ const ADMIN_TABS: AdminTabDef[] = [
   { key: "logs",           label: "Logs Connexions",        shortLabel: "Connexions",    description: "Historique des connexions et authentifications",       icon: Activity,    group: "logs" },
   { key: "search-logs",    label: "Logs Recherches",        shortLabel: "Recherches",    description: "Requêtes de recherche effectuées par les utilisateurs", icon: DatabaseZap, group: "logs" },
   { key: "game-logs",      label: "Logs de Jeu",            shortLabel: "Parties",       description: "Scores, crédits et sessions STING.EXE",               icon: BarChart3,   group: "logs" },
-  { key: "reviews",        label: "Avis Clients",           shortLabel: "Avis",          description: "Modération des avis et témoignages publics",           icon: Star,        group: "community" },
   { key: "notifications",  label: "Notifications Pop-up",   shortLabel: "Notifs",        description: "Messages d'alerte affichés aux utilisateurs",          icon: Bell,        group: "community" },
   { key: "tickets",        label: "Tickets Support",        shortLabel: "Tickets",       description: "Gestion des demandes d'assistance utilisateurs",       icon: MessageSquare, group: "community" },
   { key: "chat",           label: "Chat Global",            shortLabel: "Chat",          description: "Modération du salon de chat en temps réel",            icon: MessageSquare, group: "community" },
   { key: "bypass",         label: "Bypass Whitelist",       shortLabel: "Bypass",        description: "Utilisateurs exemptés des limites et cooldowns",        icon: ShieldCheck,   group: "moderation" },
   { key: "game-boosts",    label: "Boosts de Jeu",          shortLabel: "Boosts",        description: "Multiplicateurs de score et avantages temporaires",   icon: Zap,         group: "game" },
-  { key: "discounts",      label: "Codes Promo",            shortLabel: "Promo",         description: "Bons de réduction et codes de réduction",             icon: Tag,         group: "game" },
   { key: "services",       label: "Statut des Services",    shortLabel: "Services",      description: "Moniteur de santé des APIs et services externes",     icon: Monitor,     group: "system" },
   { key: "crypto-payments", label: "Paiements Crypto",      shortLabel: "Paiements",     description: "Historique des paiements crypto NOWPayments",          icon: Bitcoin,     group: "system" },
 ];
@@ -174,7 +170,7 @@ interface CategoryFormData {
   sortOrder: number;
 }
 
-function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAccessToken: () => string | null; editProfile?: WantedProfile | null; onEditDone?: () => void }) {
+function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedProfile | null; onEditDone?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
@@ -253,9 +249,6 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = getAccessToken();
-    if (!token) return;
-
     setLoading(true);
     try {
       const payload = {
@@ -277,9 +270,9 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
 
       const res = await fetch(url, {
         method,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -438,7 +431,7 @@ function WantedProfileForm({ getAccessToken, editProfile, onEditDone }: { getAcc
   );
 }
 
-function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () => string | null; onEdit: (profile: WantedProfile) => void }) {
+function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -447,10 +440,8 @@ function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () =
   const { data: profiles, isLoading } = useQuery<WantedProfile[]>({
     queryKey: ["/api/admin/wanted-profiles"],
     queryFn: async () => {
-      const token = getAccessToken();
-      if (!token) return [];
       const res = await fetch("/api/admin/wanted-profiles", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch wanted profiles");
       return res.json();
@@ -458,13 +449,11 @@ function WantedHistorySection({ getAccessToken, onEdit }: { getAccessToken: () =
   });
 
   const deleteProfile = async (id: number) => {
-    const token = getAccessToken();
-    if (!token) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/wanted-profiles/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
@@ -609,12 +598,10 @@ function CategoryFormDialog({
   open,
   onOpenChange,
   editCategory,
-  getAccessToken,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editCategory: Category | null;
-  getAccessToken: () => string | null;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -642,9 +629,6 @@ function CategoryFormDialog({
 
   const saveMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
-      const token = getAccessToken();
-      if (!token) throw new Error("Non authentifie");
-
       const url = editCategory
         ? `/api/admin/categories/${editCategory.id}`
         : "/api/admin/categories";
@@ -652,9 +636,9 @@ function CategoryFormDialog({
 
       const res = await fetch(url, {
         method,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(data),
       });
@@ -800,7 +784,7 @@ function CategoryFormDialog({
 
 const PAGE_SIZE = 25;
 
-function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string | null; userId: string }) {
+function UsersSection({ userId }: { userId: string }) {
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -819,11 +803,9 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
 
   useEffect(() => {
     async function fetchUsers() {
-      const token = getAccessToken();
-      if (!token) return;
       try {
         const res = await fetch("/api/admin/users", {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
         });
         if (res.ok) {
           setUsers(await res.json());
@@ -837,7 +819,7 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
       }
     }
     fetchUsers();
-  }, [getAccessToken, toast]);
+  }, [toast]);
 
   const handleRoleChange = (uid: string, newRole: string) => {
     setPendingChanges(prev => ({ ...prev, [uid]: newRole }));
@@ -846,13 +828,12 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   const saveRole = async (uid: string) => {
     const newRole = pendingChanges[uid];
     if (!newRole) return;
-    const token = getAccessToken();
-    if (!token) return;
     setSavingId(uid);
     try {
       const res = await fetch("/api/admin/set-role", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: uid, role: newRole }),
       });
       if (res.ok) {
@@ -871,13 +852,12 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   };
 
   const toggleFreeze = async (uid: string, freeze: boolean) => {
-    const token = getAccessToken();
-    if (!token) return;
     setFreezingId(uid);
     try {
       const res = await fetch("/api/admin/freeze", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: uid, frozen: freeze }),
       });
       if (res.ok) {
@@ -895,13 +875,11 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   };
 
   const deleteUser = async (uid: string) => {
-    const token = getAccessToken();
-    if (!token) return;
     setDeletingId(uid);
     try {
       const res = await fetch(`/api/admin/users/${uid}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (res.ok) {
         setUsers(prev => prev.filter(u => u.id !== uid));
@@ -919,13 +897,11 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   };
 
   const resetGameData = async (uid: string) => {
-    const token = getAccessToken();
-    if (!token) return;
     setGameResetLoadingId(uid);
     try {
       const res = await fetch(`/api/admin/game/reset/${uid}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (res.ok) {
         toast({ title: "Jeu reinitialise", description: "Score et credits remis a zero." });
@@ -942,8 +918,6 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   };
 
   const setGameScore = async (uid: string, username: string) => {
-    const token = getAccessToken();
-    if (!token) return;
     const score = parseInt(gameSetScore, 10);
     if (isNaN(score) || score < 0) {
       toast({ title: "Erreur", description: "Score invalide", variant: "destructive" });
@@ -953,7 +927,8 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
     try {
       const res = await fetch(`/api/admin/game/set/${uid}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ score, username }),
       });
       if (res.ok) {
@@ -1180,7 +1155,7 @@ function UsersSection({ getAccessToken, userId }: { getAccessToken: () => string
   );
 }
 
-function BlacklistAddForm({ getAccessToken, editEntry, onEditDone }: { getAccessToken: () => string | null; editEntry?: BlacklistEntry | null; onEditDone?: () => void }) {
+function BlacklistAddForm({ editEntry, onEditDone }: { editEntry?: BlacklistEntry | null; onEditDone?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
@@ -1251,9 +1226,6 @@ function BlacklistAddForm({ getAccessToken, editEntry, onEditDone }: { getAccess
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = getAccessToken();
-    if (!token) return;
-
     setLoading(true);
     try {
       const payload = {
@@ -1275,7 +1247,8 @@ function BlacklistAddForm({ getAccessToken, editEntry, onEditDone }: { getAccess
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -1427,7 +1400,7 @@ function BlacklistAddForm({ getAccessToken, editEntry, onEditDone }: { getAccess
   );
 }
 
-function BlacklistHistorySection({ getAccessToken, onEdit }: { getAccessToken: () => string | null; onEdit: (entry: BlacklistEntry) => void }) {
+function BlacklistHistorySection({ onEdit }: { onEdit: (entry: BlacklistEntry) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -1436,10 +1409,8 @@ function BlacklistHistorySection({ getAccessToken, onEdit }: { getAccessToken: (
   const { data: entries, isLoading } = useQuery<BlacklistEntry[]>({
     queryKey: ["/api/admin/blacklist"],
     queryFn: async () => {
-      const token = getAccessToken();
-      if (!token) return [];
       const res = await fetch("/api/admin/blacklist", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch blacklist");
       return res.json();
@@ -1447,13 +1418,11 @@ function BlacklistHistorySection({ getAccessToken, onEdit }: { getAccessToken: (
   });
 
   const deleteEntry = async (id: number) => {
-    const token = getAccessToken();
-    if (!token) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/blacklist/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["/api/admin/blacklist"] });
@@ -1586,7 +1555,7 @@ function BlacklistHistorySection({ getAccessToken, onEdit }: { getAccessToken: (
   );
 }
 
-function BlacklistRequestsSubSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function BlacklistRequestsSubSection() {
   const { toast } = useToast();
   const [blacklistRequests, setBlacklistRequests] = useState<BlacklistRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1594,27 +1563,24 @@ function BlacklistRequestsSubSection({ getAccessToken }: { getAccessToken: () =>
 
   useEffect(() => {
     async function fetch_data() {
-      const token = getAccessToken();
-      if (!token) return;
       try {
         const res = await fetch("/api/admin/blacklist-requests", {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
         });
         if (res.ok) setBlacklistRequests(await res.json());
       } catch {}
       setLoading(false);
     }
     fetch_data();
-  }, [getAccessToken]);
+  }, []);
 
   const updateStatus = async (requestId: number, status: "approved" | "rejected") => {
-    const token = getAccessToken();
-    if (!token) return;
     setProcessingId(requestId);
     try {
       const res = await fetch(`/api/admin/blacklist-requests/${requestId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
@@ -1695,7 +1661,7 @@ function BlacklistRequestsSubSection({ getAccessToken }: { getAccessToken: () =>
   );
 }
 
-function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function BlacklistSection() {
   const [subTab, setSubTab] = useState<"requests" | "history" | "add">("requests");
   const [editEntry, setEditEntry] = useState<BlacklistEntry | null>(null);
 
@@ -1744,14 +1710,14 @@ function BlacklistSection({ getAccessToken }: { getAccessToken: () => string | n
         </Button>
       </div>
 
-      {subTab === "requests" && <BlacklistRequestsSubSection getAccessToken={getAccessToken} />}
-      {subTab === "history" && <BlacklistHistorySection getAccessToken={getAccessToken} onEdit={handleEdit} />}
-      {subTab === "add" && <BlacklistAddForm getAccessToken={getAccessToken} editEntry={editEntry} onEditDone={handleEditDone} />}
+      {subTab === "requests" && <BlacklistRequestsSubSection />}
+      {subTab === "history" && <BlacklistHistorySection onEdit={handleEdit} />}
+      {subTab === "add" && <BlacklistAddForm editEntry={editEntry} onEditDone={handleEditDone} />}
     </div>
   );
 }
 
-function InfoRequestsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function InfoRequestsSection() {
   const { toast } = useToast();
   const [infoRequests, setInfoRequests] = useState<InfoRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1759,27 +1725,24 @@ function InfoRequestsSection({ getAccessToken }: { getAccessToken: () => string 
 
   useEffect(() => {
     async function fetch_data() {
-      const token = getAccessToken();
-      if (!token) return;
       try {
         const res = await fetch("/api/admin/info-requests", {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
         });
         if (res.ok) setInfoRequests(await res.json());
       } catch {}
       setLoading(false);
     }
     fetch_data();
-  }, [getAccessToken]);
+  }, []);
 
   const updateStatus = async (requestId: number, status: "approved" | "rejected" | "completed") => {
-    const token = getAccessToken();
-    if (!token) return;
     setProcessingId(requestId);
     try {
       const res = await fetch(`/api/admin/info-requests/${requestId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
@@ -1884,7 +1847,7 @@ interface AdminLicenseKey {
   usedAt: string | null;
 }
 
-function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function KeysSection() {
   const { toast } = useToast();
   const [subTab, setSubTab] = useState<"subscriptions" | "license-keys" | "generate">("subscriptions");
   const [subs, setSubs] = useState<AdminSubscription[]>([]);
@@ -1899,12 +1862,10 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
 
   useEffect(() => {
     async function fetchData() {
-      const token = getAccessToken();
-      if (!token) return;
       try {
         const [subsRes, keysRes] = await Promise.all([
-          fetch("/api/admin/subscriptions", { headers: { Authorization: `Bearer ${token}` } }),
-          fetch("/api/admin/license-keys", { headers: { Authorization: `Bearer ${token}` } }),
+          fetch("/api/admin/subscriptions", { credentials: "include" }),
+          fetch("/api/admin/license-keys", { credentials: "include" }),
         ]);
         if (subsRes.ok) setSubs(await subsRes.json());
         if (keysRes.ok) setKeys(await keysRes.json());
@@ -1913,16 +1874,15 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
       setLoadingKeys(false);
     }
     fetchData();
-  }, [getAccessToken]);
+  }, []);
 
   const handleFreeze = async (userId: string, freeze: boolean) => {
-    const token = getAccessToken();
-    if (!token) return;
     setActionLoading(userId);
     try {
       const res = await fetch("/api/admin/freeze", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, frozen: freeze }),
       });
       if (res.ok) {
@@ -1938,13 +1898,12 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
   };
 
   const handleRevoke = async (userId: string) => {
-    const token = getAccessToken();
-    if (!token) return;
     setActionLoading(userId);
     try {
       const res = await fetch("/api/admin/revoke-subscription", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
       if (res.ok) {
@@ -1960,20 +1919,19 @@ function KeysSection({ getAccessToken }: { getAccessToken: () => string | null }
   };
 
   const handleGenerate = async () => {
-    const token = getAccessToken();
-    if (!token) return;
     setGenerating(true);
     setGeneratedKey(null);
     try {
       const res = await fetch("/api/admin/generate-key", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tier: generateTier }),
       });
       if (res.ok) {
         const data = await res.json();
         setGeneratedKey(data.key);
-        const keysRes = await fetch("/api/admin/license-keys", { headers: { Authorization: `Bearer ${token}` } });
+        const keysRes = await fetch("/api/admin/license-keys", { credentials: "include" });
         if (keysRes.ok) setKeys(await keysRes.json());
         toast({ title: "Cle generee" });
       } else {
@@ -2590,7 +2548,7 @@ function DofSection({ getAccessToken }: { getAccessToken: () => string | null })
   );
 }
 
-function WantedSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function WantedSection() {
   const [wantedSubTab, setWantedSubTab] = useState<"form" | "history">("form");
   const [editProfile, setEditProfile] = useState<WantedProfile | null>(null);
 
@@ -2627,44 +2585,37 @@ function WantedSection({ getAccessToken }: { getAccessToken: () => string | null
       </div>
 
       {wantedSubTab === "form" ? (
-        <WantedProfileForm getAccessToken={getAccessToken} editProfile={editProfile} onEditDone={handleEditDone} />
+        <WantedProfileForm editProfile={editProfile} onEditDone={handleEditDone} />
       ) : (
-        <WantedHistorySection getAccessToken={getAccessToken} onEdit={handleEdit} />
+        <WantedHistorySection onEdit={handleEdit} />
       )}
     </div>
   );
 }
 
-function MaintenanceToggle({ getAccessToken }: { getAccessToken: () => string | null }) {
+function MaintenanceToggle() {
   const { toast } = useToast();
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     fetch("/api/admin/maintenance", {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
     })
       .then((r) => r.json())
       .then((d) => setEnabled(!!d.enabled))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [getAccessToken]);
+  }, []);
 
   const toggle = async () => {
-    const token = getAccessToken();
-    if (!token) return;
     setToggling(true);
     try {
       const res = await fetch("/api/admin/maintenance", {
         method: "POST",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ enabled: !enabled }),
@@ -2712,7 +2663,7 @@ interface BlockedIpEntry {
   createdAt: string;
 }
 
-function IpBlacklistSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function IpBlacklistSection() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [newIp, setNewIp] = useState("");
@@ -2721,9 +2672,8 @@ function IpBlacklistSection({ getAccessToken }: { getAccessToken: () => string |
   const { data: blockedIps = [], isLoading } = useQuery<BlockedIpEntry[]>({
     queryKey: ["/api/admin/blocked-ips"],
     queryFn: async () => {
-      const token = getAccessToken();
       const res = await fetch("/api/admin/blocked-ips", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch blocked IPs");
       return res.json();
@@ -2732,10 +2682,10 @@ function IpBlacklistSection({ getAccessToken }: { getAccessToken: () => string |
 
   const blockMutation = useMutation({
     mutationFn: async () => {
-      const token = getAccessToken();
       const res = await fetch("/api/admin/blocked-ips", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ipAddress: newIp, reason: newReason }),
       });
       if (!res.ok) throw new Error((await res.json()).message || "Erreur");
@@ -2752,10 +2702,9 @@ function IpBlacklistSection({ getAccessToken }: { getAccessToken: () => string |
 
   const unblockMutation = useMutation({
     mutationFn: async (id: number) => {
-      const token = getAccessToken();
       const res = await fetch(`/api/admin/blocked-ips/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Erreur");
       return res.json();
@@ -2836,7 +2785,7 @@ function IpBlacklistSection({ getAccessToken }: { getAccessToken: () => string |
   );
 }
 
-function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin?: boolean }) {
+function LoginLogsSection({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -2846,9 +2795,8 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
   const { data: logs = [], isLoading, isFetching, refetch } = useQuery<LoginLog[]>({
     queryKey: ["/api/admin/login-logs"],
     queryFn: async () => {
-      const token = getAccessToken();
       const res = await fetch("/api/admin/login-logs?limit=300", {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Erreur lors du chargement des logs");
       return res.json();
@@ -2860,8 +2808,7 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
   async function handleDeleteLog(id: number) {
     setDeletingId(id);
     try {
-      const token = getAccessToken();
-      const res = await fetch(`/api/superadmin/logs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/superadmin/logs/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Erreur suppression");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/login-logs"] });
       toast({ title: "Log supprimé" });
@@ -2873,12 +2820,12 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
     if (!confirm("Supprimer TOUS les logs de connexion ?")) return;
     setClearing(true);
     try {
-      const token = getAccessToken();
-      const res = await fetch("/api/superadmin/logs/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/superadmin/logs/clear", { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Erreur lors de la suppression");
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/login-logs"] });
       toast({ title: `${data.deleted} log(s) supprimé(s)` });
-    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    } catch { toast({ title: "Erreur", description: "Impossible de supprimer les logs", variant: "destructive" }); }
     finally { setClearing(false); }
   }
 
@@ -3031,225 +2978,6 @@ function LoginLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: ()
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function DiscountCodesSection({ getAccessToken }: { getAccessToken: () => string | null }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newCode, setNewCode] = useState("");
-  const [newPercent, setNewPercent] = useState(10);
-  const [newMaxUses, setNewMaxUses] = useState<string>("");
-  const [newExpiresAt, setNewExpiresAt] = useState<string>("");
-  const [creating, setCreating] = useState(false);
-
-  const { data: codes = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/discount-codes"],
-    queryFn: async () => {
-      const token = getAccessToken();
-      const res = await fetch("/api/admin/discount-codes", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Erreur chargement");
-      return res.json();
-    },
-  });
-
-  async function handleCreate() {
-    if (!newCode.trim() || newPercent < 1 || newPercent > 100) return;
-    setCreating(true);
-    const token = getAccessToken();
-    try {
-      const body: any = { code: newCode.trim(), discountPercent: newPercent };
-      if (newMaxUses.trim()) body.maxUses = parseInt(newMaxUses);
-      if (newExpiresAt.trim()) body.expiresAt = newExpiresAt;
-      const res = await fetch("/api/admin/discount-codes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      toast({ title: "Code créé", description: `Code ${data.code} créé avec succès` });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
-      setCreateOpen(false);
-      setNewCode(""); setNewPercent(10); setNewMaxUses(""); setNewExpiresAt("");
-    } catch (err: any) {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  async function handleToggle(id: number, active: boolean) {
-    const token = getAccessToken();
-    try {
-      await fetch(`/api/admin/discount-codes/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ active: !active }),
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
-    } catch {
-      toast({ title: "Erreur", variant: "destructive" });
-    }
-  }
-
-  async function handleDelete(id: number, code: string) {
-    if (!confirm(`Supprimer le code "${code}" ?`)) return;
-    const token = getAccessToken();
-    try {
-      const res = await fetch(`/api/admin/discount-codes/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Erreur suppression");
-      toast({ title: "Code supprimé" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/discount-codes"] });
-    } catch (err: any) {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
-    }
-  }
-
-  return (
-    <div className="space-y-4" data-testid="section-discounts">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Gérez les codes de réduction pour les abonnements.</p>
-        <Button size="sm" onClick={() => setCreateOpen(true)} data-testid="button-create-discount">
-          <Plus className="w-4 h-4 mr-2" />
-          Nouveau code
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : codes.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">Aucun code promo créé</div>
-      ) : (
-        <div className="space-y-2">
-          {codes.map((dc: any) => {
-            const isExpired = dc.expiresAt && new Date(dc.expiresAt) < new Date();
-            const isExhausted = dc.maxUses !== null && dc.usedCount >= dc.maxUses;
-            return (
-              <Card key={dc.id} className={`p-4 ${!dc.active || isExpired || isExhausted ? "opacity-60" : ""}`} data-testid={`card-discount-${dc.id}`}>
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
-                    <Tag className="w-4 h-4 text-primary shrink-0" />
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-bold text-sm" data-testid={`text-code-${dc.id}`}>{dc.code}</span>
-                        <Badge variant={dc.active && !isExpired && !isExhausted ? "default" : "secondary"} className="text-xs">
-                          {!dc.active ? "Désactivé" : isExpired ? "Expiré" : isExhausted ? "Épuisé" : "Actif"}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs font-mono">-{dc.discountPercent}%</Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5 space-x-3">
-                        <span>Utilisations : <strong>{dc.usedCount}</strong>{dc.maxUses !== null ? ` / ${dc.maxUses}` : " (illimité)"}</span>
-                        {dc.expiresAt && <span>Expire : {new Date(dc.expiresAt).toLocaleDateString("fr-FR")}</span>}
-                        <span>Par : {dc.createdBy}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      title={dc.active ? "Désactiver" : "Activer"}
-                      onClick={() => handleToggle(dc.id, dc.active)}
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                      data-testid={`button-toggle-discount-${dc.id}`}
-                    >
-                      {dc.active ? <ToggleRight className="w-5 h-5 text-green-500" /> : <ToggleLeft className="w-5 h-5" />}
-                    </button>
-                    <button
-                      title="Supprimer"
-                      onClick={() => handleDelete(dc.id, dc.code)}
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                      data-testid={`button-delete-discount-${dc.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="w-5 h-5 text-primary" />
-              Nouveau code promo
-            </DialogTitle>
-            <DialogDescription>Créer un code de réduction pour les abonnements.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="dc-code">Code</Label>
-              <Input
-                id="dc-code"
-                data-testid="input-new-discount-code"
-                placeholder="PROMO2024"
-                value={newCode}
-                onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-                className="font-mono"
-                maxLength={20}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dc-percent">Réduction (%)</Label>
-              <Input
-                id="dc-percent"
-                data-testid="input-discount-percent"
-                type="number"
-                min={1}
-                max={100}
-                value={newPercent}
-                onChange={(e) => setNewPercent(parseInt(e.target.value) || 1)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dc-maxuses">Utilisations max (laisser vide = illimité)</Label>
-              <Input
-                id="dc-maxuses"
-                data-testid="input-discount-maxuses"
-                type="number"
-                min={1}
-                placeholder="ex: 50"
-                value={newMaxUses}
-                onChange={(e) => setNewMaxUses(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dc-expires">Date d'expiration (optionnel)</Label>
-              <Input
-                id="dc-expires"
-                data-testid="input-discount-expires"
-                type="date"
-                value={newExpiresAt}
-                onChange={(e) => setNewExpiresAt(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
-              <Button
-                data-testid="button-confirm-create-discount"
-                onClick={handleCreate}
-                disabled={creating || !newCode.trim()}
-                className="gap-2"
-              >
-                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Créer
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -3428,7 +3156,7 @@ function NotificationsSection({ getAccessToken }: { getAccessToken: () => string
   );
 }
 
-function ServiceStatusSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function ServiceStatusSection() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
@@ -3438,8 +3166,7 @@ function ServiceStatusSection({ getAccessToken }: { getAccessToken: () => string
   const { data: services = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/service-status"],
     queryFn: async () => {
-      const token = getAccessToken();
-      const res = await fetch("/api/admin/service-status", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/admin/service-status", { credentials: "include" });
       if (!res.ok) throw new Error("Erreur chargement");
       return res.json();
     },
@@ -3450,13 +3177,12 @@ function ServiceStatusSection({ getAccessToken }: { getAccessToken: () => string
   async function handleSave() {
     if (!form.name.trim()) return;
     setCreating(true);
-    const token = getAccessToken();
     const body: any = { name: form.name.trim(), description: form.description.trim(), status: form.status, uptime: form.uptime.trim() };
     if (form.latencyMs.trim()) body.latencyMs = parseInt(form.latencyMs);
     try {
       const url = editId ? `/api/admin/service-status/${editId}` : "/api/admin/service-status";
       const method = editId ? "PATCH" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      const res = await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       toast({ title: editId ? "Service mis à jour" : "Service créé" });
@@ -3468,9 +3194,8 @@ function ServiceStatusSection({ getAccessToken }: { getAccessToken: () => string
   }
 
   async function handleDelete(id: number) {
-    const token = getAccessToken();
     try {
-      await fetch(`/api/admin/service-status/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      await fetch(`/api/admin/service-status/${id}`, { method: "DELETE", credentials: "include" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/service-status"] });
       toast({ title: "Service supprimé" });
     } catch { toast({ title: "Erreur", variant: "destructive" }); }
@@ -3804,7 +3529,7 @@ const TIER_COLORS: Record<string, string> = {
   api: "bg-green-500/20 text-green-400",
 };
 
-function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin?: boolean }) {
+function SearchLogsSection({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
   const [applied, setApplied] = useState({ userId: "", searchType: "", dateFrom: "", dateTo: "", query: "" });
@@ -3816,8 +3541,7 @@ function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: (
   async function handleDeleteSearchLog(id: number) {
     setDeletingId(id);
     try {
-      const token = await getAccessToken();
-      const res = await fetch(`/api/superadmin/search-logs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/superadmin/search-logs/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/search-logs"] });
       toast({ title: "Log supprimé" });
@@ -3829,12 +3553,12 @@ function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: (
     if (!confirm("Supprimer TOUS les logs de recherche ?")) return;
     setClearing(true);
     try {
-      const token = await getAccessToken();
-      const res = await fetch("/api/superadmin/search-logs/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/superadmin/search-logs/clear", { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Erreur lors de la suppression");
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/search-logs"] });
       toast({ title: `${data.deleted} log(s) supprimé(s)` });
-    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    } catch { toast({ title: "Erreur", description: "Impossible de supprimer les logs", variant: "destructive" }); }
     finally { setClearing(false); }
   }
 
@@ -3843,14 +3567,14 @@ function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: (
     staleTime: 0,
     refetchOnMount: true,
     queryFn: async () => {
-      const token = await getAccessToken();
       const params = new URLSearchParams({ page: String(page), limit: "50" });
       if (applied.userId) params.set("userId", applied.userId);
       if (applied.searchType) params.set("searchType", applied.searchType);
       if (applied.dateFrom) params.set("dateFrom", applied.dateFrom);
       if (applied.dateTo) params.set("dateTo", applied.dateTo);
       if (applied.query) params.set("query", applied.query);
-      const res = await fetch(`/api/admin/search-logs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/admin/search-logs?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Erreur lors du chargement des logs");
       return res.json();
     },
   });
@@ -3977,174 +3701,7 @@ function SearchLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: (
   );
 }
 
-function StarsRating({ rating, onChange }: { rating: number; onChange?: (r: number) => void }) {
-  const [hover, setHover] = useState(0);
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map(n => (
-        <Star
-          key={n}
-          className={`w-5 h-5 cursor-pointer transition-colors ${(onChange ? (hover || rating) : rating) >= n ? "text-amber-400 fill-amber-400" : "text-muted-foreground"}`}
-          onMouseEnter={() => onChange && setHover(n)}
-          onMouseLeave={() => onChange && setHover(0)}
-          onClick={() => onChange?.(n)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function AdminReviewsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [page, setPage] = useState(1);
-
-  const { data, isLoading } = useQuery<{ rows: Review[]; total: number }>({
-    queryKey: ["/api/admin/reviews", statusFilter, page],
-    queryFn: async () => {
-      const token = await getAccessToken();
-      const params = new URLSearchParams({ status: statusFilter, page: String(page), limit: "20" });
-      const res = await fetch(`/api/admin/reviews?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-      return res.json();
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const token = await getAccessToken();
-      const res = await fetch(`/api/admin/reviews/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Erreur lors de la mise à jour");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
-      toast({ title: "Avis mis à jour" });
-    },
-    onError: () => toast({ title: "Erreur", description: "Impossible de mettre à jour l'avis.", variant: "destructive" }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const token = await getAccessToken();
-      const res = await fetch(`/api/admin/reviews/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Erreur lors de la suppression");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/reviews"] });
-      toast({ title: "Avis supprimé" });
-    },
-    onError: () => toast({ title: "Erreur", description: "Impossible de supprimer l'avis.", variant: "destructive" }),
-  });
-
-  const totalPages = data ? Math.ceil(data.total / 20) : 1;
-
-  const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-    pending: { label: "En attente", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
-    approved: { label: "Approuvé", color: "bg-green-500/20 text-green-400 border-green-500/30" },
-    rejected: { label: "Refusé", color: "bg-red-500/20 text-red-400 border-red-500/30" },
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        {["all", "pending", "approved", "rejected"].map(s => (
-          <button
-            key={s}
-            data-testid={`button-review-filter-${s}`}
-            onClick={() => { setStatusFilter(s); setPage(1); }}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-              statusFilter === s
-                ? "bg-primary/10 text-primary border-primary/30"
-                : "text-muted-foreground border-border/50 hover:bg-muted/50"
-            }`}
-          >
-            {s === "all" ? "Tous" : STATUS_CONFIG[s]?.label}
-          </button>
-        ))}
-        <span className="text-sm text-muted-foreground ml-auto">{data?.total ?? 0} avis</span>
-      </div>
-
-      <div className="flex justify-end">
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-reviews-prev">
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </Button>
-          <span className="text-xs text-muted-foreground">Page {page}/{totalPages || 1}</span>
-          <Button size="sm" variant="outline" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-reviews-next">
-            <ChevronRight className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : data?.rows.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground text-sm">Aucun avis pour ce filtre.</Card>
-      ) : (
-        <div className="space-y-3">
-          {data?.rows.map(review => (
-            <Card key={review.id} className="p-4 space-y-3" data-testid={`card-review-${review.id}`}>
-              <div className="flex items-start gap-3">
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm" data-testid={`text-review-user-${review.id}`}>{review.username || review.email || review.userId}</span>
-                    <Badge className={`text-[10px] px-1.5 py-0 border ${TIER_COLORS[review.subscriptionTier] ?? "bg-muted text-muted-foreground"}`}>
-                      {review.subscriptionTier}
-                    </Badge>
-                    {review.verified && (
-                      <Badge className="text-[10px] px-1.5 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30">
-                        <CheckCircle2 className="w-2.5 h-2.5 mr-1" />Vérifié
-                      </Badge>
-                    )}
-                    <Badge className={`text-[10px] px-1.5 py-0 border ml-auto ${STATUS_CONFIG[review.status]?.color ?? ""}`}>
-                      {STATUS_CONFIG[review.status]?.label ?? review.status}
-                    </Badge>
-                  </div>
-                  <StarsRating rating={review.rating} />
-                  <p className="text-sm text-muted-foreground leading-relaxed" data-testid={`text-review-comment-${review.id}`}>{review.comment}</p>
-                  <p className="text-[11px] text-muted-foreground/60">{new Date(review.createdAt).toLocaleString("fr-FR")}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-1 border-t border-border/30">
-                {review.status !== "approved" && (
-                  <Button size="sm" variant="outline" className="h-7 text-green-400 border-green-500/30 hover:bg-green-500/10 gap-1" onClick={() => updateMutation.mutate({ id: review.id, status: "approved" })} disabled={updateMutation.isPending} data-testid={`button-review-approve-${review.id}`}>
-                    <ThumbsUp className="w-3.5 h-3.5" />Approuver
-                  </Button>
-                )}
-                {review.status !== "rejected" && (
-                  <Button size="sm" variant="outline" className="h-7 text-amber-400 border-amber-500/30 hover:bg-amber-500/10 gap-1" onClick={() => updateMutation.mutate({ id: review.id, status: "rejected" })} disabled={updateMutation.isPending} data-testid={`button-review-reject-${review.id}`}>
-                    <ThumbsDown className="w-3.5 h-3.5" />Refuser
-                  </Button>
-                )}
-                {review.status !== "pending" && (
-                  <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => updateMutation.mutate({ id: review.id, status: "pending" })} disabled={updateMutation.isPending} data-testid={`button-review-pending-${review.id}`}>
-                    <RotateCcw className="w-3.5 h-3.5" />En attente
-                  </Button>
-                )}
-                <Button size="sm" variant="outline" className="h-7 text-destructive border-destructive/30 hover:bg-destructive/10 gap-1 ml-auto" onClick={() => deleteMutation.mutate(review.id)} disabled={deleteMutation.isPending} data-testid={`button-review-delete-${review.id}`}>
-                  <Trash2 className="w-3.5 h-3.5" />Supprimer
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin?: boolean }) {
+function GameLogsSection({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ userId: "", dateFrom: "", dateTo: "" });
   const [applied, setApplied] = useState({ userId: "", dateFrom: "", dateTo: "" });
@@ -4156,8 +3713,7 @@ function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () 
   async function handleDeleteGameLog(id: number) {
     setDeletingId(id);
     try {
-      const token = await getAccessToken();
-      const res = await fetch(`/api/superadmin/game-logs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/superadmin/game-logs/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/game-logs"] });
       toast({ title: "Log supprimé" });
@@ -4169,24 +3725,23 @@ function GameLogsSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () 
     if (!confirm("Supprimer TOUS les logs de jeu ?")) return;
     setClearing(true);
     try {
-      const token = await getAccessToken();
-      const res = await fetch("/api/superadmin/game-logs/clear", { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/superadmin/game-logs/clear", { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Erreur lors de la suppression");
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/game-logs"] });
       toast({ title: `${data.deleted} log(s) supprimé(s)` });
-    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    } catch { toast({ title: "Erreur", description: "Impossible de supprimer les logs", variant: "destructive" }); }
     finally { setClearing(false); }
   }
 
   const { data, isLoading, isError, error, isFetching, refetch } = useQuery<{ rows: GameLog[]; total: number }>({
     queryKey: ["/api/admin/game-logs", applied, page],
     queryFn: async () => {
-      const token = await getAccessToken();
       const params = new URLSearchParams({ page: String(page), limit: "50" });
       if (applied.userId) params.set("userId", applied.userId);
       if (applied.dateFrom) params.set("dateFrom", applied.dateFrom);
       if (applied.dateTo) params.set("dateTo", applied.dateTo);
-      const res = await fetch(`/api/admin/game-logs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/admin/game-logs?${params}`, { credentials: "include" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.message ?? `Erreur ${res.status}`);
@@ -4367,7 +3922,7 @@ class AdminErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 }
 
 // ─── Bypass Section ──────────────────────────────────────────────────────────
-function BypassSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () => string | null; isSuperAdmin: boolean }) {
+function BypassSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [newId, setNewId] = useState("");
@@ -4375,8 +3930,7 @@ function BypassSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () =>
   const { data, isLoading, refetch } = useQuery<{ ids: number[]; users: any[] }>({
     queryKey: ["/api/superadmin/bypass"],
     queryFn: async () => {
-      const token = getAccessToken();
-      const res = await fetch("/api/superadmin/bypass", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/superadmin/bypass", { credentials: "include" });
       if (!res.ok) throw new Error();
       return res.json();
     },
@@ -4385,10 +3939,10 @@ function BypassSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () =>
 
   const addUser = useMutation({
     mutationFn: async () => {
-      const token = getAccessToken();
       const res = await fetch("/api/superadmin/bypass", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uniqueId: Number(newId) }),
       });
       const d = await res.json();
@@ -4405,8 +3959,7 @@ function BypassSection({ getAccessToken, isSuperAdmin }: { getAccessToken: () =>
 
   const removeUser = useMutation({
     mutationFn: async (uniqueId: number) => {
-      const token = getAccessToken();
-      const res = await fetch(`/api/superadmin/bypass/${uniqueId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/superadmin/bypass/${uniqueId}`, { method: "DELETE", credentials: "include" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.message);
     },
@@ -4879,7 +4432,7 @@ function AdminPageInner() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <MaintenanceToggle getAccessToken={getAccessToken} />
+            <MaintenanceToggle />
             <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-back-home" className="h-8">
               <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
               <span className="hidden sm:inline">Retour</span>
@@ -5007,37 +4560,34 @@ function AdminPageInner() {
           {/* Section body */}
           <div className="flex-1 px-5 xl:px-8 py-5">
             {activeTab === "users" && (
-              <UsersSection getAccessToken={getAccessToken} userId={user.id} />
+              <UsersSection userId={user.id} />
             )}
             {activeTab === "keys" && (
-              <KeysSection getAccessToken={getAccessToken} />
+              <KeysSection />
             )}
             {activeTab === "blacklist" && (
-              <BlacklistSection getAccessToken={getAccessToken} />
+              <BlacklistSection />
             )}
             {activeTab === "info" && (
-              <InfoRequestsSection getAccessToken={getAccessToken} />
+              <InfoRequestsSection />
             )}
             {activeTab === "wanted" && (
-              <WantedSection getAccessToken={getAccessToken} />
+              <WantedSection />
             )}
             {activeTab === "dof" && (
               <DofSection getAccessToken={getAccessToken} />
             )}
             {activeTab === "ipblock" && (
-              <IpBlacklistSection getAccessToken={getAccessToken} />
+              <IpBlacklistSection />
             )}
             {activeTab === "logs" && (
-              <LoginLogsSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
+              <LoginLogsSection isSuperAdmin={uniqueId === 1} />
             )}
             {activeTab === "search-logs" && (
-              <SearchLogsSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
+              <SearchLogsSection isSuperAdmin={uniqueId === 1} />
             )}
             {activeTab === "game-logs" && (
-              <GameLogsSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
-            )}
-            {activeTab === "reviews" && (
-              <AdminReviewsSection getAccessToken={getAccessToken} />
+              <GameLogsSection isSuperAdmin={uniqueId === 1} />
             )}
             {activeTab === "notifications" && (
               <NotificationsSection getAccessToken={getAccessToken} />
@@ -5045,11 +4595,8 @@ function AdminPageInner() {
             {activeTab === "game-boosts" && (
               <GameBoostsSection getAccessToken={getAccessToken} />
             )}
-            {activeTab === "discounts" && (
-              <DiscountCodesSection getAccessToken={getAccessToken} />
-            )}
             {activeTab === "services" && (
-              <ServiceStatusSection getAccessToken={getAccessToken} />
+              <ServiceStatusSection />
             )}
             {activeTab === "tickets" && (
               <AdminTicketsSection getAccessToken={getAccessToken} />
@@ -5058,10 +4605,10 @@ function AdminPageInner() {
               <AdminChatSection getAccessToken={getAccessToken} />
             )}
             {activeTab === "bypass" && (
-              <BypassSection getAccessToken={getAccessToken} isSuperAdmin={uniqueId === 1} />
+              <BypassSection isSuperAdmin={uniqueId === 1} />
             )}
             {activeTab === "crypto-payments" && (
-              <CryptoPaymentsSection getAccessToken={getAccessToken} />
+              <CryptoPaymentsSection />
             )}
           </div>
         </main>
@@ -5070,16 +4617,22 @@ function AdminPageInner() {
   );
 }
 
-function CryptoPaymentsSection({ getAccessToken }: { getAccessToken: () => string | null }) {
+function CryptoPaymentsSection() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const token = getAccessToken();
-  const { data, isLoading, refetch } = useQuery<{ rows: any[]; total: number }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ rows: any[]; total: number }>({
     queryKey: ["/api/admin/crypto-payments", page],
-    queryFn: () => fetch(`/api/admin/crypto-payments?page=${page}&limit=50`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/crypto-payments?page=${page}&limit=50`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message ?? `Erreur ${res.status}`);
+      }
+      return res.json();
+    },
     refetchInterval: 30000,
   });
 
@@ -5123,6 +4676,16 @@ function CryptoPaymentsSection({ getAccessToken }: { getAccessToken: () => strin
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-7 h-7 animate-spin text-primary" />
         </div>
+      ) : isError ? (
+        <Card className="p-6 border-destructive/40 bg-destructive/5">
+          <div className="flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Erreur lors du chargement des paiements crypto</p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">{(error as Error)?.message}</p>
+            </div>
+          </div>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center text-muted-foreground">
           <Bitcoin className="w-10 h-10 mx-auto mb-3 opacity-30" />

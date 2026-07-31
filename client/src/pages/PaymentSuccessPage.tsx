@@ -113,9 +113,9 @@ export default function PaymentSuccessPage() {
               <AlertTriangle className="w-12 h-12 text-destructive mx-auto" />
               <h2 className="text-xl font-semibold" data-testid="text-payment-error">Un probleme est survenu</h2>
               <p className="text-sm text-muted-foreground">{error}</p>
-              <Link href="/pricing">
+              <Link href="/">
                 <Button data-testid="button-back-pricing">
-                  Retour aux prix
+                  Retour à l'accueil
                 </Button>
               </Link>
             </div>
@@ -154,19 +154,9 @@ export default function PaymentSuccessPage() {
                 </div>
               </div>
 
-              <div className="bg-muted/50 rounded-md p-4 space-y-2">
-                <p className="text-sm font-medium">Comment activer votre abonnement :</p>
-                <ol className="text-xs text-muted-foreground text-left space-y-1 list-decimal list-inside">
-                  <li>Copiez la cle ci-dessus</li>
-                  <li>Allez sur la page Prix</li>
-                  <li>Cliquez sur "Utiliser une cle de licence"</li>
-                  <li>Collez votre cle et validez</li>
-                </ol>
-              </div>
-
-              <Link href="/pricing">
+              <Link href="/">
                 <Button className="w-full gap-2" data-testid="button-go-pricing">
-                  Activer ma cle
+                  Retour à l'accueil
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </Link>

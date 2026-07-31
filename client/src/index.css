@@ -12,6 +12,9 @@
   --background: 222 47% 98%;
   --foreground: 222 47% 8%;
 
+  /* Sidebar stays permanently dark regardless of light/dark mode (matches --background in .dark) */
+  --sidebar-bg: 230 14% 6%;
+
   --primary: 239 84% 67%;          /* indigo #6366f1 */
   --primary-foreground: 0 0% 100%;
 
