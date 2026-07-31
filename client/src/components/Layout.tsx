@@ -154,7 +154,7 @@ const NAV_SECTIONS: NavSection[] = [
 
 const ALL_FLAT_ITEMS: NavItem[] = NAV_SECTIONS.flatMap(s => s.items);
 
-const W_EXPANDED = 224;
+const W_EXPANDED = 240;
 const W_COLLAPSED = 56;
 
 /* ── Helpers ─────────────────────────────────────────────── */
@@ -316,23 +316,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     // Disabled/coming-soon logic: blocked unless admin (or not adminOnly)
     const isBlocked = item.disabled && !(item.adminOnly && role === "admin");
 
-    const itemClass = `relative flex items-center rounded-md transition-colors duration-100 select-none
-      ${collapsed ? "justify-center w-9 h-9 p-0 mx-auto" : indent ? "gap-2 px-2.5 py-[5px] ml-1" : "gap-2.5 px-2.5 py-[7px]"}
+    const itemClass = `relative flex items-center rounded-lg transition-all duration-150 select-none
+      ${collapsed ? "justify-center w-10 h-10 p-0 mx-auto" : indent ? "gap-2.5 px-3 py-[7px] ml-1" : "gap-3 px-3 py-2.5"}
       ${isBlocked
         ? "cursor-not-allowed opacity-35 text-muted-foreground/50"
         : active
-        ? "cursor-pointer bg-primary/[0.12] text-foreground ring-1 ring-inset ring-primary/15"
-        : "cursor-pointer text-muted-foreground/60 hover:text-foreground/90 hover:bg-white/[0.04]"
+        ? "cursor-pointer bg-primary text-primary-foreground shadow-[0_2px_10px_rgba(99,102,241,0.35)]"
+        : "cursor-pointer text-muted-foreground/70 hover:text-foreground hover:bg-white/[0.06]"
       }`;
 
     const innerContent = (
       <>
-        {active && !isBlocked && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-primary shadow-[0_0_6px_rgba(99,102,241,0.6)]" />
-        )}
-        <Icon className={`shrink-0 ${collapsed ? "w-[18px] h-[18px]" : indent ? "w-3.5 h-3.5" : "w-[15px] h-[15px]"} ${active && !isBlocked ? "text-primary" : ""}`} />
+        <Icon className={`shrink-0 ${collapsed ? "w-[19px] h-[19px]" : indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active && !isBlocked ? "text-primary-foreground" : ""}`} />
         <span
-          className={`font-medium whitespace-nowrap overflow-hidden ${indent ? "text-[12px]" : "text-[13px]"}`}
+          className={`whitespace-nowrap overflow-hidden ${indent ? "text-[12px] font-medium" : "text-[13.5px]"} ${active && !isBlocked ? "font-semibold" : "font-medium"}`}
           style={{
             opacity: collapsed ? 0 : 1,
             maxWidth: collapsed ? 0 : 160,
@@ -411,16 +408,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       }}>
 
       {/* Logo */}
-      <div className="h-14 flex items-center shrink-0 px-4">
+      <div className="h-16 flex items-center shrink-0 px-4">
         <Link href="/">
           <div className={`flex items-center gap-2.5 cursor-pointer group ${collapsed ? "justify-center w-full" : ""}`} data-testid="link-logo">
-            <div className="relative shrink-0">
-              <div className="absolute inset-0 rounded-full bg-primary/25 blur-md scale-110 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <DiscreenLogo className="w-7 h-7 relative" />
+            <div className="relative shrink-0 w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-lg bg-primary/25 blur-md scale-110 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <DiscreenLogo className="w-5 h-5 relative" />
             </div>
             <span
-              className="font-semibold text-[15px] tracking-tight whitespace-nowrap overflow-hidden text-foreground"
-              style={{ opacity: collapsed ? 0 : 1, maxWidth: collapsed ? 0 : 130, transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
+              className="font-bold text-[17px] tracking-tight whitespace-nowrap overflow-hidden text-foreground"
+              style={{ opacity: collapsed ? 0 : 1, maxWidth: collapsed ? 0 : 140, transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)" }}
             >
               Di<span className="text-primary">screen</span>
             </span>
@@ -440,7 +437,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             onChange={handleAvatarFileChange}
             data-testid="input-avatar-file"
           />
-          <div className="px-2 pb-2">
+          <div className="px-3 pb-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -508,7 +505,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </>
       ) : (
-        <div className={`px-2 pb-2 ${collapsed ? "flex justify-center" : ""}`}>
+        <div className={`px-3 pb-3 ${collapsed ? "flex justify-center" : ""}`}>
           <Link href="/login">
             <Button
               size="sm"
@@ -528,19 +525,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="mx-3 mb-1" style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
 
       {/* Nav sections */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-1 scrollbar-none px-2" data-testid="nav-main">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-none px-3" data-testid="nav-main">
         {NAV_SECTIONS.map((section, si) => {
           const isOpen = section.collapsible ? (openSections[section.key] ?? true) : true;
 
           return (
-            <div key={section.key} className={si > 0 ? "mt-3" : ""}>
+            <div key={section.key} className={si > 0 ? "mt-5" : ""}>
               {/* Section label */}
               {(section.labelKey || section.label) && !collapsed && (
                 <div
-                  className={`flex items-center justify-between px-2 mb-1 ${section.collapsible ? "cursor-pointer" : ""}`}
+                  className={`flex items-center justify-between px-2.5 mb-1.5 ${section.collapsible ? "cursor-pointer" : ""}`}
                   onClick={section.collapsible ? () => toggleSection(section.key) : undefined}
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/45 select-none">
+                  <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 select-none">
                     {section.label ?? (section.labelKey ? t(section.labelKey, { defaultValue: section.key.toUpperCase() }) : section.key.toUpperCase())}
                   </span>
                   {section.collapsible && (
