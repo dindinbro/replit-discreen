@@ -1220,22 +1220,24 @@ export default function SearchPage() {
     hosting?: boolean;
   } | null>(null);
 
-  const [blockchainNetworks, setBlockchainNetworks] = useState<{ id: string; label: string; symbol: string }[]>([]);
-  const [blockchainNetworksLoading, setBlockchainNetworksLoading] = useState(true);
-  const [blockchainNetwork, setBlockchainNetwork] = useState("bitcoin");
   const [blockchainAddress, setBlockchainAddress] = useState("");
   const [blockchainLoading, setBlockchainLoading] = useState(false);
+  type BlockchainNetworkResult = {
+    network: string;
+    networkLabel: string;
+    symbol: string;
+    ok: boolean;
+    message?: string;
+    balance?: string;
+    txCount?: number | null;
+  };
   const [blockchainResult, setBlockchainResult] = useState<{
     ok: boolean;
     message?: string;
-    network?: string;
-    networkLabel?: string;
-    symbol?: string;
     address?: string;
-    balance?: string;
-    txCount?: number | null;
+    results?: BlockchainNetworkResult[];
   } | null>(null);
-  const [blockchainHistory, setBlockchainHistory] = useState<{ network: string; networkLabel: string; address: string; ts: number }[]>(() => {
+  const [blockchainHistory, setBlockchainHistory] = useState<{ address: string; ts: number }[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("blockchain_lookup_history") || "[]");
     } catch {
@@ -1243,14 +1245,6 @@ export default function SearchPage() {
     }
   });
   const [showBlockchainHistory, setShowBlockchainHistory] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/blockchain/networks", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => setBlockchainNetworks(d.networks || []))
-      .catch(() => {})
-      .finally(() => setBlockchainNetworksLoading(false));
-  }, []);
 
   const [sherlockUsername, setSherlockUsername] = useState("");
   const [sherlockLoading, setSherlockLoading] = useState(false);
@@ -1335,14 +1329,14 @@ export default function SearchPage() {
       const res = await fetch("/api/blockchain/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ network: blockchainNetwork, address: blockchainAddress.trim() }),
+        body: JSON.stringify({ address: blockchainAddress.trim() }),
       });
       const data = await res.json();
       setBlockchainResult(data);
       if (data.ok) {
-        const entry = { network: data.network, networkLabel: data.networkLabel, address: data.address, ts: Date.now() };
+        const entry = { address: data.address, ts: Date.now() };
         setBlockchainHistory((prev) => {
-          const next = [entry, ...prev.filter((h) => !(h.network === entry.network && h.address === entry.address))].slice(0, 20);
+          const next = [entry, ...prev.filter((h) => h.address !== entry.address)].slice(0, 20);
           try { localStorage.setItem("blockchain_lookup_history", JSON.stringify(next)); } catch {}
           return next;
         });
@@ -2005,17 +1999,7 @@ export default function SearchPage() {
                   </Button>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch gap-2 mx-auto max-w-2xl w-full">
-                  <Select value={blockchainNetwork} onValueChange={setBlockchainNetwork}>
-                    <SelectTrigger className="sm:w-52 rounded-full shrink-0" data-testid="select-blockchain-network">
-                      <SelectValue placeholder={blockchainNetworksLoading ? "Chargement..." : "Réseau"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {blockchainNetworks.map((n) => (
-                        <SelectItem key={n.id} value={n.id}>{n.label} ({n.symbol})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-stretch gap-2 mx-auto max-w-2xl w-full">
                   <div className="flex-1 flex items-center gap-2.5 rounded-full border border-border/60 bg-background/60 pl-4 pr-1.5 py-1.5 focus-within:border-primary/50 transition-colors">
                     <Search className="w-4 h-4 text-muted-foreground shrink-0" />
                     <input
@@ -2038,17 +2022,27 @@ export default function SearchPage() {
                     </Button>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground text-center -mt-4">Le réseau est détecté automatiquement à partir du format de l'adresse</p>
 
                 {blockchainResult && (
                   <div>
-                    {blockchainResult.ok ? (
+                    {blockchainResult.ok && blockchainResult.results ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Réseau</p><p className="text-sm font-medium" data-testid="text-blockchain-network">{blockchainResult.networkLabel}</p></div>
-                        <div className="space-y-1 md:col-span-2"><p className="text-xs text-muted-foreground">Adresse</p><p className="text-sm font-mono font-medium break-all" data-testid="text-blockchain-address">{blockchainResult.address}</p></div>
-                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Solde</p><p className="text-sm font-mono font-medium" data-testid="text-blockchain-balance">{blockchainResult.balance} {blockchainResult.symbol}</p></div>
-                        {blockchainResult.txCount !== null && blockchainResult.txCount !== undefined && (
-                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Transactions</p><p className="text-sm font-medium" data-testid="text-blockchain-txcount">{blockchainResult.txCount}</p></div>
-                        )}
+                        {blockchainResult.results.map((r) => (
+                          <div key={r.network} className="rounded-xl border border-border/60 bg-background/40 p-4 space-y-2" data-testid={`card-blockchain-${r.network}`}>
+                            <p className="text-sm font-medium">{r.networkLabel}</p>
+                            {r.ok ? (
+                              <>
+                                <p className="text-sm font-mono font-medium" data-testid={`text-blockchain-balance-${r.network}`}>{r.balance} {r.symbol}</p>
+                                {r.txCount !== null && r.txCount !== undefined && (
+                                  <p className="text-xs text-muted-foreground">{r.txCount} transactions</p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-xs text-destructive">{r.message}</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ) : (<p className="text-sm text-destructive" data-testid="text-blockchain-error">{blockchainResult.message}</p>)}
                   </div>
@@ -2065,9 +2059,8 @@ export default function SearchPage() {
                       <div className="space-y-1 max-h-80 overflow-y-auto">
                         {blockchainHistory.map((h, i) => (
                           <button
-                            key={`${h.network}-${h.address}-${i}`}
+                            key={`${h.address}-${i}`}
                             onClick={() => {
-                              setBlockchainNetwork(h.network);
                               setBlockchainAddress(h.address);
                               setShowBlockchainHistory(false);
                             }}
@@ -2075,7 +2068,6 @@ export default function SearchPage() {
                             data-testid={`button-blockchain-history-${i}`}
                           >
                             <span className="text-sm font-mono truncate">{h.address}</span>
-                            <Badge variant="outline" className="shrink-0">{h.networkLabel}</Badge>
                           </button>
                         ))}
                       </div>

@@ -3821,10 +3821,6 @@ export async function registerRoutes(
     { id: "tron", label: "Tron", symbol: "TRX", decimals: 6, kind: "tron" },
   ];
 
-  app.get("/api/blockchain/networks", requireAuth, requireActiveAccount, (_req, res) => {
-    res.json({ networks: BLOCKCHAIN_NETWORKS.map(({ id, label, symbol }) => ({ id, label, symbol })) });
-  });
-
   function formatUnits(raw: bigint, decimals: number): string {
     const negative = raw < 0n;
     const abs = negative ? -raw : raw;
@@ -3834,30 +3830,30 @@ export async function registerRoutes(
     return `${negative ? "-" : ""}${whole}${frac ? "." + frac : ""}`;
   }
 
-  app.post("/api/blockchain/lookup", requireAuth, requireActiveAccount, async (req, res) => {
+  // Guess which chain(s) an address format could belong to. EVM addresses
+  // (0x...) are shared across all EVM-compatible chains, so those are all
+  // queried in parallel and returned together.
+  function detectBlockchainNetworks(address: string): BlockchainNetworkConfig[] {
+    if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return BLOCKCHAIN_NETWORKS.filter((n) => n.kind === "evm");
+    }
+    if (/^(bc1[a-z0-9]{25,90}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/.test(address)) {
+      return BLOCKCHAIN_NETWORKS.filter((n) => n.id === "bitcoin");
+    }
+    if (/^D[a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(address)) {
+      return BLOCKCHAIN_NETWORKS.filter((n) => n.id === "dogecoin");
+    }
+    if (/^T[a-km-zA-HJ-NP-Z1-9]{33}$/.test(address)) {
+      return BLOCKCHAIN_NETWORKS.filter((n) => n.id === "tron");
+    }
+    return [];
+  }
+
+  async function lookupOnNetwork(cfg: BlockchainNetworkConfig, trimmed: string): Promise<
+    { ok: true; balance: string; txCount: number | null } | { ok: false; message: string }
+  > {
     try {
-      const { network, address } = req.body;
-      if (!network || typeof network !== "string" || !address || typeof address !== "string") {
-        return res.status(400).json({ ok: false, message: "Reseau et adresse requis" });
-      }
-
-      const trimmed = address.trim();
-      if (!trimmed || trimmed.length > 128 || !/^[a-zA-Z0-9]+$/.test(trimmed)) {
-        return res.json({ ok: false, message: "Format d'adresse invalide" });
-      }
-
-      const cfg = BLOCKCHAIN_NETWORKS.find((n) => n.id === network);
-      if (!cfg) {
-        return res.status(400).json({ ok: false, message: "Reseau non supporte" });
-      }
-
-      let balance: string;
-      let txCount: number | null = null;
-
       if (cfg.kind === "evm") {
-        if (!/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
-          return res.json({ ok: false, message: "Adresse EVM invalide (attendu: 0x...)" });
-        }
         const [balRes, txRes] = await Promise.all([
           fetch(cfg.rpcUrl, {
             method: "POST",
@@ -3874,58 +3870,83 @@ export async function registerRoutes(
         ]);
         const balData = await balRes.json();
         const txData = await txRes.json();
-        if (balData.error) {
-          return res.json({ ok: false, message: "Erreur du noeud RPC" });
-        }
-        balance = formatUnits(BigInt(balData.result), cfg.decimals);
-        txCount = txData.result ? Number(BigInt(txData.result)) : null;
+        if (balData.error) return { ok: false, message: "Erreur du noeud RPC" };
+        return {
+          ok: true,
+          balance: formatUnits(BigInt(balData.result), cfg.decimals),
+          txCount: txData.result ? Number(BigInt(txData.result)) : null,
+        };
       } else if (cfg.kind === "btc") {
         const response = await fetch(`${cfg.apiBase}/address/${encodeURIComponent(trimmed)}`, {
           signal: AbortSignal.timeout(8000),
         });
-        if (!response.ok) {
-          return res.json({ ok: false, message: "Adresse introuvable ou invalide" });
-        }
+        if (!response.ok) return { ok: false, message: "Adresse introuvable ou invalide" };
         const data = await response.json();
         const funded = BigInt(data.chain_stats?.funded_txo_sum ?? 0);
         const spent = BigInt(data.chain_stats?.spent_txo_sum ?? 0);
-        balance = formatUnits(funded - spent, cfg.decimals);
-        txCount = data.chain_stats?.tx_count ?? null;
+        return {
+          ok: true,
+          balance: formatUnits(funded - spent, cfg.decimals),
+          txCount: data.chain_stats?.tx_count ?? null,
+        };
       } else if (cfg.kind === "blockcypher") {
         const response = await fetch(`https://api.blockcypher.com/v1/${cfg.coin}/main/addrs/${encodeURIComponent(trimmed)}/balance`, {
           signal: AbortSignal.timeout(8000),
         });
         const data = await response.json();
-        if (!response.ok || data.error) {
-          return res.json({ ok: false, message: data.error || "Adresse introuvable ou invalide" });
-        }
-        balance = formatUnits(BigInt(data.final_balance ?? 0), cfg.decimals);
-        txCount = data.final_n_tx ?? null;
+        if (!response.ok || data.error) return { ok: false, message: data.error || "Adresse introuvable ou invalide" };
+        return {
+          ok: true,
+          balance: formatUnits(BigInt(data.final_balance ?? 0), cfg.decimals),
+          txCount: data.final_n_tx ?? null,
+        };
       } else {
         const response = await fetch(`https://api.trongrid.io/v1/accounts/${encodeURIComponent(trimmed)}`, {
           signal: AbortSignal.timeout(8000),
         });
         const data = await response.json();
         const account = data.data?.[0];
-        if (!account) {
-          return res.json({ ok: false, message: "Adresse introuvable ou invalide" });
-        }
-        balance = formatUnits(BigInt(account.balance ?? 0), cfg.decimals);
-        txCount = null;
+        if (!account) return { ok: false, message: "Adresse introuvable ou invalide" };
+        return { ok: true, balance: formatUnits(BigInt(account.balance ?? 0), cfg.decimals), txCount: null };
+      }
+    } catch {
+      return { ok: false, message: "Reseau injoignable" };
+    }
+  }
+
+  app.post("/api/blockchain/lookup", requireAuth, requireActiveAccount, async (req, res) => {
+    try {
+      const { address } = req.body;
+      if (!address || typeof address !== "string") {
+        return res.status(400).json({ ok: false, message: "Adresse requise" });
       }
 
-      const wUser = await buildUserInfo(req);
-      if (!wUser.bypassed) logSearchToDb(req, wUser, "blockchain", `${network}:${trimmed}`, 1);
+      const trimmed = address.trim();
+      if (!trimmed || trimmed.length > 128 || !/^[a-zA-Z0-9]+$/.test(trimmed)) {
+        return res.json({ ok: false, message: "Format d'adresse invalide" });
+      }
 
-      res.json({
-        ok: true,
-        network: cfg.id,
-        networkLabel: cfg.label,
-        symbol: cfg.symbol,
-        address: trimmed,
-        balance,
-        txCount,
-      });
+      const candidates = detectBlockchainNetworks(trimmed);
+      if (candidates.length === 0) {
+        return res.json({ ok: false, message: "Format d'adresse non reconnu" });
+      }
+
+      const results = await Promise.all(
+        candidates.map(async (cfg) => {
+          const r = await lookupOnNetwork(cfg, trimmed);
+          return {
+            network: cfg.id,
+            networkLabel: cfg.label,
+            symbol: cfg.symbol,
+            ...(r.ok ? { ok: true as const, balance: r.balance, txCount: r.txCount } : { ok: false as const, message: r.message }),
+          };
+        })
+      );
+
+      const wUser = await buildUserInfo(req);
+      if (!wUser.bypassed) logSearchToDb(req, wUser, "blockchain", trimmed, 1);
+
+      res.json({ ok: true, address: trimmed, results });
     } catch (err) {
       console.error("POST /api/blockchain/lookup error:", err);
       res.status(500).json({ ok: false, message: "Erreur interne" });
