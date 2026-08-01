@@ -24,6 +24,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 import { registerRoutes } from "./routes";
 import { registerAuthRoutes } from "./auth";
 import { serveStatic } from "./static";
@@ -46,10 +48,15 @@ const httpServer = createServer(app);
 app.set("trust proxy", 1);
 
 // ── Session middleware (V2 auth) ──────────────────────────
+// Backed by Postgres (not the default in-memory store) so sessions survive
+// container restarts/redeploys — with MemoryStore, every deploy silently
+// logged out every logged-in user site-wide.
 const sessionSecret = process.env.SESSION_SECRET || "discreen-v2-dev-secret-change-in-prod";
+const PgSessionStore = connectPgSimple(session);
 export const sessionMiddleware = session({
   name: "discreen.sid",
   secret: sessionSecret,
+  store: new PgSessionStore({ pool, tableName: "session" }),
   resave: false,
   saveUninitialized: false,
   cookie: {

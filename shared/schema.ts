@@ -1,7 +1,20 @@
-import { pgTable, text, serial, timestamp, integer, date, boolean, uniqueIndex, real } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, date, boolean, uniqueIndex, index, real, varchar, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
+
+// express-session store (connect-pg-simple). Managed directly by that
+// library via raw queries, not through the app's storage layer — modeled
+// here only so drizzle-kit tracks it as a real migration. Its own
+// createTableIfMissing reads a table.sql asset file that doesn't survive
+// the esbuild bundle, so we create the table ourselves instead.
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
+}, (table) => ({
+  expireIdx: index("IDX_session_expire").on(table.expire),
+}));
 
 // New accounts start "pending" and need an admin's approval before they can
 // use the site (see /api/admin/users/:id/approve|reject). Existing rows get
