@@ -274,6 +274,9 @@ const HIDDEN_FIELDS = new Set([
   "_source", "_raw", "_advancedSource", "source", "rownum", "Rownum", "line", "Line", "content", "Content",
   // BrixHub internal metadata — provenance, not profile data.
   "_es_ids", "_source_files", "_sources", "_confidence",
+  // FiveM/gaming JSON dumps (endpoint, id, ping) — network/session noise,
+  // not identifying data.
+  "endpoint", "Endpoint", "ping", "Ping", "id", "Id", "ID",
 ]);
 const FIELD_PRIORITY: Record<string, number> = {
   email: 1, mail: 1,
