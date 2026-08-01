@@ -385,6 +385,38 @@ function computeRelevanceScore(row: Record<string, unknown>, globalIndex: number
   return Math.max(30, Math.min(97, base + jitter));
 }
 
+const DOB_KEYS = new Set(["date_naissance", "birthday", "dob", "birth", "bday"]);
+const GENDER_KEYS = new Set(["genre", "sexe", "gender", "civilite"]);
+
+function parseDob(raw: string): Date | null {
+  const s = raw.trim();
+  const iso = new Date(s);
+  if (!isNaN(iso.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(s)) return iso;
+  const dmy = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/);
+  if (dmy) {
+    const d = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
+function computeAge(raw: string): number | null {
+  const dob = parseDob(raw);
+  if (!dob) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+function genderPrefix(raw: string): string | null {
+  const v = raw.trim().toLowerCase();
+  if (["m", "h", "homme", "male", "man", "mr", "m."].includes(v)) return "M.";
+  if (["f", "femme", "female", "woman", "mme", "mme."].includes(v)) return "Mme";
+  return null;
+}
+
 function ResultCard({
   row,
   index,
@@ -425,6 +457,11 @@ function ResultCard({
     return ["email", "mail", "identifiant", "username", "nom", "name", "last_name", "lastname", "surname", "prenom"].includes(key);
   });
 
+  const dobField = dataFields.find(([k]) => DOB_KEYS.has(k.toLowerCase()));
+  const genderField = dataFields.find(([k]) => GENDER_KEYS.has(k.toLowerCase()));
+  const age = dobField ? computeAge(cleanFieldValue(dobField[1])) : null;
+  const prefix = genderField ? genderPrefix(cleanFieldValue(genderField[1])) : null;
+
   const handleCopy = () => {
     const lines = dataFields.map(([k, v]) => `${getFieldLabel(k)} : ${cleanFieldValue(v)}`);
     lines.push("Source : Discreen");
@@ -452,7 +489,9 @@ function ResultCard({
             </div>
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
+                {prefix ? `${prefix} ` : ""}
                 {titleField ? cleanFieldValue(titleField[1]) : `Résultat ${globalIndex + 1}`}
+                {age !== null ? ` · ${age} ans` : ""}
               </span>
               <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
             </div>
@@ -471,33 +510,17 @@ function ResultCard({
         </div>
 
         {/* Champs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 p-2.5">
-          {[...previewFields, ...(expanded ? hiddenFields : [])].map(([col, val]) => {
-            const Icon = getFieldIcon(col);
-            const colorVar = getFieldColorVar(col);
-            return (
-              <div
-                key={col}
-                className="flex items-start gap-2.5 px-2 py-2 rounded-lg hover:bg-muted/40 transition-colors"
-                data-testid={`field-${col}-${globalIndex}`}
-              >
-                <div
-                  className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center mt-0.5"
-                  style={{ backgroundColor: `hsl(var(${colorVar}) / 0.12)` }}
-                >
-                  <Icon className="w-3.5 h-3.5" style={{ color: `hsl(var(${colorVar}))` }} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 leading-tight mb-0.5">
-                    {getFieldLabel(col)}
-                  </p>
-                  <p className="text-sm font-medium text-foreground break-all leading-snug">
-                    {cleanFieldValue(val)}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+        <div className="divide-y divide-border/30">
+          {[...previewFields, ...(expanded ? hiddenFields : [])].map(([col, val]) => (
+            <div
+              key={col}
+              className="flex items-baseline gap-3 px-4 py-2.5"
+              data-testid={`field-${col}-${globalIndex}`}
+            >
+              <span className="text-sm text-muted-foreground shrink-0">{getFieldLabel(col)} :</span>
+              <span className="text-sm font-semibold text-foreground break-all">{cleanFieldValue(val)}</span>
+            </div>
+          ))}
         </div>
 
         {/* En savoir plus */}
@@ -1403,11 +1426,10 @@ export default function SearchPage() {
     setTimeout(() => setScanning(false), 1400);
 
     const searchValues = filledCriteria.map((c) => c.value.trim()).filter(Boolean);
-    const token = getAccessToken();
-    if (token && searchValues.length > 0) {
+    if (searchValues.length > 0) {
       fetch("/api/blacklist/check", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ values: searchValues }),
       })
         .then(r => r.ok ? r.json() : null)

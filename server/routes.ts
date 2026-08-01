@@ -224,6 +224,35 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
   return res.status(401).json({ message: "Non authentifié" });
 }
 
+// Gate for every search-capable endpoint (main search, phone/geoip/nir
+// lookups, xeuledoc, sherlock): blocks pending/rejected accounts and frozen
+// accounts. Bypass-whitelisted users skip the frozen check, same as /api/search.
+async function requireActiveAccount(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = (req as any).user.id;
+    const account = await storage.getUser(userId);
+    if (account && account.status !== "approved") {
+      return res.status(403).json({
+        message: account.status === "rejected"
+          ? "Votre compte a ete refuse par un administrateur."
+          : "Votre compte est en attente d'approbation par un administrateur.",
+        accountStatus: account.status,
+      });
+    }
+
+    const sub = await storage.getSubscription(userId);
+    const bypassed = sub ? await isUserBypassed(sub.id) : false;
+    if (!bypassed && await storage.isFrozen(userId)) {
+      return res.status(403).json({ message: "Votre compte est gele. Contactez un administrateur." });
+    }
+
+    return next();
+  } catch (err) {
+    console.error("requireActiveAccount error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 async function getEffectiveRole(userId: string): Promise<string> {
   // Check users table role column first (V2 local users)
   try {
@@ -2377,7 +2406,7 @@ export async function registerRoutes(
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
       const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
 
-      if (!userBypassed && !COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
+      if (!userBypassed) {
         const lastSearch = userSearchCooldowns.get(userId);
         if (lastSearch) {
           const elapsed = Date.now() - lastSearch;
@@ -2595,7 +2624,7 @@ export async function registerRoutes(
         }
       }
 
-      if (!userBypassed && !COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier)) {
+      if (!userBypassed) {
         userSearchCooldowns.set(userId, Date.now());
       }
 
@@ -2603,7 +2632,7 @@ export async function registerRoutes(
         results,
         total,
         previewMode: isPreview,
-        cooldownSeconds: COOLDOWN_EXEMPT_ROLES.has(isAdmin ? "admin" : tier) ? 0 : USER_SEARCH_COOLDOWN_MS / 1000,
+        cooldownSeconds: userBypassed ? 0 : USER_SEARCH_COOLDOWN_MS / 1000,
         quota: {
           used: newCount,
           limit: planInfo.dailySearches,
@@ -3511,7 +3540,7 @@ export async function registerRoutes(
   }
 
   // POST /api/phone/lookup - French phone number lookup
-  app.post("/api/phone/lookup", requireAuth, async (req, res) => {
+  app.post("/api/phone/lookup", requireAuth, requireActiveAccount, async (req, res) => {
     try {
       const { phone } = req.body;
       if (!phone || typeof phone !== "string") {
@@ -3595,7 +3624,7 @@ export async function registerRoutes(
   });
 
   // POST /api/geoip - GeoIP lookup
-  app.post("/api/geoip", requireAuth, async (req, res) => {
+  app.post("/api/geoip", requireAuth, requireActiveAccount, async (req, res) => {
     try {
       const { ip } = req.body;
       if (!ip || typeof ip !== "string") {
@@ -3647,7 +3676,7 @@ export async function registerRoutes(
   });
 
   // POST /api/nir/decode - Decode French NIR (social security number)
-  app.post("/api/nir/decode", requireAuth, async (req, res) => {
+  app.post("/api/nir/decode", requireAuth, requireActiveAccount, async (req, res) => {
     try {
       const { nir } = req.body;
       if (!nir || typeof nir !== "string") {
@@ -3749,8 +3778,7 @@ export async function registerRoutes(
   });
 
   const userSearchCooldowns = new Map<string, number>();
-  const USER_SEARCH_COOLDOWN_MS = 10_000;
-  const COOLDOWN_EXEMPT_ROLES = new Set(["api", "admin"]);
+  const USER_SEARCH_COOLDOWN_MS = 30_000;
 
   const ipDailyFreeSearches = new Map<string, { date: string; count: number }>();
   const IP_FREE_SEARCH_LIMIT = 5;
@@ -4149,7 +4177,7 @@ export async function registerRoutes(
     res.send(fs.readFileSync(filePath, "utf-8"));
   });
 
-  app.post("/api/xeuledoc", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/xeuledoc", requireAuth, requireActiveAccount, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).user.id;
 
@@ -4303,7 +4331,7 @@ export async function registerRoutes(
     { name: "Bluesky", url: "https://bsky.app/profile/{}.bsky.social", errorType: "status_code", urlProbe: "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={}.bsky.social", category: "Social" },
   ];
 
-  app.post("/api/sherlock", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/sherlock", requireAuth, requireActiveAccount, async (req: Request, res: Response) => {
     try {
       const { username } = req.body;
       if (!username || typeof username !== "string") {
