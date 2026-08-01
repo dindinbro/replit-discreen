@@ -50,6 +50,8 @@ import {
   ExternalLink,
   Upload,
   Crown,
+  Wallet,
+  History,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -1111,10 +1113,10 @@ export default function SearchPage() {
   const [searchTime, setSearchTime] = useState<number | null>(null);
   const searchStartRef = useRef<number>(0);
   const [searchElapsed, setSearchElapsed] = useState(0);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "wanted" | "fivem" | "xeuledoc" | "sherlock" | "telegram">(() => {
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "blockchain" | "wanted" | "fivem" | "xeuledoc" | "sherlock" | "telegram">(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    const valid = ["internal", "external", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
+    const valid = ["internal", "external", "phone", "geoip", "nir", "blockchain", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
     return (m && valid.includes(m) ? m : "internal") as any;
   });
 
@@ -1142,7 +1144,7 @@ export default function SearchPage() {
     const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      const valid = ["internal", "phone", "geoip", "nir", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
+      const valid = ["internal", "phone", "geoip", "nir", "blockchain", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
       if (m && valid.includes(m)) {
         setSearchMode(current => {
           if (current !== m) {
@@ -1218,6 +1220,38 @@ export default function SearchPage() {
     hosting?: boolean;
   } | null>(null);
 
+  const [blockchainNetworks, setBlockchainNetworks] = useState<{ id: string; label: string; symbol: string }[]>([]);
+  const [blockchainNetworksLoading, setBlockchainNetworksLoading] = useState(true);
+  const [blockchainNetwork, setBlockchainNetwork] = useState("bitcoin");
+  const [blockchainAddress, setBlockchainAddress] = useState("");
+  const [blockchainLoading, setBlockchainLoading] = useState(false);
+  const [blockchainResult, setBlockchainResult] = useState<{
+    ok: boolean;
+    message?: string;
+    network?: string;
+    networkLabel?: string;
+    symbol?: string;
+    address?: string;
+    balance?: string;
+    txCount?: number | null;
+  } | null>(null);
+  const [blockchainHistory, setBlockchainHistory] = useState<{ network: string; networkLabel: string; address: string; ts: number }[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("blockchain_lookup_history") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [showBlockchainHistory, setShowBlockchainHistory] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/blockchain/networks", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setBlockchainNetworks(d.networks || []))
+      .catch(() => {})
+      .finally(() => setBlockchainNetworksLoading(false));
+  }, []);
+
   const [sherlockUsername, setSherlockUsername] = useState("");
   const [sherlockLoading, setSherlockLoading] = useState(false);
 
@@ -1290,6 +1324,33 @@ export default function SearchPage() {
       setGeoipResult({ ok: false, message: "Erreur de connexion" });
     } finally {
       setGeoipLoading(false);
+    }
+  };
+
+  const handleBlockchainLookup = async () => {
+    if (!blockchainAddress.trim()) return;
+    setBlockchainLoading(true);
+    setBlockchainResult(null);
+    try {
+      const res = await fetch("/api/blockchain/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ network: blockchainNetwork, address: blockchainAddress.trim() }),
+      });
+      const data = await res.json();
+      setBlockchainResult(data);
+      if (data.ok) {
+        const entry = { network: data.network, networkLabel: data.networkLabel, address: data.address, ts: Date.now() };
+        setBlockchainHistory((prev) => {
+          const next = [entry, ...prev.filter((h) => !(h.network === entry.network && h.address === entry.address))].slice(0, 20);
+          try { localStorage.setItem("blockchain_lookup_history", JSON.stringify(next)); } catch {}
+          return next;
+        });
+      }
+    } catch {
+      setBlockchainResult({ ok: false, message: "Erreur de connexion" });
+    } finally {
+      setBlockchainLoading(false);
     }
   };
 
@@ -1770,7 +1831,7 @@ export default function SearchPage() {
             />
           )}
 
-                    {(searchMode === "phone" || searchMode === "geoip" || searchMode === "nir") && (
+                    {(searchMode === "phone" || searchMode === "geoip" || searchMode === "nir" || searchMode === "blockchain") && (
             <motion.div
               key="lookup"
               initial={{ opacity: 0, x: -20 }}
@@ -1780,7 +1841,7 @@ export default function SearchPage() {
             >
               {/* Tab bar */}
               <div className="flex items-center justify-center gap-1 bg-secondary/30 rounded-lg p-1 w-fit mx-auto">
-                {([{ mode: "phone", label: "Téléphone", Icon: Phone }, { mode: "geoip", label: "GeoIP", Icon: MapPin }, { mode: "nir", label: "NIR", Icon: Hash }] as const).map(({ mode, label, Icon }) => (
+                {([{ mode: "phone", label: "Téléphone", Icon: Phone }, { mode: "geoip", label: "GeoIP", Icon: MapPin }, { mode: "nir", label: "NIR", Icon: Hash }, { mode: "blockchain", label: "Blockchain", Icon: Wallet }] as const).map(({ mode, label, Icon }) => (
                   <button key={mode} onClick={() => setSearchMode(mode as any)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${searchMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
                     <Icon className="w-3.5 h-3.5" /> {label}
@@ -1917,6 +1978,110 @@ export default function SearchPage() {
                     ) : (<p className="text-sm text-destructive" data-testid="text-nir-error">{nirResult.message}</p>)}
                   </div>
                 )}
+              </div>
+              )}
+
+              {/* Blockchain Explorer */}
+              {searchMode === "blockchain" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                      <Wallet className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-semibold">Blockchain Explorer</h2>
+                      <p className="text-xs text-muted-foreground">Analysez n'importe quel wallet sur de nombreux réseaux</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full gap-1.5"
+                    onClick={() => setShowBlockchainHistory(true)}
+                    data-testid="button-blockchain-history"
+                  >
+                    <History className="w-3.5 h-3.5" /> Historique
+                  </Button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch gap-2 mx-auto max-w-2xl w-full">
+                  <Select value={blockchainNetwork} onValueChange={setBlockchainNetwork}>
+                    <SelectTrigger className="sm:w-52 rounded-full shrink-0" data-testid="select-blockchain-network">
+                      <SelectValue placeholder={blockchainNetworksLoading ? "Chargement..." : "Réseau"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {blockchainNetworks.map((n) => (
+                        <SelectItem key={n.id} value={n.id}>{n.label} ({n.symbol})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex-1 flex items-center gap-2.5 rounded-full border border-border/60 bg-background/60 pl-4 pr-1.5 py-1.5 focus-within:border-primary/50 transition-colors">
+                    <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <input
+                      data-testid="input-blockchain-address"
+                      placeholder="Entrez une adresse de wallet..."
+                      value={blockchainAddress}
+                      onChange={(e) => setBlockchainAddress(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleBlockchainLookup()}
+                      className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground/50 min-w-0 font-mono"
+                    />
+                    <Button
+                      data-testid="button-blockchain-lookup"
+                      onClick={handleBlockchainLookup}
+                      disabled={blockchainLoading || !blockchainAddress.trim()}
+                      size="sm"
+                      className="rounded-full gap-1.5 shrink-0"
+                    >
+                      {blockchainLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                      Analyser
+                    </Button>
+                  </div>
+                </div>
+
+                {blockchainResult && (
+                  <div>
+                    {blockchainResult.ok ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Réseau</p><p className="text-sm font-medium" data-testid="text-blockchain-network">{blockchainResult.networkLabel}</p></div>
+                        <div className="space-y-1 md:col-span-2"><p className="text-xs text-muted-foreground">Adresse</p><p className="text-sm font-mono font-medium break-all" data-testid="text-blockchain-address">{blockchainResult.address}</p></div>
+                        <div className="space-y-1"><p className="text-xs text-muted-foreground">Solde</p><p className="text-sm font-mono font-medium" data-testid="text-blockchain-balance">{blockchainResult.balance} {blockchainResult.symbol}</p></div>
+                        {blockchainResult.txCount !== null && blockchainResult.txCount !== undefined && (
+                          <div className="space-y-1"><p className="text-xs text-muted-foreground">Transactions</p><p className="text-sm font-medium" data-testid="text-blockchain-txcount">{blockchainResult.txCount}</p></div>
+                        )}
+                      </div>
+                    ) : (<p className="text-sm text-destructive" data-testid="text-blockchain-error">{blockchainResult.message}</p>)}
+                  </div>
+                )}
+
+                <Dialog open={showBlockchainHistory} onOpenChange={setShowBlockchainHistory}>
+                  <DialogContent data-testid="dialog-blockchain-history">
+                    <DialogHeader>
+                      <DialogTitle>Historique des recherches</DialogTitle>
+                    </DialogHeader>
+                    {blockchainHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">Aucune recherche recente</p>
+                    ) : (
+                      <div className="space-y-1 max-h-80 overflow-y-auto">
+                        {blockchainHistory.map((h, i) => (
+                          <button
+                            key={`${h.network}-${h.address}-${i}`}
+                            onClick={() => {
+                              setBlockchainNetwork(h.network);
+                              setBlockchainAddress(h.address);
+                              setShowBlockchainHistory(false);
+                            }}
+                            className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                            data-testid={`button-blockchain-history-${i}`}
+                          >
+                            <span className="text-sm font-mono truncate">{h.address}</span>
+                            <Badge variant="outline" className="shrink-0">{h.networkLabel}</Badge>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </div>
               )}
             </motion.div>
@@ -2479,7 +2644,7 @@ export default function SearchPage() {
           </div>
         )}
 
-        {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
+        {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "blockchain" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
             const activeResults = searchMutation.data?.results;
