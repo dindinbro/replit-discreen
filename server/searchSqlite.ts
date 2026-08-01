@@ -307,7 +307,51 @@ function parsePipeJson(line: string, source: string): Record<string, string> | n
   return parsed;
 }
 
+// Real JSON.parse over the raw line, keeping every top-level key (not just
+// the ones in JSON_FIELD_MAP) so records like FiveM identifier dumps
+// ({"endpoint":...,"identifiers":[...],"name":...,"ping":...}) render as
+// clean fields instead of falling through to the comma-splitter below,
+// which mangles JSON syntax into "champ_1", "champ_2" garbage.
+function parseJsonGeneric(line: string, source: string): Record<string, string> | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+
+  let obj: unknown;
+  try {
+    obj = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (Array.isArray(obj)) obj = obj[0];
+  if (!obj || typeof obj !== "object") return null;
+
+  const parsed: Record<string, string> = {};
+  for (const [rawKey, rawVal] of Object.entries(obj as Record<string, unknown>)) {
+    if (rawVal === null || rawVal === undefined || rawVal === "") continue;
+    let value: string;
+    if (Array.isArray(rawVal)) {
+      value = rawVal.map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ");
+    } else if (typeof rawVal === "object") {
+      value = JSON.stringify(rawVal);
+    } else {
+      value = String(rawVal);
+    }
+    if (!value.trim() || value === "null" || value === "false") continue;
+
+    const key = rawKey.toLowerCase().replace(/[\s-]/g, "_");
+    const mapped = JSON_FIELD_MAP[key] || key;
+    if (!parsed[mapped]) parsed[mapped] = value;
+  }
+
+  if (Object.keys(parsed).length === 0) return null;
+  if (source) parsed["source"] = source;
+  return parsed;
+}
+
 export function parseLineField(line: string, source: string): Record<string, string> {
+  const jsonResult = parseJsonGeneric(line, source);
+  if (jsonResult) return jsonResult;
+
   const pipeJsonResult = parsePipeJson(line, source);
   if (pipeJsonResult) return pipeJsonResult;
 

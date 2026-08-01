@@ -482,21 +482,21 @@ function ResultCard({
         data-testid={`card-result-${globalIndex}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/50">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-              <User className="w-4 h-4 text-muted-foreground" />
+        <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 border-b border-border/50">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+              <User className="w-3.5 h-3.5 text-muted-foreground" />
             </div>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-semibold text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-semibold text-sm text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
                 {prefix ? `${prefix} ` : ""}
                 {titleField ? cleanFieldValue(titleField[1]) : `Résultat ${globalIndex + 1}`}
                 {age !== null ? ` · ${age} ans` : ""}
               </span>
-              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <Check className="w-3 h-3 text-emerald-500 shrink-0" />
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={handleCopy}
               className="p-1.5 rounded-md hover:bg-muted transition-colors"
@@ -505,7 +505,7 @@ function ResultCard({
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
             </button>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
         </div>
 
@@ -514,11 +514,11 @@ function ResultCard({
           {[...previewFields, ...(expanded ? hiddenFields : [])].map(([col, val]) => (
             <div
               key={col}
-              className="flex items-baseline gap-3 px-4 py-2.5"
+              className="flex items-baseline gap-3 px-3.5 py-1.5"
               data-testid={`field-${col}-${globalIndex}`}
             >
-              <span className="text-sm text-muted-foreground shrink-0">{getFieldLabel(col)} :</span>
-              <span className="text-sm font-semibold text-foreground break-all">{cleanFieldValue(val)}</span>
+              <span className="text-xs text-muted-foreground shrink-0">{getFieldLabel(col)} :</span>
+              <span className="text-[13px] font-semibold text-foreground break-all">{cleanFieldValue(val)}</span>
             </div>
           ))}
         </div>
@@ -527,11 +527,11 @@ function ResultCard({
         {hiddenFields.length > 0 && (
           <button
             onClick={() => setExpanded(v => !v)}
-            className="w-full flex items-center gap-1 px-4 py-2.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors border-t border-border/40"
+            className="w-full flex items-center gap-1 px-3.5 py-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors border-t border-border/40"
             data-testid={`button-expand-${globalIndex}`}
           >
             {expanded ? "Voir moins" : "En savoir plus"}
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
           </button>
         )}
       </div>
@@ -2629,7 +2629,7 @@ export default function SearchPage() {
                         </Button>
                       </div>
                     )}
-                    <div className={`grid grid-cols-1 gap-3 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
+                    <div className={`grid grid-cols-1 gap-2 ${blacklistMatch?.blacklisted ? "pointer-events-none select-none" : ""}`}>
                     {activeResults.map((row, idx) => {
                       const gi = (searchMode === "internal" || searchMode === "fivem" ? page * pageSize : 0) + idx;
                       return (

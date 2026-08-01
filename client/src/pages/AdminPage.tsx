@@ -1048,27 +1048,40 @@ function UsersSection({ userId }: { userId: string }) {
                     <p className="text-xs text-muted-foreground truncate" data-testid={`text-email-${u.id}`}>{u.email}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    {(u.status === "pending" || u.status === "rejected") && (
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => setAccountStatus(u.id, "approve")}
+                        disabled={savingId === u.id}
+                        data-testid={`button-approve-${u.id}`}
+                      >
+                        {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" /> {u.status === "rejected" ? "Reactiver l'acces" : "Approuver"}</>}
+                      </Button>
+                    )}
                     {u.status === "pending" && (
-                      <>
-                        <Button
-                          size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => setAccountStatus(u.id, "approve")}
-                          disabled={savingId === u.id}
-                          data-testid={`button-approve-${u.id}`}
-                        >
-                          {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" /> Approuver</>}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => setAccountStatus(u.id, "reject")}
-                          disabled={savingId === u.id}
-                          data-testid={`button-reject-${u.id}`}
-                        >
-                          {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" /> Refuser</>}
-                        </Button>
-                      </>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setAccountStatus(u.id, "reject")}
+                        disabled={savingId === u.id}
+                        data-testid={`button-reject-${u.id}`}
+                      >
+                        {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" /> Refuser</>}
+                      </Button>
+                    )}
+                    {u.status === "approved" && u.id !== userId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => setAccountStatus(u.id, "reject")}
+                        disabled={savingId === u.id}
+                        data-testid={`button-revoke-access-${u.id}`}
+                        title="Retirer l'acces (equivalent a un refus)"
+                      >
+                        {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" /> Retirer l'acces</>}
+                      </Button>
                     )}
                     <Select value={currentRole} onValueChange={(val) => handleRoleChange(u.id, val)} disabled={u.id === userId}>
                       <SelectTrigger className="w-[130px]" data-testid={`select-role-${u.id}`}>

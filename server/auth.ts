@@ -10,6 +10,29 @@ declare module "express-session" {
   }
 }
 
+// Connection logging (IP, user agent) for the admin panel. Admin accounts
+// are deliberately excluded — only regular user activity is tracked here.
+async function logSuccessfulLogin(req: Request, user: { id: number; username: string; email: string | null; role: string }, provider: string) {
+  if (user.role === "admin") return;
+  try {
+    const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket?.remoteAddress || "unknown";
+    const userAgent = req.headers["user-agent"] || "unknown";
+    const sub = await storage.getOrCreateSubscription(String(user.id));
+    await storage.createLoginLog({
+      userId: String(user.id),
+      email: user.email || undefined,
+      username: user.username,
+      ip,
+      userAgent,
+      provider,
+      tier: sub?.tier || "free",
+      discordId: sub?.discordId || undefined,
+    });
+  } catch (err) {
+    console.error("[auth] login log error:", err);
+  }
+}
+
 export function registerAuthRoutes(app: Express) {
   /* ── Register ─────────────────────────────────────────── */
   app.post("/api/auth/register", async (req: Request, res: Response) => {
@@ -50,6 +73,7 @@ export function registerAuthRoutes(app: Express) {
       (req.session as any).authUserId = user.id;
       (req.session as any).authUsername = user.username;
       (req.session as any).authEmail = user.email || null;
+      logSuccessfulLogin(req, user, "register");
 
       return res.json({ id: user.id, username: user.username, role: user.role, status: user.status });
     } catch (err: any) {
@@ -85,6 +109,7 @@ export function registerAuthRoutes(app: Express) {
       (req.session as any).authUserId = user.id;
       (req.session as any).authUsername = user.username;
       (req.session as any).authEmail = user.email || null;
+      logSuccessfulLogin(req, user, "local");
 
       return res.json({ id: user.id, username: user.username, role: user.role });
     } catch (err) {
