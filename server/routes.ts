@@ -118,6 +118,7 @@ async function buildUserInfo(req: Request): Promise<{ id: string; email: string;
 
 async function logSearchToDb(req: Request, wUser: Awaited<ReturnType<typeof buildUserInfo>>, searchType: string, searchQuery: string, resultCount: number): Promise<void> {
   try {
+    if (wUser.id && (await getEffectiveRole(wUser.id)) === "admin") return;
     const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket?.remoteAddress || null;
     const userAgent = req.headers["user-agent"] || null;
     let tier = "free";
@@ -3826,6 +3827,11 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Invalid or revoked API key. API tier subscription required." });
       }
 
+      const apiAccount = await storage.getUser(Number(validation.userId));
+      if (apiAccount && apiAccount.status !== "approved") {
+        return res.status(403).json({ error: "Account access has been revoked. Contact an administrator." });
+      }
+
       const apiSub = await storage.getSubscription(validation.userId);
       const apiUserBypassed = apiSub ? await isUserBypassed(apiSub.id) : false;
 
@@ -3912,6 +3918,11 @@ export async function registerRoutes(
       });
       if (!validation.valid || !validation.userId) {
         return res.status(401).json({ error: "Invalid or revoked API key. API tier subscription required." });
+      }
+
+      const parametricAccount = await storage.getUser(Number(validation.userId));
+      if (parametricAccount && parametricAccount.status !== "approved") {
+        return res.status(403).json({ error: "Account access has been revoked. Contact an administrator." });
       }
 
       const sub = await storage.getSubscription(validation.userId);
@@ -4428,7 +4439,7 @@ export async function registerRoutes(
     return wmnSitesCache!;
   }
 
-  app.post("/api/whatsmyname", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/whatsmyname", requireAuth, requireActiveAccount, async (req: Request, res: Response) => {
     try {
       const { username } = req.body;
       if (!username || typeof username !== "string") {
@@ -4545,7 +4556,7 @@ export async function registerRoutes(
     { name: "Amazon", category: "shopping", checkUrl: "https://www.amazon.com/ap/register", method: "POST", body: (e) => `email=${encodeURIComponent(e)}&create=0`, contentType: "application/x-www-form-urlencoded", existsWhen: "bodyContains", existsString: "already exists" },
   ];
 
-  app.post("/api/holehe", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/holehe", requireAuth, requireActiveAccount, async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
       if (!email || typeof email !== "string") {
@@ -4646,7 +4657,7 @@ export async function registerRoutes(
     },
   });
 
-  app.post("/api/exiftool", requireAuth, exifUpload.single("file"), async (req: Request, res: Response) => {
+  app.post("/api/exiftool", requireAuth, requireActiveAccount, exifUpload.single("file"), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "Aucun fichier envoye." });
@@ -5104,6 +5115,26 @@ ${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.re
     try {
       const ok = await storage.deleteSearchLog(Number(req.params.id));
       ok ? res.json({ ok: true }) : res.status(404).json({ message: "Log introuvable" });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  // Delete every login/search log belonging to one user (distinct from
+  // deleting a single log row or clearing everything).
+  app.delete("/api/superadmin/logs/user/:userId", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const count = await storage.deleteLoginLogsByUser(req.params.userId);
+      res.json({ deleted: count });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Erreur interne" });
+    }
+  });
+
+  app.delete("/api/superadmin/search-logs/user/:userId", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const count = await storage.deleteSearchLogsByUser(req.params.userId);
+      res.json({ deleted: count });
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Erreur interne" });
     }

@@ -2897,6 +2897,19 @@ function LoginLogsSection({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     finally { setClearing(false); }
   }
 
+  async function handleDeleteUserLogs(userId: string, username?: string | null) {
+    if (!confirm(`Supprimer tous les logs de connexion de ${username || userId} ?`)) return;
+    setDeletingId(-1);
+    try {
+      const res = await fetch(`/api/superadmin/logs/user/${userId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Erreur suppression");
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/login-logs"] });
+      toast({ title: `${data.deleted} log(s) supprimé(s)` });
+    } catch { toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" }); }
+    finally { setDeletingId(null); }
+  }
+
   const filtered = logs.filter(log => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -3030,16 +3043,30 @@ function LoginLogsSection({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
                   })}
                 </span>
                 {isSuperAdmin && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-7 h-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDeleteLog(log.id)}
-                    disabled={deletingId === log.id}
-                    data-testid={`button-delete-login-log-${log.id}`}
-                  >
-                    {deletingId === log.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  </Button>
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteLog(log.id)}
+                      disabled={deletingId === log.id}
+                      title="Supprimer ce log"
+                      data-testid={`button-delete-login-log-${log.id}`}
+                    >
+                      {deletingId === log.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteUserLogs(log.userId, log.username)}
+                      disabled={deletingId === -1}
+                      title={`Supprimer tous les logs de ${log.username || log.userId}`}
+                      data-testid={`button-delete-user-login-logs-${log.id}`}
+                    >
+                      <ShieldBan className="w-3.5 h-3.5" />
+                    </Button>
+                  </>
                 )}
               </div>
             </Card>
@@ -3617,6 +3644,19 @@ function SearchLogsSection({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
     finally { setDeletingId(null); }
   }
 
+  async function handleDeleteUserSearchLogs(userId: string, username?: string | null) {
+    if (!confirm(`Supprimer tous les logs de recherche de ${username || userId} ?`)) return;
+    setDeletingId(-1);
+    try {
+      const res = await fetch(`/api/superadmin/search-logs/user/${userId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/search-logs"] });
+      toast({ title: `${data.deleted} log(s) supprimé(s)` });
+    } catch { toast({ title: "Erreur", variant: "destructive" }); }
+    finally { setDeletingId(null); }
+  }
+
   async function handleClearSearchLogs() {
     if (!confirm("Supprimer TOUS les logs de recherche ?")) return;
     setClearing(true);
@@ -3749,16 +3789,30 @@ function SearchLogsSection({ isSuperAdmin }: { isSuperAdmin?: boolean }) {
                   </div>
                 </div>
                 {isSuperAdmin && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-7 h-7 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDeleteSearchLog(log.id)}
-                    disabled={deletingId === log.id}
-                    data-testid={`button-delete-search-log-${log.id}`}
-                  >
-                    {deletingId === log.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteSearchLog(log.id)}
+                      disabled={deletingId === log.id}
+                      title="Supprimer ce log"
+                      data-testid={`button-delete-search-log-${log.id}`}
+                    >
+                      {deletingId === log.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteUserSearchLogs(log.userId, log.username)}
+                      disabled={deletingId === -1}
+                      title={`Supprimer tous les logs de ${log.username || log.userId}`}
+                      data-testid={`button-delete-user-search-logs-${log.id}`}
+                    >
+                      <ShieldBan className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>

@@ -161,8 +161,10 @@ export interface IStorage {
   getGameLogs(filters: { userId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }): Promise<{ rows: GameLog[]; total: number }>;
   deleteLoginLog(id: number): Promise<boolean>;
   clearLoginLogs(): Promise<number>;
+  deleteLoginLogsByUser(userId: string): Promise<number>;
   deleteSearchLog(id: number): Promise<boolean>;
   clearSearchLogs(): Promise<number>;
+  deleteSearchLogsByUser(userId: string): Promise<number>;
   deleteGameLog(id: number): Promise<boolean>;
   clearGameLogs(): Promise<number>;
   // Tickets
@@ -1425,6 +1427,16 @@ export class DatabaseStorage implements IStorage {
 
   async clearSearchLogs(): Promise<number> {
     const result = await db.delete(searchLogs);
+    return result.rowCount ?? 0;
+  }
+
+  async deleteLoginLogsByUser(userId: string): Promise<number> {
+    const result = await db.delete(loginLogs).where(eq(loginLogs.userId, userId));
+    return result.rowCount ?? 0;
+  }
+
+  async deleteSearchLogsByUser(userId: string): Promise<number> {
+    const result = await db.delete(searchLogs).where(eq(searchLogs.userId, userId));
     return result.rowCount ?? 0;
   }
 
