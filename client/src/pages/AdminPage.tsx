@@ -46,6 +46,7 @@ import {
   ChevronRight,
   ChevronDown,
   Wrench,
+  Lock,
   KeyRound,
   Ban,
   Copy,
@@ -2723,6 +2724,68 @@ function MaintenanceToggle() {
   );
 }
 
+function PrivateModeToggle() {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/private-mode", {
+      credentials: "include",
+    })
+      .then((r) => r.json())
+      .then((d) => setEnabled(d.enabled !== false))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const toggle = async () => {
+    setToggling(true);
+    try {
+      const res = await fetch("/api/admin/private-mode", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEnabled(data.enabled);
+        toast({
+          title: data.enabled ? "Mode prive active" : "Mode prive desactive",
+          description: data.enabled
+            ? "Les nouveaux comptes doivent etre approuves par un admin"
+            : "Les nouveaux comptes accedent au site immediatement",
+        });
+      }
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+    setToggling(false);
+  };
+
+  if (loading) return null;
+
+  return (
+    <Button
+      variant={enabled ? "outline" : "destructive"}
+      onClick={toggle}
+      disabled={toggling}
+      data-testid="button-private-mode-toggle"
+    >
+      {toggling ? (
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      ) : (
+        <Lock className="w-4 h-4 mr-2" />
+      )}
+      {enabled ? "Mode prive actif" : "Mode prive desactive"}
+    </Button>
+  );
+}
+
 interface BlockedIpEntry {
   id: number;
   ipAddress: string;
@@ -4554,6 +4617,7 @@ function AdminPageInner() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            <PrivateModeToggle />
             <MaintenanceToggle />
             <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-back-home" className="h-8">
               <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />

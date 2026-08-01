@@ -59,17 +59,22 @@ export function registerAuthRoutes(app: Express) {
 
       const passwordHash = await bcrypt.hash(password, 12);
 
+      // Private mode (enabled by default) requires admin approval before a new
+      // account can access the site. When disabled, accounts are auto-approved.
+      const privateModeVal = await storage.getSiteSetting("private_mode");
+      const privateModeEnabled = privateModeVal !== "false";
+
       const user = await storage.createUser({
         username: clean,
         passwordHash,
         email: email?.trim() || null,
         role: "free",
-        status: "pending",
+        status: privateModeEnabled ? "pending" : "approved",
       });
 
       // Auto-login after register — account still needs admin approval
       // before it can actually use the site (see status gate on /api/search
-      // and PendingApprovalGate on the client).
+      // and PendingApprovalGate on the client), unless private mode is off.
       (req.session as any).authUserId = user.id;
       (req.session as any).authUsername = user.username;
       (req.session as any).authEmail = user.email || null;

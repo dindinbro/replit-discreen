@@ -1596,6 +1596,29 @@ export async function registerRoutes(
     }
   });
 
+  // Private mode: enabled by default (unset === enabled) — new accounts need
+  // admin approval before they can access the site. Disabling it auto-approves
+  // new registrations (see /api/auth/register).
+  app.get("/api/admin/private-mode", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const val = await storage.getSiteSetting("private_mode");
+      res.json({ enabled: val !== "false" });
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/admin/private-mode", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      await storage.setSiteSetting("private_mode", enabled ? "true" : "false");
+      console.log(`[admin] Private mode ${enabled ? "ENABLED" : "DISABLED"} by admin`);
+      res.json({ enabled: !!enabled });
+    } catch (err) {
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
   // GET /api/admin/login-logs — returns latest connection logs
   app.get("/api/admin/login-logs", requireAuth, requireAdmin, async (req, res) => {
     try {
