@@ -2406,7 +2406,7 @@ export async function registerRoutes(
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
       const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
 
-      if (!userBypassed) {
+      if (!userBypassed && !isAdmin) {
         const lastSearch = userSearchCooldowns.get(userId);
         if (lastSearch) {
           const elapsed = Date.now() - lastSearch;
@@ -2624,7 +2624,7 @@ export async function registerRoutes(
         }
       }
 
-      if (!userBypassed) {
+      if (!userBypassed && !isAdmin) {
         userSearchCooldowns.set(userId, Date.now());
       }
 
@@ -2632,7 +2632,7 @@ export async function registerRoutes(
         results,
         total,
         previewMode: isPreview,
-        cooldownSeconds: userBypassed ? 0 : USER_SEARCH_COOLDOWN_MS / 1000,
+        cooldownSeconds: (userBypassed || isAdmin) ? 0 : USER_SEARCH_COOLDOWN_MS / 1000,
         quota: {
           used: newCount,
           limit: planInfo.dailySearches,
