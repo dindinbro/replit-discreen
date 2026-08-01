@@ -420,6 +420,78 @@ function genderPrefix(raw: string): string | null {
   return null;
 }
 
+function LookupHeader({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
+  return (
+    <div className="flex flex-col items-center text-center gap-1">
+      <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-1">
+        <Icon className="w-5 h-5 text-primary" />
+      </div>
+      <h2 className="text-base font-semibold">{title}</h2>
+      <p className="text-xs text-muted-foreground max-w-sm">{subtitle}</p>
+    </div>
+  );
+}
+
+function LookupBar({
+  icon: Icon,
+  value,
+  onChange,
+  onSubmit,
+  onReset,
+  placeholder,
+  loading,
+  buttonLabel,
+  buttonIcon: ButtonIcon,
+  monospace,
+  testIdPrefix,
+}: {
+  icon: React.ElementType;
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  onReset: () => void;
+  placeholder: string;
+  loading: boolean;
+  buttonLabel: string;
+  buttonIcon: React.ElementType;
+  monospace?: boolean;
+  testIdPrefix: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 mx-auto max-w-xl w-full">
+      <div className="w-full flex items-center gap-2.5 rounded-full border border-border/60 bg-background/60 pl-4 pr-1.5 py-1.5 focus-within:border-primary/50 transition-colors">
+        <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+        <input
+          data-testid={`input-${testIdPrefix}`}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+          className={`flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground/50 min-w-0 ${monospace ? "font-mono" : ""}`}
+        />
+        <Button
+          data-testid={`button-${testIdPrefix}-lookup`}
+          onClick={onSubmit}
+          disabled={loading || !value.trim()}
+          size="sm"
+          className="rounded-full gap-1.5 shrink-0"
+        >
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ButtonIcon className="w-3.5 h-3.5" />}
+          {buttonLabel}
+        </Button>
+      </div>
+      <button
+        onClick={onReset}
+        disabled={loading}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        data-testid={`button-reset-${testIdPrefix}`}
+      >
+        <RotateCcw className="w-3 h-3" /> Reinitialiser
+      </button>
+    </div>
+  );
+}
+
 function ResultCard({
   row,
   index,
@@ -1204,17 +1276,12 @@ export default function SearchPage() {
 
   const handleGeoip = async () => {
     if (!geoipTerm.trim()) return;
-    const token = getAccessToken();
-    if (!token) {
-      toast({ title: "Erreur", description: "Vous devez être connecté.", variant: "destructive" });
-      return;
-    }
     setGeoipLoading(true);
     setGeoipResult(null);
     try {
       const res = await fetch("/api/geoip", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ip: geoipTerm.trim() }),
       });
       const data = await res.json();
@@ -1228,17 +1295,12 @@ export default function SearchPage() {
 
   const handleNirDecode = async () => {
     if (!nirTerm.trim()) return;
-    const token = getAccessToken();
-    if (!token) {
-      toast({ title: "Erreur", description: "Vous devez être connecté.", variant: "destructive" });
-      return;
-    }
     setNirLoading(true);
     setNirResult(null);
     try {
       const res = await fetch("/api/nir/decode", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nir: nirTerm.trim() }),
       });
       const data = await res.json();
@@ -1252,17 +1314,12 @@ export default function SearchPage() {
 
   const handlePhoneLookup = async () => {
     if (!phoneLookupTerm.trim()) return;
-    const token = getAccessToken();
-    if (!token) {
-      toast({ title: "Erreur", description: "Vous devez être connecté.", variant: "destructive" });
-      return;
-    }
     setPhoneLookupLoading(true);
     setPhoneLookupResult(null);
     try {
       const res = await fetch("/api/phone/lookup", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: phoneLookupTerm.trim() }),
       });
       const data = await res.json();
@@ -1289,9 +1346,6 @@ export default function SearchPage() {
 
     setSubmittedTerms(filledCriteria.map((c) => c.value.trim()));
 
-    const token = getAccessToken();
-    if (!token) return;
-
     setLoadingWanted(true);
     try {
       const params = new URLSearchParams();
@@ -1300,9 +1354,7 @@ export default function SearchPage() {
         params.append(apiParam, c.value.trim());
       });
 
-      const res = await fetch(`/api/wanted/search?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/wanted/search?${params.toString()}`);
       if (res.ok) {
         setWantedResults(await res.json());
       }
@@ -1727,7 +1779,7 @@ export default function SearchPage() {
               className="glass-panel rounded-2xl p-6 md:p-8 space-y-6"
             >
               {/* Tab bar */}
-              <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-1 w-fit">
+              <div className="flex items-center justify-center gap-1 bg-secondary/30 rounded-lg p-1 w-fit mx-auto">
                 {([{ mode: "phone", label: "Téléphone", Icon: Phone }, { mode: "geoip", label: "GeoIP", Icon: MapPin }, { mode: "nir", label: "NIR", Icon: Hash }] as const).map(({ mode, label, Icon }) => (
                   <button key={mode} onClick={() => setSearchMode(mode as any)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${searchMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
@@ -1738,17 +1790,20 @@ export default function SearchPage() {
 
               {/* Téléphone */}
               {searchMode === "phone" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Input data-testid="input-phone-lookup" placeholder="06 12 34 56 78" value={phoneLookupTerm} onChange={(e) => setPhoneLookupTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePhoneLookup()} className="max-w-xs" />
-                  <Button data-testid="button-phone-lookup" onClick={handlePhoneLookup} disabled={phoneLookupLoading || !phoneLookupTerm.trim()}>
-                    {phoneLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    <span className="ml-1.5">Lookup</span>
-                  </Button>
-                  <Button data-testid="button-reset-phone" variant="outline" onClick={handleReset} disabled={phoneLookupLoading} className="gap-2">
-                    <RotateCcw className="w-4 h-4" /> Reinitialiser
-                  </Button>
-                </div>
+              <div className="space-y-6">
+                <LookupHeader icon={Phone} title="Recherche telephone" subtitle="Identifiez l'operateur, le type et la localisation d'un numero francais." />
+                <LookupBar
+                  icon={Phone}
+                  value={phoneLookupTerm}
+                  onChange={setPhoneLookupTerm}
+                  onSubmit={handlePhoneLookup}
+                  onReset={handleReset}
+                  placeholder="06 12 34 56 78"
+                  loading={phoneLookupLoading}
+                  buttonLabel="Lookup"
+                  buttonIcon={Search}
+                  testIdPrefix="phone"
+                />
                 {phoneLookupResult && (
                   <div>
                     {phoneLookupResult.ok ? (
@@ -1778,17 +1833,20 @@ export default function SearchPage() {
 
               {/* GeoIP */}
               {searchMode === "geoip" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Input data-testid="input-geoip" placeholder="8.8.8.8" value={geoipTerm} onChange={(e) => setGeoipTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleGeoip()} className="max-w-xs" />
-                  <Button data-testid="button-geoip-lookup" onClick={handleGeoip} disabled={geoipLoading || !geoipTerm.trim()}>
-                    {geoipLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    <span className="ml-1.5">Lookup</span>
-                  </Button>
-                  <Button data-testid="button-reset-geoip" variant="outline" onClick={handleReset} disabled={geoipLoading} className="gap-2">
-                    <RotateCcw className="w-4 h-4" /> Reinitialiser
-                  </Button>
-                </div>
+              <div className="space-y-6">
+                <LookupHeader icon={MapPin} title="Recherche GeoIP" subtitle="Localisez une adresse IP : pays, ville, fournisseur d'acces et plus." />
+                <LookupBar
+                  icon={MapPin}
+                  value={geoipTerm}
+                  onChange={setGeoipTerm}
+                  onSubmit={handleGeoip}
+                  onReset={handleReset}
+                  placeholder="8.8.8.8"
+                  loading={geoipLoading}
+                  buttonLabel="Lookup"
+                  buttonIcon={Search}
+                  testIdPrefix="geoip"
+                />
                 {geoipResult && (
                   <div>
                     {geoipResult.ok ? (
@@ -1818,24 +1876,21 @@ export default function SearchPage() {
 
               {/* NIR */}
               {searchMode === "nir" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Hash className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold">Numero NIR</p>
-                    <p className="text-xs text-muted-foreground">Entrez un numero de securite sociale a 13 ou 15 chiffres</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Input data-testid="input-nir" placeholder="1 85 01 25 123 456 78" value={nirTerm} onChange={(e) => setNirTerm(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleNirDecode()} className="max-w-sm font-mono" />
-                  <Button data-testid="button-nir-decode" onClick={handleNirDecode} disabled={nirLoading || !nirTerm.trim()}>
-                    {nirLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                    <span className="ml-1.5">Decoder le NIR</span>
-                  </Button>
-                  <Button data-testid="button-reset-nir" variant="outline" onClick={handleReset} disabled={nirLoading} className="gap-2">
-                    <RotateCcw className="w-4 h-4" /> Reinitialiser
-                  </Button>
-                </div>
+              <div className="space-y-6">
+                <LookupHeader icon={Hash} title="Decodeur NIR" subtitle="Entrez un numero de securite sociale a 13 ou 15 chiffres." />
+                <LookupBar
+                  icon={Hash}
+                  value={nirTerm}
+                  onChange={setNirTerm}
+                  onSubmit={handleNirDecode}
+                  onReset={handleReset}
+                  placeholder="1 85 01 25 123 456 78"
+                  loading={nirLoading}
+                  buttonLabel="Decoder"
+                  buttonIcon={FileText}
+                  monospace
+                  testIdPrefix="nir"
+                />
                 {nirResult && (
                   <div>
                     {nirResult.ok ? (
