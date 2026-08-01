@@ -1933,58 +1933,27 @@ export default function SearchPage() {
               className="glass-panel-xeuledoc rounded-2xl p-6 md:p-8 space-y-6 relative"
             >
               <div className={canAccessXeuledoc ? "" : "blur-sm select-none pointer-events-none"}>
-              <div className="flex items-center gap-2">
-                <FileSearch className="w-5 h-5 text-blue-500" />
-                <h2 className="text-xl font-semibold">Google Docs OSINT</h2>
-              </div>
+              <LookupHeader
+                icon={FileSearch}
+                title="Google Docs OSINT"
+                subtitle="Extrait les metadonnees d'un document Google public : email, nom et identifiant du proprietaire, dates de creation et de derniere modification."
+              />
 
-              <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 p-4 text-sm text-muted-foreground space-y-2">
-                <p>
-                  Cet outil permet d'extraire les <span className="text-blue-400 font-medium">metadonnees</span> d'un document Google public (Docs, Slides, Sheets, Drive).
-                </p>
-                <p>
-                  Il revele l'<span className="text-blue-400 font-medium">adresse e-mail</span>, le <span className="text-blue-400 font-medium">nom</span> et l'<span className="text-blue-400 font-medium">identifiant Google</span> du proprietaire du document, ainsi que les dates de creation et de derniere modification.
-                </p>
-                <p className="text-xs opacity-70">
-                  Fonctionne uniquement sur les documents partages publiquement (accessible a toute personne disposant du lien).
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Lien Google Document</Label>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Input
-                    data-testid="input-xeuledoc-url"
-                    placeholder="https://docs.google.com/document/d/... ou /forms/d/e/... ou /presentation/d/..."
-                    value={xeuledocUrl}
-                    onChange={(e) => setXeuledocUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleXeuledocSearch()}
-                    className="flex-1 min-w-[300px]"
-                  />
-                  <Button
-                    data-testid="button-xeuledoc-search"
-                    onClick={handleXeuledocSearch}
-                    disabled={xeuledocLoading || !xeuledocUrl.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
-                  >
-                    {xeuledocLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    <span className="ml-1.5">Analyser</span>
-                  </Button>
-                  <Button
-                    data-testid="button-reset-xeuledoc"
-                    variant="outline"
-                    onClick={() => { setXeuledocUrl(""); setXeuledocResult(null); }}
-                    disabled={xeuledocLoading}
-                    className="gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reinitialiser
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Formats acceptes : Google Docs, Slides, Sheets, Forms, Drive, Drawings, Apps Script, Jamboard
-                </p>
-              </div>
+              <LookupBar
+                icon={FileSearch}
+                value={xeuledocUrl}
+                onChange={setXeuledocUrl}
+                onSubmit={handleXeuledocSearch}
+                onReset={() => { setXeuledocUrl(""); setXeuledocResult(null); }}
+                placeholder="https://docs.google.com/document/d/..."
+                loading={xeuledocLoading}
+                buttonLabel="Analyser"
+                buttonIcon={Search}
+                testIdPrefix="xeuledoc-url"
+              />
+              <p className="text-xs text-muted-foreground text-center -mt-3">
+                Docs, Slides, Sheets, Forms, Drive, Drawings, Apps Script, Jamboard — uniquement les documents partages publiquement.
+              </p>
 
               {xeuledocResult && (
                 <motion.div
@@ -2089,12 +2058,19 @@ export default function SearchPage() {
               exit={{ opacity: 0, x: 20 }}
               className="glass-panel-sherlock rounded-2xl p-6 md:p-8 space-y-6"
             >
-              <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-purple-500" />
-                <h2 className="text-xl font-semibold">Username OSINT</h2>
-              </div>
+              <LookupHeader
+                icon={Eye}
+                title={usernameSource === "sherlock" ? "Sherlock" : usernameSource === "whatsmyname" ? "WhatsMyName" : "Holehe"}
+                subtitle={
+                  usernameSource === "sherlock"
+                    ? "Recherche un pseudo sur ~50 plateformes populaires. Rapide et fiable, ~15 secondes."
+                    : usernameSource === "whatsmyname"
+                    ? "Recherche un pseudo sur 700+ plateformes. Scan large, peut prendre jusqu'a 60 secondes."
+                    : "Verifie si un email est enregistre sur ~25 services populaires (reseaux sociaux, dev, shopping...). Base sur le projet open-source Holehe, ~10 secondes."
+                }
+              />
 
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/30 border border-border/50 w-fit">
+              <div className="flex items-center justify-center gap-1 p-1 rounded-lg bg-secondary/30 border border-border/50 w-fit mx-auto">
                 <Button
                   variant={usernameSource === "sherlock" ? "default" : "ghost"}
                   size="sm"
@@ -2126,52 +2102,18 @@ export default function SearchPage() {
 
               {usernameSource !== "holehe" ? (
                 <>
-                  <div className={`rounded-lg p-4 text-sm text-muted-foreground space-y-2 ${usernameSource === "sherlock" ? "bg-purple-500/5 border border-purple-500/10" : "bg-purple-500/5 border border-purple-500/10"}`}>
-                    <p>
-                      Recherche un <span className="text-purple-400 font-medium">pseudo</span> sur {usernameSource === "sherlock" ? "~50 plateformes populaires" : "700+ plateformes"}.
-                    </p>
-                    <p className="text-xs opacity-70">
-                      {usernameSource === "sherlock" ? "Rapide et fiable. ~15 secondes." : "Scan large. Peut prendre jusqu'a 60 secondes."}
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Nom d'utilisateur</Label>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Input
-                        data-testid="input-sherlock-username"
-                        placeholder="ex: john_doe"
-                        value={sherlockUsername}
-                        onChange={(e) => setSherlockUsername(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            if (usernameSource === "sherlock") handleSherlockSearch();
-                            else handleWmnSearch();
-                          }
-                        }}
-                        className="flex-1 min-w-[200px] max-w-sm"
-                      />
-                      <Button
-                        data-testid="button-sherlock-search"
-                        onClick={usernameSource === "sherlock" ? handleSherlockSearch : handleWmnSearch}
-                        disabled={(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) || !sherlockUsername.trim()}
-                        className="bg-purple-600 text-white border-purple-600"
-                      >
-                        {(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                        <span className="ml-1.5">{(usernameSource === "sherlock" ? sherlockLoading : wmnLoading) ? t("search.searching") : t("search.searchButton")}</span>
-                      </Button>
-                      <Button
-                        data-testid="button-reset-sherlock"
-                        variant="outline"
-                        onClick={() => { setSherlockUsername(""); setSherlockResult(null); setWmnResult(null); }}
-                        disabled={sherlockLoading || wmnLoading}
-                        className="gap-2"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Reinitialiser
-                      </Button>
-                    </div>
-                  </div>
+                  <LookupBar
+                    icon={Eye}
+                    value={sherlockUsername}
+                    onChange={setSherlockUsername}
+                    onSubmit={usernameSource === "sherlock" ? handleSherlockSearch : handleWmnSearch}
+                    onReset={() => { setSherlockUsername(""); setSherlockResult(null); setWmnResult(null); }}
+                    placeholder="ex: john_doe"
+                    loading={usernameSource === "sherlock" ? sherlockLoading : wmnLoading}
+                    buttonLabel={t("search.searchButton")}
+                    buttonIcon={Search}
+                    testIdPrefix="sherlock-username"
+                  />
 
                   {(sherlockLoading || wmnLoading) && (
                     <div className="flex items-center justify-center gap-3 py-8">
@@ -2264,48 +2206,18 @@ export default function SearchPage() {
                 </>
               ) : (
                 <>
-                  <div className="rounded-lg bg-teal-500/5 border border-teal-500/10 p-4 text-sm text-muted-foreground space-y-2">
-                    <p>
-                      Verifie si une <span className="text-teal-400 font-medium">adresse e-mail</span> est enregistree sur ~25 services populaires (reseaux sociaux, dev, shopping...).
-                    </p>
-                    <p className="text-xs opacity-70">
-                      Base sur le projet open-source Holehe. Analyse rapide, ~10 secondes.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Adresse e-mail</Label>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <Input
-                        data-testid="input-holehe-email"
-                        placeholder="ex: user@example.com"
-                        value={holehehEmail}
-                        onChange={(e) => setHolehehEmail(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleHolehehSearch(); }}
-                        className="flex-1 min-w-[200px] max-w-sm"
-                        type="email"
-                      />
-                      <Button
-                        data-testid="button-holehe-search"
-                        onClick={handleHolehehSearch}
-                        disabled={holehehLoading || !holehehEmail.trim()}
-                        className="bg-teal-600 text-white border-teal-600"
-                      >
-                        {holehehLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                        <span className="ml-1.5">{holehehLoading ? t("search.searching") : t("search.searchButton")}</span>
-                      </Button>
-                      <Button
-                        data-testid="button-reset-holehe"
-                        variant="outline"
-                        onClick={() => { setHolehehEmail(""); setHolehehResult(null); }}
-                        disabled={holehehLoading}
-                        className="gap-2"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Reinitialiser
-                      </Button>
-                    </div>
-                  </div>
+                  <LookupBar
+                    icon={Mail}
+                    value={holehehEmail}
+                    onChange={setHolehehEmail}
+                    onSubmit={handleHolehehSearch}
+                    onReset={() => { setHolehehEmail(""); setHolehehResult(null); }}
+                    placeholder="ex: user@example.com"
+                    loading={holehehLoading}
+                    buttonLabel={t("search.searchButton")}
+                    buttonIcon={Search}
+                    testIdPrefix="holehe-email"
+                  />
 
                   {holehehLoading && (
                     <div className="flex items-center justify-center gap-3 py-8">
