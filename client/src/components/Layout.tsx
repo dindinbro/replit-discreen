@@ -94,7 +94,7 @@ function useOnlineCount() {
 
 /* ── Role badges ─────────────────────────────────────────── */
 const ROLE_DISPLAY: Record<string, string> = {
-  admin: "Admin", free: "Free", vip: "VIP",
+  admin: "Admin", free: "Early", vip: "VIP",
   pro: "PRO", business: "Business", api: "API",
 };
 
@@ -484,15 +484,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           {uniqueId && <span className="text-[10px] font-mono text-foreground/30 shrink-0">#{uniqueId}</span>}
                         </div>
                         {role && (
-                          <span
-                            className="text-[9px] font-bold uppercase tracking-wider mt-0.5 inline-block px-1.5 py-[1px] rounded"
-                            style={{
-                              color: role === "admin" ? "#f87171" : role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : undefined,
-                              background: role === "admin" ? "rgba(248,113,113,0.1)" : role === "pro" || role === "business" ? "hsl(var(--primary) / 0.1)" : role === "vip" ? "rgba(251,191,36,0.1)" : "transparent",
-                            }}
-                          >
-                            {ROLE_DISPLAY[role] || "Free"}
-                          </span>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {role === "admin" && (
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
+                                style={{ color: "#f87171", background: "rgba(248,113,113,0.1)" }}
+                              >
+                                Admin
+                              </span>
+                            )}
+                            {(role === "admin" || role === "free") && (
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
+                                style={{ color: "#2dd4bf", background: "rgba(45,212,191,0.1)" }}
+                              >
+                                Early
+                              </span>
+                            )}
+                            {role !== "admin" && role !== "free" && (
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
+                                style={{
+                                  color: role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : undefined,
+                                  background: role === "pro" || role === "business" ? "hsl(var(--primary) / 0.1)" : role === "vip" ? "rgba(251,191,36,0.1)" : "transparent",
+                                }}
+                              >
+                                {ROLE_DISPLAY[role] || role}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                       <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
