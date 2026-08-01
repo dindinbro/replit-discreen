@@ -198,8 +198,8 @@
 
 /* ─── Hero HUD rings (J.A.R.V.I.S.-style) ─────────────────── */
 .hud-rings {
-  -webkit-mask-image: radial-gradient(circle, black 55%, transparent 78%);
-  mask-image: radial-gradient(circle, black 55%, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle, black 68%, transparent 92%);
+  mask-image: radial-gradient(circle, black 68%, transparent 92%);
   will-change: transform;
 }
 .hud-ring {
@@ -218,8 +218,20 @@
   transform-origin: center;
 }
 @keyframes hud-pulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50%      { opacity: 0.75; transform: scale(1.06); }
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 0.95; transform: scale(1.1); }
+}
+.hud-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 337deg, rgba(99,102,241,0.18) 350deg, rgba(165,180,252,0.4) 359deg, transparent 360deg);
+  animation: hud-spin 7s linear infinite;
+  -webkit-mask-image: radial-gradient(circle, transparent 30%, black 31%, black 100%);
+  mask-image: radial-gradient(circle, transparent 30%, black 31%, black 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-sweep { animation: none; opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hud-ring, .hud-core { animation: none; }
