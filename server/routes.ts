@@ -1592,6 +1592,7 @@ export async function registerRoutes(
           email: u.email || "",
           username: u.username,
           role: effectiveRole,
+          status: u.status || "approved",
           frozen: sub?.frozen ?? false,
           created_at: u.createdAt,
           unique_id: sub.id,
@@ -1601,6 +1602,40 @@ export async function registerRoutes(
       res.json(result);
     } catch (err) {
       console.error("GET /api/admin/users error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/admin/users/:id/approve — grant a pending account access
+  app.post("/api/admin/users/:id/approve", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const targetId = parseInt(req.params.id, 10);
+      if (Number.isNaN(targetId)) return res.status(400).json({ message: "ID utilisateur invalide" });
+
+      const targetUser = await storage.getUser(targetId);
+      if (!targetUser) return res.status(404).json({ message: "Utilisateur introuvable" });
+
+      await storage.updateUser(targetId, { status: "approved" });
+      res.json({ success: true, id: String(targetId), status: "approved" });
+    } catch (err) {
+      console.error("POST /api/admin/users/:id/approve error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/admin/users/:id/reject — deny a pending account
+  app.post("/api/admin/users/:id/reject", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const targetId = parseInt(req.params.id, 10);
+      if (Number.isNaN(targetId)) return res.status(400).json({ message: "ID utilisateur invalide" });
+
+      const targetUser = await storage.getUser(targetId);
+      if (!targetUser) return res.status(404).json({ message: "Utilisateur introuvable" });
+
+      await storage.updateUser(targetId, { status: "rejected" });
+      res.json({ success: true, id: String(targetId), status: "rejected" });
+    } catch (err) {
+      console.error("POST /api/admin/users/:id/reject error:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -2315,6 +2350,16 @@ export async function registerRoutes(
   app.post(api.search.perform.path, requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user.id;
+
+      const account = await storage.getUser(userId);
+      if (account && account.status !== "approved") {
+        return res.status(403).json({
+          message: account.status === "rejected"
+            ? "Votre compte a ete refuse par un administrateur."
+            : "Votre compte est en attente d'approbation par un administrateur.",
+          accountStatus: account.status,
+        });
+      }
 
       const sub = await storage.getSubscription(userId);
       const userBypassed = sub ? await isUserBypassed(sub.id) : false;

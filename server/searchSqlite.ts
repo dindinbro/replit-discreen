@@ -462,7 +462,12 @@ function getFieldCI(r: Record<string, string>, ...keys: string[]): string {
 
 const sourceHeaderCache: Record<string, string[]> = {};
 
-const MAX_DB_SIZE_FOR_LOCAL_SEARCH = 5 * 1024 * 1024 * 1024;
+// FTS5 MATCH queries stay fast regardless of file size (they hit the
+// inverted index, not a table scan) — verified directly against index.db
+// (42GB, FTS5) before raising this. The real guard is S3_PREFIX in
+// s3sync, which keeps anything bigger (e.g. the 313GB Discreen.db in the
+// same R2 bucket) from ever landing in this directory in the first place.
+const MAX_DB_SIZE_FOR_LOCAL_SEARCH = 100 * 1024 * 1024 * 1024;
 
 function isDbTooLargeForLocalSearch(sourceKey: string): boolean {
   const filename = SOURCE_MAP[sourceKey];

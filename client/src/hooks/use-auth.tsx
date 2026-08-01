@@ -5,6 +5,8 @@ export interface LocalUser {
   username: string;
   email: string | null;
   role: string;
+  /** "pending" | "approved" | "rejected" — new accounts start pending until an admin approves them */
+  status: string;
   /** Compat shim — parts of the UI read user_metadata.display_name */
   user_metadata: { display_name: string; username: string; avatar_url?: string; full_name?: string };
   app_metadata: Record<string, unknown>;
@@ -55,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       username: data.username || data.display_name || "",
       email: data.email || null,
       role: data.role || "free",
+      status: data.status || "approved",
       user_metadata: {
         display_name: data.display_name || data.username || "",
         username: data.username || "",

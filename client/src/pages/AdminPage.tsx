@@ -94,6 +94,7 @@ interface UserProfile {
   email: string;
   username?: string | null;
   role: string;
+  status?: string;
   frozen: boolean;
   created_at: string;
   unique_id?: number;
@@ -874,6 +875,28 @@ function UsersSection({ userId }: { userId: string }) {
     }
   };
 
+  const setAccountStatus = async (uid: string, decision: "approve" | "reject") => {
+    setSavingId(uid);
+    try {
+      const res = await fetch(`/api/admin/users/${uid}/${decision}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const newStatus = decision === "approve" ? "approved" : "rejected";
+        setUsers(prev => prev.map(u => u.id === uid ? { ...u, status: newStatus } : u));
+        toast({ title: decision === "approve" ? "Compte approuve" : "Compte refuse" });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Erreur", description: err.message || "Impossible de mettre a jour le compte", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const deleteUser = async (uid: string) => {
     setDeletingId(uid);
     try {
@@ -997,7 +1020,7 @@ function UsersSection({ userId }: { userId: string }) {
             const shortId = u.unique_id ? `${u.unique_id}` : u.id.slice(0, 8).toUpperCase();
 
             return (
-              <Card key={u.id} className={`p-4 ${u.frozen ? "border-blue-500/50 bg-blue-500/5" : ""}`} data-testid={`card-user-${u.id}`}>
+              <Card key={u.id} className={`p-4 ${u.status === "pending" ? "border-amber-500/50 bg-amber-500/5" : u.frozen ? "border-blue-500/50 bg-blue-500/5" : ""}`} data-testid={`card-user-${u.id}`}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1006,6 +1029,16 @@ function UsersSection({ userId }: { userId: string }) {
                         <span className="text-[10px] text-muted-foreground/50 italic">email</span>
                       )}
                       <Badge variant="outline" className="font-mono text-xs" data-testid={`badge-id-${u.id}`}>#{shortId}</Badge>
+                      {u.status === "pending" && (
+                        <Badge variant="secondary" className="gap-1 text-amber-500" data-testid={`badge-pending-${u.id}`}>
+                          <Clock className="w-3 h-3" /> En attente
+                        </Badge>
+                      )}
+                      {u.status === "rejected" && (
+                        <Badge variant="secondary" className="gap-1 text-red-500" data-testid={`badge-rejected-${u.id}`}>
+                          <XCircle className="w-3 h-3" /> Refuse
+                        </Badge>
+                      )}
                       {u.frozen && (
                         <Badge variant="secondary" className="gap-1 text-blue-500" data-testid={`badge-frozen-${u.id}`}>
                           <Snowflake className="w-3 h-3" /> Gele
@@ -1015,6 +1048,28 @@ function UsersSection({ userId }: { userId: string }) {
                     <p className="text-xs text-muted-foreground truncate" data-testid={`text-email-${u.id}`}>{u.email}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    {u.status === "pending" && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={() => setAccountStatus(u.id, "approve")}
+                          disabled={savingId === u.id}
+                          data-testid={`button-approve-${u.id}`}
+                        >
+                          {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-1" /> Approuver</>}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setAccountStatus(u.id, "reject")}
+                          disabled={savingId === u.id}
+                          data-testid={`button-reject-${u.id}`}
+                        >
+                          {savingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><X className="w-4 h-4 mr-1" /> Refuser</>}
+                        </Button>
+                      </>
+                    )}
                     <Select value={currentRole} onValueChange={(val) => handleRoleChange(u.id, val)} disabled={u.id === userId}>
                       <SelectTrigger className="w-[130px]" data-testid={`select-role-${u.id}`}>
                         <SelectValue />

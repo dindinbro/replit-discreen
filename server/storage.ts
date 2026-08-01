@@ -226,7 +226,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string; avatarUrl: string | null }>): Promise<User | undefined> {
+  async updateUser(id: number, data: Partial<{ username: string; passwordHash: string; email: string | null; role: string; avatarUrl: string | null; status: string }>): Promise<User | undefined> {
     const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return user;
   }

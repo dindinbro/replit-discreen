@@ -22,6 +22,13 @@
       "when": 1785532856439,
       "tag": "0002_nifty_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785544112370,
+      "tag": "0003_broken_mongoose",
+      "breakpoints": true
     }
   ]
 }

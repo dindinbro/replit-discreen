@@ -41,14 +41,17 @@ export function registerAuthRoutes(app: Express) {
         passwordHash,
         email: email?.trim() || null,
         role: "free",
+        status: "pending",
       });
 
-      // Auto-login after register
+      // Auto-login after register — account still needs admin approval
+      // before it can actually use the site (see status gate on /api/search
+      // and PendingApprovalGate on the client).
       (req.session as any).authUserId = user.id;
       (req.session as any).authUsername = user.username;
       (req.session as any).authEmail = user.email || null;
 
-      return res.json({ id: user.id, username: user.username, role: user.role });
+      return res.json({ id: user.id, username: user.username, role: user.role, status: user.status });
     } catch (err: any) {
       if (err?.code === "23505") {
         return res.status(409).json({ message: "Ce nom d'utilisateur est déjà pris." });
@@ -227,6 +230,7 @@ export function registerAuthRoutes(app: Express) {
         username: user.username,
         email: user.email || null,
         role: effectiveRole,
+        status: user.status || "approved",
         frozen: sub?.frozen ?? false,
         unique_id: sub?.id ?? null,
         display_name: user.username,

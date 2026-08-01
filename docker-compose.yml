@@ -33,6 +33,11 @@ services:
         condition: service_healthy
     ports:
       - "5000:5000"
+    volumes:
+      # Downloaded .db search databases (synced from R2) must survive
+      # container recreation — without this, every redeploy would wipe
+      # a 40+GB file and force a full re-download from R2.
+      - discreen_search_data:/app/server/data
     networks:
       - default
       # Prod nginx (separate ~/discreen compose stack) proxies to this
@@ -52,6 +57,7 @@ services:
 
 volumes:
   postgres_data:
+  discreen_search_data:
 
 networks:
   discreen_default:

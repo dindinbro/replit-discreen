@@ -3,6 +3,13 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 
+// New accounts start "pending" and need an admin's approval before they can
+// use the site (see /api/admin/users/:id/approve|reject). Existing rows get
+// "approved" from this column default when the migration adds it, so
+// current users aren't locked out retroactively.
+export const UserApprovalStatus = z.enum(["pending", "approved", "rejected"]);
+export type UserApprovalStatus = z.infer<typeof UserApprovalStatus>;
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -10,6 +17,7 @@ export const users = pgTable("users", {
   email: text("email"),
   role: text("role").notNull().default("free"),
   avatarUrl: text("avatar_url"),
+  status: text("status").notNull().default("approved"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Case-insensitive uniqueness: the plain .unique() above only blocks

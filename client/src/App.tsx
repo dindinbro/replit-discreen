@@ -27,6 +27,7 @@ import StatusPage from "@/pages/StatusPage";
 import TicketsPage from "@/pages/TicketsPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
+import PendingApprovalGate from "@/components/PendingApprovalGate";
 import Layout from "@/components/Layout";
 import { Loader2, UserCircle2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -312,7 +313,9 @@ function App() {
             <SubscriptionToastProvider />
             <UsernameSetupModal />
             <MaintenanceGate>
-              <Router />
+              <PendingApprovalGate>
+                <Router />
+              </PendingApprovalGate>
             </MaintenanceGate>
           </AuthProvider>
         </ThemeProvider>
