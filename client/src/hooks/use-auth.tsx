@@ -7,6 +7,8 @@ export interface LocalUser {
   role: string;
   /** "pending" | "approved" | "rejected" — new accounts start pending until an admin approves them */
   status: string;
+  /** True if the account had to wait on admin approval — drives the "Early" badge */
+  earlyAccess: boolean;
   /** Compat shim — parts of the UI read user_metadata.display_name */
   user_metadata: { display_name: string; username: string; avatar_url?: string; full_name?: string };
   app_metadata: Record<string, unknown>;
@@ -20,6 +22,7 @@ interface AuthContextType {
   session: { user: LocalUser } | null;
   role: string | null;
   frozen: boolean;
+  earlyAccess: boolean;
   loading: boolean;
   displayName: string | null;
   avatarUrl: string | null;
@@ -50,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [uniqueId, setUniqueId] = useState<number | null>(null);
+  const [earlyAccess, setEarlyAccess] = useState(true);
 
   const applyMeData = useCallback((data: any) => {
     const u: LocalUser = {
@@ -58,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: data.email || null,
       role: data.role || "free",
       status: data.status || "approved",
+      earlyAccess: data.early_access ?? true,
       user_metadata: {
         display_name: data.display_name || data.username || "",
         username: data.username || "",
@@ -73,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAvatarUrl(data.avatar_url || null);
     setExpiresAt(data.expires_at || null);
     setUniqueId(data.unique_id ?? null);
+    setEarlyAccess(data.early_access ?? true);
   }, []);
 
   const clearAuth = useCallback(() => {
@@ -83,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAvatarUrl(null);
     setExpiresAt(null);
     setUniqueId(null);
+    setEarlyAccess(true);
   }, []);
 
   // Check session on mount
@@ -155,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session: user ? { user } : null,
       role,
       frozen,
+      earlyAccess,
       loading,
       displayName,
       avatarUrl,

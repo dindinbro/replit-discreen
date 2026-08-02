@@ -31,6 +31,11 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("free"),
   avatarUrl: text("avatar_url"),
   status: text("status").notNull().default("approved"),
+  // True when the account had to go through admin approval (private mode
+  // was on at signup) — drives eligibility for the "Early" badge. Accounts
+  // auto-approved while private mode was off get false. Defaults to true
+  // so pre-existing accounts keep the badge they already had.
+  earlyAccess: boolean("early_access").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Case-insensitive uniqueness: the plain .unique() above only blocks

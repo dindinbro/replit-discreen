@@ -70,6 +70,9 @@ export function registerAuthRoutes(app: Express) {
         email: email?.trim() || null,
         role: "free",
         status: privateModeEnabled ? "pending" : "approved",
+        // Only accounts that actually had to wait on admin approval are
+        // "Early" — auto-approved signups (private mode off) don't qualify.
+        earlyAccess: privateModeEnabled,
       });
 
       // Auto-login after register — account still needs admin approval
@@ -261,6 +264,7 @@ export function registerAuthRoutes(app: Express) {
         email: user.email || null,
         role: effectiveRole,
         status: user.status || "approved",
+        early_access: user.earlyAccess ?? true,
         frozen: sub?.frozen ?? false,
         unique_id: sub?.id ?? null,
         display_name: user.username,

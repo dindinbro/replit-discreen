@@ -203,7 +203,7 @@ function navigateSearchMode(href: string) {
 
 /* ── Layout ──────────────────────────────────────────────── */
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, role, frozen, signOut, displayName, avatarUrl, uniqueId, getAccessToken, refreshRole } = useAuth();
+  const { user, role, frozen, earlyAccess, signOut, displayName, avatarUrl, uniqueId, getAccessToken, refreshRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t, i18n } = useTranslation();
   const [location, navigate] = useLocation();
@@ -493,7 +493,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                 Admin
                               </span>
                             )}
-                            {(role === "admin" || role === "free") && (
+                            {(role === "admin" || (role === "free" && earlyAccess)) && (
                               <span
                                 className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
                                 style={{ color: "#2dd4bf", background: "rgba(45,212,191,0.1)" }}
