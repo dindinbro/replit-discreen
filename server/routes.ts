@@ -4257,9 +4257,29 @@ export async function registerRoutes(
           return res.status(400).json({ ok: false, message: "Image requise" });
         }
 
-        const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-        const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
-        if (!apiKey) {
+        // OpenAI (already-configured Replit integration) takes priority; falls back to
+        // free Groq or Gemini API keys via their OpenAI-compatible endpoints.
+        const openaiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+        const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
+        const groqKey = process.env.GROQ_API_KEY;
+        const geminiKey = process.env.GEMINI_API_KEY;
+
+        let apiKey: string | undefined;
+        let baseUrl: string | undefined;
+        let model: string;
+        if (openaiKey) {
+          apiKey = openaiKey;
+          baseUrl = openaiBaseUrl;
+          model = "gpt-4o-mini";
+        } else if (groqKey) {
+          apiKey = groqKey;
+          baseUrl = "https://api.groq.com/openai/v1";
+          model = process.env.GROQ_MODEL || "qwen/qwen3.6-27b";
+        } else if (geminiKey) {
+          apiKey = geminiKey;
+          baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/";
+          model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+        } else {
           return res.status(503).json({ ok: false, message: "Extraction IA indisponible (cle API manquante)" });
         }
 
@@ -4293,7 +4313,7 @@ Retourne UNIQUEMENT un JSON valide avec ce format exact (omets ou laisse vide/[]
 Extrais TOUTES les occurrences de chaque type trouvees dans l'image (plusieurs emails/telephones/adresses/IPs/IDs Discord possibles). Ne retourne que le JSON, sans texte autour.`;
 
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model,
           messages: [
             {
               role: "user",
@@ -4304,8 +4324,11 @@ Extrais TOUTES les occurrences de chaque type trouvees dans l'image (plusieurs e
             },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 1500,
-        });
+          max_tokens: 2000,
+          // Groq's qwen model otherwise burns the token budget on a <think> block
+          // and returns invalid/truncated JSON; irrelevant to the other providers.
+          ...(groqKey && !openaiKey ? { reasoning_effort: "none" } : {}),
+        } as any);
 
         const raw = completion.choices[0]?.message?.content;
         if (!raw) {
