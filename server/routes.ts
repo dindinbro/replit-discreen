@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -4241,6 +4241,91 @@ export async function registerRoutes(
       res.status(500).json({ message: "Internal server error" });
     }
   });
+
+  // POST /api/admin/wanted-profiles/extract — AI vision extraction from a pasted/uploaded
+  // screenshot, used to pre-fill the Wanted form fields. Uses a bigger JSON body limit
+  // than the app default (screenshots easily exceed 100kb as base64).
+  app.post(
+    "/api/admin/wanted-profiles/extract",
+    requireAuth,
+    requireAdmin,
+    express.json({ limit: "8mb" }),
+    async (req, res) => {
+      try {
+        const { image } = req.body;
+        if (!image || typeof image !== "string") {
+          return res.status(400).json({ ok: false, message: "Image requise" });
+        }
+
+        const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+        const baseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
+        if (!apiKey) {
+          return res.status(503).json({ ok: false, message: "Extraction IA indisponible (cle API manquante)" });
+        }
+
+        const imageUrl = image.startsWith("data:") ? image : `data:image/png;base64,${image}`;
+        const openai = new OpenAI({ apiKey, ...(baseUrl ? { baseURL: baseUrl } : {}) });
+
+        const EXTRACT_PROMPT = `Tu es un assistant qui extrait des informations personnelles visibles dans une capture d'ecran (conversation, fiche, profil, document...) pour remplir une fiche de signalement.
+
+Retourne UNIQUEMENT un JSON valide avec ce format exact (omets ou laisse vide/[] les champs non trouves dans l'image — n'invente jamais de valeur) :
+{
+  "civilite": "M." | "Mme" | "",
+  "prenom": "",
+  "nom": "",
+  "dateNaissance": "",
+  "ville": "",
+  "codePostal": "",
+  "pseudo": "",
+  "discord": "",
+  "iban": "",
+  "bic": "",
+  "plaque": "",
+  "nir": "",
+  "notes": "",
+  "emails": [],
+  "phones": [],
+  "addresses": [],
+  "ips": [],
+  "discordIds": []
+}
+
+Extrais TOUTES les occurrences de chaque type trouvees dans l'image (plusieurs emails/telephones/adresses/IPs/IDs Discord possibles). Ne retourne que le JSON, sans texte autour.`;
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: EXTRACT_PROMPT },
+                { type: "image_url", image_url: { url: imageUrl } },
+              ] as any,
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 1500,
+        });
+
+        const raw = completion.choices[0]?.message?.content;
+        if (!raw) {
+          return res.status(502).json({ ok: false, message: "Reponse vide du modele" });
+        }
+
+        let extracted: any;
+        try {
+          extracted = JSON.parse(raw);
+        } catch {
+          return res.status(502).json({ ok: false, message: "Reponse IA non exploitable" });
+        }
+
+        res.json({ ok: true, fields: extracted });
+      } catch (err) {
+        console.error("POST /api/admin/wanted-profiles/extract error:", err);
+        res.status(500).json({ ok: false, message: "Erreur lors de l'extraction" });
+      }
+    }
+  );
 
   app.get("/api/dof-profiles", async (_req, res) => {
     try {

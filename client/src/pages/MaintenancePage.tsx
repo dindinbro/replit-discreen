@@ -441,10 +441,16 @@ export default function MaintenancePage() {
                     Discreen est temporairement indisponible le temps d'une courte intervention. Nous serons de retour très bientôt.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-background/60 border border-border/50">
-                  <Clock className="w-4 h-4 text-primary" />
-                  <span className="font-mono text-lg font-bold tabular-nums" data-testid="text-maintenance-elapsed">{elapsed}</span>
-                  <span className="text-xs text-muted-foreground">écoulé</span>
+                <div className="flex flex-col items-center gap-1.5 px-8 py-6 rounded-2xl bg-background/60 border border-border/50">
+                  <span
+                    className="font-mono font-extrabold tabular-nums leading-none text-primary text-5xl sm:text-6xl md:text-7xl"
+                    data-testid="text-maintenance-elapsed"
+                  >
+                    {elapsed}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground uppercase tracking-wider">
+                    <Clock className="w-3.5 h-3.5" />écoulé
+                  </span>
                 </div>
               </div>
             </Card>

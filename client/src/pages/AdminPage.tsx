@@ -1,4 +1,4 @@
-import { useState, useEffect, Component, type ReactNode } from "react";
+import { useState, useEffect, useRef, useMemo, Component, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -85,9 +85,23 @@ import {
   Bitcoin,
   CreditCard,
   ExternalLink,
+  Mail,
+  Phone,
+  MapPin,
+  Hash,
+  User,
+  Car,
+  Fingerprint,
+  Network,
+  ImagePlus,
+  Wand2,
+  Link2,
+  List,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { ReactFlow, Background, Controls, Handle, Position, type Node, type Edge, type NodeProps } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel";
 
 interface UserProfile {
@@ -172,11 +186,39 @@ interface CategoryFormData {
   sortOrder: number;
 }
 
+function FormSection({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4 p-4 rounded-lg border border-border/50 bg-secondary/10">
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+          <Icon className="w-3.5 h-3.5 text-primary" />
+        </div>
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function mergeSingular(existing: string, extracted?: string | null): string {
+  if (existing && existing.trim()) return existing;
+  return (extracted || "").trim();
+}
+
+function mergeArrayField(existing: string[], extracted?: string[] | null): string[] {
+  const merged = [...existing, ...(extracted || [])].map(v => v.trim()).filter(Boolean);
+  const unique = Array.from(new Set(merged));
+  return unique.length ? unique : [""];
+}
+
 function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedProfile | null; onEditDone?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  
+  const [extracting, setExtracting] = useState(false);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [emails, setEmails] = useState<string[]>([""]);
   const [phones, setPhones] = useState<string[]>([""]);
   const [ips, setIps] = useState<string[]>([""]);
@@ -247,6 +289,7 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
     setIps([""]);
     setDiscordIds([""]);
     setAddresses([""]);
+    setScreenshotPreview(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -295,26 +338,93 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
     }
   };
 
-  const DynamicFields = ({ label, values, setter, placeholder }: any) => (
+  const handleExtractImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    setExtracting(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      setScreenshotPreview(dataUrl);
+
+      const res = await fetch("/api/admin/wanted-profiles/extract", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        toast({ title: "Extraction impossible", description: data.message || "Erreur inconnue", variant: "destructive" });
+        return;
+      }
+
+      const f = data.fields || {};
+      setForm(prev => ({
+        ...prev,
+        civilite: prev.civilite && prev.civilite !== "M." ? prev.civilite : (f.civilite === "Mme" ? "Mme" : prev.civilite || "M."),
+        prenom: mergeSingular(prev.prenom || "", f.prenom),
+        nom: mergeSingular(prev.nom || "", f.nom),
+        dateNaissance: mergeSingular(prev.dateNaissance || "", f.dateNaissance),
+        ville: mergeSingular(prev.ville || "", f.ville),
+        codePostal: mergeSingular(prev.codePostal || "", f.codePostal),
+        pseudo: mergeSingular(prev.pseudo || "", f.pseudo),
+        discord: mergeSingular(prev.discord || "", f.discord),
+        iban: mergeSingular(prev.iban || "", f.iban),
+        bic: mergeSingular(prev.bic || "", f.bic),
+        plaque: mergeSingular(prev.plaque || "", f.plaque),
+        nir: mergeSingular(prev.nir || "", f.nir),
+        notes: prev.notes && f.notes ? `${prev.notes}\n${f.notes}` : (prev.notes || f.notes || ""),
+      }));
+      setEmails(prev => mergeArrayField(prev, f.emails));
+      setPhones(prev => mergeArrayField(prev, f.phones));
+      setAddresses(prev => mergeArrayField(prev, f.addresses));
+      setIps(prev => mergeArrayField(prev, f.ips));
+      setDiscordIds(prev => mergeArrayField(prev, f.discordIds));
+
+      const filledCount = Object.values(f).filter((v: any) => Array.isArray(v) ? v.length > 0 : !!v).length;
+      toast({ title: "Extraction terminee", description: `${filledCount} champ(s) detecte(s) dans l'image — verifiez avant d'enregistrer.` });
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau lors de l'extraction", variant: "destructive" });
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const item = Array.from(e.clipboardData.items || []).find(i => i.type.startsWith("image/"));
+    if (item) {
+      const file = item.getAsFile();
+      if (file) handleExtractImage(file);
+    }
+  };
+
+  const DynamicFields = ({ label, values, setter, placeholder, icon: Icon }: any) => (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium">{label}</label>
-        <Button type="button" variant="ghost" size="sm" onClick={() => addField(setter)} data-testid={`button-add-${label.toLowerCase()}`}>
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          {Icon && <Icon className="w-3.5 h-3.5" />} {label}
+        </label>
+        <Button type="button" variant="ghost" size="sm" className="h-6 text-xs" onClick={() => addField(setter)} data-testid={`button-add-${label.toLowerCase()}`}>
           <Plus className="w-3 h-3 mr-1" /> Ajouter
         </Button>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {values.map((val: string, i: number) => (
-          <div key={i} className="flex gap-2">
-            <Input 
-              value={val} 
-              onChange={e => updateField(setter, i, e.target.value)} 
+          <div key={i} className="flex gap-1.5">
+            <Input
+              value={val}
+              onChange={e => updateField(setter, i, e.target.value)}
               placeholder={placeholder}
+              className="h-8 text-sm"
               data-testid={`input-${label.toLowerCase()}-${i}`}
             />
             {values.length > 1 && (
-              <Button type="button" variant="ghost" size="icon" onClick={() => removeField(setter, i)} data-testid={`button-remove-${label.toLowerCase()}-${i}`}>
-                <X className="w-4 h-4" />
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeField(setter, i)} data-testid={`button-remove-${label.toLowerCase()}-${i}`}>
+                <X className="w-3.5 h-3.5" />
               </Button>
             )}
           </div>
@@ -324,7 +434,7 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
   );
 
   return (
-    <Card className="p-6">
+    <Card className="p-6" onPaste={handlePaste}>
       {isEdit && (
         <div className="flex items-center justify-between gap-2 mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/20">
           <span className="font-medium text-sm">Modification du profil #{editProfile.id}</span>
@@ -333,96 +443,125 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
           </Button>
         </div>
       )}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Civilite</label>
-            <Select value={form.civilite || "M."} onValueChange={(v) => setForm(p => ({ ...p, civilite: v }))}>
-              <SelectTrigger data-testid="select-civilite">
-                <SelectValue placeholder="Civilite" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="M.">Monsieur (M.)</SelectItem>
-                <SelectItem value="Mme">Madame (Mme)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Prenom</label>
-            <Input value={form.prenom || ""} onChange={e => setForm(p => ({ ...p, prenom: e.target.value }))} placeholder="Jean" data-testid="input-prenom" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Nom</label>
-            <Input value={form.nom || ""} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} placeholder="Dupont" data-testid="input-nom" />
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DynamicFields label="Emails" values={emails} setter={setEmails} placeholder="jean.dupont@example.com" />
-          <DynamicFields label="Telephones" values={phones} setter={setPhones} placeholder="06 12 34 56 78" />
+      {/* Screenshot import */}
+      <div className="mb-6 p-4 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] flex items-center gap-4 flex-wrap">
+        {screenshotPreview ? (
+          <img src={screenshotPreview} alt="Capture importee" className="w-14 h-14 rounded-md object-cover border border-border/50 shrink-0" />
+        ) : (
+          <div className="w-14 h-14 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+            <ImagePlus className="w-6 h-6 text-primary" />
+          </div>
+        )}
+        <div className="flex-1 min-w-[200px]">
+          <p className="text-sm font-semibold flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5 text-primary" /> Import par capture d'ecran</p>
+          <p className="text-xs text-muted-foreground">Collez une image (Ctrl+V) ou importez un fichier — les champs seront remplis automatiquement par IA.</p>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => { const file = e.target.files?.[0]; if (file) handleExtractImage(file); e.target.value = ""; }}
+          data-testid="input-wanted-screenshot"
+        />
+        <Button type="button" variant="outline" size="sm" disabled={extracting} onClick={() => fileInputRef.current?.click()} data-testid="button-wanted-screenshot-upload">
+          {extracting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5 mr-1.5" />}
+          {extracting ? "Extraction..." : "Importer une image"}
+        </Button>
+      </div>
 
-        <DynamicFields label="Adresses" values={addresses} setter={setAddresses} placeholder="123 Rue de la Republique" />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <FormSection title="Identite" icon={User}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Civilite</label>
+              <Select value={form.civilite || "M."} onValueChange={(v) => setForm(p => ({ ...p, civilite: v }))}>
+                <SelectTrigger data-testid="select-civilite">
+                  <SelectValue placeholder="Civilite" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="M.">Monsieur (M.)</SelectItem>
+                  <SelectItem value="Mme">Madame (Mme)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Prenom</label>
+              <Input value={form.prenom || ""} onChange={e => setForm(p => ({ ...p, prenom: e.target.value }))} placeholder="Jean" data-testid="input-prenom" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nom</label>
+              <Input value={form.nom || ""} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} placeholder="Dupont" data-testid="input-nom" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date de naissance</label>
+              <Input value={form.dateNaissance || ""} onChange={e => setForm(p => ({ ...p, dateNaissance: e.target.value }))} placeholder="DD/MM/YYYY" data-testid="input-date-naissance" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Pseudo</label>
+              <Input value={form.pseudo || ""} onChange={e => setForm(p => ({ ...p, pseudo: e.target.value }))} placeholder="JDupont" data-testid="input-pseudo" />
+            </div>
+          </div>
+        </FormSection>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Code Postal</label>
-            <Input value={form.codePostal || ""} onChange={e => setForm(p => ({ ...p, codePostal: e.target.value }))} placeholder="75001" data-testid="input-code-postal" />
+        <FormSection title="Contact" icon={Mail}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DynamicFields label="Emails" values={emails} setter={setEmails} placeholder="jean.dupont@example.com" icon={Mail} />
+            <DynamicFields label="Telephones" values={phones} setter={setPhones} placeholder="06 12 34 56 78" icon={Phone} />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Ville</label>
-            <Input value={form.ville || ""} onChange={e => setForm(p => ({ ...p, ville: e.target.value }))} placeholder="Paris" data-testid="input-ville" />
+          <DynamicFields label="Adresses" values={addresses} setter={setAddresses} placeholder="123 Rue de la Republique" icon={MapPin} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Code Postal</label>
+              <Input value={form.codePostal || ""} onChange={e => setForm(p => ({ ...p, codePostal: e.target.value }))} placeholder="75001" data-testid="input-code-postal" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ville</label>
+              <Input value={form.ville || ""} onChange={e => setForm(p => ({ ...p, ville: e.target.value }))} placeholder="Paris" data-testid="input-ville" />
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Date de naissance</label>
-            <Input value={form.dateNaissance || ""} onChange={e => setForm(p => ({ ...p, dateNaissance: e.target.value }))} placeholder="DD/MM/YYYY" data-testid="input-date-naissance" />
-          </div>
-        </div>
+        </FormSection>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DynamicFields label="IPs" values={ips} setter={setIps} placeholder="192.168.1.1" />
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Pseudo</label>
-            <Input value={form.pseudo || ""} onChange={e => setForm(p => ({ ...p, pseudo: e.target.value }))} placeholder="JDupont" data-testid="input-pseudo" />
+        <FormSection title="Numerique" icon={Hash}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DynamicFields label="IPs" values={ips} setter={setIps} placeholder="192.168.1.1" icon={Hash} />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Discord Tag</label>
+              <Input value={form.discord || ""} onChange={e => setForm(p => ({ ...p, discord: e.target.value }))} placeholder="jdupont#1234" data-testid="input-discord-tag" />
+            </div>
           </div>
-        </div>
+          <DynamicFields label="Discord IDs" values={discordIds} setter={setDiscordIds} placeholder="123456789012345678" icon={MessageSquare} />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Mot de passe (fuite)</label>
+            <Input value={form.password || ""} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" data-testid="input-password" />
+          </div>
+        </FormSection>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Discord Tag</label>
-            <Input value={form.discord || ""} onChange={e => setForm(p => ({ ...p, discord: e.target.value }))} placeholder="jdupont#1234" data-testid="input-discord-tag" />
+        <FormSection title="Documents & vehicule" icon={Car}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">IBAN</label>
+              <Input value={form.iban || ""} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." data-testid="input-iban" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">BIC</label>
+              <Input value={form.bic || ""} onChange={e => setForm(p => ({ ...p, bic: e.target.value.toUpperCase() }))} placeholder="BNPAFRPP" data-testid="input-bic" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Plaque d'immatriculation</label>
+              <Input value={form.plaque || ""} onChange={e => setForm(p => ({ ...p, plaque: e.target.value.toUpperCase() }))} placeholder="AA-123-BB" data-testid="input-plaque" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">NIR (Securite Sociale)</label>
+              <Input value={form.nir || ""} onChange={e => setForm(p => ({ ...p, nir: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="1850175123456" maxLength={15} data-testid="input-nir" />
+            </div>
           </div>
-          <DynamicFields label="Discord IDs" values={discordIds} setter={setDiscordIds} placeholder="123456789012345678" />
-        </div>
+        </FormSection>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Mot de passe (fuite)</label>
-          <Input value={form.password || ""} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="********" data-testid="input-password" />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">IBAN</label>
-            <Input value={form.iban || ""} onChange={e => setForm(p => ({ ...p, iban: e.target.value }))} placeholder="FR76..." data-testid="input-iban" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">BIC</label>
-            <Input value={form.bic || ""} onChange={e => setForm(p => ({ ...p, bic: e.target.value.toUpperCase() }))} placeholder="BNPAFRPP" data-testid="input-bic" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Plaque d'immatriculation</label>
-            <Input value={form.plaque || ""} onChange={e => setForm(p => ({ ...p, plaque: e.target.value.toUpperCase() }))} placeholder="AA-123-BB" data-testid="input-plaque" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">NIR (Securite Sociale)</label>
-            <Input value={form.nir || ""} onChange={e => setForm(p => ({ ...p, nir: e.target.value.replace(/[^0-9]/g, '') }))} placeholder="1850175123456" maxLength={15} data-testid="input-nir" />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Notes / Signalement</label>
-          <Textarea value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Informations complementaires..." className="min-h-[100px]" data-testid="input-notes" />
-        </div>
+        <FormSection title="Notes" icon={FileText}>
+          <Textarea value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Informations complementaires / signalement..." className="min-h-[100px]" data-testid="input-notes" />
+        </FormSection>
 
         <Button type="submit" className="w-full" disabled={loading} data-testid="button-submit-wanted">
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isEdit ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
@@ -433,11 +572,197 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
   );
 }
 
+function FieldGroup({ icon: Icon, label, values }: { icon: React.ElementType; label: string; values: string[] }) {
+  if (!values.length) return null;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <Icon className="w-3.5 h-3.5" /> {label} <span className="text-muted-foreground/60">({values.length})</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {values.map((v, i) => (
+          <Badge key={i} variant="secondary" className="font-normal text-xs">{v}</Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function wantedFieldValues(profile: WantedProfile, field: "emails" | "phones" | "addresses" | "ips" | "discordIds"): string[] {
+  const legacy: Partial<Record<typeof field, string | null | undefined>> = {
+    emails: profile.email, phones: profile.telephone,
+    addresses: (profile as any).adresse, ips: profile.ip, discordIds: profile.discordId,
+  };
+  const arr = (profile as any)[field] as string[] | undefined;
+  const values = arr?.length ? arr : legacy[field] ? [legacy[field] as string] : [];
+  return Array.from(new Set(values.map(v => v.trim()).filter(Boolean)));
+}
+
+function wantedAllValues(profile: WantedProfile): string[] {
+  return [
+    ...wantedFieldValues(profile, "emails"),
+    ...wantedFieldValues(profile, "phones"),
+    ...wantedFieldValues(profile, "addresses"),
+    ...wantedFieldValues(profile, "ips"),
+    ...wantedFieldValues(profile, "discordIds"),
+    profile.nir, profile.iban, profile.plaque,
+  ].filter(Boolean).map(v => (v as string).trim().toLowerCase());
+}
+
+function wantedProfileLabel(p: WantedProfile): string {
+  return `${p.civilite || ""} ${p.prenom || ""} ${p.nom || ""}`.replace(/\s+/g, " ").trim() || p.pseudo || `Profil #${p.id}`;
+}
+
+/* ── Graphe relationnel ── */
+type WantedNodeData = {
+  label: string;
+  icon: React.ElementType;
+  kind: "center" | "value";
+  shared?: { profileId: number; profileLabel: string }[];
+  onSelectShared?: (profileId: number) => void;
+};
+
+function WantedGraphNode({ data }: NodeProps & { data: WantedNodeData }) {
+  const Icon = data.icon;
+  const isCenter = data.kind === "center";
+  const isShared = !!data.shared?.length;
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium shadow-sm max-w-[200px] ${
+        isCenter
+          ? "bg-primary text-primary-foreground border-primary"
+          : isShared
+          ? "bg-amber-500/15 border-amber-500/50 text-amber-500 cursor-pointer hover:bg-amber-500/25"
+          : "bg-card border-border/60 text-foreground"
+      }`}
+      onClick={() => { if (isShared && data.shared) data.onSelectShared?.(data.shared[0].profileId); }}
+      title={isShared ? `Partage avec: ${data.shared!.map(s => s.profileLabel).join(", ")}` : undefined}
+    >
+      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Icon className="w-3 h-3 shrink-0" />
+      <span className="truncate">{data.label}</span>
+      {isShared && <Link2 className="w-3 h-3 shrink-0" />}
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+    </div>
+  );
+}
+
+const wantedNodeTypes = { wanted: WantedGraphNode };
+
+function radialPositions(count: number, radius = 240): { x: number; y: number }[] {
+  return Array.from({ length: count }, (_, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(count, 1) - Math.PI / 2;
+    return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+  });
+}
+
+function buildWantedGraph(profile: WantedProfile, allProfiles: WantedProfile[], onSelectShared: (id: number) => void): { nodes: Node[]; edges: Edge[] } {
+  type Branch = { value: string; icon: React.ElementType };
+  const branches: Branch[] = [
+    ...wantedFieldValues(profile, "emails").map(value => ({ value, icon: Mail })),
+    ...wantedFieldValues(profile, "phones").map(value => ({ value, icon: Phone })),
+    ...wantedFieldValues(profile, "addresses").map(value => ({ value, icon: MapPin })),
+    ...wantedFieldValues(profile, "ips").map(value => ({ value, icon: Hash })),
+    ...wantedFieldValues(profile, "discordIds").map(value => ({ value, icon: MessageSquare })),
+  ];
+  if (profile.nir) branches.push({ value: profile.nir, icon: Fingerprint });
+  if (profile.iban) branches.push({ value: profile.iban, icon: CreditCard });
+  if (profile.plaque) branches.push({ value: profile.plaque, icon: Car });
+
+  const positions = radialPositions(branches.length);
+  const nodes: Node[] = [
+    { id: "center", type: "wanted", position: { x: 0, y: 0 }, draggable: false, data: { label: wantedProfileLabel(profile), icon: User, kind: "center" } as WantedNodeData },
+  ];
+  const edges: Edge[] = [];
+
+  branches.forEach((b, i) => {
+    const norm = b.value.trim().toLowerCase();
+    const sharedWith = allProfiles.filter(p => p.id !== profile.id && wantedAllValues(p).includes(norm));
+    const nodeId = `branch-${i}`;
+    nodes.push({
+      id: nodeId,
+      type: "wanted",
+      position: positions[i],
+      data: {
+        label: b.value,
+        icon: b.icon,
+        kind: "value",
+        shared: sharedWith.length ? sharedWith.map(p => ({ profileId: p.id, profileLabel: wantedProfileLabel(p) })) : undefined,
+        onSelectShared,
+      } as WantedNodeData,
+    });
+    edges.push({
+      id: `e-${nodeId}`,
+      source: "center",
+      target: nodeId,
+      animated: sharedWith.length > 0,
+      style: sharedWith.length ? { stroke: "#f59e0b", strokeWidth: 2 } : { stroke: "hsl(var(--border))", strokeWidth: 1.5 },
+    });
+  });
+
+  return { nodes, edges };
+}
+
+function WantedGraphView({ profiles }: { profiles: WantedProfile[] }) {
+  const [selectedId, setSelectedId] = useState<number | null>(profiles[0]?.id ?? null);
+  const selected = profiles.find(p => p.id === selectedId) || profiles[0];
+
+  const { nodes, edges } = useMemo(() => {
+    if (!selected) return { nodes: [] as Node[], edges: [] as Edge[] };
+    return buildWantedGraph(selected, profiles, setSelectedId);
+  }, [selected, profiles]);
+
+  if (!profiles.length) {
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-muted-foreground">Aucun profil Wanted enregistre.</p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-muted-foreground shrink-0">Profil centre :</span>
+        <Select value={selectedId ? String(selectedId) : undefined} onValueChange={(v) => setSelectedId(Number(v))}>
+          <SelectTrigger className="w-64 h-8 text-sm" data-testid="select-graph-profile">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {profiles.map(p => (
+              <SelectItem key={p.id} value={String(p.id)}>{wantedProfileLabel(p)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Badge variant="outline" className="text-xs gap-1 ml-auto">
+          <Link2 className="w-3 h-3 text-amber-500" /> Orange = valeur partagee avec un autre profil (cliquer pour y aller)
+        </Badge>
+      </div>
+      <div className="h-[520px] rounded-lg border border-border/50 bg-secondary/5 overflow-hidden">
+        <ReactFlow
+          key={selected?.id}
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={wantedNodeTypes}
+          fitView
+          nodesConnectable={false}
+          elementsSelectable={false}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={20} size={1} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      </div>
+    </div>
+  );
+}
+
 function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
 
   const { data: profiles, isLoading } = useQuery<WantedProfile[]>({
     queryKey: ["/api/admin/wanted-profiles"],
@@ -475,18 +800,13 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
     return (
       (p.nom || "").toLowerCase().includes(q) ||
       (p.prenom || "").toLowerCase().includes(q) ||
-      (p.email || "").toLowerCase().includes(q) ||
       (p.pseudo || "").toLowerCase().includes(q) ||
-      (p.telephone || "").toLowerCase().includes(q) ||
       (p.discord || "").toLowerCase().includes(q) ||
-      (p.ip || "").toLowerCase().includes(q) ||
-      (p.discordId || "").toLowerCase().includes(q) ||
-      (p.emails || []).some(e => e.toLowerCase().includes(q)) ||
-      (p.phones || []).some(ph => ph.toLowerCase().includes(q)) ||
-      (p.ips || []).some(ip => ip.toLowerCase().includes(q)) ||
-      (p.discordIds || []).some(d => d.toLowerCase().includes(q)) ||
-      (p.adresse || "").toLowerCase().includes(q) ||
-      ((p as any).addresses || []).some((a: string) => a.toLowerCase().includes(q)) ||
+      wantedFieldValues(p, "emails").some(v => v.toLowerCase().includes(q)) ||
+      wantedFieldValues(p, "phones").some(v => v.toLowerCase().includes(q)) ||
+      wantedFieldValues(p, "ips").some(v => v.toLowerCase().includes(q)) ||
+      wantedFieldValues(p, "discordIds").some(v => v.toLowerCase().includes(q)) ||
+      wantedFieldValues(p, "addresses").some(v => v.toLowerCase().includes(q)) ||
       (p.iban || "").toLowerCase().includes(q) ||
       (p.bic || "").toLowerCase().includes(q) ||
       (p.plaque || "").toLowerCase().includes(q) ||
@@ -504,18 +824,42 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Rechercher un profil Wanted..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-          data-testid="input-wanted-search"
-        />
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher un profil Wanted..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-wanted-search"
+          />
+        </div>
+        <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-1 shrink-0">
+          <Button
+            size="sm"
+            variant={viewMode === "list" ? "default" : "ghost"}
+            className="h-7 text-xs"
+            onClick={() => setViewMode("list")}
+            data-testid="button-wanted-view-list"
+          >
+            <List className="w-3.5 h-3.5 mr-1.5" /> Liste
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === "graph" ? "default" : "ghost"}
+            className="h-7 text-xs"
+            onClick={() => setViewMode("graph")}
+            data-testid="button-wanted-view-graph"
+          >
+            <Network className="w-3.5 h-3.5 mr-1.5" /> Graphe
+          </Button>
+        </div>
       </div>
 
-      {filteredProfiles.length === 0 ? (
+      {viewMode === "graph" ? (
+        <WantedGraphView profiles={profiles || []} />
+      ) : filteredProfiles.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-muted-foreground">
             {searchQuery.trim() ? "Aucun profil correspondant." : "Aucun profil Wanted enregistre."}
@@ -526,7 +870,7 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
           {filteredProfiles.map(profile => (
             <Card key={profile.id} className="p-4" data-testid={`card-wanted-${profile.id}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex-1 min-w-0 space-y-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium">
                       {profile.civilite} {profile.prenom} {profile.nom}
@@ -534,23 +878,19 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
                     <Badge variant="outline" className="font-mono text-xs">#{profile.id}</Badge>
                     {profile.pseudo && <Badge variant="secondary">{profile.pseudo}</Badge>}
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                    <FieldGroup icon={Mail} label="Emails" values={wantedFieldValues(profile, "emails")} />
+                    <FieldGroup icon={Phone} label="Telephones" values={wantedFieldValues(profile, "phones")} />
+                    <FieldGroup icon={Hash} label="IPs" values={wantedFieldValues(profile, "ips")} />
+                    <FieldGroup icon={MessageSquare} label="Discord IDs" values={wantedFieldValues(profile, "discordIds")} />
+                    <div className="sm:col-span-2">
+                      <FieldGroup icon={MapPin} label="Adresses" values={wantedFieldValues(profile, "addresses")} />
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    {(profile.emails?.length ? profile.emails : profile.email ? [profile.email] : []).map((e, i) => (
-                      <div key={`email-${i}`}><span className="text-muted-foreground">Email:</span> {e}</div>
-                    ))}
-                    {(profile.phones?.length ? profile.phones : profile.telephone ? [profile.telephone] : []).map((p, i) => (
-                      <div key={`phone-${i}`}><span className="text-muted-foreground">Tel:</span> {p}</div>
-                    ))}
-                    {(profile.ips?.length ? profile.ips : profile.ip ? [profile.ip] : []).map((ip, i) => (
-                      <div key={`ip-${i}`}><span className="text-muted-foreground">IP:</span> {ip}</div>
-                    ))}
                     {profile.discord && <div><span className="text-muted-foreground">Discord:</span> {profile.discord}</div>}
-                    {(profile.discordIds?.length ? profile.discordIds : profile.discordId ? [profile.discordId] : []).map((d, i) => (
-                      <div key={`did-${i}`}><span className="text-muted-foreground">Discord ID:</span> {d}</div>
-                    ))}
-                    {((profile as any).addresses?.length ? (profile as any).addresses : profile.adresse ? [profile.adresse] : []).map((a: string, i: number) => (
-                      <div key={`addr-${i}`} className="col-span-2"><span className="text-muted-foreground">Adresse:</span> {a}</div>
-                    ))}
                     {(profile.codePostal || profile.ville) && (
                       <div><span className="text-muted-foreground">Ville:</span> {profile.codePostal} {profile.ville}</div>
                     )}
@@ -562,6 +902,7 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
                     {profile.password && <div><span className="text-muted-foreground">MDP:</span> {profile.password}</div>}
                     {profile.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {profile.notes}</div>}
                   </div>
+
                   <div className="text-xs text-muted-foreground">
                     {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}
                   </div>
