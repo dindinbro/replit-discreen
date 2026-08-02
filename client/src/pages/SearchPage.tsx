@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
-import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
+import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels, type WantedProfile } from "@shared/schema";
+import { FieldGroup, WantedGraphView, wantedFieldValues, wantedProfileLabel } from "@/components/WantedGraph";
 import { usePerformSearch, useSearchQuota, SearchLimitError } from "@/hooks/use-search";
 import SearchLoader from "@/components/SearchLoader";
 import { DiscreenMark } from "@/components/Layout";
@@ -52,6 +53,9 @@ import {
   Crown,
   Wallet,
   History,
+  List,
+  Network,
+  MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -1159,8 +1163,9 @@ export default function SearchPage() {
     return () => window.removeEventListener("popstate", syncFromUrl);
   }, []);
 
-  const [wantedResults, setWantedResults] = useState<any[]>([]);
+  const [wantedResults, setWantedResults] = useState<WantedProfile[]>([]);
   const [loadingWanted, setLoadingWanted] = useState(false);
+  const [wantedViewMode, setWantedViewMode] = useState<"list" | "graph">("list");
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
   const [searchCooldown, setSearchCooldown] = useState(0);
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
@@ -2451,16 +2456,21 @@ export default function SearchPage() {
             >
               <div className={canAccessWanted ? "" : "blur-sm select-none pointer-events-none"}>
                 <div className="flex items-center justify-between gap-2 flex-wrap mb-6">
-                  <div className="flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-red-500" />
-                    <h2 className="text-xl font-bold tracking-tight">Recherche Paramétrique (Wanted)</h2>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                      <ShieldAlert className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-semibold">Recherche Paramétrique (Wanted)</h2>
+                      <p className="text-xs text-muted-foreground">Recherche multi-critères sur la base des personnes recherchées</p>
+                    </div>
                   </div>
                   {getAvailableFilters().length > 0 && (
                     <Select
                       value=""
                       onValueChange={(val) => addCriterionWithType(val)}
                     >
-                      <SelectTrigger className="w-auto min-w-[200px] gap-2" data-testid="button-add-wanted-criterion" tabIndex={canAccessWanted ? 0 : -1}>
+                      <SelectTrigger className="w-auto min-w-[200px] gap-2 rounded-full" data-testid="button-add-wanted-criterion" tabIndex={canAccessWanted ? 0 : -1}>
                         <Plus className="w-4 h-4" />
                         <SelectValue placeholder={t("search.addFilter")} />
                       </SelectTrigger>
@@ -2475,7 +2485,7 @@ export default function SearchPage() {
                   )}
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <AnimatePresence mode="popLayout">
                     {criteria.map((criterion, idx) => {
                       const IconComp = FILTER_ICONS[criterion.type] || FileText;
@@ -2487,44 +2497,42 @@ export default function SearchPage() {
                           exit={{ opacity: 0, height: 0 }}
                           className="group relative"
                         >
-                          <Card className="p-3 bg-red-500/5 dark:bg-red-950/20 border-red-500/10">
-                            <div className="flex flex-col sm:flex-row items-center gap-3">
-                              <div
-                                className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500"
-                              >
-                                <IconComp className="w-4 h-4" />
-                              </div>
-                              
-                              <div className="w-full sm:w-[220px]">
-                                <span className="text-sm font-medium text-foreground">
-                                  {WantedFilterLabels[criterion.type as WantedFilterType]}
-                                </span>
-                              </div>
-
-                              <div className="flex-1 w-full relative">
-                                <Input
-                                  data-testid={`input-criterion-value-${criterion.id}`}
-                                  placeholder={WantedFilterLabels[criterion.type as WantedFilterType] ? `Rechercher par ${WantedFilterLabels[criterion.type as WantedFilterType]?.toLowerCase()}...` : "Entrez une valeur..."}
-                                  value={criterion.value}
-                                  onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleWantedSearch();
-                                  }}
-                                  className="bg-background pr-10"
-                                />
-                              </div>
-
-                              <Button
-                                data-testid={`button-remove-criterion-${criterion.id}`}
-                                variant="ghost"
-                                size="icon"
-                                className="shrink-0"
-                                onClick={() => removeCriterion(criterion.id)}
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
+                          <div className="flex flex-col sm:flex-row items-center gap-2.5 rounded-xl border border-red-500/15 bg-red-500/[0.04] p-2.5">
+                            <div
+                              className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500"
+                            >
+                              <IconComp className="w-4 h-4" />
                             </div>
-                          </Card>
+
+                            <div className="w-full sm:w-[200px] shrink-0">
+                              <span className="text-sm font-medium text-foreground">
+                                {WantedFilterLabels[criterion.type as WantedFilterType]}
+                              </span>
+                            </div>
+
+                            <div className="flex-1 w-full relative">
+                              <Input
+                                data-testid={`input-criterion-value-${criterion.id}`}
+                                placeholder={WantedFilterLabels[criterion.type as WantedFilterType] ? `Rechercher par ${WantedFilterLabels[criterion.type as WantedFilterType]?.toLowerCase()}...` : "Entrez une valeur..."}
+                                value={criterion.value}
+                                onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleWantedSearch();
+                                }}
+                                className="bg-background rounded-lg"
+                              />
+                            </div>
+
+                            <Button
+                              data-testid={`button-remove-criterion-${criterion.id}`}
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0 rounded-full"
+                              onClick={() => removeCriterion(criterion.id)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </motion.div>
                       );
                     })}
@@ -2532,7 +2540,7 @@ export default function SearchPage() {
                 </div>
 
                 {criteria.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-muted-foreground rounded-xl border border-dashed border-red-500/15">
                     <ShieldAlert className="w-10 h-10 mx-auto mb-3 opacity-40" />
                     <p className="text-sm">Ajoutez un filtre pour lancer une recherche Wanted</p>
                   </div>
@@ -2543,7 +2551,7 @@ export default function SearchPage() {
                     data-testid="button-wanted-search"
                     onClick={() => handleWantedSearch()}
                     disabled={loadingWanted || !criteria.some((c) => c.value.trim())}
-                    className="flex-1 h-11 bg-red-600 text-white hover:bg-red-700 font-semibold gap-2 shadow-lg shadow-red-500/25 border-red-600"
+                    className="flex-1 h-11 rounded-full bg-red-600 text-white hover:bg-red-700 font-semibold gap-2 shadow-lg shadow-red-500/25 border-red-600"
                     tabIndex={canAccessWanted ? 0 : -1}
                   >
                     {loadingWanted ? (
@@ -2558,7 +2566,7 @@ export default function SearchPage() {
                     variant="outline"
                     onClick={handleReset}
                     disabled={loadingWanted}
-                    className="h-11 gap-2"
+                    className="h-11 rounded-full gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Reinitialiser
@@ -2587,54 +2595,88 @@ export default function SearchPage() {
           )}
         </AnimatePresence>
 
-        {searchMode === "wanted" && (
-          <div className="space-y-6 min-h-[400px]">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Database className="w-5 h-5 text-red-500" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Résultats Wanted</span>
+        {searchMode === "wanted" && (() => {
+          const canAccessWanted = role === "admin";
+          return (
+          <div className="space-y-6 min-h-[400px] relative">
+            <div className={canAccessWanted ? "" : "blur-sm select-none pointer-events-none"}>
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Database className="w-5 h-5 text-red-500" />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Résultats Wanted</span>
+                  {wantedResults.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-red-500/10 text-red-500 border-red-500/20">
+                      {wantedResults.length}
+                    </Badge>
+                  )}
+                </h3>
                 {wantedResults.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-red-500/10 text-red-500 border-red-500/20">
-                    {wantedResults.length}
-                  </Badge>
+                  <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant={wantedViewMode === "list" ? "default" : "ghost"}
+                      className="h-7 text-xs"
+                      onClick={() => setWantedViewMode("list")}
+                      data-testid="button-wanted-results-view-list"
+                    >
+                      <List className="w-3.5 h-3.5 mr-1.5" /> Liste
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={wantedViewMode === "graph" ? "default" : "ghost"}
+                      className="h-7 text-xs"
+                      onClick={() => setWantedViewMode("graph")}
+                      data-testid="button-wanted-results-view-graph"
+                    >
+                      <Network className="w-3.5 h-3.5 mr-1.5" /> Graphe
+                    </Button>
+                  </div>
                 )}
-              </h3>
-            </div>
-
-            {loadingWanted ? (
-              <SearchLoader variant="red" />
-            ) : wantedResults.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4">
-                {wantedResults.map((profile, i) => (
-                  <ResultCard
-                    key={profile.id}
-                    index={i}
-                    globalIndex={i}
-                    searchTerms={submittedTerms}
-                    row={{
-                      nom: profile.nom,
-                      prenom: profile.prenom,
-                      emails: profile.emails?.length > 0 ? profile.emails.join(", ") : profile.email,
-                      telephones: profile.phones?.length > 0 ? profile.phones.join(", ") : profile.telephone,
-                      adresse: `${profile.adresse || ""} ${profile.codePostal || ""} ${profile.ville || ""}`.trim(),
-                      pseudo: profile.pseudo,
-                      discord_tag: profile.discord,
-                      discord_ids: profile.discordIds?.length > 0 ? profile.discordIds.join(", ") : profile.discordId,
-                      ips: profile.ips?.length > 0 ? profile.ips.join(", ") : profile.ip,
-                      notes: profile.notes,
-                      source: "Base Wanted Admin"
-                    }}
-                  />
-                ))}
               </div>
-            ) : wantedResults.length === 0 && !loadingWanted ? (
-              <Card className="p-12 text-center space-y-4 border-dashed border-red-500/20">
-                <ShieldAlert className="w-12 h-12 text-red-500/30 mx-auto" />
-                <p className="text-muted-foreground">Aucun profil wanted correspondant trouvé. Lancez une recherche pour voir les résultats.</p>
-              </Card>
-            ) : null}
+
+              {loadingWanted ? (
+                <SearchLoader variant="red" />
+              ) : wantedResults.length > 0 && wantedViewMode === "graph" ? (
+                <WantedGraphView profiles={wantedResults} />
+              ) : wantedResults.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {wantedResults.map((profile) => (
+                    <Card key={profile.id} className="p-4 space-y-3 border-red-500/15" data-testid={`card-wanted-result-${profile.id}`}>
+                      <div className="flex items-center gap-2.5 pb-3 border-b border-border/50">
+                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                          <User className="w-4 h-4 text-red-500" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm truncate">{wantedProfileLabel(profile)}</p>
+                          {profile.pseudo && <p className="text-xs text-muted-foreground truncate">@{profile.pseudo}</p>}
+                        </div>
+                      </div>
+                      <div className="space-y-2.5">
+                        <FieldGroup icon={Mail} label="Emails" values={wantedFieldValues(profile, "emails")} />
+                        <FieldGroup icon={Phone} label="Telephones" values={wantedFieldValues(profile, "phones")} />
+                        <FieldGroup icon={MapPin} label="Adresses" values={wantedFieldValues(profile, "addresses")} />
+                        <FieldGroup icon={Hash} label="IPs" values={wantedFieldValues(profile, "ips")} />
+                        <FieldGroup icon={MessageSquare} label="Discord IDs" values={wantedFieldValues(profile, "discordIds")} />
+                        {profile.notes && (
+                          <div className="space-y-1 pt-1">
+                            <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                            <p className="text-xs text-foreground/80 line-clamp-3">{profile.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="p-12 text-center space-y-4 border-dashed border-red-500/20">
+                  <ShieldAlert className="w-12 h-12 text-red-500/30 mx-auto" />
+                  <p className="text-muted-foreground">Aucun profil wanted correspondant trouvé. Lancez une recherche pour voir les résultats.</p>
+                </Card>
+              )}
+            </div>
           </div>
-        )}
+          );
+        })()}
 
         {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "blockchain" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
         <div className="space-y-6 min-h-[400px]">
