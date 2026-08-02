@@ -1,7 +1,7 @@
 import {
   users, categories, subscriptions, dailyUsage, apiKeys, vouches, licenseKeys,
   blacklistRequests, blacklistEntries, infoRequests, pendingServiceRequests,
-  wantedProfiles, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
+  wantedProfiles, wantedActivationCodes, siteSettings, discordLinkCodes, dofProfiles, activeSessions,
   blockedIps, referralCodes, referralEvents, loginLogs, gameScores, discountCodes, gameBoosts,
   searchLogs, reviews, gameLogs, supportTickets, ticketReplies, chatMessages, chatMutes,
   cryptoPayments,
@@ -11,6 +11,7 @@ import {
   type BlacklistEntry, type InsertBlacklistEntry,
   type InfoRequest, type InsertInfoRequest, type PendingServiceRequest,
   type WantedProfile, type InsertWantedProfile,
+  type WantedActivationCode,
   type DiscordLinkCode, type DofProfile, type InsertDofProfile,
   type ActiveSession, type BlockedIp,
   type ReferralCode, type ReferralEvent, type LoginLog,
@@ -62,6 +63,10 @@ export interface IStorage {
   redeemLicenseKey(key: string, userId: string): Promise<{ success: boolean; tier?: PlanTier; message: string }>;
   getLicenseKeys(): Promise<LicenseKey[]>;
   getLicenseKeyByOrder(orderId: string): Promise<LicenseKey | undefined>;
+  createWantedActivationCode(createdBy: string): Promise<WantedActivationCode>;
+  getWantedActivationCodes(): Promise<WantedActivationCode[]>;
+  deleteWantedActivationCode(id: number): Promise<{ success: boolean; message: string }>;
+  redeemWantedActivationCode(code: string, username: string): Promise<{ success: boolean; message: string }>;
   expireSubscriptions(): Promise<{ count: number; expired: typeof subscriptions.$inferSelect[] }>;
   createBlacklistRequest(data: InsertBlacklistRequest): Promise<BlacklistRequest>;
   getBlacklistRequests(): Promise<BlacklistRequest[]>;
@@ -583,6 +588,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(licenseKeys.key, key))
       .returning();
     return result.length > 0;
+  }
+
+  async createWantedActivationCode(createdBy: string): Promise<WantedActivationCode> {
+    const code = `WANTED-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    const [created] = await db
+      .insert(wantedActivationCodes)
+      .values({ code, createdBy })
+      .returning();
+    return created;
+  }
+
+  async getWantedActivationCodes(): Promise<WantedActivationCode[]> {
+    return db.select().from(wantedActivationCodes).orderBy(desc(wantedActivationCodes.createdAt));
+  }
+
+  async deleteWantedActivationCode(id: number): Promise<{ success: boolean; message: string }> {
+    const [existing] = await db.select().from(wantedActivationCodes).where(eq(wantedActivationCodes.id, id));
+    if (!existing) return { success: false, message: "Code introuvable." };
+    if (existing.used) return { success: false, message: "Ce code a deja ete utilise, il ne peut pas etre supprime." };
+    await db.delete(wantedActivationCodes).where(eq(wantedActivationCodes.id, id));
+    return { success: true, message: "Code supprime." };
+  }
+
+  async redeemWantedActivationCode(code: string, username: string): Promise<{ success: boolean; message: string }> {
+    const [updated] = await db
+      .update(wantedActivationCodes)
+      .set({ used: true, usedBy: username, usedAt: new Date() })
+      .where(and(eq(wantedActivationCodes.code, code.trim()), eq(wantedActivationCodes.used, false)))
+      .returning();
+
+    if (!updated) {
+      return { success: false, message: "Code invalide ou deja utilise." };
+    }
+    return { success: true, message: "Code active avec succes." };
   }
 
   async expireSubscriptions(): Promise<{ count: number; expired: typeof subscriptions.$inferSelect[] }> {

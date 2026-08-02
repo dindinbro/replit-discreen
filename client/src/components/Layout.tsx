@@ -95,7 +95,7 @@ function useOnlineCount() {
 /* ── Role badges ─────────────────────────────────────────── */
 const ROLE_DISPLAY: Record<string, string> = {
   admin: "Admin", free: "Early", vip: "VIP",
-  pro: "PRO", business: "Business", api: "API",
+  pro: "PRO", business: "Business", api: "API", wanted: "Wanted",
 };
 
 const ROLE_COLOR: Record<string, string> = {
@@ -131,7 +131,7 @@ const SEARCH_MODULES: NavItem[] = [
   { label: "Paramétrique",   href: "/search?mode=internal",  icon: Sparkles },
   { label: "Username OSINT", href: "/search?mode=sherlock",  icon: Eye },
   { label: "Google OSINT",   href: "/search?mode=xeuledoc",  icon: FileSearch },
-  { label: "Wanted",         href: "/search?mode=wanted",    icon: ShieldAlert, adminOnly: true },
+  { label: "Wanted",         href: "/wanted",                icon: ShieldAlert },
   { label: "Lookup",          href: "/search?mode=phone",     icon: Phone },
 ];
 
@@ -505,8 +505,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               <span
                                 className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
                                 style={{
-                                  color: role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : undefined,
-                                  background: role === "pro" || role === "business" ? "hsl(var(--primary) / 0.1)" : role === "vip" ? "rgba(251,191,36,0.1)" : "transparent",
+                                  color: role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : role === "wanted" ? "#fb923c" : undefined,
+                                  background: role === "pro" || role === "business" ? "hsl(var(--primary) / 0.1)" : role === "vip" ? "rgba(251,191,36,0.1)" : role === "wanted" ? "rgba(251,146,60,0.1)" : "transparent",
                                 }}
                               >
                                 {ROLE_DISPLAY[role] || role}

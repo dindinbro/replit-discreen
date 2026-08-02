@@ -312,6 +312,23 @@ export const insertLicenseKeySchema = createInsertSchema(licenseKeys).omit({ id:
 export type InsertLicenseKey = z.infer<typeof insertLicenseKeySchema>;
 export type LicenseKey = typeof licenseKeys.$inferSelect;
 
+// One-time activation codes that unlock the "wanted" role — a separate
+// mechanism from licenseKeys (which is tied to paid orders): these are
+// generated freely by admins and redeemed by users via POST /api/wanted/redeem.
+export const wantedActivationCodes = pgTable("wanted_activation_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  used: boolean("used").notNull().default(false),
+  usedBy: text("used_by"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  usedAt: timestamp("used_at"),
+});
+
+export const insertWantedActivationCodeSchema = createInsertSchema(wantedActivationCodes).omit({ id: true, createdAt: true, usedAt: true });
+export type InsertWantedActivationCode = z.infer<typeof insertWantedActivationCodeSchema>;
+export type WantedActivationCode = typeof wantedActivationCodes.$inferSelect;
+
 export const vouches = pgTable("vouches", {
   id: serial("id").primaryKey(),
   discordUserId: text("discord_user_id").notNull(),

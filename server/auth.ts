@@ -251,7 +251,7 @@ export function registerAuthRoutes(app: Express) {
 
       const sub = await storage.getOrCreateSubscription(String(user.id));
       let effectiveRole = user.role || "free";
-      if (effectiveRole !== "admin") {
+      if (effectiveRole !== "admin" && effectiveRole !== "wanted") {
         effectiveRole = (sub?.tier as string) || "free";
         if (sub && sub.tier !== "free" && !sub.frozen && sub.expiresAt && new Date(sub.expiresAt) < new Date()) {
           effectiveRole = "free";

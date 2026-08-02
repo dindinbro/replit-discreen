@@ -43,6 +43,13 @@
       "when": 1785647201803,
       "tag": "0005_curly_dormammu",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785662827087,
+      "tag": "0006_serious_deadpool",
+      "breakpoints": true
     }
   ]
 }

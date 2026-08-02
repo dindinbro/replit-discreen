@@ -129,7 +129,7 @@ const PRESET_COLORS = [
   "#f97316", "#6366f1",
 ];
 
-type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "dof" | "ipblock" | "logs" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "tickets" | "chat" | "bypass" | "crypto-payments";
+type AdminTab = "users" | "keys" | "blacklist" | "info" | "wanted" | "wanted-codes" | "dof" | "ipblock" | "logs" | "game-boosts" | "game-logs" | "services" | "notifications" | "search-logs" | "tickets" | "chat" | "bypass" | "crypto-payments";
 
 interface AdminTabDef {
   key: AdminTab;
@@ -173,6 +173,7 @@ const ADMIN_TABS: AdminTabDef[] = [
   { key: "chat",           label: "Chat Global",            shortLabel: "Chat",          description: "Modération du salon de chat en temps réel",            icon: MessageSquare, group: "community" },
   { key: "bypass",         label: "Bypass Whitelist",       shortLabel: "Bypass",        description: "Utilisateurs exemptés des limites et cooldowns",        icon: ShieldCheck,   group: "moderation" },
   { key: "game-boosts",    label: "Boosts de Jeu",          shortLabel: "Boosts",        description: "Multiplicateurs de score et avantages temporaires",   icon: Zap,         group: "game" },
+  { key: "wanted-codes",   label: "Codes d'activation Wanted", shortLabel: "Codes Wanted", description: "Genere et gere les codes qui debloquent le role Wanted", icon: KeyRound,  group: "system" },
   { key: "services",       label: "Statut des Services",    shortLabel: "Services",      description: "Moniteur de santé des APIs et services externes",     icon: Monitor,     group: "system" },
   { key: "crypto-payments", label: "Paiements Crypto",      shortLabel: "Paiements",     description: "Historique des paiements crypto NOWPayments",          icon: Bitcoin,     group: "system" },
 ];
@@ -2772,6 +2773,121 @@ function DofSection({ getAccessToken }: { getAccessToken: () => string | null })
   );
 }
 
+interface WantedActivationCodeEntry {
+  id: number;
+  code: string;
+  used: boolean;
+  usedBy: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  usedAt: string | null;
+}
+
+function WantedCodesSection() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: codes = [], isLoading } = useQuery<WantedActivationCodeEntry[]>({
+    queryKey: ["/api/admin/wanted-codes"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/wanted-codes", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch codes");
+      return res.json();
+    },
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/wanted-codes", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Erreur");
+      return res.json();
+    },
+    onSuccess: (created: WantedActivationCodeEntry) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-codes"] });
+      navigator.clipboard?.writeText(created.code).catch(() => {});
+      toast({ title: "Code genere", description: `${created.code} (copie dans le presse-papier)` });
+    },
+    onError: (err: any) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/admin/wanted-codes/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Erreur");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-codes"] });
+      toast({ title: "Code supprime" });
+    },
+    onError: (err: any) => toast({ title: "Erreur", description: err.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold">Codes d'activation Wanted</h2>
+          <p className="text-sm text-muted-foreground">
+            Chaque code est a usage unique et debloque le role Wanted sur le compte qui le saisit sur /wanted.
+          </p>
+        </div>
+        <Button onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending} data-testid="button-generate-wanted-code">
+          {generateMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+          Generer un code
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+      ) : codes.length === 0 ? (
+        <Card className="p-8 text-center text-muted-foreground">Aucun code genere pour le moment.</Card>
+      ) : (
+        <div className="space-y-2">
+          {codes.map((c) => (
+            <Card key={c.id} className="p-3 flex items-center justify-between gap-3 flex-wrap" data-testid={`card-wanted-code-${c.id}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                  <KeyRound className="w-4 h-4 text-red-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-mono text-sm font-medium truncate">{c.code}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Cree par {c.createdBy || "?"} le {new Date(c.createdAt).toLocaleDateString("fr-FR")}
+                    {c.used && c.usedBy && <> — utilise par <span className="font-medium">{c.usedBy}</span></>}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge variant={c.used ? "secondary" : "outline"} className={c.used ? "" : "border-emerald-500/40 text-emerald-500"}>
+                  {c.used ? "Utilise" : "Disponible"}
+                </Badge>
+                {!c.used && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteMutation.mutate(c.id)}
+                    disabled={deleteMutation.isPending}
+                    data-testid={`button-delete-wanted-code-${c.id}`}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WantedSection() {
   const [wantedSubTab, setWantedSubTab] = useState<"form" | "history">("form");
   const [editProfile, setEditProfile] = useState<WantedProfile | null>(null);
@@ -4935,6 +5051,9 @@ function AdminPageInner() {
             )}
             {activeTab === "game-boosts" && (
               <GameBoostsSection getAccessToken={getAccessToken} />
+            )}
+            {activeTab === "wanted-codes" && (
+              <WantedCodesSection />
             )}
             {activeTab === "services" && (
               <ServiceStatusSection />

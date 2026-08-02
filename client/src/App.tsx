@@ -26,6 +26,7 @@ import GamePage from "@/pages/GamePage";
 import StatusPage from "@/pages/StatusPage";
 import TicketsPage from "@/pages/TicketsPage";
 import CheckoutPage from "@/pages/CheckoutPage";
+import WantedPage from "@/pages/WantedPage";
 import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
 import PendingApprovalGate from "@/components/PendingApprovalGate";
 import Layout from "@/components/Layout";
@@ -226,6 +227,9 @@ function Router() {
       </Route>
       <Route path="/search">
         <ProtectedRoute component={SearchPage} />
+      </Route>
+      <Route path="/wanted">
+        <ProtectedRoute component={WantedPage} />
       </Route>
       <Route path="/api-keys">
         <ProtectedRoute component={ApiKeysPage} />

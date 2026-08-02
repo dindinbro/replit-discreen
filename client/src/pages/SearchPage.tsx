@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useRef } from "react";
-import { FilterLabels, type SearchFilterType, WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam, type WantedFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels, type WantedProfile } from "@shared/schema";
-import { FieldGroup, WantedGraphView, wantedFieldValues, wantedProfileLabel } from "@/components/WantedGraph";
+import { FilterLabels, type SearchFilterType, MainSearchFilterTypes, FivemFilterTypes, FivemFilterLabels } from "@shared/schema";
 import { usePerformSearch, useSearchQuota, SearchLimitError } from "@/hooks/use-search";
 import SearchLoader from "@/components/SearchLoader";
 import { DiscreenMark } from "@/components/Layout";
@@ -1108,7 +1107,7 @@ let nextCriterionId = 1;
 export default function SearchPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { getAccessToken, role } = useAuth();
+  const { getAccessToken } = useAuth();
   const [wouterLocation] = useLocation();
   const searchMutation = usePerformSearch(getAccessToken);
   const quotaQuery = useSearchQuota(getAccessToken);
@@ -1117,10 +1116,10 @@ export default function SearchPage() {
   const [searchTime, setSearchTime] = useState<number | null>(null);
   const searchStartRef = useRef<number>(0);
   const [searchElapsed, setSearchElapsed] = useState(0);
-  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "blockchain" | "wanted" | "fivem" | "xeuledoc" | "sherlock" | "telegram">(() => {
+  const [searchMode, setSearchMode] = useState<"internal" | "external" | "phone" | "geoip" | "nir" | "blockchain" | "fivem" | "xeuledoc" | "sherlock" | "telegram">(() => {
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    const valid = ["internal", "external", "phone", "geoip", "nir", "blockchain", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
+    const valid = ["internal", "external", "phone", "geoip", "nir", "blockchain", "fivem", "xeuledoc", "sherlock", "telegram"];
     return (m && valid.includes(m) ? m : "internal") as any;
   });
 
@@ -1148,7 +1147,7 @@ export default function SearchPage() {
     const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      const valid = ["internal", "phone", "geoip", "nir", "blockchain", "wanted", "fivem", "xeuledoc", "sherlock", "telegram"];
+      const valid = ["internal", "phone", "geoip", "nir", "blockchain", "fivem", "xeuledoc", "sherlock", "telegram"];
       if (m && valid.includes(m)) {
         setSearchMode(current => {
           if (current !== m) {
@@ -1163,9 +1162,6 @@ export default function SearchPage() {
     return () => window.removeEventListener("popstate", syncFromUrl);
   }, []);
 
-  const [wantedResults, setWantedResults] = useState<WantedProfile[]>([]);
-  const [loadingWanted, setLoadingWanted] = useState(false);
-  const [wantedViewMode, setWantedViewMode] = useState<"list" | "graph">("list");
   const [blacklistMatch, setBlacklistMatch] = useState<{ blacklisted: boolean } | null>(null);
   const [searchCooldown, setSearchCooldown] = useState(0);
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
@@ -1393,43 +1389,6 @@ export default function SearchPage() {
 
   const filterTypes = [...MainSearchFilterTypes] as SearchFilterType[];
 
-  const handleWantedSearch = async () => {
-    const filledCriteria = criteria.filter((c) => c.value.trim() !== "");
-    if (filledCriteria.length === 0) {
-      toast({
-        title: "Critères manquants",
-        description: "Veuillez entrer au moins un critère de recherche.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSubmittedTerms(filledCriteria.map((c) => c.value.trim()));
-
-    setLoadingWanted(true);
-    try {
-      const params = new URLSearchParams();
-      filledCriteria.forEach((c) => {
-        const apiParam = WantedFilterToApiParam[c.type as WantedFilterType] || c.type;
-        params.append(apiParam, c.value.trim());
-      });
-
-      const res = await fetch(`/api/wanted/search?${params.toString()}`);
-      if (res.ok) {
-        setWantedResults(await res.json());
-      }
-    } catch (error) {
-      console.error("Wanted search error:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de rechercher les profils Wanted",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingWanted(false);
-    }
-  };
-
   const handleInternalSearch = (newPage: number) => {
     const filledCriteria = criteria.filter((c) => c.value.trim() !== "");
     if (filledCriteria.length === 0) {
@@ -1489,9 +1448,7 @@ export default function SearchPage() {
 
   const getAvailableFilters = () => {
     const usedTypes = new Set(criteria.map((c) => c.type));
-    if (searchMode === "wanted") {
-      return WantedFilterTypes.filter((t) => !usedTypes.has(t));
-    } else if (searchMode === "fivem") {
+    if (searchMode === "fivem") {
       return FivemFilterTypes.filter((t) => !usedTypes.has(t));
     } else {
       return filterTypes.filter((t) => !usedTypes.has(t));
@@ -1593,11 +1550,9 @@ export default function SearchPage() {
     setNirResult(null);
     setGeoipTerm("");
     setGeoipResult(null);
-    setWantedResults([]);
     searchMutation.reset();
   };
 
-  const isWantedMode = searchMode === "wanted";
   const isFivemMode = searchMode === "fivem";
   const isXeuledocMode = searchMode === "xeuledoc";
   const isSherlockMode = searchMode === "sherlock";
@@ -1605,14 +1560,13 @@ export default function SearchPage() {
   // Apply atmosphere to body so sidebar + content share the same base background
   useEffect(() => {
     const body = document.body;
-    const ATMO = ["wanted-atmosphere", "fivem-atmosphere", "xeuledoc-atmosphere", "sherlock-atmosphere"];
+    const ATMO = ["fivem-atmosphere", "xeuledoc-atmosphere", "sherlock-atmosphere"];
     ATMO.forEach(c => body.classList.remove(c));
-    if (isWantedMode) body.classList.add("wanted-atmosphere");
-    else if (isFivemMode) body.classList.add("fivem-atmosphere");
+    if (isFivemMode) body.classList.add("fivem-atmosphere");
     else if (isXeuledocMode) body.classList.add("xeuledoc-atmosphere");
     else if (isSherlockMode) body.classList.add("sherlock-atmosphere");
     return () => ATMO.forEach(c => body.classList.remove(c));
-  }, [isWantedMode, isFivemMode, isXeuledocMode, isSherlockMode]);
+  }, [isFivemMode, isXeuledocMode, isSherlockMode]);
 
   const handleSherlockSearch = async () => {
     const u = sherlockUsername.trim().replace(/^@/, "");
@@ -1765,24 +1719,17 @@ export default function SearchPage() {
           </div>
         )}
       </AnimatePresence>
-      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isWantedMode || isFivemMode || isXeuledocMode || isSherlockMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ${isFivemMode || isXeuledocMode || isSherlockMode ? "opacity-0" : "opacity-100"} bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background`} />
 
       <div className="relative w-full max-w-5xl mx-auto px-4 py-12 space-y-12">
         <section className="text-center space-y-4 max-w-2xl mx-auto mb-8">
           <motion.h1
-            key={isWantedMode ? "wanted-title" : isFivemMode ? "fivem-title" : isXeuledocMode ? "xeuledoc-title" : isSherlockMode ? "sherlock-title" : "normal-title"}
+            key={isFivemMode ? "fivem-title" : isXeuledocMode ? "xeuledoc-title" : isSherlockMode ? "sherlock-title" : "normal-title"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-[1.1]"
           >
-            {isWantedMode ? (
-              <>
-                Profils <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">
-                  Wanted
-                </span>
-              </>
-            ) : isFivemMode ? (
+            {isFivemMode ? (
               <>
                 Recherche <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">
@@ -2444,241 +2391,12 @@ export default function SearchPage() {
             </motion.div>
           )}
 
-          {searchMode === "wanted" && (() => {
-            const canAccessWanted = role === "admin";
-            return (
-            <motion.div
-              key="wanted"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="glass-panel-wanted rounded-2xl p-6 md:p-8 space-y-6 relative"
-            >
-              <div className={canAccessWanted ? "" : "blur-sm select-none pointer-events-none"}>
-                <div className="flex items-center justify-between gap-2 flex-wrap mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                      <ShieldAlert className="w-5 h-5 text-red-500" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-semibold">Recherche Paramétrique (Wanted)</h2>
-                      <p className="text-xs text-muted-foreground">Recherche multi-critères sur la base des personnes recherchées</p>
-                    </div>
-                  </div>
-                  {getAvailableFilters().length > 0 && (
-                    <Select
-                      value=""
-                      onValueChange={(val) => addCriterionWithType(val)}
-                    >
-                      <SelectTrigger className="w-auto min-w-[200px] gap-2 rounded-full" data-testid="button-add-wanted-criterion" tabIndex={canAccessWanted ? 0 : -1}>
-                        <Plus className="w-4 h-4" />
-                        <SelectValue placeholder={t("search.addFilter")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableFilters().map((ft) => (
-                          <SelectItem key={ft} value={ft}>
-                            {WantedFilterLabels[ft as WantedFilterType]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <AnimatePresence mode="popLayout">
-                    {criteria.map((criterion, idx) => {
-                      const IconComp = FILTER_ICONS[criterion.type] || FileText;
-                      return (
-                        <motion.div
-                          key={criterion.id}
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="group relative"
-                        >
-                          <div className="flex flex-col sm:flex-row items-center gap-2.5 rounded-xl border border-red-500/15 bg-red-500/[0.04] p-2.5">
-                            <div
-                              className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500"
-                            >
-                              <IconComp className="w-4 h-4" />
-                            </div>
-
-                            <div className="w-full sm:w-[200px] shrink-0">
-                              <span className="text-sm font-medium text-foreground">
-                                {WantedFilterLabels[criterion.type as WantedFilterType]}
-                              </span>
-                            </div>
-
-                            <div className="flex-1 w-full relative">
-                              <Input
-                                data-testid={`input-criterion-value-${criterion.id}`}
-                                placeholder={WantedFilterLabels[criterion.type as WantedFilterType] ? `Rechercher par ${WantedFilterLabels[criterion.type as WantedFilterType]?.toLowerCase()}...` : "Entrez une valeur..."}
-                                value={criterion.value}
-                                onChange={(e) => updateCriterion(criterion.id, "value", e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleWantedSearch();
-                                }}
-                                className="bg-background rounded-lg"
-                              />
-                            </div>
-
-                            <Button
-                              data-testid={`button-remove-criterion-${criterion.id}`}
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0 rounded-full"
-                              onClick={() => removeCriterion(criterion.id)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-
-                {criteria.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground rounded-xl border border-dashed border-red-500/15">
-                    <ShieldAlert className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                    <p className="text-sm">Ajoutez un filtre pour lancer une recherche Wanted</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 w-full mt-6">
-                  <Button
-                    data-testid="button-wanted-search"
-                    onClick={() => handleWantedSearch()}
-                    disabled={loadingWanted || !criteria.some((c) => c.value.trim())}
-                    className="flex-1 h-11 rounded-full bg-red-600 text-white hover:bg-red-700 font-semibold gap-2 shadow-lg shadow-red-500/25 border-red-600"
-                    tabIndex={canAccessWanted ? 0 : -1}
-                  >
-                    {loadingWanted ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                    Rechercher
-                  </Button>
-                  <Button
-                    data-testid="button-reset-wanted"
-                    variant="outline"
-                    onClick={handleReset}
-                    disabled={loadingWanted}
-                    className="h-11 rounded-full gap-2"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reinitialiser
-                  </Button>
-                </div>
-              </div>
-              {!canAccessWanted && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl bg-background/30" data-testid="wanted-admin-overlay">
-                  <div className="text-center space-y-3 p-6">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                      <Lock className="w-6 h-6 text-red-500" />
-                    </div>
-                    <h3 className="text-lg font-bold">Accès réservé aux administrateurs</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm">
-                      Le moteur de recherche Wanted n'est accessible qu'aux administrateurs.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-            );
-          })()}
-
           {searchMode === "telegram" && (
             <TelegramLookupPanel />
           )}
         </AnimatePresence>
 
-        {searchMode === "wanted" && (() => {
-          const canAccessWanted = role === "admin";
-          return (
-          <div className="space-y-6 min-h-[400px] relative">
-            <div className={canAccessWanted ? "" : "blur-sm select-none pointer-events-none"}>
-              <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Database className="w-5 h-5 text-red-500" />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Résultats Wanted</span>
-                  {wantedResults.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 bg-red-500/10 text-red-500 border-red-500/20">
-                      {wantedResults.length}
-                    </Badge>
-                  )}
-                </h3>
-                {wantedResults.length > 0 && (
-                  <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant={wantedViewMode === "list" ? "default" : "ghost"}
-                      className="h-7 text-xs"
-                      onClick={() => setWantedViewMode("list")}
-                      data-testid="button-wanted-results-view-list"
-                    >
-                      <List className="w-3.5 h-3.5 mr-1.5" /> Liste
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={wantedViewMode === "graph" ? "default" : "ghost"}
-                      className="h-7 text-xs"
-                      onClick={() => setWantedViewMode("graph")}
-                      data-testid="button-wanted-results-view-graph"
-                    >
-                      <Network className="w-3.5 h-3.5 mr-1.5" /> Graphe
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {loadingWanted ? (
-                <SearchLoader variant="red" />
-              ) : wantedResults.length > 0 && wantedViewMode === "graph" ? (
-                <WantedGraphView profiles={wantedResults} />
-              ) : wantedResults.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {wantedResults.map((profile) => (
-                    <Card key={profile.id} className="p-4 space-y-3 border-red-500/15" data-testid={`card-wanted-result-${profile.id}`}>
-                      <div className="flex items-center gap-2.5 pb-3 border-b border-border/50">
-                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
-                          <User className="w-4 h-4 text-red-500" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm truncate">{wantedProfileLabel(profile)}</p>
-                          {profile.pseudo && <p className="text-xs text-muted-foreground truncate">@{profile.pseudo}</p>}
-                        </div>
-                      </div>
-                      <div className="space-y-2.5">
-                        <FieldGroup icon={Mail} label="Emails" values={wantedFieldValues(profile, "emails")} />
-                        <FieldGroup icon={Phone} label="Telephones" values={wantedFieldValues(profile, "phones")} />
-                        <FieldGroup icon={MapPin} label="Adresses" values={wantedFieldValues(profile, "addresses")} />
-                        <FieldGroup icon={Hash} label="IPs" values={wantedFieldValues(profile, "ips")} />
-                        <FieldGroup icon={MessageSquare} label="Discord IDs" values={wantedFieldValues(profile, "discordIds")} />
-                        {profile.notes && (
-                          <div className="space-y-1 pt-1">
-                            <p className="text-xs font-medium text-muted-foreground">Notes</p>
-                            <p className="text-xs text-foreground/80 line-clamp-3">{profile.notes}</p>
-                          </div>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card className="p-12 text-center space-y-4 border-dashed border-red-500/20">
-                  <ShieldAlert className="w-12 h-12 text-red-500/30 mx-auto" />
-                  <p className="text-muted-foreground">Aucun profil wanted correspondant trouvé. Lancez une recherche pour voir les résultats.</p>
-                </Card>
-              )}
-            </div>
-          </div>
-          );
-        })()}
-
-        {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "blockchain" && searchMode !== "wanted" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
+        {searchMode !== "phone" && searchMode !== "geoip" && searchMode !== "nir" && searchMode !== "blockchain" && searchMode !== "xeuledoc" && searchMode !== "sherlock" && (
         <div className="space-y-6 min-h-[400px]">
           {(() => {
             const activeResults = searchMutation.data?.results;
