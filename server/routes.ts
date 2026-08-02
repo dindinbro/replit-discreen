@@ -1570,9 +1570,10 @@ export async function registerRoutes(
   app.get("/api/site-status", async (_req, res) => {
     try {
       const val = await storage.getSiteSetting("maintenance_mode");
-      res.json({ maintenance: val === "true" });
+      const startedAt = await storage.getSiteSetting("maintenance_started_at");
+      res.json({ maintenance: val === "true", maintenanceStartedAt: val === "true" ? startedAt : null });
     } catch {
-      res.json({ maintenance: false });
+      res.json({ maintenance: false, maintenanceStartedAt: null });
     }
   });
 
@@ -1589,6 +1590,10 @@ export async function registerRoutes(
     try {
       const { enabled } = req.body;
       await storage.setSiteSetting("maintenance_mode", enabled ? "true" : "false");
+      if (enabled) {
+        // Reset the countdown every time maintenance is (re-)enabled.
+        await storage.setSiteSetting("maintenance_started_at", new Date().toISOString());
+      }
       console.log(`[admin] Maintenance mode ${enabled ? "ENABLED" : "DISABLED"} by admin`);
       res.json({ enabled: !!enabled });
     } catch (err) {

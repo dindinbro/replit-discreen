@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Shield, Search, Moon, Sun, Lock, Database, Zap,
+  Search, Moon, Sun, Lock, Database, Zap,
   Mail, User, Phone, Globe, Hash, MapPin, Key, Calendar,
-  Crown, Rocket, Code, Check, X, Gamepad2, Fingerprint,
-  Cpu, FileSearch, UserSearch, AlertTriangle, Infinity,
-  Clock, ChevronRight,
+  Gamepad2, Fingerprint,
+  Cpu, FileSearch, UserSearch, AlertTriangle,
+  Clock, ChevronRight, Wrench,
 } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { motion, AnimatePresence } from "framer-motion";
@@ -168,70 +168,46 @@ const TIER_BADGE: Record<string, { label: string; variant: "secondary" | "outlin
   PRO: { label: "PRO", variant: "destructive" },
 };
 
-/* ── pricing data ── */
-const PLANS = [
-  {
-    id: "free",
-    name: "Free",
-    subtitle: "Pour commencer",
-    icon: Zap,
-    price: 0,
-    lifetimePrice: 0,
-    popular: false,
-    features: [
-      { text: "2 recherches / jour", ok: true },
-      { text: "Bases limitées", ok: true },
-      { text: "Recherche basique", ok: true },
-      { text: "OSINT avancé", ok: false },
-      { text: "Wanted", ok: false },
-      { text: "API", ok: false },
-    ],
-  },
-  {
-    id: "pro",
-    name: "PRO",
-    subtitle: "Puissance maximale",
-    icon: Rocket,
-    price: 14.99,
-    lifetimePrice: 124.99,
-    popular: true,
-    features: [
-      { text: "200 recherches / jour", ok: true },
-      { text: "Toutes les bases", ok: true },
-      { text: "Google OSINT illimité", ok: true },
-      { text: "Username OSINT", ok: true },
-      { text: "Wanted", ok: true },
-      { text: "Parrainage", ok: true },
-    ],
-  },
-  {
-    id: "api",
-    name: "API",
-    subtitle: "Recherches illimitées",
-    icon: Code,
-    price: 49.99,
-    lifetimePrice: 399.99,
-    popular: false,
-    features: [
-      { text: "Recherches illimitées", ok: true },
-      { text: "Clé API dédiée", ok: true },
-      { text: "Toutes fonctionnalités PRO", ok: true },
-      { text: "Endpoint /api/v1/search", ok: true },
-      { text: "Possibilité de revente", ok: true },
-      { text: "Support premium 24/7", ok: true },
-    ],
-  },
-];
+/* ── maintenance countdown ── */
+function formatElapsed(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+function useMaintenanceElapsed() {
+  const [startedAt, setStartedAt] = useState<string | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/site-status")
+      .then((r) => r.json())
+      .then((d) => setStartedAt(d.maintenanceStartedAt || null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!startedAt) return;
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsedMs(Date.now() - start);
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [startedAt]);
+
+  return formatElapsed(elapsedMs);
+}
 
 export default function MaintenancePage() {
   const [dark, setDark] = useState(() =>
     typeof window !== "undefined" ? document.documentElement.classList.contains("dark") : true
   );
   const [activeCategory, setActiveCategory] = useState<SearchMode>("internal");
-  const [pricingMode, setPricingMode] = useState<"monthly" | "lifetime">("monthly");
-  const [tiltStyles, setTiltStyles] = useState<Record<string, { rotateX: number; rotateY: number; scale: number }>>({});
   const [typedText, setTypedText] = useState("");
   const [showResults, setShowResults] = useState(false);
+  const elapsed = useMaintenanceElapsed();
 
   const currentCat = CATEGORIES.find((c) => c.id === activeCategory)!;
 
@@ -253,24 +229,6 @@ export default function MaintenancePage() {
     return () => clearInterval(iv);
   }, [activeCategory]);
 
-  /* 3-D tilt for pricing cards */
-  function handleTiltMove(id: string, e: React.MouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    setTiltStyles((prev) => ({
-      ...prev,
-      [id]: { rotateX: ((y - cy) / cy) * -6, rotateY: ((x - cx) / cx) * 6, scale: 1.02 },
-    }));
-  }
-  function handleTiltLeave(id: string) {
-    setTiltStyles((prev) => ({ ...prev, [id]: { rotateX: 0, rotateY: 0, scale: 1 } }));
-  }
-
-  const isLifetime = pricingMode === "lifetime";
-
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-x-hidden flex flex-col">
       <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-primary/[0.04] blur-3xl pointer-events-none" />
@@ -283,7 +241,7 @@ export default function MaintenancePage() {
             <span className="text-lg font-bold tracking-tight">Di<span className="text-primary">screen</span></span>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-xs gap-1"><Lock className="w-3 h-3" />Accès restreint</Badge>
+            <Badge variant="outline" className="text-xs gap-1"><Wrench className="w-3 h-3" />Maintenance en cours</Badge>
             <Button size="icon" variant="ghost" onClick={() => setDark(!dark)} data-testid="button-theme-toggle">
               {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
@@ -468,169 +426,29 @@ export default function MaintenancePage() {
 
         <div className="w-full max-w-6xl border-t border-border/30 my-10" />
 
-        {/* ── Pricing ── */}
-        <section className="w-full max-w-6xl mb-16">
-          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }} className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2">Nos <span className="text-primary">offres</span></h2>
-            <p className="text-muted-foreground text-sm max-w-lg mx-auto mb-6">
-              Du plan gratuit à l'accès illimité — paiement mensuel ou unique à vie
-            </p>
-
-            {/* Pricing toggle */}
-            <div className="flex justify-center">
-              <div className="relative flex items-center">
-                <div
-                  onClick={() => setPricingMode("monthly")}
-                  className={`relative z-10 px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
-                    pricingMode === "monthly"
-                      ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105"
-                      : "bg-card text-muted-foreground border-border/50 -mr-3"
-                  }`}
-                  data-testid="button-pricing-monthly"
-                >
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    <div>
-                      <p className="text-sm font-bold">Mensuel</p>
-                      <p className="text-[10px] opacity-80">Paiement chaque mois</p>
-                    </div>
-                  </div>
+        {/* ── Maintenance notice ── */}
+        <section className="w-full max-w-2xl mb-16">
+          <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
+            <Card className="p-8 text-center border-primary/20 bg-primary/[0.03] relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.06] to-transparent pointer-events-none" />
+              <div className="relative z-10 flex flex-col items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center">
+                  <Wrench className="w-7 h-7 text-primary" />
                 </div>
-                <div
-                  onClick={() => setPricingMode("lifetime")}
-                  className={`relative px-6 py-3 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none ${
-                    pricingMode === "lifetime"
-                      ? "z-10 bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-lg shadow-amber-500/20 scale-105"
-                      : "z-0 bg-card text-muted-foreground border-border/50 -ml-3"
-                  }`}
-                  data-testid="button-pricing-lifetime"
-                >
-                  <div className="flex items-center gap-2">
-                    <Infinity className="w-4 h-4" />
-                    <div>
-                      <p className="text-sm font-bold">Lifetime</p>
-                      <p className="text-[10px] opacity-80">Paiement unique</p>
-                    </div>
-                  </div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-1">Maintenance en cours</h2>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    Discreen est temporairement indisponible le temps d'une courte intervention. Nous serons de retour très bientôt.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-background/60 border border-border/50">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <span className="font-mono text-lg font-bold tabular-nums" data-testid="text-maintenance-elapsed">{elapsed}</span>
+                  <span className="text-xs text-muted-foreground">écoulé</span>
                 </div>
               </div>
-            </div>
+            </Card>
           </motion.div>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={pricingMode}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.3 }}
-              className={`grid grid-cols-1 sm:grid-cols-2 ${isLifetime ? "lg:grid-cols-3 max-w-4xl mx-auto" : "lg:grid-cols-4"} gap-4`}
-            >
-              {PLANS.filter((p) => !(isLifetime && p.price === 0)).map((plan, i) => {
-                const Icon = plan.icon;
-                const tilt = tiltStyles[plan.id] || { rotateX: 0, rotateY: 0, scale: 1 };
-                const isTilted = tilt.scale > 1;
-                const yearlyIfMonthly = plan.price * 12;
-                const savedPerYear = yearlyIfMonthly - plan.lifetimePrice;
-                const discountPct = plan.price > 0 ? Math.round((1 - plan.lifetimePrice / yearlyIfMonthly) * 100) : 0;
-
-                return (
-                  <motion.div
-                    key={plan.id}
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: i * 0.07 }}
-                    style={{ perspective: "800px" }}
-                    onMouseMove={(e) => handleTiltMove(plan.id, e)}
-                    onMouseLeave={() => handleTiltLeave(plan.id)}
-                    className="relative"
-                  >
-                    {plan.popular && (
-                      <div className="absolute -top-3 left-0 right-0 flex justify-center z-10">
-                        <Badge className={`text-[10px] px-3 ${isLifetime ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0" : ""}`}>
-                          {isLifetime ? "✨ Lifetime" : "⭐ Populaire"}
-                        </Badge>
-                      </div>
-                    )}
-                    <Card
-                      className={`relative flex flex-col p-5 h-full overflow-visible transition-all duration-200 ${
-                        plan.popular && isLifetime
-                          ? "border-amber-500/50 shadow-[0_0_24px_-6px] shadow-amber-500/20"
-                          : plan.popular
-                          ? "border-primary/50 shadow-[0_0_24px_-6px] shadow-primary/15"
-                          : ""
-                      } ${isTilted && isLifetime ? "shadow-xl shadow-amber-500/20 border-amber-500/40" : isTilted ? "shadow-xl shadow-primary/25 border-primary/40" : ""}`}
-                      style={{
-                        transform: `rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(${tilt.scale},${tilt.scale},${tilt.scale})`,
-                        transition: "transform 0.15s ease-out",
-                        transformStyle: "preserve-3d",
-                        willChange: "transform",
-                      }}
-                      data-testid={`card-plan-${plan.id}`}
-                    >
-                      {/* Plan header */}
-                      <div className="space-y-3 mb-5">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-300 ${isLifetime && plan.price > 0 ? "bg-amber-500/10" : "bg-primary/10"}`}>
-                          <Icon className={`w-4.5 h-4.5 transition-colors duration-300 ${isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"}`} />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold">{plan.name}</h3>
-                          <p className="text-xs text-muted-foreground">{plan.subtitle}</p>
-                        </div>
-
-                        {/* Price */}
-                        <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <span className={`text-2xl font-bold transition-colors duration-300 ${isLifetime && plan.price > 0 ? "text-amber-500" : "text-primary"}`}>
-                            {plan.price === 0 ? "Gratuit" : isLifetime ? `€${plan.lifetimePrice.toFixed(2)}` : `€${plan.price.toFixed(2)}`}
-                          </span>
-                          {plan.price > 0 && (
-                            <span className="text-xs text-muted-foreground">{isLifetime ? "unique" : "/mois"}</span>
-                          )}
-                        </div>
-
-                        {/* Lifetime savings */}
-                        {isLifetime && plan.price > 0 && (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground line-through">€{plan.price.toFixed(2)}/mois</span>
-                              <span className="text-xs font-bold text-amber-500">-{discountPct}%</span>
-                            </div>
-                            <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px] px-2 py-0.5">
-                              Économisez €{savedPerYear.toFixed(2)}/an
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Features */}
-                      <ul className="space-y-2 flex-1 mb-5">
-                        {plan.features.map((f, fi) => (
-                          <li key={fi} className={`flex items-start gap-2 text-xs ${f.ok ? "" : "text-muted-foreground/50"}`}>
-                            {f.ok
-                              ? <Check className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-                              : <X className="w-3.5 h-3.5 text-muted-foreground/40 mt-0.5 shrink-0" />
-                            }
-                            <span className={f.ok ? "" : "line-through"}>{f.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      <Button
-                        variant={plan.popular ? "default" : "outline"}
-                        size="sm"
-                        className={`w-full gap-2 ${isLifetime && plan.price > 0 && plan.popular ? "bg-gradient-to-r from-amber-500 to-orange-500 border-0 hover:opacity-90 text-white" : ""}`}
-                        onClick={() => window.open("https://discord.gg/discreen", "_blank")}
-                        data-testid={`button-plan-${plan.id}`}
-                      >
-                        <SiDiscord className="w-3.5 h-3.5" />
-                        {plan.price === 0 ? "Commencer" : "S'abonner"}
-                      </Button>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          </AnimatePresence>
         </section>
 
         {/* ── Discord CTA ── */}
