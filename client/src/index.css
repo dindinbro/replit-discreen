@@ -51,6 +51,13 @@
   --field-id: 263 70% 55%;
   --field-date: 187 72% 48%;
   --field-finance: 25 95% 55%;
+
+  /* Graphe Wanted — types sans equivalent --field-* existant (voir client/src/components/graph/registry.ts) */
+  --graph-ip: 190 82% 46%;
+  --graph-discord: 271 65% 56%;
+  --graph-username: 300 65% 52%;
+  --graph-vehicle: 215 12% 48%;
+  --graph-domain: 160 68% 38%;
 }
 
 .dark {
@@ -91,6 +98,12 @@
   --field-id: 263 70% 68%;
   --field-date: 187 72% 58%;
   --field-finance: 25 95% 65%;
+
+  --graph-ip: 190 82% 58%;
+  --graph-discord: 271 65% 68%;
+  --graph-username: 300 65% 66%;
+  --graph-vehicle: 215 12% 62%;
+  --graph-domain: 160 55% 52%;
 }
 
 @layer base {

@@ -440,6 +440,7 @@ export const wantedProfiles = pgTable("wanted_profiles", {
   ips: text("ips").array(), // Added multiple IPs
   discordIds: text("discord_ids").array(), // Added multiple Discord IDs
   addresses: text("addresses").array(), // Added multiple addresses
+  images: text("images").array(), // Photos/screenshots attached to the profile (data URLs), shown as avatar in the graph
   addedBy: text("added_by"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
 });

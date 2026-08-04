@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
@@ -14,19 +14,30 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { WantedProfile, WantedFilterType } from "@shared/schema";
 import { WantedFilterTypes, WantedFilterLabels, WantedFilterToApiParam } from "@shared/schema";
-import { FieldGroup, wantedFieldValues, wantedProfileLabel, WantedGraphView } from "@/components/WantedGraph";
+import { FieldGroup, wantedFieldValues, wantedAllValues, wantedProfileLabel, WantedGraphView } from "@/components/graph";
 import {
   ShieldAlert, KeyRound, Loader2, Plus, X, RotateCcw, Search,
   User, Mail, Phone, MapPin, Hash, MessageSquare, Fingerprint, CreditCard, Car, FileText,
-  List, Network, Lock, Sparkles,
+  Lock, Sparkles, Network, ChevronRight, Radar, AtSign, Wifi, SlidersHorizontal,
 } from "lucide-react";
 
 const FILTER_ICONS: Record<WantedFilterType, React.ElementType> = {
-  nom: User, prenom: User, pseudo: User,
-  email: Mail, phone: Phone, ipAddress: Hash,
-  discordId: Hash, discord: MessageSquare, address: MapPin,
+  nom: User, prenom: User, pseudo: AtSign,
+  email: Mail, phone: Phone, ipAddress: Wifi,
+  discordId: MessageSquare, discord: MessageSquare, address: MapPin,
   password: KeyRound, iban: CreditCard, bic: CreditCard,
   plaque: Car, nir: Fingerprint, notes: FileText,
+};
+
+/* Reprend la palette de couleurs par type deja utilisee dans le graphe
+ * relationnel (client/src/components/graph/registry.ts) — meme langage
+ * visuel entre les criteres de recherche et les noeuds du graphe. */
+const FILTER_COLOR_VAR: Record<WantedFilterType, string> = {
+  nom: "--field-person", prenom: "--field-person", pseudo: "--graph-username",
+  email: "--field-email", phone: "--field-phone", ipAddress: "--graph-ip",
+  discordId: "--graph-discord", discord: "--graph-discord", address: "--field-location",
+  password: "--field-id", iban: "--field-finance", bic: "--field-finance",
+  plaque: "--graph-vehicle", nir: "--field-id", notes: "--field-date",
 };
 
 interface CriterionRow {
@@ -37,6 +48,13 @@ interface CriterionRow {
 
 let nextId = 0;
 
+function initials(profile: WantedProfile): string {
+  const label = wantedProfileLabel(profile);
+  const parts = label.split(" ").filter(Boolean);
+  return (parts[0]?.[0] || "?").toUpperCase() + (parts[1]?.[0] || "").toUpperCase();
+}
+
+/* ── Ecran verrouille : saisie de code d'activation ── */
 function RedeemGate() {
   const { refreshRole } = useAuth();
   const { toast } = useToast();
@@ -68,62 +86,321 @@ function RedeemGate() {
   };
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4">
-      <Card className="max-w-md w-full p-8 text-center space-y-6 border-red-500/20 bg-gradient-to-b from-red-500/[0.04] to-transparent relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-500/[0.06] via-transparent to-orange-500/[0.04] pointer-events-none" />
-        <div className="relative z-10 space-y-6">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-            <Lock className="w-7 h-7 text-red-500" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight mb-1.5">Acces Wanted verrouille</h1>
-            <p className="text-sm text-muted-foreground">
-              Cette section necessite le role <span className="text-red-400 font-medium">Wanted</span>. Entrez un code
-              d'activation unique fourni par un administrateur pour deverrouiller l'acces a votre compte.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-red-500/[0.05] blur-3xl" />
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle, #f87171 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+      </div>
+      <div className="relative z-10 max-w-md w-full text-center space-y-8">
+        <div className="mx-auto w-20 h-20 rounded-full border-2 border-red-500/30 flex items-center justify-center relative">
+          <div className="absolute inset-0 rounded-full border-2 border-red-500/20 animate-ping" />
+          <Radar className="w-9 h-9 text-red-500" />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500/70">Zone restreinte</p>
+          <h1 className="text-3xl font-bold tracking-tight">Acces Wanted</h1>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            Cette section necessite un code d'activation unique, delivre par un administrateur.
+          </p>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 rounded-full border border-red-500/25 bg-card/60 backdrop-blur pl-5 pr-1.5 py-1.5 focus-within:border-red-500/50 transition-colors">
+            <Lock className="w-4 h-4 text-red-500/60 shrink-0" />
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="WANTED-XXXXXXXX"
-              className="font-mono text-center"
+              className="border-0 bg-transparent font-mono text-center focus-visible:ring-0 shadow-none"
               data-testid="input-wanted-code"
             />
             <Button
               onClick={submit}
               disabled={loading || !code.trim()}
-              className="shrink-0 bg-red-600 hover:bg-red-700 text-white"
+              size="sm"
+              className="shrink-0 rounded-full bg-red-600 hover:bg-red-700 text-white gap-1.5"
               data-testid="button-wanted-redeem"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Activer
             </Button>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
 
+/* ── Etat vide de la colonne droite (avant recherche / aucun resultat) ── */
+function WantedEmptyState({ variant }: { variant: "idle" | "no-results" }) {
+  const Icon = variant === "idle" ? Network : Search;
+  return (
+    <div className="relative h-[calc(100vh-260px)] min-h-[560px] flex flex-col items-center justify-center text-center gap-6 rounded-2xl border border-dashed border-red-500/20 px-6 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[640px] h-[640px] rounded-full bg-red-500/[0.06] blur-3xl" />
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{ backgroundImage: "radial-gradient(circle, #f87171 1px, transparent 1px)", backgroundSize: "28px 28px" }}
+        />
+      </div>
+      <div className="relative mx-auto w-24 h-24 rounded-full border-2 border-red-500/25 flex items-center justify-center shrink-0">
+        {variant === "idle" && <div className="absolute inset-0 rounded-full border-2 border-red-500/20 animate-ping" />}
+        <Icon className="w-10 h-10 text-red-500/70" />
+      </div>
+      <div className="relative space-y-2">
+        <p className="text-lg font-semibold text-foreground/85 max-w-sm">
+          {variant === "idle" ? "Pret a cartographier" : "Aucun profil correspondant"}
+        </p>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          {variant === "idle"
+            ? "Renseignez un critere a gauche puis lancez une recherche : fiches et graphe relationnel s'affichent ici."
+            : "Aucune fiche ne correspond a ces criteres — essayez une autre combinaison."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Panneau de recherche (colonne gauche) ── */
+function SearchPanel({
+  criteria, availableFilters, onAdd, onRemove, onChange, onSearch, onReset, loading,
+}: {
+  criteria: CriterionRow[];
+  availableFilters: WantedFilterType[];
+  onAdd: (type: string) => void;
+  onRemove: (id: string) => void;
+  onChange: (id: string, value: string) => void;
+  onSearch: () => void;
+  onReset: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Card className="p-4 space-y-4 border-red-500/15 overflow-hidden relative">
+      <div className="absolute inset-0 pointer-events-none opacity-[0.4]">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-red-500/[0.06] blur-3xl" />
+      </div>
+
+      <div className="relative flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-red-500" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-foreground/80">Criteres</p>
+          <p className="text-[10px] text-muted-foreground">Combinez plusieurs champs</p>
+        </div>
+      </div>
+
+      {criteria.length > 0 && (
+        <div className="relative space-y-1.5">
+          {criteria.map((c) => {
+            const Icon = FILTER_ICONS[c.type] || FileText;
+            const colorVar = FILTER_COLOR_VAR[c.type];
+            return (
+              <div
+                key={c.id}
+                className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/60 pl-2 pr-1 py-1.5 focus-within:border-red-500/30 transition-colors"
+              >
+                <div
+                  className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: `hsl(var(${colorVar}) / 0.14)`, color: `hsl(var(${colorVar}))` }}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <Input
+                  value={c.value}
+                  onChange={(e) => onChange(c.id, e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && onSearch()}
+                  placeholder={WantedFilterLabels[c.type]}
+                  className="h-6 text-xs flex-1 bg-transparent border-0 px-1 focus-visible:ring-0 shadow-none"
+                  data-testid={`input-criterion-${c.id}`}
+                />
+                <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => onRemove(c.id)}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {availableFilters.length > 0 && (
+        <Select value="" onValueChange={onAdd}>
+          <SelectTrigger
+            className={`relative w-full h-9 text-xs gap-1.5 rounded-xl px-3 ${
+              criteria.length === 0
+                ? "border-dashed border-red-500/25 text-muted-foreground hover:border-red-500/40"
+                : "border-border/60 text-muted-foreground"
+            }`}
+            data-testid="select-add-criterion"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <SelectValue placeholder="Ajouter un critere" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableFilters.map((f) => {
+              const Icon = FILTER_ICONS[f] || FileText;
+              const colorVar = FILTER_COLOR_VAR[f];
+              return (
+                <SelectItem key={f} value={f}>
+                  <span className="flex items-center gap-2">
+                    <Icon className="w-3.5 h-3.5" style={{ color: `hsl(var(${colorVar}))` }} />
+                    {WantedFilterLabels[f]}
+                  </span>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      )}
+
+      <div className="relative flex gap-1.5 pt-1">
+        <Button
+          onClick={onSearch}
+          disabled={loading || !criteria.some((c) => c.value.trim())}
+          size="sm"
+          className="flex-1 h-9 text-xs bg-red-600 hover:bg-red-700 text-white gap-1.5 rounded-xl"
+          data-testid="button-run-search"
+        >
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+          Rechercher
+        </Button>
+        <Button variant="outline" size="sm" onClick={onReset} disabled={loading} className="h-9 w-9 p-0 rounded-xl">
+          <RotateCcw className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/* ── Ligne de resultat compacte (colonne gauche) ── */
+function ResultRow({ profile, active, sharedCount, onClick }: { profile: WantedProfile; active: boolean; sharedCount: number; onClick: () => void }) {
+  const counts = [
+    wantedFieldValues(profile, "emails").length,
+    wantedFieldValues(profile, "phones").length,
+    wantedFieldValues(profile, "addresses").length,
+    wantedFieldValues(profile, "ips").length,
+    wantedFieldValues(profile, "discordIds").length,
+  ].reduce((a, b) => a + b, 0);
+
+  return (
+    <button
+      onClick={onClick}
+      data-testid={`row-result-${profile.id}`}
+      className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${
+        active ? "bg-red-500/10 border border-red-500/30" : "border border-transparent hover:bg-secondary/40"
+      }`}
+    >
+      <div
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+          active ? "bg-red-500 text-white" : "bg-secondary text-muted-foreground"
+        }`}
+      >
+        {initials(profile)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold truncate">{wantedProfileLabel(profile)}</p>
+        <p className="text-[10px] text-muted-foreground truncate">
+          {counts} info{counts !== 1 ? "s" : ""}{sharedCount > 0 && <span className="text-amber-500"> · {sharedCount} partagee{sharedCount > 1 ? "s" : ""}</span>}
+        </p>
+      </div>
+      <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${active ? "text-red-500" : "text-muted-foreground/40"}`} />
+    </button>
+  );
+}
+
+/* ── Panneau de detail (colonne droite) ── */
+function DetailPanel({ profile, allResults }: { profile: WantedProfile; allResults: WantedProfile[] }) {
+  const [showGraph, setShowGraph] = useState(false);
+
+  return (
+    <Card className="p-5 md:p-6 space-y-5 border-red-500/15" data-testid={`detail-${profile.id}`}>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          {profile.images?.[0] ? (
+            <img src={profile.images[0]} alt="" className="w-12 h-12 rounded-2xl object-cover shrink-0" />
+          ) : (
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-orange-400 text-white flex items-center justify-center text-sm font-bold shrink-0">
+              {initials(profile)}
+            </div>
+          )}
+          <div>
+            <h2 className="text-lg font-bold leading-tight">{wantedProfileLabel(profile)}</h2>
+            <p className="text-xs text-muted-foreground">
+              {[profile.pseudo && `@${profile.pseudo}`, profile.ville, profile.dateNaissance].filter(Boolean).join(" · ") || `Profil #${profile.id}`}
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant={showGraph ? "default" : "outline"}
+          className={`gap-1.5 rounded-full ${showGraph ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
+          onClick={() => setShowGraph((v) => !v)}
+          data-testid="button-toggle-graph"
+        >
+          <Network className="w-3.5 h-3.5" /> {showGraph ? "Voir la fiche" : "Voir le graphe"}
+        </Button>
+      </div>
+
+      {showGraph ? (
+        <WantedGraphView profiles={allResults} initialCenterId={profile.id} compact />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+          {(profile.images?.filter(Boolean).length || 0) > 0 && (
+            <div className="sm:col-span-2 flex gap-2 flex-wrap">
+              {profile.images!.filter(Boolean).map((src, i) => (
+                <img key={i} src={src} alt="" className="w-16 h-16 rounded-md object-cover border border-border/50" />
+              ))}
+            </div>
+          )}
+          <FieldGroup icon={Mail} label="Emails" values={wantedFieldValues(profile, "emails")} />
+          <FieldGroup icon={Phone} label="Telephones" values={wantedFieldValues(profile, "phones")} />
+          <FieldGroup icon={MapPin} label="Adresses" values={wantedFieldValues(profile, "addresses")} />
+          <FieldGroup icon={Hash} label="IPs" values={wantedFieldValues(profile, "ips")} />
+          <FieldGroup icon={MessageSquare} label="Discord IDs" values={wantedFieldValues(profile, "discordIds")} />
+          <FieldGroup icon={Fingerprint} label="Documents" values={[profile.nir, profile.iban, profile.plaque].filter(Boolean) as string[]} />
+          {profile.notes && (
+            <div className="sm:col-span-2 space-y-1 pt-1 border-t border-border/40">
+              <p className="text-xs font-medium text-muted-foreground pt-2">Notes</p>
+              <p className="text-sm text-foreground/80 whitespace-pre-wrap">{profile.notes}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ── Espace de travail (recherche + resultats) ── */
 function WantedWorkspace() {
   const [criteria, setCriteria] = useState<CriterionRow[]>([]);
   const [results, setResults] = useState<WantedProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const { toast } = useToast();
 
   const usedTypes = new Set(criteria.map((c) => c.type));
   const availableFilters = WantedFilterTypes.filter((t) => !usedTypes.has(t));
+  const selected = results.find((p) => p.id === selectedId) || results[0] || null;
 
-  const addCriterion = (type: string) => {
-    setCriteria((prev) => [...prev, { id: String(nextId++), type: type as WantedFilterType, value: "" }]);
-  };
+  const sharedCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const p of results) {
+      const values = new Set(wantedAllValues(p));
+      let count = 0;
+      for (const other of results) {
+        if (other.id === p.id) continue;
+        if (wantedAllValues(other).some((v) => values.has(v))) count++;
+      }
+      map.set(p.id, count);
+    }
+    return map;
+  }, [results]);
+
+  const addCriterion = (type: string) => setCriteria((prev) => [...prev, { id: String(nextId++), type: type as WantedFilterType, value: "" }]);
   const removeCriterion = (id: string) => setCriteria((prev) => prev.filter((c) => c.id !== id));
-  const updateCriterion = (id: string, value: string) =>
-    setCriteria((prev) => prev.map((c) => (c.id === id ? { ...c, value } : c)));
-  const reset = () => { setCriteria([]); setResults([]); setSearched(false); };
+  const updateCriterion = (id: string, value: string) => setCriteria((prev) => prev.map((c) => (c.id === id ? { ...c, value } : c)));
+  const reset = () => { setCriteria([]); setResults([]); setSearched(false); setSelectedId(null); };
 
   const runSearch = async () => {
     const filled = criteria.filter((c) => c.value.trim());
@@ -137,7 +414,11 @@ function WantedWorkspace() {
       const params = new URLSearchParams();
       filled.forEach((c) => params.append(WantedFilterToApiParam[c.type], c.value.trim()));
       const res = await fetch(`/api/wanted/search?${params.toString()}`, { credentials: "include" });
-      if (res.ok) setResults(await res.json());
+      if (res.ok) {
+        const data: WantedProfile[] = await res.json();
+        setResults(data);
+        setSelectedId(data[0]?.id ?? null);
+      }
     } catch {
       toast({ title: "Erreur", description: "Recherche impossible.", variant: "destructive" });
     } finally {
@@ -146,141 +427,55 @@ function WantedWorkspace() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Filter builder */}
-      <Card className="p-5 md:p-6 border-red-500/15 bg-gradient-to-br from-red-500/[0.03] to-transparent space-y-4">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-red-500" />
-            <h2 className="text-sm font-semibold">Criteres de recherche</h2>
-          </div>
-          {availableFilters.length > 0 && (
-            <Select value="" onValueChange={addCriterion}>
-              <SelectTrigger className="w-auto min-w-[180px] h-8 text-xs gap-1.5 rounded-full" data-testid="select-add-criterion">
-                <Plus className="w-3.5 h-3.5" />
-                <SelectValue placeholder="Ajouter un filtre" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableFilters.map((f) => (
-                  <SelectItem key={f} value={f}>{WantedFilterLabels[f]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+    <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 items-start">
+      {/* Colonne gauche : recherche + liste */}
+      <div className="space-y-4 lg:sticky lg:top-6">
+        <SearchPanel
+          criteria={criteria}
+          availableFilters={availableFilters}
+          onAdd={addCriterion}
+          onRemove={removeCriterion}
+          onChange={updateCriterion}
+          onSearch={runSearch}
+          onReset={reset}
+          loading={loading}
+        />
 
-        {criteria.length === 0 ? (
-          <div className="text-center py-6 text-sm text-muted-foreground">
-            Ajoutez un filtre pour lancer une recherche.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {criteria.map((c) => {
-              const Icon = FILTER_ICONS[c.type] || FileText;
-              return (
-                <div key={c.id} className="flex items-center gap-2 rounded-xl border border-red-500/10 bg-background/50 p-2 pr-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
-                    <Icon className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-xs font-medium w-28 shrink-0 hidden sm:block">{WantedFilterLabels[c.type]}</span>
-                  <Input
-                    value={c.value}
-                    onChange={(e) => updateCriterion(c.id, e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && runSearch()}
-                    placeholder={WantedFilterLabels[c.type]}
-                    className="h-8 text-sm flex-1 bg-transparent border-0 focus-visible:ring-1"
-                    data-testid={`input-criterion-${c.id}`}
-                  />
-                  <Button variant="ghost" size="icon" className="w-7 h-7 shrink-0" onClick={() => removeCriterion(c.id)}>
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <Button
-            onClick={runSearch}
-            disabled={loading || !criteria.some((c) => c.value.trim())}
-            className="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white gap-2"
-            data-testid="button-run-search"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            Rechercher
-          </Button>
-          <Button variant="outline" onClick={reset} disabled={loading} className="h-10 gap-2">
-            <RotateCcw className="w-4 h-4" /> Reinitialiser
-          </Button>
-        </div>
-      </Card>
-
-      {/* Results */}
-      {searched && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Resultats</span>
+        {searched && (
+          <Card className="p-2 border-red-500/15">
+            <div className="flex items-center justify-between px-1.5 py-1 mb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Resultats</span>
               {results.length > 0 && (
-                <Badge variant="secondary" className="bg-red-500/10 text-red-500 border-red-500/20">{results.length}</Badge>
+                <Badge variant="secondary" className="bg-red-500/10 text-red-500 border-red-500/20 text-[10px] h-4 px-1.5">{results.length}</Badge>
               )}
-            </h3>
-            {results.length > 0 && (
-              <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-1">
-                <Button size="sm" variant={viewMode === "list" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setViewMode("list")} data-testid="button-view-list">
-                  <List className="w-3.5 h-3.5 mr-1.5" /> Liste
-                </Button>
-                <Button size="sm" variant={viewMode === "graph" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setViewMode("graph")} data-testid="button-view-graph">
-                  <Network className="w-3.5 h-3.5 mr-1.5" /> Graphe
-                </Button>
+            </div>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-red-500" />
+              </div>
+            ) : results.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">Aucun profil correspondant.</p>
+            ) : (
+              <div className="space-y-0.5 max-h-[60vh] overflow-y-auto">
+                {results.map((p) => (
+                  <ResultRow key={p.id} profile={p} active={p.id === selectedId} sharedCount={sharedCounts.get(p.id) || 0} onClick={() => setSelectedId(p.id)} />
+                ))}
               </div>
             )}
-          </div>
+          </Card>
+        )}
+      </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 animate-spin text-red-500" />
-            </div>
-          ) : results.length === 0 ? (
-            <Card className="p-12 text-center space-y-3 border-dashed border-red-500/20">
-              <ShieldAlert className="w-10 h-10 text-red-500/30 mx-auto" />
-              <p className="text-sm text-muted-foreground">Aucun profil correspondant.</p>
-            </Card>
-          ) : viewMode === "graph" ? (
-            <WantedGraphView profiles={results} />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {results.map((profile) => (
-                <Card key={profile.id} className="p-4 space-y-3 border-red-500/15" data-testid={`card-result-${profile.id}`}>
-                  <div className="flex items-center gap-2.5 pb-3 border-b border-border/50">
-                    <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
-                      <User className="w-4 h-4 text-red-500" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{wantedProfileLabel(profile)}</p>
-                      {profile.pseudo && <p className="text-xs text-muted-foreground truncate">@{profile.pseudo}</p>}
-                    </div>
-                  </div>
-                  <div className="space-y-2.5">
-                    <FieldGroup icon={Mail} label="Emails" values={wantedFieldValues(profile, "emails")} />
-                    <FieldGroup icon={Phone} label="Telephones" values={wantedFieldValues(profile, "phones")} />
-                    <FieldGroup icon={MapPin} label="Adresses" values={wantedFieldValues(profile, "addresses")} />
-                    <FieldGroup icon={Hash} label="IPs" values={wantedFieldValues(profile, "ips")} />
-                    <FieldGroup icon={MessageSquare} label="Discord IDs" values={wantedFieldValues(profile, "discordIds")} />
-                    {profile.notes && (
-                      <div className="space-y-1 pt-1">
-                        <p className="text-xs font-medium text-muted-foreground">Notes</p>
-                        <p className="text-xs text-foreground/80 line-clamp-3">{profile.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Colonne droite : detail */}
+      <div>
+        {!searched ? (
+          <WantedEmptyState variant="idle" />
+        ) : selected ? (
+          <DetailPanel profile={selected} allResults={results} />
+        ) : !loading && (
+          <WantedEmptyState variant="no-results" />
+        )}
+      </div>
     </div>
   );
 }
@@ -291,32 +486,37 @@ export default function WantedPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-          <ShieldAlert className="w-5 h-5 text-red-500" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Wanted</span>
-          </h1>
-          <p className="text-sm text-muted-foreground">Recherche parametrique de profils recherches</p>
-        </div>
-        {role === "wanted" && (
-          <Badge className="ml-auto" style={{ color: "#fb923c", background: "rgba(251,146,60,0.1)", borderColor: "rgba(251,146,60,0.3)" }} variant="outline">
-            Role Wanted actif
-          </Badge>
-        )}
-      </div>
+  if (!hasAccess) return <RedeemGate />;
 
-      {hasAccess ? <WantedWorkspace /> : <RedeemGate />}
+  return (
+    <div className="min-h-screen">
+      <div className="border-b border-red-500/10 bg-gradient-to-b from-red-500/[0.04] to-transparent">
+        <div className="max-w-6xl mx-auto px-4 py-6 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+            <ShieldAlert className="w-5 h-5 text-red-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-400">Wanted</span>
+            </h1>
+            <p className="text-xs text-muted-foreground">Recherche parametrique et cartographie relationnelle</p>
+          </div>
+          {role === "wanted" && (
+            <Badge className="ml-auto" style={{ color: "#fb923c", background: "rgba(251,146,60,0.1)", borderColor: "rgba(251,146,60,0.3)" }} variant="outline">
+              Role Wanted actif
+            </Badge>
+          )}
+        </div>
+      </div>
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <WantedWorkspace />
+      </div>
     </div>
   );
 }

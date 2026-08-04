@@ -87,6 +87,7 @@ export interface IStorage {
   clearDiscordId(userId: string): Promise<void>;
   getDiscordId(userId: string): Promise<string | null>;
   createWantedProfile(data: InsertWantedProfile): Promise<WantedProfile>;
+  findDuplicateWantedProfiles(data: Partial<InsertWantedProfile>, excludeId?: number): Promise<WantedProfile[]>;
   getWantedProfiles(): Promise<WantedProfile[]>;
   getWantedProfileById(id: number): Promise<WantedProfile | undefined>;
   updateWantedProfile(id: number, data: Partial<InsertWantedProfile>): Promise<WantedProfile | undefined>;
@@ -591,12 +592,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createWantedActivationCode(createdBy: string): Promise<WantedActivationCode> {
-    const code = `WANTED-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-    const [created] = await db
-      .insert(wantedActivationCodes)
-      .values({ code, createdBy })
-      .returning();
-    return created;
+    // 6 random bytes (48 bits) keeps collisions astronomically unlikely, but we
+    // still verify + retry on an actual unique-constraint hit rather than trusting
+    // probability alone — genuine uniqueness, not just "very likely unique".
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = `WANTED-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+      const [existing] = await db.select({ id: wantedActivationCodes.id }).from(wantedActivationCodes).where(eq(wantedActivationCodes.code, code));
+      if (existing) continue;
+      try {
+        const [created] = await db
+          .insert(wantedActivationCodes)
+          .values({ code, createdBy })
+          .returning();
+        return created;
+      } catch (err: any) {
+        if (err?.code === "23505") continue; // unique_violation race — retry with a fresh code
+        throw err;
+      }
+    }
+    throw new Error("Impossible de generer un code unique apres plusieurs tentatives.");
   }
 
   async getWantedActivationCodes(): Promise<WantedActivationCode[]> {
@@ -766,6 +780,67 @@ export class DatabaseStorage implements IStorage {
   async createWantedProfile(data: InsertWantedProfile): Promise<WantedProfile> {
     const [created] = await db.insert(wantedProfiles).values(data).returning();
     return created;
+  }
+
+  /**
+   * Recoupe les identifiants forts (email, tel, discord id, pseudo, tag discord,
+   * nir, iban, plaque) d'un profil candidat contre ceux deja enregistres, pour
+   * eviter qu'un meme individu ne soit saisi deux fois sous forme de fiches
+   * distinctes. L'IP et l'adresse sont volontairement exclues : trop souvent
+   * partagees (NAT, colocataires) pour etre un signal fiable de doublon.
+   */
+  async findDuplicateWantedProfiles(data: Partial<InsertWantedProfile>, excludeId?: number): Promise<WantedProfile[]> {
+    const normList = (...vals: (string[] | string | null | undefined)[]): string[] => {
+      const out = new Set<string>();
+      for (const v of vals) {
+        if (!v) continue;
+        for (const item of Array.isArray(v) ? v : [v]) {
+          const t = item?.trim().toLowerCase();
+          if (t) out.add(t);
+        }
+      }
+      return Array.from(out);
+    };
+
+    const emails = normList(data.emails, data.email);
+    const phones = normList(data.phones, data.telephone);
+    const discordIds = normList(data.discordIds, data.discordId);
+    const pseudo = data.pseudo?.trim().toLowerCase();
+    const discord = data.discord?.trim().toLowerCase();
+    const nir = data.nir?.trim();
+    const iban = data.iban?.trim().toUpperCase();
+    const plaque = data.plaque?.trim().toUpperCase();
+
+    // NB: interpoler un tableau JS directement dans un sql`` template le
+    // deroule en liste de parametres (utile pour IN (...)) plutot que de le
+    // lier comme un unique parametre de type tableau Postgres — d'ou l'usage
+    // de sql.join pour construire des clauses IN au lieu de "= ANY(${values})".
+    const inList = (values: string[]) => sql.join(values.map(v => sql`${v}`), sql`, `);
+
+    const clauses: any[] = [];
+    const matchArrayOrLegacy = (arrCol: any, legacyCol: any, values: string[]) => {
+      if (!values.length) return;
+      clauses.push(sql`(
+        EXISTS (SELECT 1 FROM unnest(${arrCol}) v WHERE lower(v) IN (${inList(values)}))
+        OR lower(${legacyCol}) IN (${inList(values)})
+      )`);
+    };
+    matchArrayOrLegacy(wantedProfiles.emails, wantedProfiles.email, emails);
+    matchArrayOrLegacy(wantedProfiles.phones, wantedProfiles.telephone, phones);
+    matchArrayOrLegacy(wantedProfiles.discordIds, wantedProfiles.discordId, discordIds);
+    if (pseudo) clauses.push(sql`lower(${wantedProfiles.pseudo}) = ${pseudo}`);
+    if (discord) clauses.push(sql`lower(${wantedProfiles.discord}) = ${discord}`);
+    if (nir) clauses.push(sql`${wantedProfiles.nir} = ${nir}`);
+    if (iban) clauses.push(sql`upper(${wantedProfiles.iban}) = ${iban}`);
+    if (plaque) clauses.push(sql`upper(${wantedProfiles.plaque}) = ${plaque}`);
+
+    if (!clauses.length) return [];
+
+    const where = excludeId !== undefined
+      ? and(or(...clauses), sql`${wantedProfiles.id} != ${excludeId}`)
+      : or(...clauses);
+
+    return db.select().from(wantedProfiles).where(where).orderBy(desc(wantedProfiles.createdAt));
   }
 
   async getWantedProfiles(): Promise<WantedProfile[]> {

@@ -523,7 +523,7 @@ function ResultCard({
       return pa - pb;
     });
 
-  let dataFields = visibleFields.filter(([k]) => k.toLowerCase() !== "source");
+  let dataFields = visibleFields.filter(([k]) => k.toLowerCase() !== "source" && cleanFieldValue(row[k]) !== "");
   if (dataFields.length === 0 && rawLine) {
     dataFields = [["donnee", rawLine]];
   }
@@ -558,14 +558,17 @@ function ResultCard({
       transition={{ delay: index * 0.03, duration: 0.18 }}
     >
       <div
-        className="rounded-xl overflow-hidden border border-border/60 bg-card"
+        className="rounded-2xl overflow-hidden border border-border/60 bg-card shadow-sm hover:border-border transition-colors"
         data-testid={`card-result-${globalIndex}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 border-b border-border/50">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-muted-foreground" />
+        <div className="flex items-center justify-between gap-2.5 px-4 py-3 border-b border-border/50 bg-secondary/20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: `hsl(var(${titleField ? getFieldColorVar(titleField[0]) : "--primary"}) / 0.14)` }}
+            >
+              <User className="w-4 h-4" style={{ color: `hsl(var(${titleField ? getFieldColorVar(titleField[0]) : "--primary"}))` }} />
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="font-semibold text-sm text-foreground truncate" data-testid={`text-result-title-${globalIndex}`}>
@@ -576,7 +579,10 @@ function ResultCard({
               <Check className="w-3 h-3 text-emerald-500 shrink-0" />
             </div>
           </div>
-          <div className="flex items-center gap-0.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="hidden sm:inline text-[10px] text-muted-foreground/60 mr-1">
+              {dataFields.length} champ{dataFields.length > 1 ? "s" : ""}
+            </span>
             <button
               onClick={handleCopy}
               className="p-1.5 rounded-md hover:bg-muted transition-colors"
@@ -585,32 +591,47 @@ function ResultCard({
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
             </button>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
         </div>
 
         {/* Champs */}
-        <div className="divide-y divide-border/30">
-          {[...previewFields, ...(expanded ? hiddenFields : [])].map(([col, val]) => (
-            <div
-              key={col}
-              className="flex items-baseline gap-3 px-3.5 py-1.5"
-              data-testid={`field-${col}-${globalIndex}`}
-            >
-              <span className="text-xs text-muted-foreground shrink-0">{getFieldLabel(col)} :</span>
-              <span className="text-[13px] font-semibold text-foreground break-all">{cleanFieldValue(val)}</span>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
+          {[...previewFields, ...(expanded ? hiddenFields : [])].map(([col, val]) => {
+            const Icon = getFieldIcon(col);
+            const colorVar = getFieldColorVar(col);
+            return (
+              <div
+                key={col}
+                className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 bg-secondary/30 min-w-0"
+                data-testid={`field-${col}-${globalIndex}`}
+              >
+                <div
+                  className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center"
+                  style={{ background: `hsl(var(${colorVar}) / 0.12)`, color: `hsl(var(${colorVar}))` }}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70 truncate">
+                    {getFieldLabel(col)}
+                  </p>
+                  <p className="text-[13px] font-semibold text-foreground break-all leading-snug">
+                    {cleanFieldValue(val)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* En savoir plus */}
         {hiddenFields.length > 0 && (
           <button
             onClick={() => setExpanded(v => !v)}
-            className="w-full flex items-center gap-1 px-3.5 py-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors border-t border-border/40"
+            className="w-full flex items-center justify-center gap-1 px-3.5 py-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors border-t border-border/40"
             data-testid={`button-expand-${globalIndex}`}
           >
-            {expanded ? "Voir moins" : "En savoir plus"}
+            {expanded ? "Voir moins" : `En savoir plus (${hiddenFields.length})`}
             <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
           </button>
         )}

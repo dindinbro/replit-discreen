@@ -97,10 +97,12 @@ import {
   Wand2,
   Link2,
   List,
+  ClipboardPaste,
+  AtSign,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { FieldGroup, WantedGraphView, wantedFieldValues } from "@/components/WantedGraph";
+import { FieldGroup, WantedGraphView, wantedFieldValues, wantedAllValues, wantedProfileLabel, wantedInitials } from "@/components/graph";
 import { getIconComponent, AVAILABLE_ICONS } from "@/components/CategoriesPanel";
 
 interface UserProfile {
@@ -211,6 +213,50 @@ function mergeArrayField(existing: string[], extracted?: string[] | null): strin
   return unique.length ? unique : [""];
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* Redimensionne/compresse cote client avant stockage en base (colonne text[]
+ * de data URLs, pas d'objet-storage dedie dans ce projet) — evite des lignes
+ * demesurees quand l'admin colle une capture d'ecran pleine resolution. */
+function compressImage(dataUrl: string, maxDim = 1000, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas non supporte"));
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("Image invalide"));
+    img.src = dataUrl;
+  });
+}
+
+async function fileToGraphImage(file: File): Promise<string> {
+  const dataUrl = await readFileAsDataUrl(file);
+  try {
+    return await compressImage(dataUrl);
+  } catch {
+    return dataUrl;
+  }
+}
+
 function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedProfile | null; onEditDone?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -218,12 +264,17 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
   const [extracting, setExtracting] = useState(false);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [emails, setEmails] = useState<string[]>([""]);
   const [phones, setPhones] = useState<string[]>([""]);
   const [ips, setIps] = useState<string[]>([""]);
   const [discordIds, setDiscordIds] = useState<string[]>([""]);
   const [addresses, setAddresses] = useState<string[]>([""]);
+  const [images, setImages] = useState<string[]>([]);
+  const [importingImages, setImportingImages] = useState(false);
+  const [duplicateMatches, setDuplicateMatches] = useState<WantedProfile[] | null>(null);
+  const [pendingPayload, setPendingPayload] = useState<Record<string, any> | null>(null);
 
   const [form, setForm] = useState<Partial<InsertWantedProfile>>({
     nom: "",
@@ -271,6 +322,7 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
       setIps(editProfile.ips?.length ? editProfile.ips : [editProfile.ip || ""]);
       setDiscordIds(editProfile.discordIds?.length ? editProfile.discordIds : [editProfile.discordId || ""]);
       setAddresses((editProfile as any).addresses?.length ? (editProfile as any).addresses : [editProfile.adresse || ""]);
+      setImages((editProfile as any).images?.filter(Boolean) || []);
     }
   }, [editProfile]);
 
@@ -289,7 +341,40 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
     setIps([""]);
     setDiscordIds([""]);
     setAddresses([""]);
+    setImages([]);
     setScreenshotPreview(null);
+  };
+
+  const submitProfile = async (payload: Record<string, any>, force: boolean) => {
+    const url = isEdit ? `/api/admin/wanted-profiles/${editProfile.id}` : "/api/admin/wanted-profiles";
+    const method = isEdit ? "PATCH" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(force ? { ...payload, force: true } : payload),
+    });
+
+    if (res.ok) {
+      toast({ title: isEdit ? "Profil modifie" : "Profil cree", description: isEdit ? "Le profil Wanted a ete mis a jour." : "Le profil Wanted a ete ajoute avec succes." });
+      resetForm();
+      setDuplicateMatches(null);
+      setPendingPayload(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
+      if (onEditDone) onEditDone();
+      return;
+    }
+
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 409 && err.duplicate) {
+      setDuplicateMatches(err.matches || []);
+      setPendingPayload(payload);
+      return;
+    }
+    toast({ title: "Erreur", description: err.message || "Une erreur est survenue", variant: "destructive" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -303,40 +388,56 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
         ips: ips.filter(Boolean),
         discordIds: discordIds.filter(Boolean),
         addresses: addresses.filter(Boolean),
+        images: images.filter(Boolean),
         email: emails[0] || "",
         telephone: phones[0] || "",
         ip: ips[0] || "",
         discordId: discordIds[0] || form.discordId || "",
         adresse: addresses[0] || form.adresse || "",
       };
-
-      const url = isEdit ? `/api/admin/wanted-profiles/${editProfile.id}` : "/api/admin/wanted-profiles";
-      const method = isEdit ? "PATCH" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        toast({ title: isEdit ? "Profil modifie" : "Profil cree", description: isEdit ? "Le profil Wanted a ete mis a jour." : "Le profil Wanted a ete ajoute avec succes." });
-        resetForm();
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
-        if (onEditDone) onEditDone();
-      } else {
-        const err = await res.json();
-        toast({ title: "Erreur", description: err.message, variant: "destructive" });
-      }
+      await submitProfile(payload, false);
     } catch {
       toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
+
+  const handleForceCreate = async () => {
+    if (!pendingPayload) return;
+    setLoading(true);
+    try {
+      await submitProfile(pendingPayload, true);
+    } catch {
+      toast({ title: "Erreur", description: "Erreur reseau", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addImageFiles = async (files: FileList | File[]) => {
+    const list = Array.from(files).filter(f => f.type.startsWith("image/"));
+    if (!list.length) return;
+    setImportingImages(true);
+    try {
+      const converted = await Promise.all(list.map(fileToGraphImage));
+      setImages(prev => [...prev, ...converted]);
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'importer cette image.", variant: "destructive" });
+    } finally {
+      setImportingImages(false);
+    }
+  };
+
+  const handleImagesPaste = (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items || []).filter(i => i.type.startsWith("image/"));
+    if (!items.length) return;
+    e.stopPropagation();
+    const files = items.map(i => i.getAsFile()).filter((f): f is File => !!f);
+    if (files.length) addImageFiles(files);
+  };
+
+  const removeImage = (index: number) => setImages(prev => prev.filter((_, i) => i !== index));
 
   const handleExtractImage = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -402,6 +503,24 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
     }
   };
 
+  const handlePasteFromClipboardApi = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find(t => t.startsWith("image/"));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const file = new File([blob], "clipboard-image.png", { type: imageType });
+          await handleExtractImage(file);
+          return;
+        }
+      }
+      toast({ title: "Presse-papiers vide", description: "Aucune image trouvee dans le presse-papiers.", variant: "destructive" });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'acceder au presse-papiers. Essayez Ctrl+V sur la zone d'import.", variant: "destructive" });
+    }
+  };
+
   const DynamicFields = ({ label, values, setter, placeholder, icon: Icon }: any) => (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -445,7 +564,11 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
       )}
 
       {/* Screenshot import */}
-      <div className="mb-6 p-4 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] flex items-center gap-4 flex-wrap">
+      <div
+        className="mb-6 p-4 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] flex items-center gap-4 flex-wrap focus:outline-none focus:ring-2 focus:ring-primary/40"
+        tabIndex={0}
+        data-testid="dropzone-wanted-screenshot"
+      >
         {screenshotPreview ? (
           <img src={screenshotPreview} alt="Capture importee" className="w-14 h-14 rounded-md object-cover border border-border/50 shrink-0" />
         ) : (
@@ -455,7 +578,7 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
         )}
         <div className="flex-1 min-w-[200px]">
           <p className="text-sm font-semibold flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5 text-primary" /> Import par capture d'ecran</p>
-          <p className="text-xs text-muted-foreground">Collez une image (Ctrl+V) ou importez un fichier — les champs seront remplis automatiquement par IA.</p>
+          <p className="text-xs text-muted-foreground">Cliquez ici puis Ctrl+V, utilisez le bouton "Coller", ou importez un fichier — les champs seront remplis automatiquement par IA.</p>
         </div>
         <input
           ref={fileInputRef}
@@ -465,6 +588,10 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
           onChange={(e) => { const file = e.target.files?.[0]; if (file) handleExtractImage(file); e.target.value = ""; }}
           data-testid="input-wanted-screenshot"
         />
+        <Button type="button" variant="outline" size="sm" disabled={extracting} onClick={handlePasteFromClipboardApi} data-testid="button-wanted-screenshot-paste">
+          {extracting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ClipboardPaste className="w-3.5 h-3.5 mr-1.5" />}
+          {extracting ? "Extraction..." : "Coller"}
+        </Button>
         <Button type="button" variant="outline" size="sm" disabled={extracting} onClick={() => fileInputRef.current?.click()} data-testid="button-wanted-screenshot-upload">
           {extracting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5 mr-1.5" />}
           {extracting ? "Extraction..." : "Importer une image"}
@@ -563,12 +690,262 @@ function WantedProfileForm({ editProfile, onEditDone }: { editProfile?: WantedPr
           <Textarea value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Informations complementaires / signalement..." className="min-h-[100px]" data-testid="input-notes" />
         </FormSection>
 
+        <FormSection title="Photos" icon={Image}>
+          <div
+            className="p-4 rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] flex items-center gap-4 flex-wrap focus:outline-none focus:ring-2 focus:ring-primary/40"
+            tabIndex={0}
+            onPaste={handleImagesPaste}
+            data-testid="dropzone-wanted-images"
+          >
+            <div className="w-14 h-14 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+              <Image className="w-6 h-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <p className="text-sm font-semibold">Photos du profil</p>
+              <p className="text-xs text-muted-foreground">Cliquez ici puis Ctrl+V, ou importez un ou plusieurs fichiers — ces images seront affichees sur la fiche et sur le noeud du graphe.</p>
+            </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => { if (e.target.files?.length) addImageFiles(e.target.files); e.target.value = ""; }}
+              data-testid="input-wanted-images"
+            />
+            <Button type="button" variant="outline" size="sm" disabled={importingImages} onClick={() => imageInputRef.current?.click()} data-testid="button-wanted-images-upload">
+              {importingImages ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5 mr-1.5" />}
+              {importingImages ? "Import..." : "Ajouter des images"}
+            </Button>
+          </div>
+
+          {images.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+              {images.map((src, i) => (
+                <div key={i} className="relative group aspect-square rounded-md overflow-hidden border border-border/50" data-testid={`image-wanted-${i}`}>
+                  <img src={src} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    data-testid={`button-remove-wanted-image-${i}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </FormSection>
+
         <Button type="submit" className="w-full" disabled={loading} data-testid="button-submit-wanted">
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isEdit ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
           {isEdit ? "Sauvegarder les modifications" : "Entrer les informations"}
         </Button>
       </form>
+
+      <Dialog open={!!duplicateMatches} onOpenChange={(open) => { if (!open) { setDuplicateMatches(null); setPendingPayload(null); } }}>
+        <DialogContent data-testid="dialog-wanted-duplicate">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Users className="w-4 h-4 text-amber-500" /> Doublon possible</DialogTitle>
+            <DialogDescription>
+              {duplicateMatches?.length === 1
+                ? "Un profil avec au moins un identifiant identique (email, telephone, discord, pseudo, IBAN, plaque ou NIR) existe deja :"
+                : "Des profils avec au moins un identifiant identique (email, telephone, discord, pseudo, IBAN, plaque ou NIR) existent deja :"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {(duplicateMatches || []).map(m => (
+              <div key={m.id} className="p-2.5 rounded-md bg-secondary/30 border border-border/50 text-sm">
+                <p className="font-medium">{wantedProfileLabel(m)}</p>
+                <p className="text-xs text-muted-foreground">{m.pseudo ? `@${m.pseudo} - ` : ""}Fiche #{m.id}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="outline" onClick={() => { setDuplicateMatches(null); setPendingPayload(null); }} data-testid="button-duplicate-cancel">
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={handleForceCreate} disabled={loading} data-testid="button-duplicate-force">
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isEdit ? "Enregistrer quand meme" : "Creer quand meme"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
+  );
+}
+
+function wantedInfoCount(profile: WantedProfile): number {
+  return wantedAllValues(profile).length;
+}
+
+/* ── Fiche detaillee d'un profil Wanted, ouverte au clic depuis la liste
+ * compacte — meme logique que WantedCodeDetailDialog pour les codes
+ * d'activation : la liste ne montre qu'un resume, tout le detail vit dans
+ * la boite de dialogue. ── */
+function WantedProfileDetailDialog({
+  profile, onOpenChange, onEdit, onDelete, deleting,
+}: {
+  profile: WantedProfile | null;
+  onOpenChange: (open: boolean) => void;
+  onEdit: (profile: WantedProfile) => void;
+  onDelete: (id: number) => void;
+  deleting: boolean;
+}) {
+  return (
+    <Dialog open={!!profile} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="dialog-wanted-profile-detail">
+        {profile && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5">
+                {profile.images?.[0] ? (
+                  <img src={profile.images[0]} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center text-xs font-bold shrink-0">
+                    {wantedInitials(profile)}
+                  </div>
+                )}
+                <span className="min-w-0 truncate">{wantedProfileLabel(profile)}</span>
+                <Badge variant="outline" className="font-mono text-xs shrink-0">#{profile.id}</Badge>
+              </DialogTitle>
+              <DialogDescription>
+                {profile.pseudo && <>@{profile.pseudo} · </>}
+                {wantedInfoCount(profile)} info{wantedInfoCount(profile) > 1 ? "s" : ""} enregistree{wantedInfoCount(profile) > 1 ? "s" : ""}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-1">
+              {(profile.images?.filter(Boolean).length || 0) > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {profile.images!.filter(Boolean).map((src, i) => (
+                    <img key={i} src={src} alt="" className="w-16 h-16 rounded-md object-cover border border-border/50" data-testid={`img-wanted-detail-${i}`} />
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                <FieldGroup icon={Mail} label="Emails" values={wantedFieldValues(profile, "emails")} />
+                <FieldGroup icon={Phone} label="Telephones" values={wantedFieldValues(profile, "phones")} />
+                <FieldGroup icon={Hash} label="IPs" values={wantedFieldValues(profile, "ips")} />
+                <FieldGroup icon={MessageSquare} label="Discord IDs" values={wantedFieldValues(profile, "discordIds")} />
+                <div className="sm:col-span-2">
+                  <FieldGroup icon={MapPin} label="Adresses" values={wantedFieldValues(profile, "addresses")} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm p-3 rounded-lg border border-border/50 bg-secondary/10">
+                {profile.discord && <div><span className="text-muted-foreground">Discord:</span> {profile.discord}</div>}
+                {(profile.codePostal || profile.ville) && (
+                  <div><span className="text-muted-foreground">Ville:</span> {profile.codePostal} {profile.ville}</div>
+                )}
+                {profile.dateNaissance && <div><span className="text-muted-foreground">Naissance:</span> {profile.dateNaissance}</div>}
+                {profile.iban && <div><span className="text-muted-foreground">IBAN:</span> {profile.iban}</div>}
+                {profile.bic && <div><span className="text-muted-foreground">BIC:</span> {profile.bic}</div>}
+                {profile.plaque && <div><span className="text-muted-foreground">Plaque:</span> {profile.plaque}</div>}
+                {profile.nir && <div><span className="text-muted-foreground">NIR:</span> {profile.nir}</div>}
+                {profile.password && <div><span className="text-muted-foreground">MDP:</span> {profile.password}</div>}
+                {profile.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {profile.notes}</div>}
+                {!profile.discord && !profile.codePostal && !profile.ville && !profile.dateNaissance && !profile.iban
+                  && !profile.bic && !profile.plaque && !profile.nir && !profile.password && !profile.notes && (
+                  <p className="col-span-2 text-muted-foreground">Aucune information complementaire.</p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <p className="text-xs text-muted-foreground">
+                  {profile.addedBy && <>Ajoute par {profile.addedBy} · </>}
+                  {profile.createdAt
+                    ? new Date(profile.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+                    : ""}
+                </p>
+                <div className="flex gap-1.5 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { onOpenChange(false); onEdit(profile); }}
+                    data-testid={`button-edit-wanted-detail-${profile.id}`}
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" /> Modifier
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={() => onDelete(profile.id)}
+                    disabled={deleting}
+                    data-testid={`button-delete-wanted-detail-${profile.id}`}
+                  >
+                    {deleting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
+                    Supprimer
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ── Recherche de pseudo dediee : liste compacte de tous les profils qui
+ * ont un pseudo renseigne, filtrable independamment de la recherche
+ * generale (utile pour verifier rapidement un username). ── */
+function WantedPseudoSection({ profiles, onSelect }: { profiles: WantedProfile[]; onSelect: (profile: WantedProfile) => void }) {
+  const [query, setQuery] = useState("");
+
+  const withPseudo = useMemo(
+    () => profiles.filter(p => p.pseudo?.trim()).sort((a, b) => (a.pseudo || "").localeCompare(b.pseudo || "")),
+    [profiles],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return withPseudo;
+    return withPseudo.filter(p => (p.pseudo || "").toLowerCase().includes(q));
+  }, [withPseudo, query]);
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher un pseudo..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="pl-9"
+          data-testid="input-wanted-pseudo-search"
+        />
+        <Badge variant="secondary" className="absolute right-2 top-1/2 -translate-y-1/2 text-xs">{filtered.length}</Badge>
+      </div>
+
+      {withPseudo.length === 0 ? (
+        <Card className="p-8 text-center text-muted-foreground">Aucun profil avec un pseudo enregistre.</Card>
+      ) : filtered.length === 0 ? (
+        <Card className="p-8 text-center text-muted-foreground">Aucun pseudo correspondant.</Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {filtered.map(p => (
+            <button
+              key={p.id}
+              onClick={() => onSelect(p)}
+              className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-secondary/10 px-3 py-2 text-left hover:border-red-500/30 hover:bg-red-500/[0.03] transition-colors"
+              data-testid={`row-wanted-pseudo-${p.id}`}
+            >
+              <div className="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+                <AtSign className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{p.pseudo}</p>
+                <p className="text-xs text-muted-foreground truncate">{wantedProfileLabel(p)}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -577,7 +954,8 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
+  const [viewMode, setViewMode] = useState<"list" | "graph" | "pseudos">("list");
+  const [selectedProfile, setSelectedProfile] = useState<WantedProfile | null>(null);
 
   const { data: profiles, isLoading } = useQuery<WantedProfile[]>({
     queryKey: ["/api/admin/wanted-profiles"],
@@ -599,6 +977,7 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
       });
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ["/api/admin/wanted-profiles"] });
+        setSelectedProfile(prev => (prev?.id === id ? null : prev));
         toast({ title: "Profil supprime" });
       } else {
         toast({ title: "Erreur", description: "Impossible de supprimer", variant: "destructive" });
@@ -662,6 +1041,15 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
           </Button>
           <Button
             size="sm"
+            variant={viewMode === "pseudos" ? "default" : "ghost"}
+            className="h-7 text-xs"
+            onClick={() => setViewMode("pseudos")}
+            data-testid="button-wanted-view-pseudos"
+          >
+            <AtSign className="w-3.5 h-3.5 mr-1.5" /> Pseudos
+          </Button>
+          <Button
+            size="sm"
             variant={viewMode === "graph" ? "default" : "ghost"}
             className="h-7 text-xs"
             onClick={() => setViewMode("graph")}
@@ -674,6 +1062,8 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
 
       {viewMode === "graph" ? (
         <WantedGraphView profiles={profiles || []} />
+      ) : viewMode === "pseudos" ? (
+        <WantedPseudoSection profiles={profiles || []} onSelect={setSelectedProfile} />
       ) : filteredProfiles.length === 0 ? (
         <Card className="p-8 text-center">
           <p className="text-muted-foreground">
@@ -681,52 +1071,35 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
           </p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filteredProfiles.map(profile => (
-            <Card key={profile.id} className="p-4" data-testid={`card-wanted-${profile.id}`}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex-1 min-w-0 space-y-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium">
-                      {profile.civilite} {profile.prenom} {profile.nom}
-                    </span>
-                    <Badge variant="outline" className="font-mono text-xs">#{profile.id}</Badge>
-                    {profile.pseudo && <Badge variant="secondary">{profile.pseudo}</Badge>}
+        <div className="space-y-2">
+          {filteredProfiles.map(profile => {
+            const count = wantedInfoCount(profile);
+            return (
+              <Card
+                key={profile.id}
+                className="p-3 flex items-center justify-between gap-3 flex-wrap cursor-pointer hover:border-red-500/30 hover:bg-red-500/[0.03] transition-colors"
+                onClick={() => setSelectedProfile(profile)}
+                data-testid={`card-wanted-${profile.id}`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center text-xs font-bold shrink-0">
+                    {wantedInitials(profile)}
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                    <FieldGroup icon={Mail} label="Emails" values={wantedFieldValues(profile, "emails")} />
-                    <FieldGroup icon={Phone} label="Telephones" values={wantedFieldValues(profile, "phones")} />
-                    <FieldGroup icon={Hash} label="IPs" values={wantedFieldValues(profile, "ips")} />
-                    <FieldGroup icon={MessageSquare} label="Discord IDs" values={wantedFieldValues(profile, "discordIds")} />
-                    <div className="sm:col-span-2">
-                      <FieldGroup icon={MapPin} label="Adresses" values={wantedFieldValues(profile, "addresses")} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    {profile.discord && <div><span className="text-muted-foreground">Discord:</span> {profile.discord}</div>}
-                    {(profile.codePostal || profile.ville) && (
-                      <div><span className="text-muted-foreground">Ville:</span> {profile.codePostal} {profile.ville}</div>
-                    )}
-                    {profile.dateNaissance && <div><span className="text-muted-foreground">Naissance:</span> {profile.dateNaissance}</div>}
-                    {profile.iban && <div><span className="text-muted-foreground">IBAN:</span> {profile.iban}</div>}
-                    {profile.bic && <div><span className="text-muted-foreground">BIC:</span> {profile.bic}</div>}
-                    {profile.plaque && <div><span className="text-muted-foreground">Plaque:</span> {profile.plaque}</div>}
-                    {profile.nir && <div><span className="text-muted-foreground">NIR:</span> {profile.nir}</div>}
-                    {profile.password && <div><span className="text-muted-foreground">MDP:</span> {profile.password}</div>}
-                    {profile.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {profile.notes}</div>}
-                  </div>
-
-                  <div className="text-xs text-muted-foreground">
-                    {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : ""}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{wantedProfileLabel(profile)}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {profile.pseudo && <>@{profile.pseudo} · </>}
+                      {count} info{count > 1 ? "s" : ""}
+                      {profile.ville && <> · {profile.ville}</>}
+                    </p>
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Badge variant="outline" className="font-mono text-xs">#{profile.id}</Badge>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onEdit(profile)}
+                    onClick={(e) => { e.stopPropagation(); onEdit(profile); }}
                     title="Modifier"
                     data-testid={`button-edit-wanted-${profile.id}`}
                   >
@@ -735,7 +1108,7 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => deleteProfile(profile.id)}
+                    onClick={(e) => { e.stopPropagation(); deleteProfile(profile.id); }}
                     disabled={deletingId === profile.id}
                     title="Supprimer"
                     data-testid={`button-delete-wanted-${profile.id}`}
@@ -743,11 +1116,19 @@ function WantedHistorySection({ onEdit }: { onEdit: (profile: WantedProfile) => 
                     {deletingId === profile.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}
                   </Button>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
+
+      <WantedProfileDetailDialog
+        profile={selectedProfile}
+        onOpenChange={(open) => !open && setSelectedProfile(null)}
+        onEdit={onEdit}
+        onDelete={deleteProfile}
+        deleting={selectedProfile ? deletingId === selectedProfile.id : false}
+      />
     </div>
   );
 }
@@ -2783,9 +3164,82 @@ interface WantedActivationCodeEntry {
   usedAt: string | null;
 }
 
+function formatCodeDateTime(iso: string | null): { day: string; time: string } | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const day = d.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return { day, time };
+}
+
+function WantedCodeDetailDialog({ entry, onOpenChange }: { entry: WantedActivationCodeEntry | null; onOpenChange: (open: boolean) => void }) {
+  const created = entry ? formatCodeDateTime(entry.createdAt) : null;
+  const used = entry ? formatCodeDateTime(entry.usedAt) : null;
+
+  return (
+    <Dialog open={!!entry} onOpenChange={onOpenChange}>
+      <DialogContent data-testid="dialog-wanted-code-detail">
+        {entry && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 font-mono">
+                <KeyRound className="w-4 h-4 text-red-500" /> {entry.code}
+              </DialogTitle>
+              <DialogDescription>
+                Details et historique d'activation de ce code Wanted.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-secondary/10">
+                <span className="text-sm text-muted-foreground">Statut</span>
+                <Badge variant={entry.used ? "secondary" : "outline"} className={entry.used ? "" : "border-emerald-500/40 text-emerald-500"}>
+                  {entry.used ? "Utilise" : "Disponible"}
+                </Badge>
+              </div>
+
+              <div className="p-3 rounded-lg border border-border/50 bg-secondary/10 space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <UserPlus className="w-3.5 h-3.5" /> Genere par
+                </div>
+                <p className="text-sm font-semibold">{entry.createdBy || "Inconnu"}</p>
+                {created && (
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {created.day} a {created.time}
+                  </p>
+                )}
+              </div>
+
+              {entry.used ? (
+                <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Check className="w-3.5 h-3.5 text-emerald-500" /> Active par
+                  </div>
+                  <p className="text-sm font-semibold">{entry.usedBy || "Inconnu"}</p>
+                  {used && (
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {used.day} a {used.time}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg border border-dashed border-border/50 text-center">
+                  <p className="text-xs text-muted-foreground">Ce code n'a pas encore ete active.</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function WantedCodesSection() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [selectedCode, setSelectedCode] = useState<WantedActivationCodeEntry | null>(null);
 
   const { data: codes = [], isLoading } = useQuery<WantedActivationCodeEntry[]>({
     queryKey: ["/api/admin/wanted-codes"],
@@ -2851,7 +3305,12 @@ function WantedCodesSection() {
       ) : (
         <div className="space-y-2">
           {codes.map((c) => (
-            <Card key={c.id} className="p-3 flex items-center justify-between gap-3 flex-wrap" data-testid={`card-wanted-code-${c.id}`}>
+            <Card
+              key={c.id}
+              className="p-3 flex items-center justify-between gap-3 flex-wrap cursor-pointer hover:border-red-500/30 hover:bg-red-500/[0.03] transition-colors"
+              onClick={() => setSelectedCode(c)}
+              data-testid={`card-wanted-code-${c.id}`}
+            >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
                   <KeyRound className="w-4 h-4 text-red-500" />
@@ -2872,7 +3331,7 @@ function WantedCodesSection() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => deleteMutation.mutate(c.id)}
+                    onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(c.id); }}
                     disabled={deleteMutation.isPending}
                     data-testid={`button-delete-wanted-code-${c.id}`}
                   >
@@ -2884,6 +3343,8 @@ function WantedCodesSection() {
           ))}
         </div>
       )}
+
+      <WantedCodeDetailDialog entry={selectedCode} onOpenChange={(open) => !open && setSelectedCode(null)} />
     </div>
   );
 }

@@ -4187,6 +4187,17 @@ export async function registerRoutes(
     try {
       const criteria = req.query as Record<string, string>;
       const results = await storage.searchWantedProfiles(criteria);
+      const wUser = await buildUserInfo(req);
+      const summary = Object.entries(criteria).map(([k, v]) => `${k}=${v}`).join(", ") || "(vide)";
+      await storage.createSearchLog({
+        userId: wUser.id,
+        email: wUser.email || null,
+        username: wUser.username || null,
+        discordId: wUser.discordId || null,
+        searchType: "wanted",
+        searchQuery: summary.slice(0, 500),
+        resultCount: results.length,
+      });
       res.json(results);
     } catch (err) {
       console.error("GET /api/wanted/search error:", err);
@@ -4206,7 +4217,14 @@ export async function registerRoutes(
 
   app.post("/api/admin/wanted-profiles", requireAuth, requireAdmin, async (req, res) => {
     try {
-      const profile = await storage.createWantedProfile(req.body);
+      const { force, ...data } = req.body || {};
+      if (!force) {
+        const matches = await storage.findDuplicateWantedProfiles(data);
+        if (matches.length > 0) {
+          return res.status(409).json({ message: "Un profil avec des identifiants identiques existe deja", duplicate: true, matches });
+        }
+      }
+      const profile = await storage.createWantedProfile(data);
       res.json(profile);
     } catch (err) {
       console.error("POST /api/admin/wanted-profiles error:", err);
@@ -4218,7 +4236,14 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
-      const updated = await storage.updateWantedProfile(id, req.body);
+      const { force, ...data } = req.body || {};
+      if (!force) {
+        const matches = await storage.findDuplicateWantedProfiles(data, id);
+        if (matches.length > 0) {
+          return res.status(409).json({ message: "Un autre profil avec des identifiants identiques existe deja", duplicate: true, matches });
+        }
+      }
+      const updated = await storage.updateWantedProfile(id, data);
       if (!updated) return res.status(404).json({ message: "Profil introuvable" });
       res.json(updated);
     } catch (err) {
