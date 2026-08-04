@@ -74,66 +74,84 @@ function WantedIntroVisual() {
     return { x: CX + R * Math.cos(rad), y: CY + R * Math.sin(rad) };
   });
 
+  // Chaque "branche" (noeud + sa ligne + son flux) partage le meme decalage
+  // pour rester en phase avec elle-meme d'un cycle a l'autre, tout en
+  // demarrant legerement apres ses voisines — cf. le commentaire dans
+  // index.css sur pourquoi une meme duree de cycle rend ce decalage stable.
+  const branchDelay = (i: number) => `${i * 110}ms`;
+
   return (
-    <div className="relative w-56 h-56 mx-auto animate-wanted-breathe" aria-hidden="true">
-      <svg viewBox="0 0 220 220" className="w-full h-full overflow-visible">
-        {points.map((p, i) => (
-          <line
-            key={`draw-${i}`}
-            x1={CX} y1={CY} x2={p.x} y2={p.y}
-            stroke={nodes[i].color}
-            strokeWidth={1.5}
-            strokeDasharray={78}
-            className="animate-wanted-draw"
-            style={{ animationDelay: `${i * 120}ms`, opacity: 0.5 }}
-          />
-        ))}
-        {points.map((p, i) => (
-          <line
-            key={`flow-${i}`}
-            x1={CX} y1={CY} x2={p.x} y2={p.y}
-            stroke={nodes[i].color}
-            strokeWidth={2}
-            strokeDasharray="3 9"
-            className="animate-wanted-flow"
-            style={{ animationDelay: `${900 + i * 120}ms`, opacity: 0.8 }}
-          />
-        ))}
-
-        <circle cx={CX} cy={CY} r={20} fill="none" stroke="#f87171" strokeWidth={1.5} className="animate-wanted-ping" style={{ animationDelay: "0.3s" }} />
-        <circle cx={CX} cy={CY} r={20} fill="none" stroke="#f87171" strokeWidth={1.5} className="animate-wanted-ping" style={{ animationDelay: "1.3s" }} />
-
-        <g className="animate-wanted-lock">
-          <circle cx={CX} cy={CY} r={20} fill="rgba(239,68,68,0.12)" stroke="#f87171" strokeWidth={1.5} />
-          {[0, 90, 180, 270].map((rot) => (
-            <path
-              key={rot}
-              d={`M ${CX - 30} ${CY - 30} l 8 0 M ${CX - 30} ${CY - 30} l 0 8`}
-              stroke="#f87171"
-              strokeWidth={2}
-              strokeLinecap="round"
-              fill="none"
-              transform={`rotate(${rot} ${CX} ${CY})`}
+    <div className="space-y-3" aria-hidden="true">
+      <div className="relative w-56 h-56 mx-auto animate-wanted-zoom">
+        <svg viewBox="0 0 220 220" className="w-full h-full overflow-visible">
+          {points.map((p, i) => (
+            <line
+              key={`draw-${i}`}
+              x1={CX} y1={CY} x2={p.x} y2={p.y}
+              stroke={nodes[i].color}
+              strokeWidth={1.5}
+              strokeDasharray={78}
+              className="animate-wanted-draw"
+              style={{ animationDelay: branchDelay(i) }}
             />
           ))}
-        </g>
+          {points.map((p, i) => (
+            <line
+              key={`flow-${i}`}
+              x1={CX} y1={CY} x2={p.x} y2={p.y}
+              stroke={nodes[i].color}
+              strokeWidth={2}
+              strokeDasharray="3 9"
+              className="animate-wanted-flow"
+              style={{ animationDelay: branchDelay(i) }}
+            />
+          ))}
 
-        {points.map((p, i) => {
-          const { Icon, color } = nodes[i];
-          return (
-            <g
-              key={`node-${i}`}
-              className="animate-wanted-pop"
-              style={{ animationDelay: `${300 + i * 120}ms`, opacity: 0, transformOrigin: `${p.x}px ${p.y}px` }}
-            >
-              <circle cx={p.x} cy={p.y} r={NODE_R} fill="rgba(255,255,255,0.06)" stroke={color} strokeWidth={1.5} />
-              <foreignObject x={p.x - 8} y={p.y - 8} width={16} height={16}>
-                <Icon className="w-4 h-4" style={{ color }} />
-              </foreignObject>
-            </g>
-          );
-        })}
-      </svg>
+          <circle cx={CX} cy={CY} r={20} fill="none" stroke="#f87171" strokeWidth={1.5} className="animate-wanted-ping" />
+          <circle cx={CX} cy={CY} r={20} fill="none" stroke="#f87171" strokeWidth={1.5} className="animate-wanted-ping" style={{ animationDelay: "180ms" }} />
+
+          <g className="animate-wanted-lock">
+            <circle cx={CX} cy={CY} r={20} fill="rgba(239,68,68,0.12)" stroke="#f87171" strokeWidth={1.5} />
+            {[0, 90, 180, 270].map((rot) => (
+              <path
+                key={rot}
+                d={`M ${CX - 30} ${CY - 30} l 8 0 M ${CX - 30} ${CY - 30} l 0 8`}
+                stroke="#f87171"
+                strokeWidth={2}
+                strokeLinecap="round"
+                fill="none"
+                transform={`rotate(${rot} ${CX} ${CY})`}
+              />
+            ))}
+          </g>
+
+          {points.map((p, i) => {
+            const { Icon, color } = nodes[i];
+            return (
+              <g
+                key={`node-${i}`}
+                className="animate-wanted-node"
+                style={{ animationDelay: branchDelay(i), transformOrigin: `${p.x}px ${p.y}px` }}
+              >
+                <circle cx={p.x} cy={p.y} r={NODE_R} fill="rgba(255,255,255,0.06)" stroke={color} strokeWidth={1.5} />
+                <foreignObject x={p.x - 8} y={p.y - 8} width={16} height={16}>
+                  <Icon className="w-4 h-4" style={{ color }} />
+                </foreignObject>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Legende textuelle synchronisee sur le meme cycle de 6s que le
+       * graphe : elle nomme explicitement chaque phase (collecte / recoupement
+       * / identification) pour que l'animation explique reellement le
+       * service au lieu d'etre juste decorative. */}
+      <div className="relative h-4 text-center">
+        <p className="absolute inset-0 text-[11px] text-muted-foreground animate-wanted-caption-1">Collecte des fuites eparses</p>
+        <p className="absolute inset-0 text-[11px] text-muted-foreground animate-wanted-caption-2">Recoupement automatique des sources</p>
+        <p className="absolute inset-0 text-[11px] font-medium text-red-500 animate-wanted-caption-3">Profil identifie et cartographie</p>
+      </div>
     </div>
   );
 }

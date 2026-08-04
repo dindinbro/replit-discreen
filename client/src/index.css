@@ -322,20 +322,67 @@
 ::view-transition-new(root) { animation: theme-wipe-in  0.45s cubic-bezier(0.76,0,0.24,1) forwards; }
 
 /* ─── Ecran d'accueil /wanted : mini-graphe anime (donnees -> cible)
- * qui sert d'accroche commerciale a la page verrouillee ─────── */
-@keyframes wanted-intro-draw    { from { stroke-dashoffset: 78; } to { stroke-dashoffset: 0; } }
-@keyframes wanted-intro-pop     { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
-@keyframes wanted-intro-lock    { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(248,113,113,0)); } 50% { transform: scale(1.22); filter: drop-shadow(0 0 14px rgba(248,113,113,0.75)); } }
-@keyframes wanted-intro-flow    { to { stroke-dashoffset: -24; } }
-@keyframes wanted-intro-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
-/* Anneau de "scan" qui part du centre et s'estompe en s'agrandissant, en
- * boucle — le mouvement le plus lisible du groupe, sert de repere visuel
- * evident pour que l'ensemble se lise bien comme anime. */
-@keyframes wanted-intro-ping    { 0% { transform: scale(0.7); opacity: 0.7; } 100% { transform: scale(2.1); opacity: 0; } }
+ * qui sert d'accroche commerciale a la page verrouillee.
+ *
+ * Contrairement a une v1 avec des boucles ambiantes independantes (chacune
+ * sa propre periode), ici TOUT partage le meme cycle de 6s : chaque element
+ * (noeud, ligne, cible, legende) encode sa propre fenetre de visibilite en
+ * pourcentages de ce cycle commun. Resultat : une vraie sequence qui se
+ * relit a l'identique en boucle — collecte -> recoupement -> identification
+ * — plutot qu'un simple fond qui bouge. Le stagger par noeud (voir
+ * animation-delay inline dans WantedIntroVisual) decale la meme timeline
+ * de quelques centaines de ms sans changer sa duree, donc la synchro entre
+ * elements persiste indefiniment. ─────── */
+@keyframes wanted-story-node {
+  0%, 100% { opacity: 0; transform: scale(0.3); }
+  6%        { opacity: 1; transform: scale(1.15); }
+  10%       { opacity: 1; transform: scale(1); }
+  80%       { opacity: 1; transform: scale(1); }
+  90%       { opacity: 0; transform: scale(0.6); }
+}
+@keyframes wanted-story-draw {
+  0%, 8%, 100% { stroke-dashoffset: 78; opacity: 0; }
+  20%          { stroke-dashoffset: 0; opacity: 0.55; }
+  80%          { stroke-dashoffset: 0; opacity: 0.55; }
+  90%          { stroke-dashoffset: 0; opacity: 0; }
+}
+/* Deplacement continu des tirets sur la ligne (vitesse propre, rapide) —
+ * combine avec wanted-story-flow-gate qui ne le rend visible que pendant
+ * la fenetre "recoupement" du cycle de 6s. */
+@keyframes wanted-flow-dash { to { stroke-dashoffset: -24; } }
+@keyframes wanted-story-flow-gate {
+  0%, 22%, 100% { opacity: 0; }
+  30%           { opacity: 0.9; }
+  72%           { opacity: 0.9; }
+  80%           { opacity: 0; }
+}
+/* Le pic du cycle : la cible "verrouille" juste apres la fenetre de
+ * recoupement — le seul vrai temps fort visuel, il doit se produire une
+ * fois par cycle et pas en continu pour rester lisible comme un evenement
+ * ("profil identifie") plutot qu'un tic nerveux. */
+@keyframes wanted-story-lock {
+  0%, 78%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(248,113,113,0)); }
+  86%           { transform: scale(1.32); filter: drop-shadow(0 0 18px rgba(248,113,113,0.85)); }
+  94%           { transform: scale(1.05); filter: drop-shadow(0 0 8px rgba(248,113,113,0.5)); }
+}
+@keyframes wanted-story-ping {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0; }
+  86%           { transform: scale(0.6); opacity: 0.85; }
+  100%          { transform: scale(2.3); opacity: 0; }
+}
+@keyframes wanted-story-caption-1 { 0%, 3% { opacity: 0; } 7%, 24% { opacity: 1; } 30%, 100% { opacity: 0; } }
+@keyframes wanted-story-caption-2 { 0%, 32% { opacity: 0; } 36%, 68% { opacity: 1; } 74%, 100% { opacity: 0; } }
+@keyframes wanted-story-caption-3 { 0%, 76% { opacity: 0; } 84%, 97% { opacity: 1; } 100% { opacity: 0; } }
 
-.animate-wanted-draw    { animation: wanted-intro-draw 0.9s ease-out forwards; }
-.animate-wanted-pop     { animation: wanted-intro-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-.animate-wanted-lock    { animation: wanted-intro-lock 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-.animate-wanted-flow    { animation: wanted-intro-flow 0.9s linear infinite; }
-.animate-wanted-breathe { animation: wanted-intro-breathe 5s ease-in-out infinite; }
-.animate-wanted-ping    { animation: wanted-intro-ping 2s cubic-bezier(0,0,0.2,1) infinite; transform-box: fill-box; transform-origin: center; }
+.animate-wanted-node    { animation: wanted-story-node 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.animate-wanted-draw    { animation: wanted-story-draw 6s ease-in-out infinite; }
+.animate-wanted-flow    { animation: wanted-flow-dash 0.8s linear infinite, wanted-story-flow-gate 6s ease-in-out infinite; }
+.animate-wanted-lock    { animation: wanted-story-lock 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.animate-wanted-ping    { animation: wanted-story-ping 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.animate-wanted-caption-1 { animation: wanted-story-caption-1 6s ease-in-out infinite; }
+.animate-wanted-caption-2 { animation: wanted-story-caption-2 6s ease-in-out infinite; }
+.animate-wanted-caption-3 { animation: wanted-story-caption-3 6s ease-in-out infinite; }
+/* Le conteneur entier "zoome" au moment du verrouillage — le geste de camera
+ * qui se rapproche de la cible identifiee, demande explicitement. */
+@keyframes wanted-story-zoom { 0%, 78%, 100% { transform: scale(1); } 88% { transform: scale(1.05); } 94% { transform: scale(1.015); } }
+.animate-wanted-zoom { animation: wanted-story-zoom 6s ease-in-out infinite; }
