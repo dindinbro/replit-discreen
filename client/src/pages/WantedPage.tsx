@@ -18,7 +18,7 @@ import { FieldGroup, wantedFieldValues, wantedAllValues, wantedProfileLabel, Wan
 import {
   ShieldAlert, KeyRound, Loader2, Plus, X, RotateCcw, Search,
   User, Mail, Phone, MapPin, Hash, MessageSquare, Fingerprint, CreditCard, Car, FileText,
-  Lock, Sparkles, Network, ChevronRight, Radar, AtSign, Wifi, SlidersHorizontal,
+  Lock, Sparkles, Network, ChevronRight, AtSign, Wifi, SlidersHorizontal,
 } from "lucide-react";
 
 const FILTER_ICONS: Record<WantedFilterType, React.ElementType> = {
@@ -54,6 +54,87 @@ function initials(profile: WantedProfile): string {
   return (parts[0]?.[0] || "?").toUpperCase() + (parts[1]?.[0] || "").toUpperCase();
 }
 
+/* ── Mini-graphe anime servant d'accroche visuelle sur l'ecran verrouille :
+ * des points de donnees (email, tel, IP, discord, adresse) convergent vers
+ * une cible centrale qui "verrouille" en boucle — illustre le principe du
+ * service (croiser des fuites eparses pour reconstituer un profil). Toutes
+ * les aretes ont la meme longueur (noeuds equidistants du centre), d'ou le
+ * stroke-dashoffset fixe a 78 dans les keyframes CSS. ── */
+function WantedIntroVisual() {
+  const CX = 110, CY = 110, R = 78, NODE_R = 15;
+  const nodes: { Icon: React.ElementType; angle: number; color: string }[] = [
+    { Icon: Mail, angle: -90, color: "hsl(var(--field-email))" },
+    { Icon: Phone, angle: -18, color: "hsl(var(--field-phone))" },
+    { Icon: Hash, angle: 54, color: "hsl(var(--graph-ip))" },
+    { Icon: MessageSquare, angle: 126, color: "hsl(var(--graph-discord))" },
+    { Icon: MapPin, angle: 198, color: "hsl(var(--field-location))" },
+  ];
+  const points = nodes.map(({ angle }) => {
+    const rad = (angle * Math.PI) / 180;
+    return { x: CX + R * Math.cos(rad), y: CY + R * Math.sin(rad) };
+  });
+
+  return (
+    <div className="relative w-56 h-56 mx-auto animate-wanted-breathe" aria-hidden="true">
+      <svg viewBox="0 0 220 220" className="w-full h-full overflow-visible">
+        {points.map((p, i) => (
+          <line
+            key={`draw-${i}`}
+            x1={CX} y1={CY} x2={p.x} y2={p.y}
+            stroke={nodes[i].color}
+            strokeWidth={1.5}
+            strokeDasharray={78}
+            className="animate-wanted-draw"
+            style={{ animationDelay: `${i * 120}ms`, opacity: 0.5 }}
+          />
+        ))}
+        {points.map((p, i) => (
+          <line
+            key={`flow-${i}`}
+            x1={CX} y1={CY} x2={p.x} y2={p.y}
+            stroke={nodes[i].color}
+            strokeWidth={2}
+            strokeDasharray="3 9"
+            className="animate-wanted-flow"
+            style={{ animationDelay: `${900 + i * 120}ms`, opacity: 0.8 }}
+          />
+        ))}
+
+        <g className="animate-wanted-lock">
+          <circle cx={CX} cy={CY} r={20} fill="rgba(239,68,68,0.12)" stroke="#f87171" strokeWidth={1.5} />
+          {[0, 90, 180, 270].map((rot) => (
+            <path
+              key={rot}
+              d={`M ${CX - 30} ${CY - 30} l 8 0 M ${CX - 30} ${CY - 30} l 0 8`}
+              stroke="#f87171"
+              strokeWidth={2}
+              strokeLinecap="round"
+              fill="none"
+              transform={`rotate(${rot} ${CX} ${CY})`}
+            />
+          ))}
+        </g>
+
+        {points.map((p, i) => {
+          const { Icon, color } = nodes[i];
+          return (
+            <g
+              key={`node-${i}`}
+              className="animate-wanted-pop"
+              style={{ animationDelay: `${300 + i * 120}ms`, opacity: 0, transformOrigin: `${p.x}px ${p.y}px` }}
+            >
+              <circle cx={p.x} cy={p.y} r={NODE_R} fill="rgba(255,255,255,0.06)" stroke={color} strokeWidth={1.5} />
+              <foreignObject x={p.x - 8} y={p.y - 8} width={16} height={16}>
+                <Icon className="w-4 h-4" style={{ color }} />
+              </foreignObject>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 /* ── Ecran verrouille : saisie de code d'activation ── */
 function RedeemGate() {
   const { refreshRole } = useAuth();
@@ -85,25 +166,39 @@ function RedeemGate() {
     }
   };
 
+  const features: { icon: React.ElementType; text: string }[] = [
+    { icon: Search, text: "Recherche croisee sur email, telephone, IP, Discord, adresse..." },
+    { icon: Network, text: "Cartographie relationnelle en direct entre les profils lies" },
+    { icon: ShieldAlert, text: "Fiches completes : contacts, documents, vehicule, notes" },
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-red-500/[0.05] blur-3xl" />
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle, #f87171 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
       </div>
       <div className="relative z-10 max-w-md w-full text-center space-y-8">
-        <div className="mx-auto w-20 h-20 rounded-full border-2 border-red-500/30 flex items-center justify-center relative">
-          <div className="absolute inset-0 rounded-full border-2 border-red-500/20 animate-ping" />
-          <Radar className="w-9 h-9 text-red-500" />
-        </div>
+        <WantedIntroVisual />
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500/70">Zone restreinte</p>
           <h1 className="text-3xl font-bold tracking-tight">Acces Wanted</h1>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            Cette section necessite un code d'activation unique, delivre par un administrateur.
+            Le moteur qui relie les fuites eparses en un graphe exploitable — retrouvez et cartographiez un profil en quelques secondes.
           </p>
         </div>
+        <div className="space-y-2.5 text-left max-w-xs mx-auto">
+          {features.map(({ icon: Icon, text }, i) => (
+            <div key={i} className="flex items-start gap-2.5">
+              <div className="w-6 h-6 rounded-md bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Icon className="w-3.5 h-3.5 text-red-500" />
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">{text}</p>
+            </div>
+          ))}
+        </div>
         <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">Cette section necessite un code d'activation unique, delivre par un administrateur.</p>
           <div className="flex items-center gap-2 rounded-full border border-red-500/25 bg-card/60 backdrop-blur pl-5 pr-1.5 py-1.5 focus-within:border-red-500/50 transition-colors">
             <Lock className="w-4 h-4 text-red-500/60 shrink-0" />
             <Input
