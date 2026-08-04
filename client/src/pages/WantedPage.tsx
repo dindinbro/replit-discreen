@@ -82,7 +82,7 @@ function WantedIntroVisual() {
 
   return (
     <div className="space-y-3" aria-hidden="true">
-      <div className="relative w-56 h-56 mx-auto animate-wanted-zoom">
+      <div className="relative w-72 h-72 sm:w-80 sm:h-80 mx-auto animate-wanted-zoom">
         <svg viewBox="0 0 220 220" className="w-full h-full overflow-visible">
           {points.map((p, i) => (
             <line
