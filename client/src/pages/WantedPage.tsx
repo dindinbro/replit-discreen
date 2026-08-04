@@ -100,6 +100,9 @@ function WantedIntroVisual() {
           />
         ))}
 
+        <circle cx={CX} cy={CY} r={20} fill="none" stroke="#f87171" strokeWidth={1.5} className="animate-wanted-ping" style={{ animationDelay: "0.3s" }} />
+        <circle cx={CX} cy={CY} r={20} fill="none" stroke="#f87171" strokeWidth={1.5} className="animate-wanted-ping" style={{ animationDelay: "1.3s" }} />
+
         <g className="animate-wanted-lock">
           <circle cx={CX} cy={CY} r={20} fill="rgba(239,68,68,0.12)" stroke="#f87171" strokeWidth={1.5} />
           {[0, 90, 180, 270].map((rot) => (
