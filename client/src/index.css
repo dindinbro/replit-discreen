@@ -386,3 +386,82 @@
  * qui se rapproche de la cible identifiee, demande explicitement. */
 @keyframes wanted-story-zoom { 0%, 78%, 100% { transform: scale(1); } 88% { transform: scale(1.05); } 94% { transform: scale(1.015); } }
 .animate-wanted-zoom { animation: wanted-story-zoom 6s ease-in-out infinite; }
+
+/* ─── Carte de prix Wanted (RedeemGate) ───────────────────────
+ * Respiration ambiante autour de la carte + entree en cascade des lignes
+ * de fonctionnalites + reclame visuelle discrete sur le CTA. Tout reste
+ * lent et en boucle douce pour ne pas distraire d'une page de conversion. */
+@keyframes wanted-card-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+.animate-wanted-card-glow { animation: wanted-card-breathe 4.5s ease-in-out infinite; }
+
+@keyframes wanted-card-border {
+  0%, 100% { border-color: rgba(239,68,68,0.25); box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  50%      { border-color: rgba(239,68,68,0.5);  box-shadow: 0 0 28px 2px rgba(239,68,68,0.12); }
+}
+.animate-wanted-card-border { animation: wanted-card-border 4.5s ease-in-out infinite; }
+
+@keyframes wanted-shine-sweep {
+  0%   { transform: translateX(-130%) skewX(-18deg); }
+  100% { transform: translateX(230%) skewX(-18deg); }
+}
+.animate-wanted-shine { animation: wanted-shine-sweep 3.2s ease-in-out infinite; }
+
+@keyframes wanted-price-in {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.94); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.animate-wanted-price-in { animation: wanted-price-in 0.5s cubic-bezier(0.2,0.8,0.2,1) both; }
+
+@keyframes wanted-feature-in {
+  0%   { opacity: 0; transform: translateX(-8px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.animate-wanted-feature-in { animation: wanted-feature-in 0.45s ease-out both; }
+
+@keyframes wanted-badge-pulse {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(239,68,68,0.35); }
+  50%      { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+}
+.animate-wanted-badge { animation: wanted-badge-pulse 2.8s ease-in-out infinite; }
+
+@keyframes wanted-cta-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.5), 0 4px 14px rgba(220,38,38,0.25); }
+  50%      { box-shadow: 0 0 0 8px rgba(220,38,38,0), 0 4px 22px rgba(220,38,38,0.4); }
+}
+.animate-wanted-cta { animation: wanted-cta-glow 2.4s ease-in-out infinite; }
+
+/* Liseret lumineux qui balaie le haut de la carte, en boucle lente et
+ * decalee du shine principal pour eviter deux effets synchrones. */
+@keyframes wanted-topbar-sweep {
+  0%   { transform: translateX(-100%); opacity: 0; }
+  50%  { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+.animate-wanted-topbar { animation: wanted-topbar-sweep 3.6s ease-in-out infinite; }
+
+/* Leger halo qui revient respirer autour du prix une fois l'entree jouee,
+ * pour garder l'oeil sur la valeur sans repeter l'animation d'entree. */
+@keyframes wanted-price-glow {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(239,68,68,0)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(239,68,68,0.35)); }
+}
+.animate-wanted-price-glow { animation: wanted-price-glow 3.2s ease-in-out 0.6s infinite; }
+
+/* Chaque avantage "pop" a l'arrivee (au lieu d'un simple glissement) avec
+ * un petit anneau qui se dissipe autour de l'icone — la liste des benefices
+ * doit se lire comme une suite de bonnes nouvelles, pas un texte statique. */
+@keyframes wanted-feature-pop {
+  0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
+  55%  { transform: scale(1.2) rotate(6deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.animate-wanted-feature-pop { animation: wanted-feature-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+@keyframes wanted-feature-ring {
+  0%   { transform: scale(0.5); opacity: 0.55; }
+  100% { transform: scale(2); opacity: 0; }
+}
+.animate-wanted-feature-ring { animation: wanted-feature-ring 0.6s ease-out both; }

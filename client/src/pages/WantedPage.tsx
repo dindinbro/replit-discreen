@@ -18,7 +18,7 @@ import { FieldGroup, wantedFieldValues, wantedAllValues, wantedProfileLabel, Wan
 import {
   ShieldAlert, KeyRound, Loader2, Plus, X, RotateCcw, Search,
   User, Mail, Phone, MapPin, Hash, MessageSquare, Fingerprint, CreditCard, Car, FileText,
-  Lock, Sparkles, Network, ChevronRight, AtSign, Wifi, SlidersHorizontal,
+  Lock, Sparkles, Network, ChevronRight, AtSign, Wifi, SlidersHorizontal, Check,
 } from "lucide-react";
 
 const FILTER_ICONS: Record<WantedFilterType, React.ElementType> = {
@@ -156,12 +156,27 @@ function WantedIntroVisual() {
   );
 }
 
-/* ── Ecran verrouille : saisie de code d'activation ── */
+/* ── Prix et fonctionnalites de l'abonnement Wanted ──
+ * Le montant est fixe cote serveur (WANTED_PRICE_EUR dans routes.ts) —
+ * ne changer ce libelle que si le prix serveur change en meme temps. */
+const WANTED_PRICE_LABEL = "19,99€";
+
+const WANTED_FEATURES: string[] = [
+  "Recherche croisee sur email, telephone, IP, Discord, adresse...",
+  "Cartographie relationnelle en direct entre les profils lies",
+  "Fiches completes : contacts, documents, vehicule, notes",
+  "Detection automatique des doublons et informations partagees",
+  "Recherches et cartographies illimitees pendant l'abonnement",
+];
+
+/* ── Ecran verrouille : tarif, fonctionnalites et acces (paiement ou code) ── */
 function RedeemGate() {
-  const { refreshRole } = useAuth();
+  const { refreshRole, getAccessToken } = useAuth();
   const { toast } = useToast();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
+  const [showCodeInput, setShowCodeInput] = useState(false);
 
   const submit = async () => {
     if (!code.trim()) return;
@@ -187,11 +202,25 @@ function RedeemGate() {
     }
   };
 
-  const features: { icon: React.ElementType; text: string }[] = [
-    { icon: Search, text: "Recherche croisee sur email, telephone, IP, Discord, adresse..." },
-    { icon: Network, text: "Cartographie relationnelle en direct entre les profils lies" },
-    { icon: ShieldAlert, text: "Fiches completes : contacts, documents, vehicule, notes" },
-  ];
+  const subscribe = async () => {
+    setPayLoading(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch("/api/payment/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ type: "wanted" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Impossible de creer le paiement.");
+      if (data.orderId) {
+        window.location.href = `/checkout?orderId=${data.orderId}&token=${data.sessionToken}`;
+      }
+    } catch (err) {
+      toast({ title: "Erreur", description: err instanceof Error ? err.message : "Paiement impossible.", variant: "destructive" });
+      setPayLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden">
@@ -208,39 +237,117 @@ function RedeemGate() {
             Le moteur qui relie les fuites eparses en un graphe exploitable — retrouvez et cartographiez un profil en quelques secondes.
           </p>
         </div>
-        <div className="space-y-2.5 text-left max-w-xs mx-auto">
-          {features.map(({ icon: Icon, text }, i) => (
-            <div key={i} className="flex items-start gap-2.5">
-              <div className="w-6 h-6 rounded-md bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Icon className="w-3.5 h-3.5 text-red-500" />
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{text}</p>
-            </div>
-          ))}
-        </div>
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">Cette section necessite un code d'activation unique, delivre par un administrateur.</p>
-          <div className="flex items-center gap-2 rounded-full border border-red-500/25 bg-card/60 backdrop-blur pl-5 pr-1.5 py-1.5 focus-within:border-red-500/50 transition-colors">
-            <Lock className="w-4 h-4 text-red-500/60 shrink-0" />
-            <Input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="WANTED-XXXXXXXX"
-              className="border-0 bg-transparent font-mono text-center focus-visible:ring-0 shadow-none"
-              data-testid="input-wanted-code"
-            />
-            <Button
-              onClick={submit}
-              disabled={loading || !code.trim()}
-              size="sm"
-              className="shrink-0 rounded-full bg-red-600 hover:bg-red-700 text-white gap-1.5"
-              data-testid="button-wanted-redeem"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              Activer
-            </Button>
+
+        <Card className="group relative overflow-hidden rounded-2xl border-red-500/25 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur p-6 text-left space-y-5 animate-wanted-card-border">
+          {/* Halo ambiant qui respire derriere la carte */}
+          <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-red-500/[0.1] blur-3xl pointer-events-none animate-wanted-card-glow" />
+          <div className="absolute -bottom-16 -left-16 w-40 h-40 rounded-full bg-red-500/[0.06] blur-3xl pointer-events-none animate-wanted-card-glow" style={{ animationDelay: "1.2s" }} />
+
+          {/* Liseret de lumiere qui balaie doucement la carte */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
+            <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-red-500/[0.06] to-transparent animate-wanted-shine" />
           </div>
+
+          {/* Trait lumineux qui balaie le haut de la carte */}
+          <div className="absolute top-0 left-0 right-0 h-px overflow-hidden pointer-events-none">
+            <div className="w-full h-px bg-gradient-to-r from-transparent via-red-500/80 to-transparent animate-wanted-topbar" />
+          </div>
+
+          <div className="relative flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-red-500/80 flex items-center gap-1.5">
+                <span className="relative flex w-1.5 h-1.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+                </span>
+                Abonnement Wanted
+              </p>
+              <div className="flex items-baseline gap-1.5 mt-1 animate-wanted-price-in">
+                <span className="text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent animate-wanted-price-glow">{WANTED_PRICE_LABEL}</span>
+                <span className="text-sm text-muted-foreground">/ mois</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 animate-wanted-badge">
+              <CreditCard className="w-5 h-5 text-red-500" />
+            </div>
+          </div>
+
+          <div className="relative h-px bg-gradient-to-r from-transparent via-red-500/20 to-transparent" />
+
+          <div className="relative -mx-2 space-y-0.5">
+            {WANTED_FEATURES.map((text, i) => (
+              <div
+                key={i}
+                className="group/feature flex items-start gap-2.5 rounded-lg px-2 py-1.5 animate-wanted-feature-in transition-colors duration-200 hover:bg-red-500/[0.06]"
+                style={{ animationDelay: `${150 + i * 90}ms` }}
+              >
+                <div className="relative w-5 h-5 shrink-0 mt-0.5">
+                  <span
+                    className="absolute inset-0 rounded-md bg-red-500/30 animate-wanted-feature-ring"
+                    style={{ animationDelay: `${150 + i * 90}ms` }}
+                  />
+                  <div
+                    className="relative w-5 h-5 rounded-md bg-red-500/10 flex items-center justify-center transition-all duration-300 group-hover/feature:scale-110 group-hover/feature:bg-red-500/20 animate-wanted-feature-pop"
+                    style={{ animationDelay: `${150 + i * 90}ms` }}
+                  >
+                    <Check className="w-3 h-3 text-red-500" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed transition-colors duration-200 group-hover/feature:text-foreground/85">{text}</p>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            onClick={subscribe}
+            disabled={payLoading}
+            className="relative w-full h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white gap-1.5 overflow-hidden transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] animate-wanted-cta"
+            data-testid="button-wanted-subscribe"
+          >
+            <span className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-[-18deg] -translate-x-[150%] group-hover:translate-x-[350%] transition-transform duration-700 ease-out" />
+            {payLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+            S'abonner — {WANTED_PRICE_LABEL}/mois
+          </Button>
+          <p className="relative text-[10px] text-center text-muted-foreground">
+            Paiement securise en cryptomonnaie · Activation automatique du compte
+          </p>
+        </Card>
+
+        <div className="space-y-3">
+          {!showCodeInput ? (
+            <button
+              onClick={() => setShowCodeInput(true)}
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+              data-testid="button-show-code-input"
+            >
+              Vous avez deja un code d'activation ?
+            </button>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">Code d'activation unique, delivre par un administrateur.</p>
+              <div className="flex items-center gap-2 rounded-full border border-red-500/25 bg-card/60 backdrop-blur pl-5 pr-1.5 py-1.5 focus-within:border-red-500/50 transition-colors">
+                <Lock className="w-4 h-4 text-red-500/60 shrink-0" />
+                <Input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  placeholder="WANTED-XXXXXXXX"
+                  className="border-0 bg-transparent font-mono text-center focus-visible:ring-0 shadow-none"
+                  data-testid="input-wanted-code"
+                />
+                <Button
+                  onClick={submit}
+                  disabled={loading || !code.trim()}
+                  size="sm"
+                  className="shrink-0 rounded-full bg-red-600 hover:bg-red-700 text-white gap-1.5"
+                  data-testid="button-wanted-redeem"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  Activer
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

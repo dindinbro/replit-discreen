@@ -10,7 +10,7 @@ import {
   Key, FileText, Menu, X, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
   Sparkles, Phone, MapPin, Hash, FileSearch, Eye, ShieldAlert, Sword,
-  Camera, Activity,
+  Camera, Activity, Bot,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -129,6 +129,7 @@ interface NavSection {
 
 const SEARCH_MODULES: NavItem[] = [
   { label: "Paramétrique",   href: "/search?mode=internal",  icon: Sparkles },
+  { label: "Discord Scan",   href: "/discord",               icon: Bot, comingSoon: true },
   { label: "Username OSINT", href: "/search?mode=sherlock",  icon: Eye },
   { label: "Google OSINT",   href: "/search?mode=xeuledoc",  icon: FileSearch },
   { label: "Wanted",         href: "/wanted",                icon: ShieldAlert },

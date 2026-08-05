@@ -78,6 +78,7 @@ async function isDisposableDomain(domain: string): Promise<boolean> {
 }
 
 const ORDER_TOKEN_SECRET = process.env.NOWPAYMENTS_API_KEY || crypto.randomBytes(32).toString("hex");
+const WANTED_PRICE_EUR = 19.99;
 
 function sortObject(obj: any): any {
   if (typeof obj !== "object" || obj === null) return obj;
@@ -2937,6 +2938,19 @@ export async function registerRoutes(
 
             webhookPaymentCompleted(orderStr, serviceType as any, String(source_amount || "50"), String(currency || "BTC"));
           }
+        } else if (orderStr.match(/^order_wanted_/)) {
+          const payment = await storage.getCryptoPaymentByOrderId(orderStr);
+          if (payment) {
+            const numId = parseInt(payment.userId);
+            if (!isNaN(numId)) {
+              const account = await storage.getUser(numId);
+              if (account && account.role !== "admin" && account.role !== "wanted") {
+                await storage.updateUser(numId, { role: "wanted" });
+                console.log(`Wanted role granted for order ${orderStr} (user ${numId})`);
+              }
+            }
+            webhookPaymentCompleted(orderStr, "wanted", String(source_amount || "?"), String(currency || "BTC"));
+          }
         } else {
           const tierMatch = orderStr.match(/^order_(vip|pro|business|api)_(lifetime_)?/);
           const tier = tierMatch ? tierMatch[1] as PlanTier : null;
@@ -3005,7 +3019,7 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const bodySchema = z.object({
-        type: z.enum(["subscription", "service"]),
+        type: z.enum(["subscription", "service", "wanted"]),
         // subscription fields
         tier: z.string().optional(),
         billing: z.enum(["monthly", "lifetime"]).optional(),
@@ -3071,6 +3085,24 @@ export async function registerRoutes(
           discountPercent: appliedDiscount?.percent ?? null,
         });
 
+      } else if (parsed.type === "wanted") {
+        // Wanted role subscription — flat monthly price, no tier/billing options.
+        // On IPN confirmation the paying account's role is granted directly
+        // (see /api/nowpayments-ipn), unlike subscription tiers which mint a
+        // redeemable license key.
+        orderId = `order_wanted_${Date.now()}`;
+        priceEur = WANTED_PRICE_EUR;
+        label = "Abonnement Wanted";
+
+        const user = (req as any).user;
+        const userPseudo = user?.user_metadata?.username || user?.email || "Inconnu";
+        const userEmail = user?.email || "Inconnu";
+        const userDiscord = user?.user_metadata?.discord_id || null;
+        webhookInvoiceCreated("wanted", orderId, priceEur, {
+          pseudo: userPseudo, email: userEmail, userId,
+          discordId: userDiscord,
+        });
+
       } else {
         // service
         if (!parsed.serviceType || !parsed.formData) return res.status(400).json({ message: "serviceType et formData requis" });
@@ -3084,7 +3116,7 @@ export async function registerRoutes(
         orderId,
         userId,
         orderType: parsed.type,
-        tier: parsed.type === "subscription" ? parsed.tier : undefined,
+        tier: parsed.type === "subscription" ? parsed.tier : parsed.type === "wanted" ? "wanted" : undefined,
         serviceType: parsed.type === "service" ? parsed.serviceType : undefined,
         billing: parsed.billing,
         priceEur,

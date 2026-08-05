@@ -115,7 +115,7 @@ const POPULAR_DEFAULTS = ["btc", "eth", "ltc", "usdt", "usdc", "trx", "doge", "s
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
   const [, navigate] = useLocation();
-  const { getAccessToken } = useAuth();
+  const { getAccessToken, refreshRole } = useAuth();
   const { toast } = useToast();
 
   // Parse query params
@@ -202,6 +202,12 @@ export default function CheckoutPage() {
     if (step === "payment") startPolling();
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [step, startPolling]);
+
+  // Wanted orders grant the role directly on IPN confirmation — refresh the
+  // auth context so the "Accéder à Wanted" link works without a full reload.
+  useEffect(() => {
+    if (step === "success" && session?.orderType === "wanted") refreshRole();
+  }, [step, session?.orderType, refreshRole]);
 
   async function handleSelectCurrency(currency: string) {
     setSelectedCurrency(currency);
@@ -437,6 +443,8 @@ export default function CheckoutPage() {
                   <p className="text-muted-foreground text-sm">
                     {session?.orderType === "subscription"
                       ? "Votre paiement a bien été reçu. Votre clé de licence a été générée."
+                      : session?.orderType === "wanted"
+                      ? "Votre paiement a bien été reçu. L'accès Wanted a été activé automatiquement sur votre compte."
                       : "Votre paiement a été reçu. Votre demande a été envoyée à notre équipe."}
                   </p>
                 </div>
@@ -454,6 +462,22 @@ export default function CheckoutPage() {
                       <Button size="sm" className="gap-2 mt-2">
                         <Key className="w-4 h-4" />
                         Voir ma clé de licence
+                      </Button>
+                    </Link>
+                  </div>
+                ) : session?.orderType === "wanted" ? (
+                  <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4 text-sm text-left space-y-2">
+                    <p className="font-medium flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-green-500" />
+                      Accès Wanted activé
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Rendez-vous sur la page Wanted pour commencer à rechercher et cartographier des profils. Si l'accès n'apparaît pas immédiatement, rechargez la page.
+                    </p>
+                    <Link href="/wanted">
+                      <Button size="sm" className="gap-2 mt-2">
+                        <ShieldCheck className="w-4 h-4" />
+                        Accéder à Wanted
                       </Button>
                     </Link>
                   </div>
