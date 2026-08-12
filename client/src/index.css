@@ -378,6 +378,36 @@
 .animate-wanted-draw    { animation: wanted-story-draw 6s ease-in-out infinite; }
 .animate-wanted-flow    { animation: wanted-flow-dash 0.8s linear infinite, wanted-story-flow-gate 6s ease-in-out infinite; }
 .animate-wanted-lock    { animation: wanted-story-lock 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+
+/* Meme temps fort que wanted-story-lock (pic une fois par cycle de 6s) mais
+ * en glow indigo/violet plutot que rouge — reutilise pour le coeur de
+ * l'ecran verrouille DisX, ou l'evenement represente "requete traitee"
+ * plutot que "profil verrouille". */
+@keyframes disx-core-pulse {
+  0%, 78%, 100% { transform: scale(1);    filter: drop-shadow(0 0 0 rgba(99,102,241,0)); }
+  86%           { transform: scale(1.28); filter: drop-shadow(0 0 18px rgba(99,102,241,0.85)); }
+  94%           { transform: scale(1.05); filter: drop-shadow(0 0 8px rgba(99,102,241,0.5)); }
+}
+.animate-disx-core { animation: disx-core-pulse 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+
+/* Petit synapse qui orbite autour du logo cerveau du header DisX — signale
+ * une activite neuronale continue plutot qu'un logo statique. */
+@keyframes disx-orbit {
+  from { transform: rotate(0deg) translateX(21px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(21px) rotate(-360deg); }
+}
+.animate-disx-orbit { animation: disx-orbit 9s linear infinite; }
+
+/* Point lumineux qui parcourt le fil vertical reliant les cartes de
+ * recherche DisX — le "fil" devient un axone, la recherche suivante un
+ * signal qui s'y propage plutot qu'un simple connecteur decoratif. */
+@keyframes disx-signal-travel {
+  0%   { top: 0; opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.animate-disx-signal { animation: disx-signal-travel 3.2s ease-in-out infinite; }
 .animate-wanted-ping    { animation: wanted-story-ping 6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 .animate-wanted-caption-1 { animation: wanted-story-caption-1 6s ease-in-out infinite; }
 .animate-wanted-caption-2 { animation: wanted-story-caption-2 6s ease-in-out infinite; }
@@ -465,3 +495,56 @@
   100% { transform: scale(2); opacity: 0; }
 }
 .animate-wanted-feature-ring { animation: wanted-feature-ring 0.6s ease-out both; }
+
+/* ── Fond anime de la page tarifs : trois halos qui derivent lentement sur
+ * des trajectoires et des durees differentes (pas de synchronisation visible)
+ * pour donner une impression de profondeur vivante sans distraire du contenu. ── */
+@keyframes pricing-orb-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(60px, 40px) scale(1.12); }
+  66%      { transform: translate(-30px, 70px) scale(0.95); }
+}
+@keyframes pricing-orb-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%      { transform: translate(-70px, 30px) scale(1.08); }
+  75%      { transform: translate(40px, -50px) scale(0.92); }
+}
+@keyframes pricing-orb-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(30px, -60px) scale(1.15); }
+}
+.animate-pricing-orb-a { animation: pricing-orb-drift-a 22s ease-in-out infinite; }
+.animate-pricing-orb-b { animation: pricing-orb-drift-b 26s ease-in-out infinite; }
+.animate-pricing-orb-c { animation: pricing-orb-drift-c 19s ease-in-out infinite; }
+
+@keyframes pricing-grid-drift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 56px 56px; }
+}
+.animate-pricing-grid { animation: pricing-grid-drift 40s linear infinite; }
+
+/* Grain fin en overlay (filtre SVG feTurbulence encode en data-URI, pas de
+ * requete externe) — donne une texture "matiere" au fond plutot qu'un simple
+ * degrade plat. Anime tres legerement en zoom pour ne jamais paraitre figee. */
+.pricing-noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: overlay;
+}
+@keyframes pricing-noise-breathe {
+  0%, 100% { opacity: 0.05; transform: scale(1); }
+  50%      { opacity: 0.09; transform: scale(1.04); }
+}
+.animate-pricing-noise { animation: pricing-noise-breathe 8s ease-in-out infinite; }
+
+/* Faisceau diagonal qui balaie lentement tout le fond, en boucle — le meme
+ * langage visuel que le "shine" des cartes (wanted-shine-sweep) mais etire
+ * a l'echelle de la page pour donner du mouvement sans surcharger le premier plan. */
+@keyframes pricing-beam-sweep {
+  0%   { transform: translateX(-60%) rotate(12deg); opacity: 0; }
+  10%  { opacity: 0.5; }
+  50%  { opacity: 0.5; }
+  90%  { opacity: 0; }
+  100% { transform: translateX(60%) rotate(12deg); opacity: 0; }
+}
+.animate-pricing-beam { animation: pricing-beam-sweep 9s ease-in-out infinite; }

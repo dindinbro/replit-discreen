@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
@@ -156,11 +157,7 @@ function WantedIntroVisual() {
   );
 }
 
-/* ── Prix et fonctionnalites de l'abonnement Wanted ──
- * Le montant est fixe cote serveur (WANTED_PRICE_EUR dans routes.ts) —
- * ne changer ce libelle que si le prix serveur change en meme temps. */
-const WANTED_PRICE_LABEL = "19,99€";
-
+/* ── Fonctionnalites de l'abonnement Wanted (tarif detaille sur /pricing) ── */
 const WANTED_FEATURES: string[] = [
   "Recherche croisee sur email, telephone, IP, Discord, adresse...",
   "Cartographie relationnelle en direct entre les profils lies",
@@ -169,13 +166,12 @@ const WANTED_FEATURES: string[] = [
   "Recherches et cartographies illimitees pendant l'abonnement",
 ];
 
-/* ── Ecran verrouille : tarif, fonctionnalites et acces (paiement ou code) ── */
+/* ── Ecran verrouille : fonctionnalites et acces (page tarifs ou code) ── */
 function RedeemGate() {
-  const { refreshRole, getAccessToken } = useAuth();
+  const { refreshRole } = useAuth();
   const { toast } = useToast();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [payLoading, setPayLoading] = useState(false);
   const [showCodeInput, setShowCodeInput] = useState(false);
 
   const submit = async () => {
@@ -202,26 +198,6 @@ function RedeemGate() {
     }
   };
 
-  const subscribe = async () => {
-    setPayLoading(true);
-    try {
-      const token = getAccessToken();
-      const res = await fetch("/api/payment/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ type: "wanted" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Impossible de creer le paiement.");
-      if (data.orderId) {
-        window.location.href = `/checkout?orderId=${data.orderId}&token=${data.sessionToken}`;
-      }
-    } catch (err) {
-      toast({ title: "Erreur", description: err instanceof Error ? err.message : "Paiement impossible.", variant: "destructive" });
-      setPayLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -238,7 +214,7 @@ function RedeemGate() {
           </p>
         </div>
 
-        <Card className="group relative overflow-hidden rounded-2xl border-red-500/25 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur p-6 text-left space-y-5 animate-wanted-card-border">
+        <Card className="group relative overflow-hidden rounded-2xl border-red-500/25 bg-gradient-to-b from-card/80 to-card/40 backdrop-blur p-6 text-left space-y-4 animate-wanted-card-border">
           {/* Halo ambiant qui respire derriere la carte */}
           <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-red-500/[0.1] blur-3xl pointer-events-none animate-wanted-card-glow" />
           <div className="absolute -bottom-16 -left-16 w-40 h-40 rounded-full bg-red-500/[0.06] blur-3xl pointer-events-none animate-wanted-card-glow" style={{ animationDelay: "1.2s" }} />
@@ -252,27 +228,6 @@ function RedeemGate() {
           <div className="absolute top-0 left-0 right-0 h-px overflow-hidden pointer-events-none">
             <div className="w-full h-px bg-gradient-to-r from-transparent via-red-500/80 to-transparent animate-wanted-topbar" />
           </div>
-
-          <div className="relative flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-red-500/80 flex items-center gap-1.5">
-                <span className="relative flex w-1.5 h-1.5">
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
-                </span>
-                Abonnement Wanted
-              </p>
-              <div className="flex items-baseline gap-1.5 mt-1 animate-wanted-price-in">
-                <span className="text-4xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent animate-wanted-price-glow">{WANTED_PRICE_LABEL}</span>
-                <span className="text-sm text-muted-foreground">/ mois</span>
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 animate-wanted-badge">
-              <CreditCard className="w-5 h-5 text-red-500" />
-            </div>
-          </div>
-
-          <div className="relative h-px bg-gradient-to-r from-transparent via-red-500/20 to-transparent" />
 
           <div className="relative -mx-2 space-y-0.5">
             {WANTED_FEATURES.map((text, i) => (
@@ -298,19 +253,14 @@ function RedeemGate() {
             ))}
           </div>
 
-          <Button
-            onClick={subscribe}
-            disabled={payLoading}
-            className="relative w-full h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white gap-1.5 overflow-hidden transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] animate-wanted-cta"
-            data-testid="button-wanted-subscribe"
+          <Link
+            href="/pricing"
+            className="relative flex items-center justify-center w-full h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white gap-1.5 overflow-hidden transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] animate-wanted-cta text-sm font-medium"
+            data-testid="link-wanted-pricing"
           >
-            <span className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-[-18deg] -translate-x-[150%] group-hover:translate-x-[350%] transition-transform duration-700 ease-out" />
-            {payLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-            S'abonner — {WANTED_PRICE_LABEL}/mois
-          </Button>
-          <p className="relative text-[10px] text-center text-muted-foreground">
-            Paiement securise en cryptomonnaie · Activation automatique du compte
-          </p>
+            <CreditCard className="w-4 h-4" />
+            Voir les tarifs
+          </Link>
         </Card>
 
         <div className="space-y-3">
