@@ -30,11 +30,12 @@ import {
   webhookSearch, webhookBreachSearch, webhookExternalProxySearch, webhookLeakosintSearch, webhookDaltonSearch, webhookApiSearch,
   webhookRoleChange, webhookFreeze, webhookInvoiceCreated, webhookPaymentCompleted,
   webhookKeyRedeemed, webhookKeyGenerated, webhookApiKeyCreated, webhookApiKeyRevoked,
-  webhookPhoneLookup, webhookGeoIP, webhookVouchDeleted,
+  webhookGeoIP, webhookVouchDeleted,
   webhookCategoryCreated, webhookCategoryUpdated, webhookCategoryDeleted,
   webhookBlacklistRequest, webhookInfoRequest, webhookSubscriptionExpired, webhookAbnormalActivity,
   webhookBotKeyRedeemed, webhookSuspiciousSession, webhookSessionLogin, webhookBlockedIpAttempt,
   webhookGameLog,
+  type InvoiceUserInfo,
 } from "./webhook";
 import { sendFreezeAlert, sendSharedIpAlert, setOnIpBlacklisted, checkDiscordMemberStatus, syncCustomerRole } from "./discord-bot";
 import { createRequire } from "module";
@@ -740,8 +741,9 @@ export async function registerRoutes(
 
         // Fetch stored username from users table for accurate display name
         let storedUsername = username;
+        let dbUser: Awaited<ReturnType<typeof storage.getUser>> | undefined;
         try {
-          const dbUser = await storage.getUser(Number(user.id));
+          dbUser = await storage.getUser(Number(user.id));
           if (dbUser?.username) storedUsername = dbUser.username;
         } catch (_) {}
 
@@ -759,9 +761,21 @@ export async function registerRoutes(
           // Mark as logged so /api/me fallback doesn't create a duplicate
           loginLogCache.set(user.id, Date.now());
 
+          // Meme logique de badges que la sidebar (client/src/components/Layout.tsx
+          // ROLE_DISPLAY) pour que le webhook de connexion montre exactement ce que
+          // l'utilisateur voit sur son propre compte.
+          const role = dbUser?.role || "free";
+          const badges: string[] = [];
+          if (role === "admin") badges.push("Admin");
+          if (role === "admin" || (role === "free" && dbUser?.earlyAccess)) badges.push("Early");
+          if (role !== "admin" && role !== "free") {
+            const ROLE_DISPLAY: Record<string, string> = { vip: "VIP", pro: "PRO", business: "Business", api: "API", wanted: "Wanted" };
+            badges.push(ROLE_DISPLAY[role] || role);
+          }
+
           const sessionEmail = await getSessionEmail(user.id, provider);
           webhookSessionLogin(
-            { id: user.id, email: user.email || "", sessionEmail, username: storedUsername, uniqueId: sub.id },
+            { id: user.id, email: user.email || "", sessionEmail, username: storedUsername, uniqueId: sub.id, badges },
             ip,
             userAgent,
             sub.discordId,
@@ -2437,7 +2451,13 @@ export async function registerRoutes(
       const planInfo = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
       const isUnlimited = isAdmin || userBypassed || planInfo.dailySearches === -1;
 
-      if (!userBypassed && !isAdmin) {
+      const request = api.search.perform.input.parse(req.body);
+
+      // Le cooldown vise a espacer les *nouvelles* recherches, pas a bloquer
+      // la pagination d'un resultat deja lance (offset > 0) — sinon un simple
+      // clic sur "page suivante" juste apres la recherche initiale se prenait
+      // le cooldown de plein fouet et affichait un faux "Limite atteinte (0/0)".
+      if (!userBypassed && !isAdmin && request.offset === 0) {
         const lastSearch = userSearchCooldowns.get(userId);
         if (lastSearch) {
           const elapsed = Date.now() - lastSearch;
@@ -2451,8 +2471,6 @@ export async function registerRoutes(
           }
         }
       }
-
-      const request = api.search.perform.input.parse(req.body);
 
       const FIVEM_FILTER_SET = new Set<string>(FivemFilterTypes as unknown as string[]);
       const hasFivemFilter = request.criteria.some((c: { type: string }) => FIVEM_FILTER_SET.has(c.type));
@@ -2632,7 +2650,7 @@ export async function registerRoutes(
       const wUser = await buildUserInfo(req);
       const criteriaStr = request.criteria.map((c: any) => `${c.type}:${c.value}`).join(", ");
       if (!wUser.bypassed) {
-        webhookSearch(wUser, "interne", criteriaStr, total ?? 0);
+        webhookSearch(wUser, "Paramétrique", criteriaStr, total ?? 0);
 
         if (externalResults.length > 0) {
           webhookExternalProxySearch(wUser, criteriaStr, externalResults.length);
@@ -2655,7 +2673,7 @@ export async function registerRoutes(
         }
       }
 
-      if (!userBypassed && !isAdmin) {
+      if (!userBypassed && !isAdmin && request.offset === 0) {
         userSearchCooldowns.set(userId, Date.now());
       }
 
@@ -2883,13 +2901,51 @@ export async function registerRoutes(
         return res.status(403).json({ status: "invalid signature" });
       }
 
-      const { payment_status, order_id, price_amount, pay_currency } = req.body;
-      console.log("NOWPayments IPN:", { payment_status, order_id, price_amount, pay_currency });
+      const {
+        payment_status, order_id, price_amount, price_currency, pay_currency,
+        payment_id, invoice_id, actually_paid,
+      } = req.body;
+      console.log("NOWPayments IPN:", { payment_status, order_id, price_amount, pay_currency, payment_id, actually_paid });
 
       const status = payment_status;
       const order_number = order_id;
       const source_amount = price_amount;
       const currency = pay_currency;
+
+      const paymentExtra = {
+        priceAmount: price_amount,
+        priceCurrency: price_currency,
+        payCurrency: pay_currency,
+        actuallyPaid: actually_paid,
+        paymentId: payment_id ? String(payment_id) : undefined,
+        invoiceId: invoice_id ? String(invoice_id) : undefined,
+        paymentStatus: payment_status,
+      };
+
+      // Reconstitue le meme "ID Unique" que partout ailleurs dans les logs
+      // Discord (subscriptions.id, pas users.id — cf. /api/auth/me) plus
+      // pseudo/email/Discord reel, a partir du seul userId stocke sur la
+      // commande. Best-effort : un paiement ne doit jamais echouer si Discord
+      // ou la resolution utilisateur a un probleme.
+      const resolvePaymentUserInfo = async (userId: string | undefined | null): Promise<InvoiceUserInfo | undefined> => {
+        if (!userId) return undefined;
+        try {
+          const numId = parseInt(userId);
+          const [account, sub] = await Promise.all([
+            !isNaN(numId) ? storage.getUser(numId) : Promise.resolve(undefined),
+            storage.getSubscription(userId),
+          ]);
+          return {
+            pseudo: account?.username,
+            email: account?.email || undefined,
+            userId: sub?.id != null ? String(sub.id) : userId,
+            discordId: sub?.discordId || null,
+          };
+        } catch (err) {
+          console.error("resolvePaymentUserInfo error:", err);
+          return undefined;
+        }
+      };
 
       // Always sync crypto_payments table status
       try {
@@ -2936,7 +2992,13 @@ export async function registerRoutes(
               console.log(`Info request created for paid order ${orderStr}`);
             }
 
-            webhookPaymentCompleted(orderStr, serviceType as any, String(source_amount || "50"), String(currency || "BTC"));
+            const resolvedInfo = await resolvePaymentUserInfo(pending.userId);
+            webhookPaymentCompleted(orderStr, serviceType as any, String(source_amount || "50"), String(currency || "BTC"), {
+              pseudo: resolvedInfo?.pseudo || formData.pseudo || undefined,
+              email: resolvedInfo?.email || formData.email || undefined,
+              userId: resolvedInfo?.userId,
+              discordId: resolvedInfo?.discordId ?? formData.discordId ?? null,
+            }, paymentExtra);
           }
         } else if (orderStr.match(/^order_wanted_/)) {
           const payment = await storage.getCryptoPaymentByOrderId(orderStr);
@@ -2949,7 +3011,8 @@ export async function registerRoutes(
                 console.log(`Wanted role granted for order ${orderStr} (user ${numId})`);
               }
             }
-            webhookPaymentCompleted(orderStr, "wanted", String(source_amount || "?"), String(currency || "BTC"));
+            const resolvedInfo = await resolvePaymentUserInfo(payment.userId);
+            webhookPaymentCompleted(orderStr, "wanted", String(source_amount || "?"), String(currency || "BTC"), resolvedInfo, paymentExtra);
           }
         } else {
           const tierMatch = orderStr.match(/^order_(vip|pro|business|api)_(lifetime_)?/);
@@ -2967,10 +3030,14 @@ export async function registerRoutes(
               console.error("Discount lookup error:", dErr);
             }
 
-            webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"), discountInfo ? {
-              discountCode: discountInfo.code,
-              discountPercent: discountInfo.discountPercent,
-            } : undefined);
+            const tierPayment = await storage.getCryptoPaymentByOrderId(orderStr);
+            const resolvedInfo = await resolvePaymentUserInfo(tierPayment?.userId);
+
+            webhookPaymentCompleted(orderStr, tier, String(source_amount || "?"), String(currency || "BTC"), {
+              ...resolvedInfo,
+              discountCode: discountInfo?.code,
+              discountPercent: discountInfo?.discountPercent,
+            }, paymentExtra);
 
             try {
               const credited = await storage.creditReferral(orderStr);
@@ -3676,7 +3743,7 @@ export async function registerRoutes(
 
       const wUser = await buildUserInfo(req);
       if (!wUser.bypassed) {
-        webhookPhoneLookup(wUser, normalized);
+        webhookSearch(wUser, "Lookup", normalized, 1);
       }
       if (!wUser.bypassed) logSearchToDb(req, wUser, "phone", normalized, 1);
     } catch (err) {
@@ -4230,6 +4297,7 @@ export async function registerRoutes(
         searchQuery: summary.slice(0, 500),
         resultCount: results.length,
       });
+      if (!wUser.bypassed) webhookSearch(wUser, "Wanted", summary, results.length);
       res.json(results);
     } catch (err) {
       console.error("GET /api/wanted/search error:", err);
@@ -4247,7 +4315,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/wanted-profiles", requireAuth, requireAdmin, async (req, res) => {
+  // Limite JSON par defaut (100kb, cf. server/index.ts) trop basse des que le
+  // profil embarque une ou plusieurs photos en data URL — meme raison que
+  // pour /api/admin/wanted-profiles/extract juste au-dessus.
+  app.post("/api/admin/wanted-profiles", requireAuth, requireAdmin, express.json({ limit: "8mb" }), async (req, res) => {
     try {
       const { force, ...data } = req.body || {};
       if (!force) {
@@ -4264,7 +4335,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/wanted-profiles/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.patch("/api/admin/wanted-profiles/:id", requireAuth, requireAdmin, express.json({ limit: "8mb" }), async (req, res) => {
     try {
       const id = parseInt(req.params.id as string);
       if (isNaN(id)) return res.status(400).json({ message: "ID invalide" });
@@ -4685,6 +4756,9 @@ Extrais TOUTES les occurrences de chaque type trouvees dans l'image (plusieurs e
       const userEmail = (req as any).user?.email || "inconnu";
       console.log(`[xeuledoc] User ${userEmail} (${userId}) searched: ${docUrl} => owner: ${result.owner?.email || "not found"}`);
 
+      const wUser = await buildUserInfo(req);
+      if (!wUser.bypassed) webhookSearch(wUser, "Google OSINT", docUrl, result.owner ? 1 : 0);
+
       res.json(result);
     } catch (err) {
       console.error("POST /api/xeuledoc error:", err);
@@ -4820,6 +4894,9 @@ Extrais TOUTES les occurrences de chaque type trouvees dans l'image (plusieurs e
 
       results.sort((a, b) => a.name.localeCompare(b.name));
       console.log(`[sherlock] Username "${cleaned}" found on ${results.length} sites`);
+
+      const wUser = await buildUserInfo(req);
+      if (!wUser.bypassed) webhookSearch(wUser, "Username OSINT", cleaned, results.length);
 
       res.json({
         username: cleaned,
@@ -5099,16 +5176,20 @@ Extrais TOUTES les occurrences de chaque type trouvees dans l'image (plusieurs e
   });
 
   /* ── DisX AI OSINT — Natural language → DB search ──────── */
-  app.post("/api/disx/chat", requireAuth, requireRole("pro", "api"), async (req: any, res: any) => {
+  app.post("/api/disx/chat", requireAuth, requireRole("wanted"), async (req: any, res: any) => {
     try {
       const { message } = req.body;
       if (!message || typeof message !== "string" || !message.trim()) {
         return res.status(400).json({ error: "Message requis." });
       }
 
-      const dixApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-      const dixBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL;
-      const dixModel = process.env.DISX_MODEL || (dixApiKey?.startsWith("gsk_") ? "llama-3.3-70b-versatile" : "gpt-4o-mini");
+      const groqKey = process.env.GROQ_API_KEY;
+      const dixApiKey = groqKey || process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+      const dixBaseUrl = groqKey ? "https://api.groq.com/openai/v1" : (process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || process.env.OPENAI_BASE_URL);
+      const dixModel = process.env.DISX_MODEL || (groqKey ? "llama-3.3-70b-versatile" : "gpt-4o-mini");
+      if (!dixApiKey) {
+        return res.status(503).json({ error: "DisX n'est pas configure sur cet environnement (aucune cle IA)." });
+      }
       const openai = new OpenAI({
         apiKey: dixApiKey,
         ...(dixBaseUrl ? { baseURL: dixBaseUrl } : {}),
@@ -5162,13 +5243,17 @@ Règles :
         });
         const raw = extraction.choices[0]?.message?.content || "{}";
         const parsed = JSON.parse(raw);
-        criteria = (parsed.criteria || []).filter((c: any) =>
-          c && typeof c.type === "string" && typeof c.value === "string" && c.value.trim()
-        );
+        criteria = (parsed.criteria || [])
+          .filter((c: any) => c && typeof c.type === "string" && typeof c.value === "string" && c.value.trim())
+          // Le modele ne respecte pas toujours la casse exacte demandee dans le
+          // prompt (ex: "Email" au lieu de "email") — sans normalisation, ca
+          // rate silencieusement TYPE_TO_WANTED et validTypes plus bas.
+          .map((c: any) => ({ type: c.type.trim().toLowerCase(), value: c.value.trim() }));
       } catch (e) {
         console.error("[DisX] Extraction error:", e);
       }
 
+      console.log("[DisX] Extracted criteria:", JSON.stringify(criteria));
       send({ type: "criteria", data: criteria });
 
       if (criteria.length === 0) {
@@ -5188,11 +5273,20 @@ Règles :
 
       let searchResult = { results: [] as any[], total: 0 };
       if (searchCriteria.length > 0) {
-        try {
-          searchResult = await searchAllIndexes(searchCriteria, 10, 0);
-        } catch (e) {
-          console.error("[DisX] Search error:", e);
-        }
+        const [indexResult, brixhubResult] = await Promise.all([
+          searchAllIndexes(searchCriteria, 10, 0).catch(e => {
+            console.error("[DisX] index.db search error:", e);
+            return { results: [] as any[], total: 0 };
+          }),
+          (isBrixhubConfigured() ? callBrixhubInternal(searchCriteria) : Promise.resolve([])).catch(e => {
+            console.error("[DisX] Brixhub search error:", e);
+            return [] as any[];
+          }),
+        ]);
+        searchResult = {
+          results: [...indexResult.results, ...brixhubResult],
+          total: (indexResult.total ?? indexResult.results.length) + brixhubResult.length,
+        };
       }
 
       // Detect if user is specifically asking about Wanted profiles
@@ -5217,8 +5311,10 @@ Règles :
           const mapped = TYPE_TO_WANTED[c.type];
           if (mapped) wantedCriteriaMap[mapped] = c.value.trim();
         }
+        console.log("[DisX] wantedCriteriaMap:", JSON.stringify(wantedCriteriaMap));
         if (Object.keys(wantedCriteriaMap).length > 0) {
           const wantedResults = await storage.searchWantedProfiles(wantedCriteriaMap);
+          console.log("[DisX] wantedResults.length:", wantedResults.length);
           wantedFoundCount = wantedResults.length;
           if (wantedResults.length > 0) {
             const wantedMapped = wantedResults.slice(0, 5).map((w: any) => ({ ...w, _wantedProfile: true }));
@@ -5234,6 +5330,24 @@ Règles :
 
       send({ type: "results", data: { results: searchResult.results, total: searchResult.total } });
 
+      {
+        const wUser = await buildUserInfo(req);
+        if (!wUser.bypassed) webhookSearch(wUser, "DisX", message.trim(), searchResult.total);
+      }
+
+      // Si la recherche reelle (Wanted + Brixhub + index) ne remonte aucune
+      // ligne, on ne fait PAS generer de synthese par le LLM : sans donnees
+      // en entree, le modele peut "halluciner" (ou reciter des donnees vues
+      // pendant son entrainement) une fiche complete et contredire le "0
+      // trouve" affiche juste au-dessus. On envoie directement un message
+      // deterministe coherent avec le compteur de resultats.
+      if (searchResult.total === 0) {
+        send({ type: "summary", content: "Aucun résultat dans Wanted, Brixhub ou l'index pour ces critères." });
+        send({ type: "done" });
+        res.end();
+        return;
+      }
+
       /* ── Phase 3 : AI summary ── */
       const SUMMARY_PROMPT = `Tu es DisX, un assistant OSINT de Discreen. Analyse les résultats de recherche et fournis une synthèse concise en français.
 
@@ -5243,7 +5357,7 @@ Règles :
 - Si des profils "_wantedProfile: true" sont présents dans les données : détaille leurs informations (pseudo, notes, raison du signalement, contacts) et signale-les clairement comme WANTED ⚠️
 - Si aucun profil Wanted correspondant, dis-le explicitement : "Aucun profil Wanted trouvé pour [cible]"
 - Si des résultats de bases de données normales sont trouvés, résume les infos clés (identité, contacts, localisation)
-- Ne jamais inventer d'informations absentes des résultats
+- N'utilise QUE les informations presentes dans les donnees fournies ci-dessous. N'invente et ne suppose JAMAIS un pseudo, un telephone, une adresse, un email ou tout autre identifiant qui n'apparait pas explicitement dans ces donnees, meme s'il te semble plausible.
 - Maximum 4-5 phrases`;
 
       const wantedSummary = wantedFoundCount > 0
@@ -5253,10 +5367,27 @@ Règles :
         ? `${searchResult.total - wantedFoundCount} résultat(s) trouvé(s) dans les bases de données.`
         : "Aucun résultat dans les bases de données.";
 
+      // Les enregistrements bruts (dumps de leaks, notamment) peuvent embarquer
+      // des champs massifs (colonne "content" de searchSqlite, notes libres...)
+      // qui a eux seuls depassent le budget TPM de Groq (12k tokens/min sur le
+      // tier gratuit) — on ne garde que quelques champs courts par resultat.
+      const compactRecordForPrompt = (r: Record<string, unknown>) => {
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(r)) {
+          if (v === null || v === undefined || v === "") continue;
+          if (["id", "createdAt", "updatedAt", "_score", "_source"].includes(k)) continue;
+          const str = typeof v === "string" ? v : Array.isArray(v) ? v.join(", ") : String(v);
+          out[k] = str.length > 120 ? str.slice(0, 120) + "…" : str;
+        }
+        return out;
+      };
+      let compactResultsJson = JSON.stringify(searchResult.results.slice(0, 3).map(compactRecordForPrompt));
+      if (compactResultsJson.length > 2500) compactResultsJson = compactResultsJson.slice(0, 2500) + "…]";
+
       const resultsSummary = `
 [Wanted] ${wantedSummary}
 [Bases de données] ${dbSummary}
-${searchResult.results.length > 0 ? `Données : ${JSON.stringify(searchResult.results.slice(0, 5))}` : ""}`.trim();
+${searchResult.results.length > 0 ? `Données : ${compactResultsJson}` : ""}`.trim();
 
       const wantedFocusHint = isWantedQuery
         ? "\n⚠️ L'utilisateur interroge SPÉCIFIQUEMENT les profils Wanted. Concentre ta réponse sur ce point."

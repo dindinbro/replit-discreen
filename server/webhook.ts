@@ -45,6 +45,7 @@ interface UserInfo {
   uniqueId?: number;
   discordId?: string | null;
   bypassed?: boolean;
+  badges?: string[];
 }
 
 function userBlock(u: UserInfo): string {
@@ -57,6 +58,9 @@ function userBlock(u: UserInfo): string {
     lines.push(`**Email Session** : \`${u.sessionEmail}\``);
   }
   lines.push(`**ID Unique** : \`#${u.uniqueId ?? "N/A"}\``);
+  if (u.badges && u.badges.length) {
+    lines.push(`**Badges** : ${u.badges.map(b => `\`${b}\``).join(" ")}`);
+  }
   if (u.discordId) {
     lines.push(`**Discord** : <@${u.discordId}> (\`${u.discordId}\`)`);
   }
@@ -71,9 +75,9 @@ async function sendToWebhook(webhookUrl: string, options: WebhookOptions, label:
   try {
     const embed: any = {
       title: options.title,
-      color: options.color || COLORS.info,
       timestamp: new Date().toISOString(),
     };
+    if (options.color !== undefined) embed.color = options.color;
 
     if (options.description) embed.description = options.description;
     if (options.footer) embed.footer = { text: options.footer };
@@ -115,21 +119,41 @@ async function sendSearchWebhook(options: WebhookOptions): Promise<void> {
   await sendToWebhook(url, options, "search");
 }
 
-export function webhookSearch(user: UserInfo, type: string, criteria: string, resultCount: number) {
+// Falls back to the general webhook so payment logs still fire even if the
+// dedicated channel isn't configured yet.
+function getPaymentWebhookUrl(): string | undefined {
+  return process.env.DISCORD_PAYMENT_WEBHOOK_URL ?? getWebhookUrl();
+}
+
+async function sendPaymentWebhook(options: WebhookOptions): Promise<void> {
+  const url = getPaymentWebhookUrl();
+  if (!url) {
+    console.warn("[webhook] DISCORD_PAYMENT_WEBHOOK_URL / DISCORD_WEBHOOK_URL not set, skipping payment log");
+    return;
+  }
+  await sendToWebhook(url, options, "payment");
+}
+
+/* Un seul des 6 modules de recherche du site — reprend exactement les
+ * intitules du menu (client/src/components/Layout.tsx SEARCH_MODULES + page
+ * Wanted/DisX) pour que le champ "Type" du webhook soit immediatement
+ * reconnaissable, plutot qu'un nom de route interne comme "interne". */
+export type SearchWebhookType = "Paramétrique" | "Wanted" | "DisX" | "Lookup" | "Google OSINT" | "Username OSINT";
+
+export function webhookSearch(user: UserInfo, type: SearchWebhookType, criteria: string, resultCount: number) {
   const desc = [
     userBlock(user),
     sep(),
-    `**Requete**`,
+    `**Requête**`,
     `**Type** : ${type}`,
-    `**Criteres** : \`${criteria.slice(0, 200) || "N/A"}\``,
+    `**Recherché** : \`${criteria.slice(0, 200) || "N/A"}\``,
     sep(),
-    `**Resultat** : **${resultCount}** trouve(s)`,
+    `**Résultat** : **${resultCount}** trouvé(s)`,
   ].join("\n");
 
   sendSearchWebhook({
-    title: "\u{1F50D} Recherche Interne",
+    title: "\u{1F50D} Recherche",
     description: desc,
-    color: COLORS.search,
   });
 }
 
@@ -286,35 +310,62 @@ export function webhookInvoiceCreated(plan: string, orderId: string, amount: num
   if (userInfo) {
     if (userInfo.pseudo) lines.push(`**Pseudo** : \`${userInfo.pseudo}\``);
     if (userInfo.email) lines.push(`**Email** : \`${userInfo.email}\``);
-    if (userInfo.userId) lines.push(`**ID Unique** : \`${userInfo.userId}\``);
+    if (userInfo.userId) lines.push(`**ID Unique** : \`#${userInfo.userId}\``);
     if (userInfo.discordId) lines.push(`**Discord** : <@${userInfo.discordId}> (\`${userInfo.discordId}\`)`);
     if (userInfo.discountCode) lines.push(`**Code Promo** : \`${userInfo.discountCode}\` (-${userInfo.discountPercent}%)`);
   }
 
-  sendWebhook({
+  sendPaymentWebhook({
     title: "\u{1F4C4} Facture Creee",
     description: lines.join("\n"),
     color: COLORS.payment,
   });
 }
 
-export function webhookPaymentCompleted(orderId: string, tier: string, amount: string, currency: string, userInfo?: InvoiceUserInfo) {
+// Champs bruts du callback IPN NOWPayments qu'on ne loggait pas avant —
+// permet un log de paiement avec le detail complet (crypto exacte payee,
+// montant reellement recu, identifiants NOWPayments) plutot que juste le
+// montant/devise deja extraits par l'appelant.
+export interface PaymentDetails {
+  priceAmount?: string | number;
+  priceCurrency?: string;
+  payCurrency?: string;
+  actuallyPaid?: string | number;
+  paymentId?: string;
+  invoiceId?: string;
+  paymentStatus?: string;
+}
+
+export function webhookPaymentCompleted(orderId: string, tier: string, amount: string, currency: string, userInfo?: InvoiceUserInfo, extra?: PaymentDetails) {
+  const cryptoTicker = (extra?.payCurrency || currency || "").toUpperCase();
+  const priceAmount = extra?.priceAmount ?? amount;
+  const priceCurrency = (extra?.priceCurrency || "EUR").toUpperCase();
+
   const lines = [
     `>>> **Details Paiement**`,
     `**Commande** : \`${orderId}\``,
     `**Tier** : \`${tier.toUpperCase()}\``,
-    `**Montant** : ${amount} ${currency}`,
+    `**Prix** : ${priceAmount} ${priceCurrency}`,
+    `**Crypto payee** : \`${cryptoTicker || "N/A"}\``,
   ];
 
+  if (extra?.actuallyPaid !== undefined && extra.actuallyPaid !== null && extra.actuallyPaid !== "") {
+    lines.push(`**Montant recu** : ${extra.actuallyPaid} ${cryptoTicker}`);
+  }
+  if (extra?.paymentStatus) lines.push(`**Statut NOWPayments** : \`${extra.paymentStatus}\``);
+  if (extra?.paymentId) lines.push(`**Payment ID** : \`${extra.paymentId}\``);
+  if (extra?.invoiceId) lines.push(`**Invoice ID** : \`${extra.invoiceId}\``);
+
   if (userInfo) {
+    lines.push(sep());
     if (userInfo.pseudo) lines.push(`**Pseudo** : \`${userInfo.pseudo}\``);
     if (userInfo.email) lines.push(`**Email** : \`${userInfo.email}\``);
-    if (userInfo.userId) lines.push(`**ID Unique** : \`${userInfo.userId}\``);
+    if (userInfo.userId) lines.push(`**ID Unique** : \`#${userInfo.userId}\``);
     if (userInfo.discordId) lines.push(`**Discord** : <@${userInfo.discordId}> (\`${userInfo.discordId}\`)`);
     if (userInfo.discountCode) lines.push(`**Code Promo** : \`${userInfo.discountCode}\` (-${userInfo.discountPercent}%)`);
   }
 
-  sendWebhook({
+  sendPaymentWebhook({
     title: "\u{1F4B3} Paiement Complete",
     description: lines.join("\n"),
     color: COLORS.payment,
@@ -395,20 +446,6 @@ export function webhookApiKeyRevoked(user: UserInfo, keyId: number) {
     title: "\u{26D4} Cle API Revoquee",
     description: desc,
     color: COLORS.security,
-  });
-}
-
-export function webhookPhoneLookup(user: UserInfo, phone: string) {
-  const desc = [
-    userBlock(user),
-    sep(),
-    `**Numero** : \`${phone}\``,
-  ].join("\n");
-
-  sendSearchWebhook({
-    title: "\u{1F4F1} Lookup Telephone",
-    description: desc,
-    color: COLORS.lookup,
   });
 }
 
