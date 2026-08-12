@@ -32,6 +32,8 @@ export interface EntityNode {
   subtitle?: string;
   value?: string;
   profile?: WantedProfile;
+  /** Noeud de regroupement intercale entre la personne et ses attributs d'un meme type (voir buildGraph.ts). */
+  isCategory?: boolean;
   contributingProfileIds: number[];
   degree: number;
   confidence: number;

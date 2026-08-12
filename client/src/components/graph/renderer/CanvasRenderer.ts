@@ -33,6 +33,7 @@ export interface CanvasRendererDeps {
   getNodes: () => EntityNode[];
   getEdges: () => RuntimeEdge[];
   getAdjacency: () => Map<string, AdjacencyEntry[]>;
+  getById: () => Map<string, EntityNode>;
   getFocusId: () => string | null;
   getRevealState: () => RevealState | null;
   getInteractionState: () => RendererInteractionState;
@@ -141,7 +142,7 @@ export function createCanvasRenderer(deps: CanvasRendererDeps): CanvasRendererHa
     const interaction = deps.getInteractionState();
     const now = performance.now();
     const vis = visibilityStateOf(interaction);
-    const isVisible = (n: EntityNode) => isNodeVisible(n, vis, adjacency);
+    const isVisible = (n: EntityNode) => isNodeVisible(n, vis, adjacency, deps.getById());
 
     quadtreeCache = buildQuadtree(nodes);
 
@@ -233,7 +234,7 @@ export function createCanvasRenderer(deps: CanvasRendererDeps): CanvasRendererHa
         quadtreeCache,
         world.x,
         world.y,
-        n => isNodeVisible(n, vis, adjacency) && spawnProgress(n.id, revealState, now) >= 1,
+        n => isNodeVisible(n, vis, adjacency, deps.getById()) && spawnProgress(n.id, revealState, now) >= 1,
       );
     },
     invalidateSprite(nodeId) {

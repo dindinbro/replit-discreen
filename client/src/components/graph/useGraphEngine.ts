@@ -58,7 +58,7 @@ function createGraphEngine(model: GraphModel, initialFocusId: string | null): Gr
   }
 
   function isVisible(node: EntityNode): boolean {
-    return isNodeVisible(node, { hiddenIds, activeFilters, isolateFocusId }, model.adjacency);
+    return isNodeVisible(node, { hiddenIds, activeFilters, isolateFocusId }, model.adjacency, model.byId);
   }
 
   function applyFocus(id: string | null) {
@@ -91,6 +91,7 @@ function createGraphEngine(model: GraphModel, initialFocusId: string | null): Gr
         getNodes: () => model.nodes,
         getEdges: () => sim.edges,
         getAdjacency: () => model.adjacency,
+        getById: () => model.byId,
         getFocusId: () => focusId,
         getRevealState: () => revealState,
         getInteractionState: () => ({

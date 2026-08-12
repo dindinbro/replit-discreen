@@ -78,7 +78,7 @@ export function drawEdges(ctx: CanvasRenderingContext2D, edges: RuntimeEdge[], s
     const emphasized = isEmphasized(edge, state);
     const dim = hasActive && !emphasized;
 
-    const attrNode = edge.source.kind === "person" ? edge.target : edge.source;
+    const attrNode = edge.source.kind === "person" || edge.source.isCategory ? edge.target : edge.source;
     const kindColor = state.colorMode === "confidence" ? confidenceColor(attrNode.confidence) : state.resolveColor(ENTITY_REGISTRY[edge.kind].colorVar);
     const width = 1 + Math.min(Math.max(attrNode.degree - 1, 0), 4) * 0.55;
     const { x: cx, y: cy } = controlPoint(edge.id, x0, y0, x1, y1);

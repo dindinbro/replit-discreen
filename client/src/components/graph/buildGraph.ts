@@ -16,6 +16,10 @@ function attributeNodeId(kind: EntityKind, value: string): string {
   return `${kind}:${normalize(value)}`;
 }
 
+function categoryNodeId(profileId: number, kind: EntityKind): string {
+  return `category:${profileId}:${kind}`;
+}
+
 interface AttributeAccumulator {
   kind: EntityKind;
   value: string;
@@ -36,9 +40,41 @@ interface AttributeAccumulator {
  */
 export function buildEntityGraph(profiles: WantedProfile[]): GraphModel {
   const personNodes = new Map<string, EntityNode>();
+  const categoryNodes = new Map<string, EntityNode>();
   const attributeAccumulators = new Map<string, AttributeAccumulator>();
   const edges: EntityEdge[] = [];
   const edgeKeys = new Set<string>();
+
+  function addEdge(edgeId: string, source: string, target: string, kind: EntityKind, relationLabel: string) {
+    if (edgeKeys.has(edgeId)) return;
+    edgeKeys.add(edgeId);
+    edges.push({ id: edgeId, source, target, kind, relationLabel, weight: 1 });
+  }
+
+  // Chaque profil a, par type d'attribut, un noeud "branche" intercale entre
+  // la personne et les valeurs de ce type (ex: la branche "Email" de la
+  // personne X relie X a chacun de ses emails) plutot qu'une arete directe
+  // personne -> valeur — cf. maquette de regroupement par categorie.
+  function getOrCreateCategory(kind: EntityKind, profileId: number): EntityNode {
+    const id = categoryNodeId(profileId, kind);
+    let node = categoryNodes.get(id);
+    if (!node) {
+      node = {
+        id,
+        kind,
+        label: ENTITY_REGISTRY[kind].label,
+        isCategory: true,
+        contributingProfileIds: [profileId],
+        degree: 0,
+        confidence: 100,
+        status: "verifie",
+        source: "Discreen",
+      };
+      categoryNodes.set(id, node);
+    }
+    addEdge(`e:${personNodeId(profileId)}->${id}`, personNodeId(profileId), id, kind, ENTITY_REGISTRY[kind].relationLabel);
+    return node;
+  }
 
   function addAttribute(kind: EntityKind, rawValue: string, profileId: number, addedBy?: string | null) {
     const value = rawValue.trim();
@@ -52,18 +88,8 @@ export function buildEntityGraph(profiles: WantedProfile[]): GraphModel {
     if (!acc.contributors.some(c => c.profileId === profileId)) {
       acc.contributors.push({ profileId, addedBy });
     }
-    const edgeId = `e:${personNodeId(profileId)}->${id}`;
-    if (!edgeKeys.has(edgeId)) {
-      edgeKeys.add(edgeId);
-      edges.push({
-        id: edgeId,
-        source: personNodeId(profileId),
-        target: id,
-        kind,
-        relationLabel: ENTITY_REGISTRY[kind].relationLabel,
-        weight: 1,
-      });
-    }
+    const category = getOrCreateCategory(kind, profileId);
+    addEdge(`e:${category.id}->${id}`, category.id, id, kind, ENTITY_REGISTRY[kind].relationLabel);
   }
 
   for (const p of profiles) {
@@ -114,7 +140,7 @@ export function buildEntityGraph(profiles: WantedProfile[]): GraphModel {
     });
   });
 
-  const nodes: EntityNode[] = [...personNodes.values(), ...attributeNodes.values()];
+  const nodes: EntityNode[] = [...personNodes.values(), ...categoryNodes.values(), ...attributeNodes.values()];
   const byId = new Map(nodes.map(n => [n.id, n]));
 
   const adjacency = new Map<string, AdjacencyEntry[]>();
