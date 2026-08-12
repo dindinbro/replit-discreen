@@ -10,7 +10,7 @@ import {
   Key, FileText, Menu, X, Users, User,
   ChevronDown, ChevronLeft, ChevronRight, LogIn,
   Sparkles, Phone, MapPin, Hash, FileSearch, Eye, ShieldAlert, Sword,
-  Camera, Activity, Bot,
+  Camera, Activity, Bot, Brain, CreditCard,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -129,11 +129,16 @@ interface NavSection {
 
 const SEARCH_MODULES: NavItem[] = [
   { label: "Paramétrique",   href: "/search?mode=internal",  icon: Sparkles },
-  { label: "Discord Scan",   href: "/discord",               icon: Bot, comingSoon: true },
   { label: "Username OSINT", href: "/search?mode=sherlock",  icon: Eye },
   { label: "Google OSINT",   href: "/search?mode=xeuledoc",  icon: FileSearch },
-  { label: "Wanted",         href: "/wanted",                icon: ShieldAlert },
   { label: "Lookup",          href: "/search?mode=phone",     icon: Phone },
+];
+
+const MODULE_ITEMS: NavItem[] = [
+  { label: "Discord Scan",   href: "/discord",  icon: Bot, comingSoon: true },
+  { label: "Wanted",         href: "/wanted",   icon: ShieldAlert },
+  { label: "DisX",           href: "/disx",     icon: Brain },
+  { label: "Prix",           href: "/pricing",  icon: CreditCard },
 ];
 
 const NAV_SECTIONS: NavSection[] = [
@@ -149,6 +154,13 @@ const NAV_SECTIONS: NavSection[] = [
     collapsible: true,
     defaultOpen: true,
     items: SEARCH_MODULES,
+  },
+  {
+    key: "modules",
+    labelKey: "nav.section.modules",
+    collapsible: true,
+    defaultOpen: true,
+    items: MODULE_ITEMS,
   },
   {
     key: "community",
@@ -170,8 +182,8 @@ const NAV_SECTIONS: NavSection[] = [
 
 const ALL_FLAT_ITEMS: NavItem[] = NAV_SECTIONS.flatMap(s => s.items);
 
-const W_EXPANDED = 240;
-const W_COLLAPSED = 56;
+const W_EXPANDED = 288;
+const W_COLLAPSED = 64;
 
 /* ── Helpers ─────────────────────────────────────────────── */
 function matchesHref(href: string, pathname: string, search: string): boolean {
@@ -333,30 +345,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     // filtered out of the list entirely for non-admins before this runs.
     const isBlocked = !!item.disabled;
 
-    const itemClass = `relative flex items-center rounded-lg transition-all duration-150 select-none
-      ${collapsed ? "justify-center w-10 h-10 p-0 mx-auto" : indent ? "gap-2.5 px-3 py-[7px] ml-1" : "gap-3 px-3 py-2.5"}
+    const itemClass = `relative flex items-center rounded-lg transition-all duration-200 select-none
+      ${collapsed ? "justify-center w-12 h-12 p-0 mx-auto" : indent ? "gap-3 px-3.5 py-2.5 ml-1" : "gap-3.5 px-3.5 py-3.5"}
       ${isBlocked
         ? "cursor-not-allowed opacity-35 text-muted-foreground/50"
         : active
         ? "cursor-pointer bg-primary text-primary-foreground shadow-[0_2px_10px_rgba(99,102,241,0.35)]"
-        : "cursor-pointer text-muted-foreground/70 hover:text-foreground hover:bg-white/[0.06]"
+        : "cursor-pointer text-muted-foreground/70 hover:text-foreground hover:bg-white/[0.06] hover:translate-x-0.5"
       }`;
 
     const innerContent = (
       <>
-        <Icon className={`shrink-0 ${collapsed ? "w-[19px] h-[19px]" : indent ? "w-3.5 h-3.5" : "w-4 h-4"} ${active && !isBlocked ? "text-primary-foreground" : ""}`} />
+        <Icon className={`shrink-0 ${collapsed ? "w-[22px] h-[22px]" : indent ? "w-[18px] h-[18px]" : "w-5 h-5"} ${active && !isBlocked ? "text-primary-foreground" : ""}`} />
         <span
-          className={`whitespace-nowrap overflow-hidden ${indent ? "text-[12px] font-medium" : "text-[13.5px]"} ${active && !isBlocked ? "font-semibold" : "font-medium"}`}
+          className={`whitespace-nowrap overflow-hidden ${indent ? "text-[14px] font-medium" : "text-base"} ${active && !isBlocked ? "font-semibold" : "font-medium"}`}
           style={{
             opacity: collapsed ? 0 : 1,
-            maxWidth: collapsed ? 0 : 160,
+            maxWidth: collapsed ? 0 : 200,
             transition: "opacity 0.15s ease, max-width 0.22s cubic-bezier(0.4,0,0.2,1)",
           }}
         >
           {label}
         </span>
         {!collapsed && item.comingSoon && (
-          <span className="ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 bg-white/[0.05] text-muted-foreground/50 border border-white/[0.06]">
+          <span className="ml-auto text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 bg-white/[0.05] text-muted-foreground/50 border border-white/[0.06]">
             SOON
           </span>
         )}
@@ -458,37 +470,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className={`w-full flex items-center gap-2.5 rounded-lg px-2 py-2 border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-primary/20 transition-colors focus:outline-none
+                  className={`w-full flex items-center gap-3.5 rounded-xl px-3 py-3 border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-primary/20 transition-colors focus:outline-none
                     ${collapsed ? "justify-center" : ""}`}
                   data-testid="button-user-menu"
                   title={collapsed ? userName : undefined}
                 >
                   <label
                     htmlFor="avatar-file-upload"
-                    className="relative w-7 h-7 rounded-full bg-primary/15 border border-primary/25 shadow-[0_0_0_1px_rgba(99,102,241,0.08)] flex items-center justify-center overflow-hidden group cursor-pointer shrink-0"
+                    className="relative w-11 h-11 rounded-full bg-primary/15 border border-primary/25 shadow-[0_0_0_1px_rgba(99,102,241,0.08)] flex items-center justify-center overflow-hidden group cursor-pointer shrink-0"
                     onClick={(e) => e.stopPropagation()}
                     title="Changer la photo de profil"
                     data-testid="button-avatar-change"
                   >
-                    {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-3.5 h-3.5 text-primary" />}
+                    {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <User className="w-5 h-5 text-primary" />}
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
                       {avatarUploading
-                        ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
-                        : <Camera className="w-3 h-3 text-white" />}
+                        ? <div className="w-4 h-4 border border-white border-t-transparent rounded-full animate-spin" />
+                        : <Camera className="w-4 h-4 text-white" />}
                     </div>
                   </label>
                   {!collapsed && (
                     <>
                       <div className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-[13px] font-medium text-foreground/90 truncate leading-none">{userName}</span>
-                          {uniqueId && <span className="text-[10px] font-mono text-foreground/30 shrink-0">#{uniqueId}</span>}
+                          <span className="text-base font-medium text-foreground/90 truncate leading-none">{userName}</span>
+                          {uniqueId && <span className="text-xs font-mono text-foreground/30 shrink-0">#{uniqueId}</span>}
                         </div>
                         {role && (
-                          <div className="flex items-center gap-1 mt-0.5">
+                          <div className="flex items-center gap-1 mt-1.5">
                             {role === "admin" && (
                               <span
-                                className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
+                                className="text-[11px] font-bold uppercase tracking-wider inline-block px-2 py-[2px] rounded"
                                 style={{ color: "#f87171", background: "rgba(248,113,113,0.1)" }}
                               >
                                 Admin
@@ -496,7 +508,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             )}
                             {(role === "admin" || (role === "free" && earlyAccess)) && (
                               <span
-                                className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
+                                className="text-[11px] font-bold uppercase tracking-wider inline-block px-2 py-[2px] rounded"
                                 style={{ color: "#2dd4bf", background: "rgba(45,212,191,0.1)" }}
                               >
                                 Early
@@ -504,7 +516,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             )}
                             {role !== "admin" && role !== "free" && (
                               <span
-                                className="text-[9px] font-bold uppercase tracking-wider inline-block px-1.5 py-[1px] rounded"
+                                className="text-[11px] font-bold uppercase tracking-wider inline-block px-2 py-[2px] rounded"
                                 style={{
                                   color: role === "pro" || role === "business" ? "hsl(var(--primary))" : role === "vip" ? "#fbbf24" : role === "wanted" ? "#fb923c" : undefined,
                                   background: role === "pro" || role === "business" ? "hsl(var(--primary) / 0.1)" : role === "vip" ? "rgba(251,191,36,0.1)" : role === "wanted" ? "rgba(251,146,60,0.1)" : "transparent",
@@ -516,7 +528,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           </div>
                         )}
                       </div>
-                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0" />
+                      <ChevronDown className="w-[18px] h-[18px] text-muted-foreground/30 shrink-0" />
                     </>
                   )}
                 </button>
@@ -571,14 +583,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {/* Section label */}
               {(section.labelKey || section.label) && !collapsed && (
                 <div
-                  className={`flex items-center justify-between px-2.5 mb-1.5 ${section.collapsible ? "cursor-pointer" : ""}`}
+                  className={`group/section flex items-center justify-between px-2.5 py-1 mb-1 rounded-md transition-colors duration-200 ${section.collapsible ? "cursor-pointer hover:bg-white/[0.04]" : ""}`}
                   onClick={section.collapsible ? () => toggleSection(section.key) : undefined}
                 >
-                  <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 select-none">
+                  <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground/50 select-none transition-all duration-200 group-hover/section:text-primary/80 group-hover/section:tracking-[0.16em]">
                     {section.label ?? (section.labelKey ? t(section.labelKey, { defaultValue: section.key.toUpperCase() }) : section.key.toUpperCase())}
                   </span>
                   {section.collapsible && (
-                    <ChevronDown className={`w-3 h-3 text-muted-foreground/35 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`} />
+                    <ChevronDown className={`w-3 h-3 text-muted-foreground/35 transition-all duration-200 group-hover/section:text-primary/80 group-hover/section:translate-y-0.5 ${isOpen ? "" : "-rotate-90"}`} />
                   )}
                 </div>
               )}

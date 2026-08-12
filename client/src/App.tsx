@@ -28,6 +28,8 @@ import TicketsPage from "@/pages/TicketsPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import WantedPage from "@/pages/WantedPage";
 import DiscordScanPage from "@/pages/DiscordScanPage";
+import DisXPage from "@/pages/DisXPage";
+import PricingPage from "@/pages/PricingPage";
 import SubscriptionToastProvider from "@/components/SubscriptionToastProvider";
 import PendingApprovalGate from "@/components/PendingApprovalGate";
 import Layout from "@/components/Layout";
@@ -232,8 +234,14 @@ function Router() {
       <Route path="/wanted">
         <ProtectedRoute component={WantedPage} />
       </Route>
+      <Route path="/disx">
+        <ProtectedRoute component={DisXPage} />
+      </Route>
       <Route path="/discord">
         <ProtectedRoute component={DiscordScanPage} />
+      </Route>
+      <Route path="/pricing">
+        <ProtectedRoute component={PricingPage} />
       </Route>
       <Route path="/api-keys">
         <ProtectedRoute component={ApiKeysPage} />

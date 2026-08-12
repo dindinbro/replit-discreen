@@ -11,6 +11,7 @@
       "main": "Principal",
       "info": "Informations",
       "recherche": "Recherche",
+      "modules": "Modules",
       "community": "Communauté"
     },
     "darkMode": "Mode sombre",
