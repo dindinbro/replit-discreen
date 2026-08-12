@@ -186,6 +186,7 @@ export async function startDiscordBot() {
         .addChoices(
           { name: "VIP", value: "vip" },
           { name: "PRO", value: "pro" },
+          { name: "Business", value: "business" },
           { name: "API", value: "api" }
         )
     )
@@ -254,6 +255,7 @@ export async function startDiscordBot() {
           { name: "Free", value: "free" },
           { name: "VIP", value: "vip" },
           { name: "PRO", value: "pro" },
+          { name: "Business", value: "business" },
           { name: "API", value: "api" }
         )
     )
@@ -347,23 +349,18 @@ export async function startDiscordBot() {
 
   const setstatusCommand = new SlashCommandBuilder()
     .setName("setstatus")
-    .setDescription("Forcer le statut d'un service")
+    .setDescription("Forcer le statut d'un service affiche sur discreen.site/status")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption((opt) =>
       opt
         .setName("service")
-        .setDescription("Le service a modifier")
+        .setDescription("Le service a modifier (nom affiche sur la page Status du site)")
         .setRequired(true)
         .addChoices(
-          { name: "Site", value: "Site" },
-          { name: "Bot", value: "Bot" },
-          { name: "API", value: "API" },
-          { name: "GeoIP", value: "GeoIP" },
-          { name: "Lookup Numero", value: "Lookup Numero" },
-          { name: "Recherche par critere", value: "Recherche par critere" },
-          { name: "Recherche Globale", value: "Recherche Globale" },
-          { name: "Autres sources", value: "Autres sources" },
-          { name: "Decodeur NIR", value: "Decodeur NIR" }
+          { name: "Moteur de Recherche", value: "Moteur de Recherche" },
+          { name: "API Externe", value: "API Externe" },
+          { name: "Base de Données", value: "Base de Données" },
+          { name: "Interface Web", value: "Interface Web" }
         )
     )
     .addStringOption((opt) =>
@@ -372,10 +369,9 @@ export async function startDiscordBot() {
         .setDescription("Le statut a forcer")
         .setRequired(true)
         .addChoices(
-          { name: "Operationnel (vert)", value: "operational" },
-          { name: "Degrade (orange)", value: "degraded" },
-          { name: "Hors ligne (rouge)", value: "down" },
-          { name: "Automatique (detection auto)", value: "auto" }
+          { name: "Opérationnel (vert)", value: "operational" },
+          { name: "Dégradé (orange)", value: "degraded" },
+          { name: "Panne (rouge)", value: "outage" }
         )
     );
 
@@ -1814,33 +1810,33 @@ export async function startDiscordBot() {
     if (interaction.commandName === "setstatus") {
       try {
         const serviceName = interaction.options.getString("service", true);
-        const statut = interaction.options.getString("statut", true);
+        const statut = interaction.options.getString("statut", true) as "operational" | "degraded" | "outage";
 
-        let overrides: Record<string, string> = {};
-        try {
-          const raw = await storage.getSiteSetting("status_overrides");
-          if (raw) overrides = JSON.parse(raw);
-        } catch {}
-
-        if (statut === "auto") {
-          delete overrides[serviceName];
+        // Ecrit directement dans la table service_status (celle que lit
+        // GET /api/status pour la page discreen.site/status) au lieu d'un
+        // site-setting "status_overrides" qui n'etait consulte que par la
+        // commande /status (embed Discord) \u2014 /setstatus n'avait donc jusque
+        // la aucun effet sur ce que les visiteurs voient reellement.
+        const existing = await storage.getAllServiceStatus();
+        const match = existing.find(s => s.name === serviceName);
+        if (match) {
+          await storage.updateServiceStatus(match.id, { status: statut });
         } else {
-          overrides[serviceName] = statut;
+          await storage.createServiceStatus({ name: serviceName, status: statut, sortOrder: existing.length });
         }
 
-        await storage.setSiteSetting("status_overrides", JSON.stringify(overrides));
-
-        const statusLabel = statut === "operational" ? "Operationnel" : statut === "degraded" ? "Degrade" : statut === "down" ? "Hors ligne" : "Automatique";
-        const statusDot = statut === "operational" ? "\uD83D\uDFE2" : statut === "degraded" ? "\uD83D\uDFE0" : statut === "down" ? "\uD83D\uDD34" : "\u2699\uFE0F";
+        const statusLabel = statut === "operational" ? "Op\u00E9rationnel" : statut === "degraded" ? "D\u00E9grad\u00E9" : "Panne";
+        const statusDot = statut === "operational" ? "\uD83D\uDFE2" : statut === "degraded" ? "\uD83D\uDFE0" : "\uD83D\uDD34";
 
         const embed = new EmbedBuilder()
-          .setColor(statut === "operational" ? 0x10b981 : statut === "degraded" ? 0xf59e0b : statut === "down" ? 0xef4444 : 0x6366f1)
-          .setTitle("Statut de service modifie")
+          .setColor(statut === "operational" ? 0x10b981 : statut === "degraded" ? 0xf59e0b : 0xef4444)
+          .setTitle("Statut de service modifi\u00E9")
+          .setDescription("Visible imm\u00E9diatement sur discreen.site/status")
           .addFields(
             { name: "Service", value: serviceName, inline: true },
             { name: "Statut", value: `${statusDot} ${statusLabel}`, inline: true }
           )
-          .setFooter({ text: `Modifie par ${interaction.user.username}` })
+          .setFooter({ text: `Modifi\u00E9 par ${interaction.user.username}` })
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
