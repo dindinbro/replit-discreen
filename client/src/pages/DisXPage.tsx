@@ -13,8 +13,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const SOURCES = ["Wanted", "Brixhub", "Index"];
-
 const FILTER_LABELS: Record<string, string> = {
   firstName: "Prénom", lastName: "Nom", dob: "Date naiss.", yob: "Année naiss.",
   city: "Ville", email: "Email", phone: "Téléphone", username: "Username",
@@ -121,51 +119,42 @@ function DisXIntroVisual() {
   );
 }
 
-/* Toile de fond "reseau neuronal" derriere tout le contenu de la page DisX
- * (une fois l'acces debloque) — noeuds et synapses places a la main (pas de
- * simulation physique) qui respirent en boucle, avec quelques aretes ou un
- * signal voyage en continu. Le cerveau du header n'est plus un logo isole :
- * toute la page baigne dans le meme langage visuel, a tres faible opacite
- * pour ne jamais concurrencer le contenu au premier plan. */
-const NEURAL_NODES: { x: number; y: number }[] = [
-  { x: 40, y: 50 }, { x: 120, y: 30 }, { x: 200, y: 60 }, { x: 300, y: 40 }, { x: 370, y: 90 },
-  { x: 60, y: 140 }, { x: 150, y: 120 }, { x: 250, y: 150 }, { x: 340, y: 170 },
-  { x: 90, y: 220 }, { x: 190, y: 240 }, { x: 280, y: 230 }, { x: 30, y: 260 }, { x: 360, y: 260 },
+/* Nuage de synapses derriere tout le contenu de la page DisX (une fois
+ * l'acces debloque) — de simples points lumineux places en pourcentage
+ * (pas un SVG a viewBox fixe) qui respirent en boucle, sans aretes qui les
+ * relient. Un maillage geometrique a base de <line> se deforme et se coupe
+ * n'importe comment selon la forme du conteneur (panneau de chat haut et
+ * etroit) ; des points positionnes en % s'adaptent eux nativement, quelle
+ * que soit la forme de l'ecran, sans jamais ressembler a un schema casse. */
+const NEURAL_DOTS: { left: number; top: number; size: number; violet?: boolean }[] = [
+  { left: 8, top: 12, size: 3 }, { left: 22, top: 28, size: 2 }, { left: 15, top: 52, size: 2.5, violet: true },
+  { left: 6, top: 74, size: 2 }, { left: 30, top: 82, size: 3, violet: true }, { left: 40, top: 18, size: 2 },
+  { left: 88, top: 10, size: 2.5, violet: true }, { left: 76, top: 30, size: 2 }, { left: 92, top: 46, size: 3 },
+  { left: 82, top: 64, size: 2, violet: true }, { left: 94, top: 80, size: 2.5 }, { left: 68, top: 88, size: 2, violet: true },
+  { left: 55, top: 8, size: 2 }, { left: 60, top: 95, size: 2.5 },
 ];
-const NEURAL_EDGES: [number, number][] = [
-  [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [1, 6], [2, 6], [2, 7], [3, 7], [4, 8],
-  [5, 6], [6, 7], [7, 8], [5, 9], [6, 10], [7, 10], [7, 11], [8, 11], [8, 13], [9, 10],
-  [10, 11], [11, 13], [9, 12], [10, 12],
-];
-const NEURAL_ACTIVE_EDGES = new Set([1, 4, 8, 12, 16, 20]);
 
 function NeuralField() {
   return (
-    <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full opacity-[0.18]" aria-hidden="true">
-      {NEURAL_EDGES.map(([a, b], i) => {
-        const n1 = NEURAL_NODES[a], n2 = NEURAL_NODES[b];
-        const active = NEURAL_ACTIVE_EDGES.has(i);
-        return (
-          <line
-            key={i}
-            x1={n1.x} y1={n1.y} x2={n2.x} y2={n2.y}
-            stroke={i % 2 === 0 ? "rgba(99,102,241,0.55)" : "rgba(139,92,246,0.55)"}
-            strokeWidth={0.6}
-            strokeDasharray={active ? "3 7" : undefined}
-            style={active ? { animation: `wanted-flow-dash ${2.4 + (i % 3) * 0.6}s linear infinite` } : undefined}
-          />
-        );
-      })}
-      {NEURAL_NODES.map((n, i) => (
-        <circle
+    <div className="absolute inset-0 opacity-[0.55]" aria-hidden="true">
+      {NEURAL_DOTS.map((d, i) => (
+        <span
           key={i}
-          cx={n.x} cy={n.y} r={i % 3 === 0 ? 2.6 : 1.8}
-          fill={i % 2 === 0 ? "rgba(99,102,241,0.75)" : "rgba(139,92,246,0.75)"}
-          className="animate-wanted-card-glow"
-          style={{ animationDelay: `${(i * 0.35).toFixed(2)}s`, transformBox: "fill-box", transformOrigin: "center" }}
+          className="absolute rounded-full animate-wanted-card-glow"
+          style={{
+            left: `${d.left}%`,
+            top: `${d.top}%`,
+            width: d.size * 4,
+            height: d.size * 4,
+            background: d.violet
+              ? "radial-gradient(circle, rgba(139,92,246,0.9) 0%, rgba(139,92,246,0) 70%)"
+              : "radial-gradient(circle, rgba(99,102,241,0.9) 0%, rgba(99,102,241,0) 70%)",
+            animationDelay: `${(i * 0.4).toFixed(1)}s`,
+            animationDuration: `${4.5 + (i % 3)}s`,
+          }}
         />
       ))}
-    </svg>
+    </div>
   );
 }
 
@@ -731,14 +720,6 @@ export default function DisXPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border/30 bg-muted/20">
-            {SOURCES.map(s => (
-              <span key={s} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground/70">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400/80" />
-                {s}
-              </span>
-            ))}
-          </div>
           {entries.length > 0 && (
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/30 bg-muted/20 text-xs font-bold text-muted-foreground tabular-nums">
               {entries.length} recherche{entries.length > 1 ? "s" : ""}
@@ -772,7 +753,6 @@ export default function DisXPage() {
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                 {[
-                  { icon: Network, label: "Wanted · Brixhub · Index" },
                   { icon: Wand2, label: "Zéro formulaire" },
                   { icon: History, label: "Contexte conservé" },
                 ].map(({ icon: SIcon, label }, i) => (
