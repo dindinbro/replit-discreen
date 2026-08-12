@@ -2447,7 +2447,9 @@ export default function SearchPage() {
                       <h3 className="text-lg font-bold text-destructive">Erreur de recherche</h3>
                       <p className="text-muted-foreground max-w-md mx-auto text-sm">
                         {activeError instanceof SearchLimitError
-                          ? `Limite atteinte (${activeError.used}/${activeError.limit}) pour le plan ${activeError.tier.toUpperCase()}.`
+                          ? activeError.cooldown
+                            ? activeError.message
+                            : `Limite atteinte (${activeError.used}/${activeError.limit}) pour le plan ${activeError.tier.toUpperCase()}.`
                           : activeError.message || "Le service est temporairement indisponible. Reessayez plus tard."}
                       </p>
                     </div>
