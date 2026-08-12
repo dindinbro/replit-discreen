@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
+import { webhookSessionLogin } from "./webhook";
 
 declare module "express-session" {
   interface SessionData {
@@ -12,7 +13,7 @@ declare module "express-session" {
 
 // Connection logging (IP, user agent) for the admin panel. Admin accounts
 // are deliberately excluded — only regular user activity is tracked here.
-async function logSuccessfulLogin(req: Request, user: { id: number; username: string; email: string | null; role: string }, provider: string) {
+async function logSuccessfulLogin(req: Request, user: { id: number; username: string; email: string | null; role: string; earlyAccess?: boolean }, provider: string) {
   if (user.role === "admin") return;
   try {
     const ip = req.headers["x-forwarded-for"]?.toString().split(",")[0]?.trim() || req.ip || req.socket?.remoteAddress || "unknown";
@@ -28,6 +29,23 @@ async function logSuccessfulLogin(req: Request, user: { id: number; username: st
       tier: sub?.tier || "free",
       discordId: sub?.discordId || undefined,
     });
+
+    // Meme logique de badges que la sidebar (client/src/components/Layout.tsx
+    // ROLE_DISPLAY) pour que le webhook de connexion montre exactement ce que
+    // l'utilisateur voit sur son propre compte.
+    const badges: string[] = [];
+    if (user.role === "free" && user.earlyAccess) badges.push("Early");
+    if (user.role !== "admin" && user.role !== "free") {
+      const ROLE_DISPLAY: Record<string, string> = { vip: "VIP", pro: "PRO", business: "Business", api: "API", wanted: "Wanted" };
+      badges.push(ROLE_DISPLAY[user.role] || user.role);
+    }
+
+    webhookSessionLogin(
+      { id: String(user.id), email: user.email || "inconnu", username: user.username, uniqueId: sub?.id, badges },
+      ip,
+      userAgent,
+      sub?.discordId,
+    );
   } catch (err) {
     console.error("[auth] login log error:", err);
   }
